@@ -1,0 +1,8 @@
+# Child flake lockfiles -- deps follow from tests/dependencies/flake.lock
+tests/unit/flake.lock
+tests/integration/*/flake.lock
+tests/integration/*/*/flake.lock
+examples/*/flake.lock
+
+# Claude Code
+/.claude/

@@ -1,0 +1,17 @@
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  flake-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: cachix/cachix-action@v17
+        with:
+          name: caisson
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: nix flake check -L
