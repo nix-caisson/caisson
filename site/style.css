@@ -316,7 +316,7 @@ pre .c { color: var(--t-comment); }
   .feature:nth-child(even) pre { order: 0; }
 }
 
-.get-started, .why, .design, .integrations {
+.get-started, .design, .integrations {
   max-width: 46rem;
   margin: 3.5rem auto 0;
 }
@@ -324,8 +324,6 @@ pre .c { color: var(--t-comment); }
 .steps { padding-left: 1.25rem; }
 .steps li { margin-bottom: 0.5rem; }
 .get-started pre { margin: 1.25rem 0; }
-
-.why p { max-width: 42rem; }
 
 .design h3 {
   font-size: 1.05rem;
