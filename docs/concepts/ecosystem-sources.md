@@ -13,7 +13,7 @@ of each ecosystem.
 
 An ecosystem is a community library outside of caisson at the center
 of an extensible Nix abstraction framework. Most ecosystems are built
-on NixOS modules, but an extensible ecosystem can be anything
+on NixOS modules, but some use other abstractions
 (e.g. package sets, `lib` ecosystems). The ecosystem source is that
 project's source tree or
 flake, in whatever shape its evaluator expects. Each integration
