@@ -166,6 +166,6 @@ extra-trusted-public-keys = caisson.cachix.org-1:iAqoNapIW5L9DR+bKG9JjAsGkfn7J2j
 
 ## Trademarks
 
-caisson is an independent project and is not affiliated with, endorsed
+Despite the org name, caisson is an independent project and is not affiliated with, endorsed
 by, or sponsored by the NixOS Foundation. Nix and NixOS are trademarks
 of the NixOS Foundation.
