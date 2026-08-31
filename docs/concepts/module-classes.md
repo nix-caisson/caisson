@@ -57,7 +57,7 @@ two channels:
     overlay =
       final: prev:
       contributeModules prev {
-        nixos.my-service = mkModule "nixos" ./modules/my-service.nix;
+        nixos."my-flake/my-service" = mkModule "nixos" ./modules/my-service.nix;
       }
       // {
         my-flake = (prev.my-flake or { }) // { ... };
@@ -70,6 +70,15 @@ two channels:
   the consumer's. A consumer who registers the exported overlay gets
   its library namespace and its modules together, transitively through
   the overlay's `imports` chain; no re-registration is involved.
+
+The registry is one shared, class-keyed space per composition, so two
+rules keep multiple contributors coherent. Names within a class are a
+single flat space: qualify contributed names with your project prefix
+(`my-flake/my-service`), the same discipline as top-level library
+namespaces; short names are for the composing flake's own
+registrations. And precedence is deterministic: the composing flake's
+local registrations apply last, so a local entry always wins over a
+same-named contribution.
 
 Use class `flake` for flake-parts modules and other class keys for other module ecosystems. The shipped integrations (`caisson.nixos`, `caisson.home-manager`, `caisson.terranix`, `caisson.colmena`, `caisson.system-manager`, and `caisson.nixpkgs`) each register their own class this way; see the [library reference](../reference/lib.md).
 

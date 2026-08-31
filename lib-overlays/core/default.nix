@@ -381,7 +381,16 @@
               );
 
               coreLibOverlays = [ coreLibOverlay ];
-              finalLib = mkExtendedLib (coreLibOverlays ++ importedLibOverlays) baseLib;
+              # The composing flake's own registrations apply last, so a
+              # local name deterministically beats a same-named
+              # overlay-borne contribution.
+              localModulesOverlay = {
+                imports = [ ];
+                overlay = _final: prev: contributeModules prev modules;
+              };
+              finalLib = mkExtendedLib (
+                coreLibOverlays ++ importedLibOverlays ++ [ localModulesOverlay ]
+              ) baseLib;
               localLibOverlays = args.libOverlays;
               importedLibOverlays = libOverlayImports localLibOverlays;
 
@@ -484,7 +493,10 @@
         partitionExtraInputs = import ./partition-extra-inputs.nix;
 
         mkModule = mkModuleFor;
-        modules = mkLibArgs.modules;
+        # Seed only: overlay contributions merge in during composition,
+        # and mkLib applies the local registrations as a final overlay so
+        # the composing flake's own entries win over contributed ones.
+        modules = { };
 
         types = {
           libOverlay =

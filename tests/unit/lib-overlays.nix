@@ -729,6 +729,36 @@ in
       expected = [ "carried" ];
     };
 
+    "test: local registrations win over same-named contributions" = {
+      expr =
+        let
+          myLib = mkTestLib {
+            modules = testLib: {
+              nixos.shared = testLib.caisson.mkModule "nixos" ({ ... }: { config.origin = "local"; });
+            };
+            libOverlays = _mkLibOverlay: {
+              contrib = mkLibOverlay (
+                {
+                  mkModule,
+                  contributeModules,
+                  ...
+                }:
+                {
+                  imports = [ ];
+                  overlay =
+                    _final: prev:
+                    contributeModules prev {
+                      nixos.shared = mkModule "nixos" ({ ... }: { config.origin = "contributed"; });
+                    };
+                }
+              );
+            };
+          };
+        in
+        myLib.caisson.modules.nixos.shared.config.origin;
+      expected = "local";
+    };
+
     "test: contributeModules composes with namespace contributions" = {
       expr =
         let
