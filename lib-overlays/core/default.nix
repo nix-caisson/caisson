@@ -37,17 +37,33 @@
           ;
       };
 
+      # The composition calculus and kernel, vendored from caisson-core.
+      engine = import ../../vendor/caisson-core/lib;
+
       # Use a list of lib overlays to extend a lib. Every entry is a built
-      # overlay — `{ imports, overlay }` — whose imports are applied before
-      # the overlay itself. The implementation of this function must not
-      # depend on any functions that don't come from either nixpkgs-lib or
-      # this lib overlay.
+      # overlay, an `{ imports, overlay }` attrset whose imports are
+      # applied before the overlay itself. Composition runs on the
+      # caisson-core engine (vendored under vendor/caisson-core; see its
+      # PROVENANCE.md): the chain is flattened depth-first, imports before
+      # self, duplicates preserved, and applied as anonymous engine
+      # entries over the base library, which reproduces the historical
+      # fold order exactly. One deliberate contract: the base is
+      # contributed as an opaque attribute set, so overriding one of its
+      # attributes does not re-tie the base's internal references the way
+      # `lib.extend` did.
       mkExtendedLib = (
         let
-          libExtend =
-            lib: overlay:
+          flattenOverlay =
+            overlay:
             if (builtins.isAttrs overlay) && (builtins.hasAttr "overlay" overlay) then
-              (mkExtendedLib (overlay.imports or [ ]) lib).extend overlay.overlay
+              (builtins.concatMap flattenOverlay (overlay.imports or [ ]))
+              ++ [
+                {
+                  key = null;
+                  imports = [ ];
+                  overlay = overlay.overlay;
+                }
+              ]
             else
               throw ''
                 Library overlays are `{ imports, overlay }` attrsets (build them
@@ -55,7 +71,17 @@
                 composition encountered a ${builtins.typeOf overlay}.
               '';
         in
-        overlays: lib: builtins.foldl' libExtend lib overlays
+        overlays: lib:
+        (engine.compose {
+          entries = [
+            {
+              key = null;
+              imports = [ ];
+              overlay = _final: _prev: lib;
+            }
+          ]
+          ++ builtins.concatMap flattenOverlay overlays;
+        }).lib
       );
 
       mkLibOverlay =
