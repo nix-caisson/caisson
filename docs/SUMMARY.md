@@ -19,8 +19,11 @@
 - [Closed inputs](concepts/closed-inputs.md)
 - [Module classes](concepts/module-classes.md)
 - [Library overlays](concepts/library-overlays.md)
-- [Library lifecycle](concepts/library-lifecycle.md)
-- [The composition engine](concepts/composition-engine.md)
+- [Ecosystem sources](concepts/ecosystem-sources.md)
+
+# Deep dives
+
+- [How `lib` is composed](deep-dives/how-lib-is-composed.md)
 
 # Guides
 

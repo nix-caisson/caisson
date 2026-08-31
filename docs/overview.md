@@ -26,11 +26,14 @@ reading order:
 - [Library overlays](concepts/library-overlays.md): namespaced,
   dependency-declaring `lib` composition, and the patterns for writing
   overlays.
-- [Library lifecycle](concepts/library-lifecycle.md), the mechanics:
-  how `mkLib` registers, selects, and composes the final `lib`.
-- [The composition engine](concepts/composition-engine.md): the
-  foundation contract under library composition, implemented in
-  caisson-core, and caisson's entries onto it.
+- [Ecosystem sources](concepts/ecosystem-sources.md): why
+  integrations pin nothing, and the three channels a source arrives
+  through.
+
+**Deep dives**:
+[How `lib` is composed](deep-dives/how-lib-is-composed.md) traces one
+`mkLib` call from arguments to finished attrset, including the rules
+that decide conflicts and composing through caisson-core directly.
 
 **Guides**: [Testing](./testing.md) covers unit and integration testing
 (including `callConsumerFlake`), and

@@ -10,7 +10,7 @@
 # mkLib-time facts, read from its manifest; a manifest-less
 # composition (composed without mkLib) has only the explicit channel.
 let
-  engine = import ../vendor/caisson-core/lib;
+  caisson-core = import ../vendor/caisson-core/lib;
 in
 {
   # the integration's name for its target ecosystem, e.g. "nixpkgs"
@@ -24,7 +24,7 @@ in
   manifest ? { },
 }:
 let
-  resolved = engine.resolve {
+  resolved = caisson-core.resolve {
     inherit name explicit;
     defaults = manifest.ecosystems or { };
     inputs = manifest.inputs or { };

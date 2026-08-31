@@ -283,10 +283,10 @@
       <tr><td><code>system-manager</code></td><td>system-manager configurations on foreign distros</td></tr>
     </table>
     <p>
-      Each integration is a library overlay exported by this flake and
-      a set of entries onto the
+      Each integration is a library overlay exported by this flake,
+      also consumable as keyed entries through
       <a href="https://github.com/nix-caisson/caisson-core">caisson-core</a>
-      composition engine. Integrations take their target ecosystem as
+      directly. Integrations take their target ecosystem as
       an explicit <code>ecosystemSrc</code> argument and pin nothing
       themselves.
     </p>

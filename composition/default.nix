@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
-# caisson's contributions to the caisson-core composition engine
+# caisson's contributions to caisson-core's keyed composition
 # (https://github.com/nix-caisson/caisson-core), exported as
-# `lib.composition` on the flake. These entries let engine consumers
-# compose the same library that caisson's own mkLib builds: the
+# `lib.composition` on the flake. These entries let consumers of
+# caisson-core's `compose` build the same library that caisson's own
+# mkLib builds: the
 # machinery entry injects the `caisson-core` namespace, and each
 # integration is an entry importing it.
 { inputs }:
@@ -15,9 +16,9 @@
   entriesFor =
     { ecosystemSrc }:
     let
-      engine = import ../vendor/caisson-core/lib;
+      caisson-core = import ../vendor/caisson-core/lib;
       baseLib = import ecosystemSrc;
-      machineryOverlay = engine.mkCoreOverlay {
+      machineryOverlay = caisson-core.mkCoreOverlay {
         inherit inputs;
         defaultBaseLib = baseLib;
       };

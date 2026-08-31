@@ -1,7 +1,7 @@
 # Vendored caisson-core
 
 Source: https://github.com/nix-caisson/caisson-core
-Revision: c7c513f (consume whole projects through mkLib)
+Revision: 09ffdb5 (drop the branded noun)
 Contents: `lib/` (the composition engine and kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and

@@ -253,8 +253,8 @@ who import modules without composing anything.
 
 - [Closed inputs](concepts/closed-inputs.md), the convention every
   registered file follows.
-- [The composition engine](concepts/composition-engine.md): the
-  contract underneath, and composing with `caisson-core` directly.
+- [How `lib` is composed](deep-dives/how-lib-is-composed.md): the
+  whole composition pass, and composing with `caisson-core` directly.
 - [Testing](./testing.md), including `callConsumerFlake` for testing
   consumer flakes without a push/lock cycle.
 - [FAQ](faq.md) for the questions this page tends to raise.

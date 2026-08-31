@@ -19,7 +19,7 @@ caisson is built on flake-parts and keeps all of it. What it adds is
 a set of enforced conventions on top: closed inputs (every registered
 file takes an explicit closure argument list instead of reaching for
 inputs ambiently), namespaced library overlays with declared
-dependencies composed on the caisson-core engine, class-keyed
+dependencies composed by caisson-core, class-keyed
 module registration and export, integrations that take their target
 ecosystems as explicit `ecosystemSrc` arguments, and measured
 evaluation-cost gates. Use plain flake-parts when you want the module
@@ -90,10 +90,10 @@ repository and the conventions need to hold across a fleet.
 Independently of the convention trade-offs above, three things are
 distinctive here rather than variations on a shared theme:
 
-- **The composition engine** ([concepts](concepts/composition-engine.md)):
-  library composition with identity, dedup, wholesale replacement,
-  and reliable polyfills, implemented in a zero-dependency engine
-  (caisson-core) that is usable without caisson.
+- **Library composition with identity**
+  ([deep dive](deep-dives/how-lib-is-composed.md)): dedup, wholesale
+  replacement, and reliable polyfills, implemented in caisson-core, a
+  zero-dependency flake usable without caisson.
 - **Explicit ecosystem sources**: integrations pin none of their
   targets; the consumer hands every ecosystem in, so one caisson
   serves any nixpkgs, home-manager, or colmena revision the consumer
@@ -108,7 +108,7 @@ Flakes do two jobs today: acquisition (fetching, pinning, integrity)
 and composition (deciding which copy of each dependency an evaluation
 actually uses, via the `follows` pin bucket). caisson separates the
 two. Flakes keep acquisition. Composition moves to the evaluation
-layer, where the engine gives it real semantics: deduplication is
+layer, with real semantics: deduplication is
 key identity, override is wholesale replacement of a keyed entry,
 local patches are the keyless tail, and ecosystems (nixpkgs,
 home-manager, and the rest) are handed in once as explicit

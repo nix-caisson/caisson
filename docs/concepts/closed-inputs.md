@@ -84,6 +84,6 @@ Already-built overlays (for example another flake's exported `libOverlays.defaul
 
 ## Further Reading
 
-- [Library Lifecycle](./library-lifecycle.md): how overlays are composed during `mkLib`
+- [How `lib` is composed](../deep-dives/how-lib-is-composed.md): the whole composition pass
 - [Module Classes](./module-classes.md): class-keyed module registration and export
 - `examples/literate-flake/`: a working example demonstrating closed input wiring

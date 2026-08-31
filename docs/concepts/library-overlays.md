@@ -69,7 +69,7 @@ caisson provides the tooling for safe library overlays. The same principles appl
 The safety mechanisms described here aren't free. Import chains are
 flattened depth-first with duplicates preserved (an overlay's imports
 are applied before it, every time it appears) and folded through the
-caisson-core engine, so evaluation cost grows with the number of
+caisson-core, so evaluation cost grows with the number of
 overlays and the depth of the dependency graph. One contract worth
 knowing: the base library is contributed as an opaque attribute set,
 so overriding one of its attributes changes what readers of the
@@ -149,6 +149,6 @@ libOverlays = mkLibOverlay: {
 
 ## Further Reading
 
-- [Library Lifecycle](./library-lifecycle.md): how overlays are composed during `mkLib`
+- [How `lib` is composed](../deep-dives/how-lib-is-composed.md): the whole composition pass
 - [Closed Inputs](./closed-inputs.md): how inputs are closed over in overlays and modules
 - `examples/literate-flake/`: a working example with a custom library overlay
