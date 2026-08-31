@@ -70,8 +70,8 @@
           };
           flake = {
             # Import the framework's default module, which provides configInfo,
-            # lib export, flakeModules export, and libOverlays export options.
-            caisson-default = inputs.caisson.flakeModules.default;
+            # lib export, module export, and libOverlays export options.
+            caisson-default = inputs.caisson.modules.flake.default;
 
             # Register this flake's own module. Everything passed to mkModule
             # takes the closure attrset ({ closure-inputs, closure-lib,
@@ -101,7 +101,7 @@
 
       - `configModule` is the flake's top-level configuration (systems,
         caisson settings, per-system packages, etc.).
-      - `moduleImports` selects which of the registered flakeModules to
+      - `moduleImports` selects which of the registered flake-class modules to
         activate. This is how you control which modules participate in
         evaluation.
     */

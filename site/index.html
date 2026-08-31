@@ -170,11 +170,11 @@
       </div>
 <pre><code><span class="c"># a module, closed over the</span>
 <span class="c"># defining flake's inputs</span>
-{ closure-inputs, closure-lib, ... }:
-{ config, lib, ... }:
+{ closure-inputs, ... }:
+{ ... }:
 {
   imports = [
-    closure-inputs.some-helper.flakeModules.default
+    closure-inputs.some-helper.modules.flake.default
   ];
   <span class="c"># consumers are not required to declare</span>
   <span class="c"># their own dependency on some-helper</span>
@@ -198,7 +198,9 @@
     closure-inputs.other-flake.libOverlays.default
   ];
   overlay = final: prev: {
-    my-flake.greet = name: "hello, ${name}";
+    my-flake = (prev.my-flake or { }) // {
+      greet = name: "hello, ${name}";
+    };
   };
 }</code></pre>
     </article>
