@@ -15,7 +15,7 @@
       when it fabricates inputs.
 
       **Shared dependency pinning (`deps` / `follows`):**  Common dependencies
-      (nixpkgs, flake-parts) are declared once in `tests/dependencies/flake.nix`
+      (nixpkgs, flake-parts) are declared in `tests/dependencies/flake.nix`
       and inherited here via `follows`.  This keeps every test and example flake
       on the same versions without maintaining separate lockfiles.
 

@@ -77,7 +77,7 @@ in three ways:
   dictionary. Selection stays per item at every use site, and a
   local registration beats a same-named project entry.
 
-The registry is one shared, class-keyed space per composition, so two
+The registry is a shared, class-keyed space per composition, so two
 rules keep multiple contributors coherent. Names within a class are a
 single flat space: qualify contributed names with your project prefix
 (`my-flake/my-service`), the same discipline as top-level library

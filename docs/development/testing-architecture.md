@@ -312,7 +312,7 @@ evaluation (see "The `deps` mapping" above for why this works).
 
 ## Shared Dependencies Flake
 
-`tests/dependencies/flake.nix` declares all development-time inputs in one place:
+`tests/dependencies/flake.nix` declares the development-time inputs shared by the test and example flakes:
 
 ```nix
 inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

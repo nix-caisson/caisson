@@ -232,7 +232,7 @@
     <h2>Get started</h2>
     <ol class="steps">
       <li><strong>Add the input.</strong> <code>inputs.caisson.url = "github:nix-caisson/caisson";</code></li>
-      <li><strong>Compose your library.</strong> <code>caisson-core.mkLib</code> merges your overlays with caisson's into one <code>lib</code>.</li>
+      <li><strong>Compose your library.</strong> <code>caisson-core.mkLib</code> merges your overlays with caisson's into your flake's <code>lib</code>.</li>
       <li><strong>Emit your outputs.</strong> <code>mkFlake</code> evaluates your config module and module selections into flake outputs.</li>
     </ol>
 <pre><code><span class="c"># flake.nix</span>

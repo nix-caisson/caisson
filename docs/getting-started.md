@@ -37,7 +37,7 @@ Create a directory with this `flake.nix`:
 
 `caisson-core.mkLib` composes a library: nixpkgs' lib, the machinery
 under `lib.caisson-core`, and the overlays you register. Consuming
-caisson as a project registers everything it exports at once, its
+caisson as a project registers everything it exports, its
 integrations included, which contributes `lib.caisson` (`mkFlake`
 and friends); `mkFlake` then evaluates flake-parts with that library
 and your config module, using caisson's own flake-parts pin, so your

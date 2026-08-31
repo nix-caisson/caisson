@@ -21,7 +21,7 @@ file takes an explicit closure argument list instead of reaching for
 inputs ambiently), namespaced library overlays with declared
 dependencies composed by caisson-core, class-keyed
 module registration and export, integrations that take their
-own ecosystems as explicit `ecosystemSrc` arguments, and measured
+ecosystems as explicit `ecosystemSrc` arguments, and measured
 evaluation-cost gates. Use plain flake-parts when you want the module
 system and your own conventions; use caisson when you want these
 conventions machine-enforced, particularly across several flakes that
@@ -95,7 +95,7 @@ distinctive here rather than variations on a shared theme:
   replacement, and reliable polyfills, implemented in caisson-core, a
   zero-dependency flake usable without caisson.
 - **Explicit ecosystem sources**: integrations pin none of their
-  ecosystems; the consumer hands every one in, so a single caisson
+  ecosystems; the consumer hands each in, so a single caisson
   revision works with any nixpkgs, home-manager, or colmena revision
   with a compatible evaluation contract.
 - **Evaluation-weight gates** ([guide](eval-weight.md)): framework
@@ -115,7 +115,7 @@ home-manager, and the rest) are handed in as explicit
 `ecosystemSrc` arguments instead of being re-pinned and re-wired
 through every level of an input graph.
 
-Everything caisson adds travels through the flake schema's one
+Everything caisson adds travels through the flake schema's only
 freeform slot, the `lib` output: composed libraries, the module
 registry, and the manifest (the capture of what `mkLib` consumed) all
 live there, and the remaining flake outputs (`modules.<class>`,

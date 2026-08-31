@@ -63,7 +63,7 @@
           # nixpkgs input; current nixos-unstable restructured
           # nixos/modules/config/nix.nix in two ways system-manager's
           # module set (tip 48d4734) does not absorb. Both are bridged
-          # here, at the one place every system-manager eval composes.
+          # here, where every system-manager eval composes.
           # Delete the bridge when upstream absorbs the restructure: each
           # half fails loudly (duplicate declaration / unused disable)
           # when its reason disappears.

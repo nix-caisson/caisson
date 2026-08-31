@@ -136,7 +136,7 @@ lives in `configs/flake-parts/<flake-name>`.
 - [`docs/reference/`](docs/reference/): the `lib.caisson` API and module
   options.
 - [`examples/literate-flake/`](examples/literate-flake/): a working,
-  annotated flake demonstrating the whole structure in one place.
+  annotated flake demonstrating the whole structure end to end.
 
 ## Verification
 

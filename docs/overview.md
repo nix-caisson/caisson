@@ -31,7 +31,7 @@ reading order:
   from.
 
 **Deep dives**:
-[How `lib` is composed](deep-dives/how-lib-is-composed.md) traces one
+[How `lib` is composed](deep-dives/how-lib-is-composed.md) traces a
 `mkLib` call from arguments to finished attrset, including the rules
 that decide conflicts and composing through caisson-core directly.
 
