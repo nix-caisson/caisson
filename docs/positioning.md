@@ -1,10 +1,11 @@
 # Choosing a flake framework
 
-Where caisson sits relative to plain flake-parts, flakelight, and
-snowfall-lib, characterized from those projects' own documentation.
-The honest summary first: all four produce working flakes, and the
-differences are about which conventions you want enforced by
-machinery rather than by discipline.
+Where caisson sits relative to plain flake-parts, flakelight,
+snowfall-lib, and the dendritic pattern, characterized from those
+projects' own documentation. The honest summary first: all five
+produce working flakes, and the differences are about which
+conventions you want enforced by machinery rather than by
+discipline.
 
 ## Plain flake-parts
 
@@ -54,6 +55,35 @@ the most from layout, caisson infers nothing from layout. caisson's
 integrations also differ structurally from a generator: they are thin
 adapters over each target's own evaluator, taking the target as an
 explicit source argument and pinning nothing.
+
+## The dendritic pattern
+
+The dendritic pattern is an organizational discipline over
+flake-parts rather than a framework: every Nix file except the entry
+points is a module of the top-level configuration, each file
+implements one feature across all the configurations it touches, and
+lower-level modules (NixOS, home-manager, nix-darwin) live as
+`deferredModule` values inside the top-level config, merged by name.
+Files are commonly auto-imported with import-tree, and cross-cutting
+values travel through the shared top-level `config` instead of
+`specialArgs` threading.
+
+caisson agrees with more of this than with the generators above:
+both build on flake-parts, both eliminate ambient `specialArgs`
+plumbing (dendritic through the shared top-level config, caisson
+through closed inputs and the composed library), and both group
+modules by the module system they belong to (dendritic by option
+path, caisson by class key). The differences are scope and
+mechanism. Dendritic organizes one repository's configurations by
+feature and, with import-tree, derives the import set from the file
+tree; caisson registers every module and overlay explicitly and
+infers nothing from layout. Dendritic keeps everything inside a
+single module evaluation; caisson separates library composition from
+module evaluation and adds export machinery so several repositories
+can publish and consume each other's overlays and modules. Use
+dendritic to structure one flake's configurations by aspect with
+almost no machinery; use caisson when the unit of reuse is a
+repository and the conventions need to hold across a fleet.
 
 ## What is caisson-specific
 
