@@ -6,7 +6,7 @@ pass the target in, as an argument called the ecosystem source, and
 the integration calls the evaluator inside that source. One caisson
 therefore works with any nixpkgs, home-manager, or colmena revision,
 and two consumers of the same caisson can run different revisions of
-everything.
+each ecosystem.
 
 ## What a source is
 
