@@ -241,7 +241,7 @@ who import modules without composing your overlay.
 
 - [Closed inputs](concepts/closed-inputs.md), the convention every
   registered file follows.
-- [The composition calculus](concepts/composition-calculus.md), the
+- [The composition engine](concepts/composition-engine.md), the
   engine underneath, and composing with `caisson-core` directly.
 - [Testing](./testing.md), including `callConsumerFlake` for testing
   consumer flakes without a push/lock cycle.

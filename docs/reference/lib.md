@@ -19,7 +19,7 @@ Type notation used below:
 ## The caisson-core namespace
 
 - **Source:** `vendor/caisson-core/lib/` (`lifecycle.nix` for the
-  machinery, `default.nix` for the calculus)
+  machinery, `default.nix` for the engine)
 
 ### `mkLib`
 
@@ -166,10 +166,10 @@ only if supplied. See [Testing](../testing.md).
 
 ### `compose`, `resolve`, `partitionExtraInputs`
 
-The composition calculus (`compose`), the layered ecosystem-source
+The composition engine (`compose`), the layered ecosystem-source
 resolver (`resolve`), and the read-only-eval-safe partition
 extra-inputs loader, re-exposed from caisson-core. See
-[The composition calculus](../concepts/composition-calculus.md) and
+[The composition engine](../concepts/composition-engine.md) and
 caisson-core's own documentation.
 
 ## The caisson namespace
@@ -247,7 +247,7 @@ option of this type before projecting the `flake.libOverlays` and
 ## Integration namespaces
 
 Each integration is a library overlay exported by this flake
-(`libOverlays.<target>`) and available as a calculus entry via
+(`libOverlays.<target>`) and available as a engine entry via
 `lib.composition.entriesFor`. Composing one contributes its
 `lib.caisson.<target>` namespace, documented below (the flake-parts
 integration contributes directly under `lib.caisson`, plus the

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# caisson's contributions to the caisson-core composition calculus
+# caisson's contributions to the caisson-core composition engine
 # (https://github.com/nix-caisson/caisson-core), exported as
-# `lib.composition` on the flake. These entries let calculus consumers
+# `lib.composition` on the flake. These entries let engine consumers
 # compose the same library that caisson's own mkLib builds: the
 # machinery entry injects the `caisson-core` namespace, and each
 # integration is an entry importing it.

@@ -1,7 +1,7 @@
 # Vendored caisson-core
 
 Source: https://github.com/nix-caisson/caisson-core
-Revision: 2ab58b0 (capture declared ecosystem sources in the manifest)
+Revision: c8c5d18 (call the engine an engine)
 Contents: `lib/` (the composition calculus and kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and

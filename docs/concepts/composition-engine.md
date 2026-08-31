@@ -1,6 +1,6 @@
-# The composition calculus
+# The composition engine
 
-The composition calculus is the foundation layer under caisson's
+The composition engine is the foundation layer under caisson's
 library composition. It is implemented in
 [caisson-core](https://github.com/nix-caisson/caisson-core), a
 zero-input flake whose library code references nothing but Nix
@@ -11,7 +11,7 @@ caisson's own `mkLib` composes on this engine: overlay chains are
 flattened depth-first (imports before self, duplicates preserved) and
 folded as anonymous entries over the base library, the sequence
 described in [Library lifecycle](./library-lifecycle.md). caisson
-also exports its contributions in keyed calculus form (see
+also exports its contributions in keyed engine-entry form (see
 [`entriesFor`](#caissons-entries) below) for consumers composing with
 `caisson-core` directly.
 
@@ -40,7 +40,7 @@ so an entry's imports precede it in application order.
 **The key is identity.** A keyed entry applies once no matter how many
 entries import it. The first occurrence of a key fixes its position;
 the last occurrence supplies its value. Mentioning a key again
-therefore *replaces* that entry wholesale, which is the calculus's
+therefore *replaces* that entry wholesale, which is the engine's
 override mechanism: there are no priority annotations, and the answer
 to "I need this entry to behave differently" is to replace the entry.
 
@@ -86,7 +86,7 @@ over old and new bases.
 
 ## Ecosystem sources
 
-The calculus deliberately fetches nothing. Sources for whole
+The engine deliberately fetches nothing. Sources for whole
 ecosystems (a nixpkgs `lib` directory, a flake-parts tree) arrive as
 explicit arguments, and `caisson-core` ships a layered resolver for
 them: an explicit argument wins, then the client repository's declared
@@ -96,7 +96,7 @@ to the caller.
 
 ## caisson's entries
 
-caisson exports its own library as calculus entries through
+caisson exports its own library as engine entries through
 `lib.composition.entriesFor`:
 
 ```nix

@@ -20,7 +20,7 @@
 - [Module classes](concepts/module-classes.md)
 - [Library overlays](concepts/library-overlays.md)
 - [Library lifecycle](concepts/library-lifecycle.md)
-- [The composition calculus](concepts/composition-calculus.md)
+- [The composition engine](concepts/composition-engine.md)
 
 # Guides
 

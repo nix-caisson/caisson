@@ -6,7 +6,7 @@ change is part of its contract.
 
 | Repository | Moves | Holds |
 |---|---|---|
-| [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | the composition calculus (`compose`, `resolve`) and the library lifecycle (`mkLib`, registration, the manifest) |
+| [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | the composition engine (`compose`, `resolve`) and the library lifecycle (`mkLib`, registration, the manifest) |
 | caisson (this repository) | at ecosystem speed | the seven integrations (flake-parts included) and the pkgs-dependent tooling |
 | [caisson-compat](https://github.com/nix-caisson/caisson-compat) | at upstream speed | pinned-world tests and compatibility exports |
 
@@ -14,7 +14,7 @@ change is part of its contract.
 
 The engine. A zero-input flake whose library code references nothing
 but builtins (CI enforces this with a lint), implementing the
-[composition calculus](../concepts/composition-calculus.md) and the
+[composition engine](../concepts/composition-engine.md) and the
 library lifecycle: `mkLib` is the point of core. It takes the base
 library as a plain argument (nothing is looked up by input name) and
 injects the machinery, the class-keyed module registry, and the
@@ -40,7 +40,7 @@ composes on the caisson-core engine (vendored under
 PROVENANCE.md carries the revision and refresh ritual, and
 caisson-compat pins both repositories and catches drift between the
 copy and caisson-core's main). caisson also exports its library
-contributions, integrations included, in keyed calculus form via
+contributions, integrations included, in keyed engine-entry form via
 `lib.composition.entriesFor`.
 
 ## caisson-compat

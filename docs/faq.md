@@ -31,12 +31,12 @@ whatever nixpkgs you hand it, and two consumers of the same caisson
 can run different nixpkgs revisions. The argument is explicit rather
 than resolved from input names by convention.
 
-**What exactly does `key = null` mean in a calculus entry?**
+**What exactly does `key = null` mean in a engine entry?**
 No identity: the entry can never be deduplicated, replaced, or
 imported by another entry, and it applies in list order. Keyed
 entries are the shareable units; keyless entries are a consumer's
 local patch layer. See
-[the composition calculus](concepts/composition-calculus.md).
+[the composition engine](concepts/composition-engine.md).
 
 **Does overriding a nixpkgs lib function affect nixpkgs' own uses of
 it?**
