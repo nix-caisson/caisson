@@ -27,11 +27,13 @@ integrations (`caisson-nixpkgs`, `caisson-nixos`,
 `caisson-home-manager`, `caisson-colmena`, `caisson-terranix`,
 `caisson-system-manager`), each a library overlay registering its own
 module class and taking its target ecosystem as an explicit
-`ecosystemSrc` argument. caisson exports its library contributions,
-integrations included, in calculus form via
-`lib.composition.entriesFor`, alongside the current `mkLib` surface;
-moving `mkLib` itself onto the calculus is the pending cutover, and
-until then both surfaces are exported and tested.
+`ecosystemSrc` argument. `mkLib` composes on the caisson-core engine
+(vendored under `vendor/caisson-core` while the repositories are
+private; the copy's PROVENANCE.md carries the revision and refresh
+ritual, and caisson-compat pins both repositories and catches drift
+between the copy and caisson-core's main). caisson also exports its
+library contributions, integrations included, in keyed calculus form
+via `lib.composition.entriesFor`.
 
 ## caisson-compat
 
@@ -54,6 +56,10 @@ change that caisson must absorb. The stable repositories rev on those
 events, not on a schedule.
 
 While the repositories are private, cross-repository fetches in CI
-need credentials that the default workflow token does not have;
-caisson-compat's full suite therefore runs locally (see its
-`run-tests.sh`) and its push-triggered CI is enabled at publication.
+need the `CAISSON_CI_SSH_KEY` secret (an SSH key able to read the
+nix-caisson repositories); jobs without it skip with a notice.
+caisson-compat runs on push, pull request, weekly schedule (the pin
+advance that doubles as drift detection, auto-landed when green), and
+manual dispatch, and the stable repositories carry non-blocking
+`compat-suite` jobs under the same gate. At publication the secret
+becomes unnecessary.

@@ -1,6 +1,9 @@
 # Summary
 
 [Overview](overview.md)
+[Getting started](getting-started.md)
+[Choosing a flake framework](positioning.md)
+[FAQ](faq.md)
 
 # Reference
 

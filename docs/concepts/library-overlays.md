@@ -66,9 +66,17 @@ caisson provides the tooling for safe library overlays. The same principles appl
 
 ## Tradeoffs
 
-The safety mechanisms described here aren't free. `mkExtendedLib`'s recursive import resolution means multiple `lib.extend` calls during composition — an overlay's imports are applied before it, each as its own extension. This adds to evaluation time during `mkLib`, and the cost grows with the number of overlays and the depth of the dependency graph.
+The safety mechanisms described here aren't free. Import chains are
+flattened depth-first with duplicates preserved (an overlay's imports
+are applied before it, every time it appears) and folded through the
+caisson-core engine, so evaluation cost grows with the number of
+overlays and the depth of the dependency graph. One contract worth
+knowing: the base library is contributed as an opaque attribute set,
+so overriding one of its attributes changes what readers of the
+composed library see, without re-tying the base's own internal
+references.
 
-For most flakes the overhead is negligible, but it's worth being aware of -- especially if you're composing a large number of upstream library overlays. Future work may optimize the resolution strategy, but the current implementation prioritizes correctness, explicitness, and ease of implementation over evaluation speed.
+For most flakes the overhead is negligible, but it's worth being aware of -- especially if you're composing a large number of upstream library overlays. The eval-weight harness (see the guides) is the tool for holding it to a measured ceiling.
 
 ## Practical Patterns
 

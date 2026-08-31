@@ -7,12 +7,13 @@ zero-input flake whose library code references nothing but Nix
 builtins, and it defines one small set of rules for turning a list of
 overlay-shaped pieces into a composed library.
 
-caisson today composes libraries with the machinery described in
-[Library lifecycle](./library-lifecycle.md). The calculus is the
-successor contract for that composition step: caisson already exports
-its own contributions in calculus form (see
-[`entriesFor`](#caissons-entries) below), and the cutover of `mkLib`
-itself is tracked in the contributor documentation.
+caisson's own `mkLib` composes on this engine: overlay chains are
+flattened depth-first (imports before self, duplicates preserved) and
+folded as anonymous entries over the base library, the sequence
+described in [Library lifecycle](./library-lifecycle.md). caisson
+also exports its contributions in keyed calculus form (see
+[`entriesFor`](#caissons-entries) below) for consumers composing with
+`caisson-core` directly.
 
 ## Entries
 

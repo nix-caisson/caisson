@@ -150,3 +150,109 @@ verifies the structure recursively: an attrset with an `overlay`
 function and a (possibly absent) `imports` list whose entries are
 themselves valid `libOverlay`s. Used by options that carry overlays,
 such as `caisson.libOverlays.exported`.
+
+## Integration namespaces
+
+Each integration is a library overlay exported by this flake
+(`libOverlays.caisson-<target>`) and available as a calculus entry
+via `lib.composition.entriesFor`. Composing one contributes the
+namespace documented below. Every entry point takes its target
+ecosystem as an explicit `ecosystemSrc` argument; the integrations
+pin nothing themselves. Common conventions:
+
+- `pkgSets`: an attrset of package sets; `pkgSets.pkgs` is required
+  where present and becomes the evaluation's package set (also passed
+  through in `specialArgs`/`extraSpecialArgs`).
+- `moduleImports`: a selection function over the corresponding class
+  registry (`lib.caisson.modules.<class>`), defaulting to all
+  registered modules.
+- Framework-provided special arguments compose first; the caller's
+  win on conflict.
+
+### `caisson-nixos` (module class `nixos`)
+
+- **Source:** `lib-overlays/caisson-nixos/default.nix`
+- `mkNixosModule : freeformModule -> module`: class-bound `mkModule`.
+- `mkSystem : { ecosystemSrc, pkgSets, configModule, moduleImports?,
+  specialArgs?, ... } -> nixosSystem`: evaluates
+  `<ecosystemSrc>/nixos/lib/eval-config.nix` (a nixpkgs source tree)
+  with the selected class modules, the config module, and a framework
+  module pinning `nixpkgs.pkgs` to `pkgSets.pkgs`. Extra arguments
+  pass through to `eval-config.nix`.
+- `mkSystemFull`: as `mkSystem`, additionally passing nixpkgs'
+  `module-list.nix` as `baseModules`.
+- `mkSystemMinimal : { ecosystemSrc, prefix?, ... }`: bare
+  `evalModules` from `<ecosystemSrc>/nixos/lib`; no NixOS base
+  modules, so the config module declares any options it uses.
+
+### `caisson-home-manager` (module class `homeManager`)
+
+- **Source:** `lib-overlays/caisson-home-manager/default.nix`
+- `mkHomeManagerModule : freeformModule -> module`.
+- `mkHomeConfiguration : { ecosystemSrc, pkgSets, configModule,
+  moduleImports?, extraSpecialArgs?, osConfig?, check?, minimal?,
+  sourceMeta? } -> homeConfiguration`: runs home-manager's own
+  evaluator (`<ecosystemSrc>/modules`). Source metadata defaults
+  derive from what actually composes: `homeManagerOutPath` from
+  `ecosystemSrc` and `nixpkgsOutPath` from `pkgSets.pkgs.path`
+  (`schemaVersion` 3).
+- `mkHomeConfigurationMinimal`: `mkHomeConfiguration` with
+  `minimal = true`.
+- `mkStandaloneAdapter : { moduleImports?, ... } -> { homeModules,
+  buildHome }`: the selected class modules plus a `buildHome`
+  closure over the same arguments.
+- `mkNixosAdapter : { users, ecosystemSrc, hostName?, hostKind?,
+  baseSystem?, sourceMeta?, moduleImports?, sharedModules?,
+  useGlobalPkgs?, useUserPackages?, activationMode?,
+  extraSpecialArgs?, ... } -> module (nixos class)`: embeds
+  home-manager in a NixOS generation. `activationMode = "upstream"`
+  uses home-manager's own NixOS module; `"user-service"` embeds
+  standalone activation packages behind a `ConditionUser` user unit
+  and never touches `users.users` (safe for systemd-homed hosts; one
+  hosted user). Both write `/etc/caisson-home-manager/source.json`
+  for the drift check.
+- `mkSourceMeta`, `assertSourceCoherence`: source-provenance records
+  and the fingerprint comparison used by the drift machinery.
+
+### `caisson-nixpkgs`
+
+- **Source:** `lib-overlays/caisson-nixpkgs/default.nix`
+- `mkScope : pkgs -> (callPackage -> attrs) -> scope`: a
+  `makeScope` wrapper handing the scope function its `callPackage`.
+- `mkPackagesOverlay : pkgsFn -> name -> overlayFn`: turns a scope
+  function (or path; optionally context-taking
+  `{ callPackage, inputs, lib }`) into an overlay that merges the
+  scope under attribute `name`.
+- `mkPolyfillOverlay : overlayFn -> name -> overlayFn`: wraps an
+  overlay (or path; optionally context-taking) for registration
+  alongside package overlays; the name is ignored.
+- `types.nixpkgsOverlay`, `types.nixpkgs`: option types.
+
+### `caisson-colmena` (module class `colmena`)
+
+- **Source:** `lib-overlays/caisson-colmena/default.nix`
+- `mkColmenaModule : freeformModule -> module`.
+- `mkColmenaHive : { ecosystemSrc, modules?, moduleImports?,
+  specialArgs?, ... } -> hive`: `ecosystemSrc.lib.makeHive` over the
+  passthrough arguments, with the selected class modules and
+  framework `specialArgs` merged into `meta` and `defaults`.
+
+### `caisson-terranix` (module class `terranix`)
+
+- **Source:** `lib-overlays/caisson-terranix/default.nix`
+- `mkTerranixModule : freeformModule -> module`.
+- `mkTerranixConfiguration : { ecosystemSrc, modules?, moduleImports?,
+  extraArgs?, ... } -> derivation`:
+  `ecosystemSrc.lib.terranixConfiguration` with the selected class
+  modules and framework `extraArgs`.
+
+### `caisson-system-manager` (module class `systemManager`)
+
+- **Source:** `lib-overlays/caisson-system-manager/default.nix`
+- `mkSystemManagerModule : freeformModule -> module`.
+- `mkSystemConfig : { ecosystemSrc, modules?, moduleImports?,
+  specialArgs?, ... } -> systemConfig`:
+  `ecosystemSrc.lib.makeSystemConfig` with the selected class
+  modules, plus a compatibility bridge for the current
+  nixos-unstable restructuring of the NixOS nix module (each half
+  self-retires; see the source comments).

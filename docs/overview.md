@@ -2,6 +2,12 @@
 
 This is the documentation for the framework's design and API.
 
+New here? [Getting started](getting-started.md) walks through a first
+flake step by step; [Choosing a flake framework](positioning.md)
+places caisson relative to plain flake-parts, flakelight, and
+snowfall-lib; the [FAQ](faq.md) answers the questions the concept
+pages tend to raise.
+
 **Reference** documents the exported surface — the
 [Library](reference/lib.md) functions and the
 [Options](reference/options.md).
