@@ -10,7 +10,12 @@ each ecosystem.
 
 ## What a source is
 
-Each integration documents the shape it expects; in practice:
+An ecosystem is a community library outside of caisson at the center
+of a modular Nix abstraction framework: usually one built on NixOS
+modules, but it can be anything, package sets and plain libraries
+included. The ecosystem source is that project's source tree or
+flake, in whatever shape its evaluator expects. Each integration
+documents the shape it takes; in practice:
 
 - `caisson.nixos` takes a nixpkgs source tree (it evaluates
   `nixos/lib/eval-config.nix` from it).
