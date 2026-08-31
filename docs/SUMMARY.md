@@ -24,6 +24,7 @@
 # Deep dives
 
 - [How `lib` is composed](deep-dives/how-lib-is-composed.md)
+- [How inputs are closed over](deep-dives/how-inputs-are-closed-over.md)
 
 # Guides
 

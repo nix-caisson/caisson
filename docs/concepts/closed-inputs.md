@@ -84,6 +84,7 @@ Already-built overlays (for example another flake's exported `libOverlays.defaul
 
 ## Further Reading
 
+- [How inputs are closed over](../deep-dives/how-inputs-are-closed-over.md): the mechanism behind this convention
 - [How `lib` is composed](../deep-dives/how-lib-is-composed.md): the whole composition pass
 - [Module Classes](./module-classes.md): class-keyed module registration and export
 - `examples/literate-flake/`: a working example demonstrating closed input wiring

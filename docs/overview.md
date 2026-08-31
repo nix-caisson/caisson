@@ -34,6 +34,10 @@ reading order:
 [How `lib` is composed](deep-dives/how-lib-is-composed.md) traces a
 `mkLib` call from arguments to finished attrset, including the rules
 that decide conflicts and composing through caisson-core directly.
+[How inputs are closed over](deep-dives/how-inputs-are-closed-over.md)
+traces the closure attrset from `mkLib` to a registered file,
+including what each kind of registration receives and which values
+cross flake boundaries.
 
 **Guides**: [Testing](./testing.md) covers unit and integration testing
 (including `callConsumerFlake`), and
