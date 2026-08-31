@@ -12,9 +12,10 @@ of each ecosystem.
 ## What a source is
 
 An ecosystem is a community library outside of caisson at the center
-of a modular Nix abstraction framework: usually one built on NixOS
-modules, but it can be anything (e.g. package sets, `lib`
-ecosystems). The ecosystem source is that project's source tree or
+of an extensible Nix abstraction framework. Most ecosystems are built
+on NixOS modules, but an extensible ecosystem can be anything
+(e.g. package sets, `lib` ecosystems). The ecosystem source is that
+project's source tree or
 flake, in whatever shape its evaluator expects. Each integration
 documents the shape it takes; in practice:
 
