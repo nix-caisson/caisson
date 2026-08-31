@@ -1,6 +1,6 @@
 # How `lib` is composed
 
-Every caisson flake's `lib` is built by a single call to
+A caisson flake's `lib` is canonically built by a call to
 `caisson-core.mkLib`. This page traces what happens between that
 call and the finished attrset: what goes in, the order things apply,
 the rules that decide conflicts, and how to drive the same machinery
