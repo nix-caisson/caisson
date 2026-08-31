@@ -49,14 +49,24 @@
         };
 
       in
-      lib.caisson.mkFlake {
+      let
 
-        name = "caisson";
+        flakeOutputs = lib.caisson.mkFlake {
 
-        configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/caisson;
+          name = "caisson";
 
-        moduleImports = modules: { inherit (modules) default; };
+          configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/caisson;
 
+          moduleImports = modules: { inherit (modules) default; };
+
+        };
+
+      in
+      flakeOutputs
+      // {
+        lib = flakeOutputs.lib // {
+          composition = import ./composition { inherit inputs; };
+        };
       }
 
     );
