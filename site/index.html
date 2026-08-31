@@ -185,7 +185,7 @@
       <div class="feature-text">
         <h2>Library overlays</h2>
         <p>
-          Every flake exports its logic under <code>lib.&lt;namespace&gt;</code>:
+          Flakes should export their logic under <code>lib.&lt;namespace&gt;</code>:
           namespacing instead of a fight over the global namespace.
           Overlays declare their dependencies explicitly and compose in
           dependency order, so layered abstractions stay predictable.
