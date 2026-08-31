@@ -100,9 +100,9 @@ caisson exports its own library as calculus entries through
 
 ```nix
 caisson.lib.composition.entriesFor {
-  # a directory importable as nixpkgs' lib,
-  # e.g. "${nixpkgs}/lib" or the nixpkgs.lib flake
-  ecosystemSrc = inputs.nixpkgs-lib;
+  # a directory importable as nixpkgs' lib, e.g. "${nixpkgs}/lib"
+  # or "${nixpkgs-lib}/lib" for the nixpkgs.lib mirror
+  ecosystemSrc = "${inputs.nixpkgs-lib}/lib";
 }
 # => { base, caisson-lib }
 ```

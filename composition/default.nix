@@ -10,7 +10,8 @@
 {
 
   # ecosystemSrc: a directory importable as nixpkgs' lib, e.g.
-  # "${nixpkgs}/lib" or the nixpkgs.lib flake.
+  # "${nixpkgs}/lib" (full nixpkgs) or "${nixpkgs-lib}/lib" (the
+  # github:nix-community/nixpkgs.lib mirror).
   entriesFor =
     { ecosystemSrc }:
     let
