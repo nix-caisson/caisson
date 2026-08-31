@@ -5,8 +5,9 @@ nixpkgs pin, and `caisson.home-manager` has no home-manager pin. You
 pass the ecosystem in, as an argument called the ecosystem source, and
 the integration calls the evaluator inside that source. A single
 caisson revision therefore works with any nixpkgs, home-manager, or
-colmena revision, and two consumers of that same caisson revision can
-pin different revisions of each ecosystem.
+colmena revision with a compatible evaluation contract, and two
+consumers of that same caisson revision can pin different revisions
+of each ecosystem.
 
 ## What a source is
 

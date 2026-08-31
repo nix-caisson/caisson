@@ -97,7 +97,7 @@ distinctive here rather than variations on a shared theme:
 - **Explicit ecosystem sources**: integrations pin none of their
   ecosystems; the consumer hands every one in, so a single caisson
   revision works with any nixpkgs, home-manager, or colmena revision
-  the consumer chooses.
+  with a compatible evaluation contract.
 - **Evaluation-weight gates** ([guide](eval-weight.md)): framework
   overhead is measured and held to committed ceilings in CI rather
   than described.
