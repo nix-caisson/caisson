@@ -17,8 +17,9 @@
 - [Module classes](concepts/module-classes.md)
 - [Library overlays](concepts/library-overlays.md)
 - [Library lifecycle](concepts/library-lifecycle.md)
+- [The composition calculus](concepts/composition-calculus.md)
 
 # Guides
 
-- [Testing](testing.md)
+- [Testing](./testing.md)
 - [Evaluation weight](eval-weight.md)

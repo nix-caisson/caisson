@@ -13,7 +13,7 @@ with manually constructed inputs and lazy circular self-references.
 > evaluation or lift the pure-mode path restriction, much of this manual wiring
 > could be replaced with direct flake calls.
 
-For commands and test conventions, see [testing.md](testing.md).
+For commands and test conventions, see [testing.md](./testing.md).
 
 ## Overview
 
