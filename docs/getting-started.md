@@ -2,7 +2,7 @@
 
 A step-by-step first flake: create it, add a library overlay, register
 a module, use an integration, then consume your flake from a second
-one. The finished shape of every step also exists as a working flake
+one. The finished shape of each step also exists as a working flake
 under `examples/literate-flake/` in the repository, with commentary.
 
 ## 1. A minimal caisson flake
@@ -190,7 +190,7 @@ flake-level default at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs`)
 and drop the argument; an explicit argument still wins, and an input
 named exactly `nixpkgs` is the last fallback.
 
-With caisson consumed as a project, every integration overlay is
+With caisson consumed as a project, its integration overlays are
 already registered and applied, so `caisson.nixos` is present. To
 compose only some of them, keep the project registration and select
 per item over the combined dictionary:
@@ -206,7 +206,7 @@ per item over the combined dictionary:
 Registering a single overlay by hand
 (`nixos = caisson.libOverlays.nixos`) remains the way to cherry-pick
 or rename one. The [library reference](reference/lib.md) documents
-every integration namespace.
+the integration namespaces.
 
 ## 5. Consume your flake from another flake
 
@@ -237,10 +237,10 @@ A consumer registers your exported overlay the same way:
 ```
 
 The consumer's composed library now has `lib.my-flake.greet`: the
-project registration brings in every overlay you exported, each
+project registration brings in the overlays you exported, each
 overlay's `imports` chain guarantees anything it depends on composes
 with it, and your exported modules land in the consumer's registry
-under `my-flake/<name>`, selectable at every use site. Overlays that
+under `my-flake/<name>`, selectable at each use site. Overlays that
 contribute modules via `contributeModules` (see
 [Module classes](concepts/module-classes.md)) deliver them the same
 way. A consumer who wants only part of your project selects with

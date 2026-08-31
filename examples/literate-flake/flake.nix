@@ -97,7 +97,7 @@
       Step 2: Create the flake outputs.
 
       `mkFlake` wraps flake-parts' mkFlake, injecting the framework's core
-      module and threading `lib` as a special arg so every module receives
+      module and threading `lib` as a special arg so modules receive
       the fully composed library.
 
       - `configModule` is the flake's top-level configuration (systems,

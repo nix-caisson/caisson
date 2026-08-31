@@ -4,7 +4,7 @@
 
 Nix flake modules often need access to the defining flake's `inputs`, but `flake-parts` does not provide a built-in mechanism for closing over them. This means every module and library overlay would need inputs threaded explicitly through its call site, a tedious and error-prone pattern.
 
-caisson solves this with an **explicit closure convention**: everything registered through `mkModule` or `mkLibOverlay` takes a single closure attrset as its first arg list. Plain modules and already-built overlays are registered directly instead.
+caisson solves this with an **explicit closure convention**: everything registered through `mkModule` or `mkLibOverlay` takes a closure attrset as its first arg list. Plain modules and already-built overlays are registered directly instead.
 
 ## The Problem
 

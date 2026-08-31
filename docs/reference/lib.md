@@ -101,7 +101,7 @@ an overlay's output attribute names must not depend on `final`.
 Qualify contributed names with your project prefix
 (`my-flake/my-service`); the composing flake's local registrations
 apply last and win over same-named contributions. See
-[Module classes](../concepts/module-classes.md) for every way
+[Module classes](../concepts/module-classes.md) for the ways
 modules enter the registry.
 
 ### `mkModule`
@@ -143,7 +143,7 @@ manifest : { inputs : attrs; modules : attrsOf (attrsOf module);
 ```
 
 The capture of what `mkLib` consumed, injected as the composition's
-final overlay. Every mkLib composition self-describes: a consumer's
+final overlay. An mkLib composition self-describes: a consumer's
 composed library carries the consumer's own manifest. Checks live on
 the export side only (the flake-parts integration type-checks it and
 projects the `flake.libOverlays` and `flake.modules` outputs from
@@ -267,7 +267,7 @@ Each integration is a library overlay exported by this flake
 `lib.composition.entriesFor`. Composing one contributes its
 `lib.caisson.<ecosystem>` namespace, documented below (the flake-parts
 integration contributes directly under `lib.caisson`, plus the
-`lib.flake-parts` mirror of flake-parts' own library). Every entry
+`lib.flake-parts` mirror of flake-parts' own library). Each entry
 point takes its ecosystem as an `ecosystemSrc` argument, and
 the integrations pin nothing themselves, with one exception:
 flake-parts, whose pin is caisson's own hidden input.

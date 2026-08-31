@@ -40,7 +40,7 @@ See [Closed Inputs](./closed-inputs.md) for the full mechanism.
 
 Library overlays sometimes need to call functions defined by other library overlays. Without explicit dependency management, this requires manually ensuring that overlays are applied in the right order, a fragile arrangement that breaks when overlays are reorganized or new ones are added.
 
-caisson solves this. Every registered overlay is an `{ imports ? [ ], overlay }` attrset, and `imports` is where its dependencies go. Entries are built overlays; the closure's `mkLibOverlay` member exists exactly so a dependency can be built in place:
+caisson solves this. A registered overlay is an `{ imports ? [ ], overlay }` attrset, and `imports` is where its dependencies go. Entries are built overlays; the closure's `mkLibOverlay` member exists exactly so a dependency can be built in place:
 
 ```nix
 { mkLibOverlay, ... }:

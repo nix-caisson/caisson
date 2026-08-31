@@ -38,7 +38,7 @@ caisson leans the other way: registration is explicit, namespaces are
 explicit, dependencies between overlays are declared, and nothing is
 inferred from file layout. If you value minimal ceremony in a single
 project, flakelight gets a working flake with fewer lines. If you
-value being able to trace every attribute of a composed library to a
+value being able to trace any attribute of a composed library to a
 declared registration, especially across a fleet of interdependent
 flakes, that explicitness is caisson's point.
 
@@ -76,7 +76,7 @@ modules by the module system they belong to (dendritic by option
 path, caisson by class key). The differences are scope and
 mechanism. Dendritic organizes one repository's configurations by
 feature and, with import-tree, derives the import set from the file
-tree; caisson registers every module and overlay explicitly and
+tree; caisson registers modules and overlays explicitly and
 infers nothing from layout. Dendritic keeps everything inside a
 single module evaluation; caisson separates library composition from
 module evaluation and adds export machinery so several repositories
@@ -113,7 +113,7 @@ key identity, override is wholesale replacement of a keyed entry,
 local patches are the keyless tail, and ecosystems (nixpkgs,
 home-manager, and the rest) are handed in as explicit
 `ecosystemSrc` arguments instead of being re-pinned and re-wired
-through every level of an input graph.
+through the input graph.
 
 Everything caisson adds travels through the flake schema's only
 freeform slot, the `lib` output: composed libraries, the module

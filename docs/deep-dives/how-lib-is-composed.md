@@ -151,7 +151,7 @@ integrations and tooling, each importing `caisson-lib`.
 ## Where the composed `lib` goes
 
 `mkFlake` passes the composed library to flake-parts as
-`specialArgs.lib`, so every module receives it as its ordinary `lib`
+`specialArgs.lib`, so modules receive it as their ordinary `lib`
 argument. `flake.lib` publishes a selection of it when
 `caisson.lib.export.enabled` is set; the default selection is the
 flake's own namespace only, and that is the convention: exporting

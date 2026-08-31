@@ -25,8 +25,8 @@ libraries or helper flakes being passed down from the top level. This
 creates an unhygienic closure: a module implicitly assumes that the
 *consumer's* flake has declared and forwarded every specialized dependency
 it needs, forcing users to add another flake's internal dependencies to
-their own `flake.nix`. Every new internal dependency adds drag for every
-downstream user, which quietly discourages modularity.
+their own `flake.nix`. A new internal dependency adds drag for
+downstream users, which quietly discourages modularity.
 
 **The solution:** caisson closes modules and library overlays over the
 inputs *of the flake that defines them*. A module can rely on its

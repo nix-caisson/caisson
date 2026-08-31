@@ -74,7 +74,7 @@ in three ways:
   whole upstream contribution (`projects.my-dep = inputs.my-dep`)
   places its exported modules in the registry under
   `<project>/<name>` per class, beside its overlays in the overlay
-  dictionary. Selection stays per item at every use site, and a
+  dictionary. Selection stays per item at each use site, and a
   local registration beats a same-named project entry.
 
 The registry is a shared, class-keyed space per composition, so two
