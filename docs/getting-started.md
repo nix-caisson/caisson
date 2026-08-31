@@ -180,6 +180,11 @@ in the config module's `perSystem` or at the top level:
   };
 ```
 
+Instead of passing `ecosystemSrc` at every call, a flake can declare
+its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs;`)
+and drop the argument; an explicit argument still wins, and an input
+named exactly `nixpkgs` serves as the last fallback.
+
 The composed library only contains `caisson.nixos` if its overlay is
 in the composition; register it from caisson's exports:
 

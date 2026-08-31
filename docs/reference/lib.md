@@ -33,6 +33,7 @@ mkLib :
                       : (freeformOverlay -> libOverlay) -> attrsOf libOverlay
   , libOverlayImports ? builtins.attrValues
                       : attrsOf libOverlay -> listOf libOverlay
+  , ecosystems        ? { } : attrs                        # declared ecosystem sources, by exact name
   } -> lib
 ```
 
@@ -54,6 +55,10 @@ defaults it to that composition's own base.
 - `libOverlayImports` selects which registered overlays apply to this
   flake's own `lib`; registration also feeds export, so the two can
   differ.
+- `ecosystems` declares default ecosystem sources for this
+  composition (`{ nixpkgs = inputs.nixpkgs; ... }`), keyed by the
+  exact names the integrations resolve. mkLib only captures them into
+  the manifest; the integrations interpret them.
 
 ### `mkLibOverlay`
 
@@ -121,7 +126,7 @@ selection.
 
 ```
 manifest : { inputs : attrs; modules : attrsOf (attrsOf module);
-             libOverlays : attrsOf libOverlay }
+             libOverlays : attrsOf libOverlay; ecosystems : attrs }
 ```
 
 The capture of what `mkLib` consumed, injected as the composition's
@@ -247,9 +252,18 @@ Each integration is a library overlay exported by this flake
 `lib.caisson.<target>` namespace, documented below (the flake-parts
 integration contributes directly under `lib.caisson`, plus the
 `lib.flake-parts` mirror of flake-parts' own library). Every entry
-point takes its target ecosystem as an explicit `ecosystemSrc`
-argument; the integrations pin nothing themselves, with one
-exception: flake-parts, whose pin is caisson's own hidden input.
+point takes its target ecosystem as an `ecosystemSrc` argument, and
+the integrations pin nothing themselves, with one exception:
+flake-parts, whose pin is caisson's own hidden input.
+
+An adapter's ecosystem source resolves in layers: the explicit
+`ecosystemSrc` argument first, then the serving composition's
+declared `ecosystems.<name>` (an mkLib argument, carried by the
+manifest), then an input of the composing flake named exactly
+`<name>`. The names are `nixpkgs` (the nixos integration),
+`home-manager`, `colmena`, `terranix`, and `system-manager`. A full
+miss throws at the adapter, naming the three channels; a composition
+built without mkLib (no manifest) has only the explicit channel.
 Common conventions:
 
 - `pkgSets`: an attrset of package sets; `pkgSets.pkgs` is required

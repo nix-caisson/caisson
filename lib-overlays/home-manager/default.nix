@@ -10,6 +10,17 @@
       mkHomeManagerModule = final.caisson-core.mkModule "homeManager";
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "home-manager";
+        context = "caisson.home-manager";
+      };
+      resolveSrc =
+        explicit:
+        resolveEcosystemSrc {
+          inherit explicit;
+          manifest = final.caisson-core.manifest or { };
+        };
+
       assertPkgSets =
         pkgSets:
         if pkgSets ? pkgs then
@@ -135,7 +146,7 @@
 
       mkCommonArgs =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           pkgSets,
           configModule,
           moduleImports ? modules: modules,
@@ -149,7 +160,7 @@
         let
           checkedPkgSets = assertPkgSets pkgSets;
           selectedModules = moduleImports (final.caisson-core.modules.homeManager or { });
-          hmSource = resolveOutPath ecosystemSrc;
+          hmSource = resolveOutPath (resolveSrc ecosystemSrc);
           resolvedSourceMeta =
             if sourceMeta != null then
               sourceMeta
@@ -219,7 +230,7 @@
       mkNixosAdapter =
         args@{
           users,
-          ecosystemSrc,
+          ecosystemSrc ? null,
           hostName ? null,
           hostKind ? "nixos",
           # The same host's NixOS system evaluated *without* this adapter
@@ -269,7 +280,7 @@
             sharedClassModules = builtins.attrValues (
               moduleImports (final.caisson-core.modules.homeManager or { })
             );
-            hmSource = resolveOutPath ecosystemSrc;
+            hmSource = resolveOutPath (resolveSrc ecosystemSrc);
             resolvedSourceMeta =
               if sourceMeta != null then
                 sourceMeta

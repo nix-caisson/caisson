@@ -1559,4 +1559,93 @@ in
       };
     };
   };
+
+  ecosystemResolution =
+    let
+      # A minimal colmena "ecosystem": the adapter only needs
+      # lib.makeHive, so a stub shows which channel resolution chose.
+      colmenaStub = probe: {
+        lib.makeHive = hiveArgs: {
+          stubbed = probe;
+          inherit hiveArgs;
+        };
+      };
+      # Test compositions register caisson's real colmena integration
+      # (from the parent flake's exports) alongside the harness's
+      # flake-parts registration.
+      mkResolutionLib =
+        extra:
+        caisson.mkLib (
+          {
+            inputs = mockInputs;
+            libOverlays = _mkLibOverlay: {
+              colmena = inputs.parent.libOverlays.colmena;
+            };
+          }
+          // extra
+        );
+    in
+    {
+      "test: a declared ecosystem resolves for an adapter" = {
+        expr =
+          let
+            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+          in
+          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+        expected = "declared";
+      };
+
+      "test: an explicit ecosystemSrc beats the declaration" = {
+        expr =
+          let
+            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+          in
+          (myLib.caisson.colmena.mkColmenaHive { ecosystemSrc = colmenaStub "explicit"; }).stubbed;
+        expected = "explicit";
+      };
+
+      "test: an input with the exact name is the last channel" = {
+        expr =
+          let
+            myLib = mkResolutionLib {
+              inputs = mockInputs // {
+                colmena = colmenaStub "input";
+              };
+            };
+          in
+          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+        expected = "input";
+      };
+
+      "test: the declaration beats the exact-name input" = {
+        expr =
+          let
+            myLib = mkResolutionLib {
+              inputs = mockInputs // {
+                colmena = colmenaStub "input";
+              };
+              ecosystems.colmena = colmenaStub "declared";
+            };
+          in
+          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+        expected = "declared";
+      };
+
+      "test: a full miss throws at the adapter" = {
+        expr = builtins.tryEval ((mkResolutionLib { }).caisson.colmena.mkColmenaHive { }).stubbed;
+        expected = {
+          success = false;
+          value = false;
+        };
+      };
+
+      "test: declarations join the manifest" = {
+        expr =
+          let
+            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+          in
+          (myLib.caisson-core.manifest.ecosystems.colmena.lib.makeHive { }).stubbed;
+        expected = "declared";
+      };
+    };
 }

@@ -44,12 +44,13 @@
         # CI; consumers assume shape.
         manifest = final.mkOptionType {
           name = "caissonManifest";
-          description = "caisson-core manifest ({ inputs, modules, libOverlays })";
+          description = "caisson-core manifest ({ inputs, modules, libOverlays, ecosystems })";
           descriptionClass = "noun";
           check =
             v:
             builtins.isAttrs v
             && builtins.isAttrs (v.inputs or null)
+            && builtins.isAttrs (v.ecosystems or { })
             && builtins.isAttrs (v.modules or null)
             && builtins.all builtins.isAttrs (builtins.attrValues v.modules)
             && builtins.isAttrs (v.libOverlays or null)

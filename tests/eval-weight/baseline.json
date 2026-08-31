@@ -1,21 +1,21 @@
 {
   "caisson-overhead": {
-    "nrThunks": 14015,
-    "nrValues": 17876,
+    "nrThunks": 14031,
+    "nrValues": 17892,
     "nrEnvs": 10935,
     "nrFunctionCalls": 9278,
-    "nrPrimOpCalls": 4794,
+    "nrPrimOpCalls": 4800,
     "totalAllocBytes": 836000,
     "nixpkgsEvals": 0,
     "nixpkgsLibEvals": 0,
     "moduleSystemEvals": 5
   },
   "minimal-consumer-total": {
-    "nrThunks": 241010,
-    "nrValues": 701191,
+    "nrThunks": 241026,
+    "nrValues": 701207,
     "nrEnvs": 132041,
     "nrFunctionCalls": 108894,
-    "nrPrimOpCalls": 68708,
+    "nrPrimOpCalls": 68714,
     "totalAllocBytes": 46731936,
     "nixpkgsEvals": 1,
     "nixpkgsLibEvals": 2,

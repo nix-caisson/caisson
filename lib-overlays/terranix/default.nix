@@ -9,6 +9,11 @@
     let
       mkTerranixModule = final.caisson-core.mkModule "terranix";
 
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "terranix";
+        context = "caisson.terranix";
+      };
+
       assertTerranixEcosystemSrc =
         ecosystemSrc:
         if ecosystemSrc ? lib && ecosystemSrc.lib ? terranixConfiguration then
@@ -38,11 +43,14 @@
 
       mkTerranixConfiguration =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           ...
         }:
         let
-          checkedEcosystemSrc = assertTerranixEcosystemSrc ecosystemSrc;
+          checkedEcosystemSrc = assertTerranixEcosystemSrc (resolveEcosystemSrc {
+            explicit = ecosystemSrc;
+            manifest = final.caisson-core.manifest or { };
+          });
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"

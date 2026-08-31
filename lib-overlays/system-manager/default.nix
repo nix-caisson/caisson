@@ -9,6 +9,11 @@
     let
       mkSystemManagerModule = final.caisson-core.mkModule "systemManager";
 
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "system-manager";
+        context = "caisson.system-manager";
+      };
+
       assertSystemManagerEcosystemSrc =
         ecosystemSrc:
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
@@ -38,11 +43,14 @@
 
       mkSystemConfig =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           ...
         }:
         let
-          checkedEcosystemSrc = assertSystemManagerEcosystemSrc ecosystemSrc;
+          checkedEcosystemSrc = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
+            explicit = ecosystemSrc;
+            manifest = final.caisson-core.manifest or { };
+          });
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"

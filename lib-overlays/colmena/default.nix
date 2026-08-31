@@ -9,6 +9,11 @@
     let
       mkColmenaModule = final.caisson-core.mkModule "colmena";
 
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "colmena";
+        context = "caisson.colmena";
+      };
+
       assertColmenaEcosystemSrc =
         ecosystemSrc:
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeHive then
@@ -38,11 +43,14 @@
 
       mkColmenaHive =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           ...
         }:
         let
-          checkedEcosystemSrc = assertColmenaEcosystemSrc ecosystemSrc;
+          checkedEcosystemSrc = assertColmenaEcosystemSrc (resolveEcosystemSrc {
+            explicit = ecosystemSrc;
+            manifest = final.caisson-core.manifest or { };
+          });
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"

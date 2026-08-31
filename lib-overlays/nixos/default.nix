@@ -9,6 +9,17 @@
     let
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "nixpkgs";
+        context = "caisson.nixos";
+      };
+      resolveSrc =
+        explicit:
+        resolveEcosystemSrc {
+          inherit explicit;
+          manifest = final.caisson-core.manifest or { };
+        };
+
       assertPkgSets =
         pkgSets:
         if pkgSets ? pkgs then
@@ -57,10 +68,11 @@
 
       mkSystem =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           ...
         }:
         let
+          src = resolveSrc ecosystemSrc;
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"
@@ -69,7 +81,7 @@
             "moduleImports"
             "specialArgs"
           ];
-          evalConfig = import "${ecosystemSrc}/nixos/lib/eval-config.nix";
+          evalConfig = import "${src}/nixos/lib/eval-config.nix";
         in
         evalConfig (
           passthroughArgs
@@ -82,10 +94,11 @@
 
       mkSystemFull =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           ...
         }:
         let
+          src = resolveSrc ecosystemSrc;
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"
@@ -94,12 +107,12 @@
             "moduleImports"
             "specialArgs"
           ];
-          evalConfig = import "${ecosystemSrc}/nixos/lib/eval-config.nix";
+          evalConfig = import "${src}/nixos/lib/eval-config.nix";
         in
         evalConfig (
           passthroughArgs
           // {
-            baseModules = import "${ecosystemSrc}/nixos/modules/module-list.nix";
+            baseModules = import "${src}/nixos/modules/module-list.nix";
             modules = common.modules;
             specialArgs = common.specialArgs;
             system = common.system;
@@ -108,13 +121,14 @@
 
       mkSystemMinimal =
         args@{
-          ecosystemSrc,
+          ecosystemSrc ? null,
           prefix ? [ ],
           ...
         }:
         let
+          src = resolveSrc ecosystemSrc;
           common = mkCommonArgs args;
-          nixosLib = import "${ecosystemSrc}/nixos/lib" { };
+          nixosLib = import "${src}/nixos/lib" { };
         in
         nixosLib.evalModules {
           inherit prefix;
