@@ -91,12 +91,24 @@ mkLibOverlay : freeformOverlay -> libOverlay
 
 freeformOverlay = path | (closure -> { imports ? listOf libOverlay
                                      ; overlay : overlayFn })
-closure = { closure-inputs : attrs
-          ; mkLibOverlay   : freeformOverlay -> libOverlay
+closure = { closure-inputs     : attrs
+          ; mkLibOverlay       : freeformOverlay -> libOverlay
+          ; mkModule           : string -> freeformModule -> module
+          ; contributeModules  : attrs -> attrsOf (attrsOf module) -> attrs
           }
 ```
 
 Applies the closure attrset to an overlay given as a function or a path to one, and normalizes the result: the built `libOverlay` always carries both keys, with `imports` defaulted to `[ ]`. Already-built overlays are registered directly, never wrapped.
+
+The closure's `mkModule` is bound to the defining composition, so
+modules contributed by an overlay close over the definer's inputs and
+library. `contributeModules prev { <class>.<name> = module; }`
+returns the `caisson.modules` registry merge for the overlay's output
+(merge its result with any namespace contributions); it arrives
+through the closure rather than the composed library because an
+overlay's output attribute names must not depend on `final`. See
+[Module classes](../concepts/module-classes.md) for the two
+registration channels.
 
 ### `importApply`
 

@@ -38,13 +38,40 @@ nested use of `mkModule` stays in that class.
 
 ## Registration APIs
 
-`mkLib` registers modules through a single class-keyed hook:
+Modules enter the class-keyed registry (`lib.caisson.modules`) through
+two channels:
 
-- `modules`: a function `lib: { ... }` receiving the composed `lib`
-  (whose helpers, like `lib.caisson.mkFlakeModule`, build the entries)
-  and returning the class-keyed registration
+- **Local registration**, `mkLib`'s `modules` hook: a function
+  `lib: { ... }` receiving the composed `lib` (whose helpers, like
+  `lib.caisson.mkFlakeModule`, build the entries) and returning the
+  class-keyed registration. This is for the flake's own modules.
+- **Overlay contribution**, for modules that travel with a library
+  overlay: the overlay closure carries `mkModule` and
+  `contributeModules`, and the overlay merges its entries into the
+  registry:
 
-Use `modules.flake` for flake-parts modules and other class keys for other module ecosystems. The shipped integrations (`caisson.nixos`, `caisson.home-manager`, `caisson.terranix`, `caisson.colmena`, `caisson.system-manager`, and `caisson.nixpkgs`) each register their own class this way; see the [library reference](../reference/lib.md).
+  ```nix
+  { mkModule, contributeModules, ... }:
+  {
+    imports = [ ];
+    overlay =
+      final: prev:
+      contributeModules prev {
+        nixos.my-service = mkModule "nixos" ./modules/my-service.nix;
+      }
+      // {
+        my-flake = (prev.my-flake or { }) // { ... };
+      };
+  }
+  ```
+
+  `mkModule` here is bound to the defining flake's composition, so the
+  contributed module closes over the definer's inputs and library, not
+  the consumer's. A consumer who registers the exported overlay gets
+  its library namespace and its modules together, transitively through
+  the overlay's `imports` chain; no re-registration is involved.
+
+Use class `flake` for flake-parts modules and other class keys for other module ecosystems. The shipped integrations (`caisson.nixos`, `caisson.home-manager`, `caisson.terranix`, `caisson.colmena`, `caisson.system-manager`, and `caisson.nixpkgs`) each register their own class this way; see the [library reference](../reference/lib.md).
 
 ## Consuming Exported Modules
 

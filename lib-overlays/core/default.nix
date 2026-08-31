@@ -3,6 +3,12 @@
   libOverlays ? { },
   modules ? { },
 
+  # Extra attrs merged into the closure that mkLibOverlay applies to
+  # overlay files; mkLib threads the defining composition's mkModule
+  # and the static contributeModules helper through here so overlays
+  # can contribute modules closed over their own flake.
+  extraOverlayClosure ? { },
+
   # This closes over the inputs to flake where this overlay is used
   inputs,
 }:
@@ -102,10 +108,13 @@
             reified = if requiresImport then import freeformOverlay else freeformOverlay;
             applied =
               if builtins.isFunction reified then
-                reified {
-                  closure-inputs = inputs;
-                  inherit mkLibOverlay;
-                }
+                reified (
+                  {
+                    closure-inputs = inputs;
+                    inherit mkLibOverlay;
+                  }
+                  // extraOverlayClosure
+                )
               else
                 throw ''
                   ${provenance}mkLibOverlay expects a function taking the closure attrset
@@ -237,6 +246,25 @@
           inherit sourceInfo;
         };
 
+      # Merge module contributions into the registry from inside an
+      # overlay body: `overlay = final: prev: contributeModules prev
+      # { <class>.<name> = mkModule "<class>" ./m.nix; } // { ... }`.
+      # Static on purpose: an overlay's output attribute names must not
+      # depend on `final`, so the helper arrives through the overlay
+      # closure rather than the composed library.
+      contributeModules =
+        prev: contributions:
+        let
+          prevModules = (prev.caisson or { }).modules or { };
+        in
+        {
+          caisson = (prev.caisson or { }) // {
+            modules =
+              prevModules
+              // builtins.mapAttrs (class: names: (prevModules.${class} or { }) // names) contributions;
+          };
+        };
+
       mkModuleFor =
         moduleClass:
         let
@@ -294,8 +322,18 @@
               baseLib = resolvedArgs.baseLib or closure-inputs.nixpkgs-lib.lib;
               inputs = resolvedArgs.inputs;
               mkLibOverlayForInputs = (
-                (baseLib.extend (import ./. { inherit inputs; } { inherit closure-inputs; }).overlay)
-                .caisson.mkLibOverlay
+                (baseLib.extend
+                  (import ./. {
+                    inherit inputs;
+                    # Lazily bound: overlay files that never contribute
+                    # modules never force the composed fixpoint through
+                    # these.
+                    extraOverlayClosure = {
+                      mkModule = finalLib.caisson.mkModule;
+                      inherit contributeModules;
+                    };
+                  } { inherit closure-inputs; }).overlay
+                ).caisson.mkLibOverlay
               );
               rawModules = resolvedArgs.modules or (lib: { });
               rawLibOverlays = resolvedArgs.libOverlays or (mkLibOverlay: { });
@@ -335,6 +373,10 @@
                     modules
                     libOverlays
                     ;
+                  extraOverlayClosure = {
+                    mkModule = finalLib.caisson.mkModule;
+                    inherit contributeModules;
+                  };
                 }
               );
 

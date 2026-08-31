@@ -217,8 +217,12 @@ A consumer registers your exported overlay the same way:
 
 The consumer's composed library now has `lib.my-flake.greet`, and the
 overlay's `imports` chain guarantees anything your overlay depends on
-composes with it. Exported modules travel the same way, through
-`my-flake.modules.<class>.<name>`.
+composes with it. Modules can travel with the overlay too: an overlay
+that contributes entries via `contributeModules` (see
+[Module classes](concepts/module-classes.md)) delivers them into the
+consumer's registry through the same single registration. The
+`my-flake.modules.<class>.<name>` flake outputs remain for consumers
+who import modules without composing your overlay.
 
 ## Where next
 

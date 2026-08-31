@@ -634,6 +634,138 @@ in
     };
   };
 
+  moduleContribution = {
+    "test: overlays contribute modules through the closure" = {
+      expr =
+        let
+          myLib = mkTestLib {
+            libOverlays = _mkLibOverlay: {
+              contrib = mkLibOverlay (
+                {
+                  mkModule,
+                  contributeModules,
+                  ...
+                }:
+                {
+                  imports = [ ];
+                  overlay =
+                    _final: prev:
+                    contributeModules prev {
+                      nixos.probe = mkModule "nixos" ({ ... }: { config.probe = true; });
+                    };
+                }
+              );
+            };
+          };
+        in
+        builtins.attrNames (myLib.caisson.modules.nixos or { });
+      expected = [ "probe" ];
+    };
+
+    "test: contributions merge with argument registrations" = {
+      expr =
+        let
+          myLib = mkTestLib {
+            modules = testLib: {
+              nixos.local = testLib.caisson.mkModule "nixos" ({ ... }: { config.local = true; });
+            };
+            libOverlays = _mkLibOverlay: {
+              contrib = mkLibOverlay (
+                {
+                  mkModule,
+                  contributeModules,
+                  ...
+                }:
+                {
+                  imports = [ ];
+                  overlay =
+                    _final: prev:
+                    contributeModules prev {
+                      nixos.contributed = mkModule "nixos" ({ ... }: { config.contributed = true; });
+                    };
+                }
+              );
+            };
+          };
+        in
+        builtins.attrNames (myLib.caisson.modules.nixos or { });
+      expected = [
+        "contributed"
+        "local"
+      ];
+    };
+
+    "test: contributions ride an overlay's imports chain" = {
+      expr =
+        let
+          contributor = mkLibOverlay (
+            {
+              mkModule,
+              contributeModules,
+              ...
+            }:
+            {
+              imports = [ ];
+              overlay =
+                _final: prev:
+                contributeModules prev {
+                  homeManager.carried = mkModule "homeManager" ({ ... }: { config.carried = true; });
+                };
+            }
+          );
+          myLib = mkTestLib {
+            libOverlays = _mkLibOverlay: {
+              wrapper = mkLibOverlay (
+                { ... }:
+                {
+                  imports = [ contributor ];
+                  overlay = _final: _prev: { };
+                }
+              );
+            };
+          };
+        in
+        builtins.attrNames (myLib.caisson.modules.homeManager or { });
+      expected = [ "carried" ];
+    };
+
+    "test: contributeModules composes with namespace contributions" = {
+      expr =
+        let
+          myLib = mkTestLib {
+            libOverlays = _mkLibOverlay: {
+              contrib = mkLibOverlay (
+                {
+                  mkModule,
+                  contributeModules,
+                  ...
+                }:
+                {
+                  imports = [ ];
+                  overlay =
+                    _final: prev:
+                    contributeModules prev {
+                      nixos.probe = mkModule "nixos" ({ ... }: { config.probe = true; });
+                    }
+                    // {
+                      probe-ns.marker = "ok";
+                    };
+                }
+              );
+            };
+          };
+        in
+        {
+          marker = myLib.probe-ns.marker or "missing";
+          stillHasMkLib = builtins.isFunction (myLib.caisson.mkLib or null);
+        };
+      expected = {
+        marker = "ok";
+        stillHasMkLib = true;
+      };
+    };
+  };
+
   mkLib = {
     "test: bootstraps correctly" = {
       expr =
