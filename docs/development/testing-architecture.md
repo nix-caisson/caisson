@@ -322,7 +322,7 @@ inputs.nixpkgs-lib.url = "github:nix-community/nixpkgs.lib";
 inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 ```
 
-Its `outputs` is empty. It exists to serve three purposes:
+Its `outputs` is empty. It exists for three reasons:
 
 1. **Partition input source:** The checks and formatter partitions use
    `extraInputsFlake = tests/dependencies` to pull these inputs into their
@@ -342,7 +342,7 @@ The dependencies flake uses `follows` internally to deduplicate transitive input
 ## Example Flakes
 
 The checks partition also wires in example flakes (e.g., `examples/literate-flake/`)
-using the same raw-import pattern. These serve as both documentation and regression
+using the same raw-import pattern. These are both documentation and regression
 tests: if the example stops evaluating, `nix flake check` fails.
 
 ## Complete Check Inventory

@@ -96,7 +96,7 @@ modules contributed by an overlay close over the definer's inputs and
 library. `contributeModules prev { <class>.<name> = module; }`
 returns the `caisson-core.modules` registry merge for the overlay's
 output (merge its result with any namespace contributions); it
-arrives through the closure rather than the composed library because
+is passed through the closure rather than the composed library because
 an overlay's output attribute names must not depend on `final`.
 Qualify contributed names with your project prefix
 (`my-flake/my-service`); the composing flake's local registrations

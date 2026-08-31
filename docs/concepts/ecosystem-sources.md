@@ -1,12 +1,12 @@
 # Ecosystem sources
 
 Integrations do not pin their targets: `caisson.nixos` has no
-nixpkgs pin, and `caisson.home-manager` has no home-manager pin. The
-target arrives as a value, called the ecosystem source, and the
-integration is glue over that target's own evaluator. This is what
-lets one caisson serve any nixpkgs, home-manager, or colmena revision
-the consumer chooses, and lets two consumers of the same caisson run
-different revisions of everything.
+nixpkgs pin, and `caisson.home-manager` has no home-manager pin. You
+pass the target in, as an argument called the ecosystem source, and
+the integration calls the evaluator inside that source. One caisson
+therefore works with any nixpkgs, home-manager, or colmena revision,
+and two consumers of the same caisson can run different revisions of
+everything.
 
 ## What a source is
 
@@ -22,8 +22,7 @@ Each integration documents the shape it expects; in practice:
 
 ## The three channels
 
-A source reaches an adapter through one of three channels, in
-priority order:
+A source comes from one of three places, in priority order:
 
 1. **Explicit argument.** `ecosystemSrc = inputs.nixpkgs;` at the
    call site always wins.
@@ -33,7 +32,7 @@ priority order:
    disappears from your code.
 3. **Exact-name input.** As a final fallback, an input of the
    composing flake named exactly like the ecosystem (`nixpkgs`,
-   `home-manager`, ...) serves. Handy for leaf flakes that declare
+   `home-manager`, ...) is used. Handy for leaf flakes that declare
    the input anyway.
 
 A full miss is an error at the adapter, naming all three channels. A

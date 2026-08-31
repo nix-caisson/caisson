@@ -96,7 +96,7 @@ distinctive here rather than variations on a shared theme:
   zero-dependency flake usable without caisson.
 - **Explicit ecosystem sources**: integrations pin none of their
   targets; the consumer hands every ecosystem in, so one caisson
-  serves any nixpkgs, home-manager, or colmena revision the consumer
+  works with any nixpkgs, home-manager, or colmena revision the consumer
   chooses.
 - **Evaluation-weight gates** ([guide](eval-weight.md)): framework
   overhead is measured and held to committed ceilings in CI rather

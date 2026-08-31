@@ -27,8 +27,8 @@ reading order:
   dependency-declaring `lib` composition, and the patterns for writing
   overlays.
 - [Ecosystem sources](concepts/ecosystem-sources.md): why
-  integrations pin nothing, and the three channels a source arrives
-  through.
+  integrations pin nothing, and the three places a source can come
+  from.
 
 **Deep dives**:
 [How `lib` is composed](deep-dives/how-lib-is-composed.md) traces one
