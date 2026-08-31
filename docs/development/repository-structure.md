@@ -29,7 +29,7 @@ The layer users reach for: the seven integrations (`flake-parts`,
 `nixpkgs`, `nixos`, `home-manager`, `colmena`, `terranix`,
 `system-manager`), each a library overlay contributing its
 `lib.caisson` namespace, registering its own module class where it
-has one, and taking its target ecosystem as an explicit
+has one, and taking its ecosystem as an explicit
 `ecosystemSrc` argument (flake-parts is the exception: its pin is
 caisson's own hidden input, and it carries the export machinery that
 projects a composition's manifest into flake outputs). The

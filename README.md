@@ -67,10 +67,10 @@ ecosystems (NixOS, Home Manager, and friends).
 
 caisson ships integrations that carry the same conventions into other
 module ecosystems, each a library overlay contributing a
-`lib.caisson.<target>` namespace and registering its own module class:
+`lib.caisson.<ecosystem>` namespace and registering its own module class:
 `nixpkgs` (package sets and overlays), `nixos`, `home-manager`,
 `terranix` (Terranix/Terraform), `colmena` (deployment hives), and
-`system-manager` (foreign distros). Each takes its target ecosystem as
+`system-manager` (foreign distros). Each takes its ecosystem as
 an explicit `ecosystemSrc` argument and pins nothing itself.
 
 ## Quick start

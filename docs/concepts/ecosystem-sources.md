@@ -1,19 +1,19 @@
 # Ecosystem sources
 
-Integrations do not pin their targets: `caisson.nixos` has no
+Integrations do not pin their ecosystems: `caisson.nixos` has no
 nixpkgs pin, and `caisson.home-manager` has no home-manager pin. You
-pass the target in, as an argument called the ecosystem source, and
-the integration calls the evaluator inside that source. One caisson
-therefore works with any nixpkgs, home-manager, or colmena revision,
-and two consumers of the same caisson can run different revisions of
-each ecosystem.
+pass the ecosystem in, as an argument called the ecosystem source, and
+the integration calls the evaluator inside that source. A single
+caisson revision therefore works with any nixpkgs, home-manager, or
+colmena revision, and two consumers of that same caisson revision can
+pin different revisions of each ecosystem.
 
 ## What a source is
 
 An ecosystem is a community library outside of caisson at the center
 of a modular Nix abstraction framework: usually one built on NixOS
-modules, but it can be anything, package sets and plain libraries
-included. The ecosystem source is that project's source tree or
+modules, but it can be anything (e.g. package sets, `lib`
+ecosystems). The ecosystem source is that project's source tree or
 flake, in whatever shape its evaluator expects. Each integration
 documents the shape it takes; in practice:
 
@@ -25,7 +25,7 @@ documents the shape it takes; in practice:
   `lib.makeHive`, `lib.terranixConfiguration`, and
   `lib.makeSystemConfig` on it).
 
-## The three channels
+## How does caisson get access to ecosystem sources?
 
 A source comes from one of three places, in priority order:
 
@@ -40,14 +40,6 @@ A source comes from one of three places, in priority order:
    `home-manager`, ...) is used. Handy for leaf flakes that declare
    the input anyway.
 
-A full miss is an error at the adapter, naming all three channels. A
+A full miss is an error at the adapter, naming all three places. A
 composition built without `mkLib` carries no declarations, so only
-the explicit channel exists there.
-
-## What this means for your flake
-
-You pin the ecosystems, in your own lock, which is the design: the
-versions of nixpkgs and its peers are visible where you manage
-everything else, version skew between them is a fact of your lock
-rather than of something transitive, and updating an ecosystem is
-`nix flake update`, not a framework release.
+the explicit argument works there.

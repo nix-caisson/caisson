@@ -39,7 +39,7 @@ nested use of `mkModule` stays in that class.
 ## Registration APIs
 
 Modules enter the class-keyed registry (`lib.caisson-core.modules`)
-through three channels:
+in three ways:
 
 - **Local registration**, `mkLib`'s `modules` hook: a function
   `lib: { ... }` receiving the composed `lib` (whose helpers, like

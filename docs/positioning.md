@@ -20,8 +20,8 @@ a set of enforced conventions on top: closed inputs (every registered
 file takes an explicit closure argument list instead of reaching for
 inputs ambiently), namespaced library overlays with declared
 dependencies composed by caisson-core, class-keyed
-module registration and export, integrations that take their target
-ecosystems as explicit `ecosystemSrc` arguments, and measured
+module registration and export, integrations that take their
+own ecosystems as explicit `ecosystemSrc` arguments, and measured
 evaluation-cost gates. Use plain flake-parts when you want the module
 system and your own conventions; use caisson when you want these
 conventions machine-enforced, particularly across several flakes that
@@ -53,7 +53,7 @@ seeking new maintainers.
 The comparison is similar to flakelight but stronger: snowfall infers
 the most from layout, caisson infers nothing from layout. caisson's
 integrations also differ structurally from a generator: they are thin
-adapters over each target's own evaluator, taking the target as an
+adapters over each ecosystem's evaluator, taking the ecosystem as an
 explicit source argument and pinning nothing.
 
 ## The dendritic pattern
@@ -95,9 +95,9 @@ distinctive here rather than variations on a shared theme:
   replacement, and reliable polyfills, implemented in caisson-core, a
   zero-dependency flake usable without caisson.
 - **Explicit ecosystem sources**: integrations pin none of their
-  targets; the consumer hands every ecosystem in, so one caisson
-  works with any nixpkgs, home-manager, or colmena revision the consumer
-  chooses.
+  ecosystems; the consumer hands every one in, so a single caisson
+  revision works with any nixpkgs, home-manager, or colmena revision
+  the consumer chooses.
 - **Evaluation-weight gates** ([guide](eval-weight.md)): framework
   overhead is measured and held to committed ceilings in CI rather
   than described.

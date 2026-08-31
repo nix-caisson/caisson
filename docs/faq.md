@@ -57,10 +57,10 @@ A few things:
 ### Do I pin nixpkgs, home-manager, and the rest myself?
 
 Yes, you manage the ecosystem pins in your own flake, which is the
-point: a caisson integration is glue over the target's own evaluator,
+point: a caisson integration is glue over the ecosystem's evaluator,
 composing with whatever ecosystem source version you give it, so
 caisson imposes no transitive pins and two consumers of the same
-caisson can run different nixpkgs revisions. Version skew within your
+caisson revision can run different nixpkgs revisions. Version skew within your
 ecosystems lives in your own locks, where you can see and manage it. A
 flake that uses one version of an ecosystem everywhere can declare it
 once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs;`). But it's

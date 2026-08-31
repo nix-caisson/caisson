@@ -165,7 +165,7 @@ selection, and export.
 ## 4. Use an integration
 
 Integrations bring the same conventions to other module ecosystems
-and take their target as an explicit `ecosystemSrc`. A NixOS system,
+and take their ecosystem as an explicit `ecosystemSrc`. A NixOS system,
 in the config module's `perSystem` or at the top level:
 
 ```nix

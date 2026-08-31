@@ -101,8 +101,8 @@ an overlay's output attribute names must not depend on `final`.
 Qualify contributed names with your project prefix
 (`my-flake/my-service`); the composing flake's local registrations
 apply last and win over same-named contributions. See
-[Module classes](../concepts/module-classes.md) for the two
-registration channels.
+[Module classes](../concepts/module-classes.md) for every way
+modules enter the registry.
 
 ### `mkModule`
 
@@ -263,23 +263,23 @@ option of this type before projecting the `flake.libOverlays` and
 ## Integration namespaces
 
 Each integration is a library overlay exported by this flake
-(`libOverlays.<target>`) and available as a keyed entry via
+(`libOverlays.<ecosystem>`) and available as a keyed entry via
 `lib.composition.entriesFor`. Composing one contributes its
-`lib.caisson.<target>` namespace, documented below (the flake-parts
+`lib.caisson.<ecosystem>` namespace, documented below (the flake-parts
 integration contributes directly under `lib.caisson`, plus the
 `lib.flake-parts` mirror of flake-parts' own library). Every entry
-point takes its target ecosystem as an `ecosystemSrc` argument, and
+point takes its ecosystem as an `ecosystemSrc` argument, and
 the integrations pin nothing themselves, with one exception:
 flake-parts, whose pin is caisson's own hidden input.
 
 An adapter's ecosystem source resolves in layers: the explicit
-`ecosystemSrc` argument first, then the serving composition's
-declared `ecosystems.<name>` (an mkLib argument, carried by the
+`ecosystemSrc` argument first, then the composition's declared
+`ecosystems.<name>` (an mkLib argument, carried by the
 manifest), then an input of the composing flake named exactly
 `<name>`. The names are `nixpkgs` (the nixos integration),
 `home-manager`, `colmena`, `terranix`, and `system-manager`. A full
-miss throws at the adapter, naming the three channels; a composition
-built without mkLib (no manifest) has only the explicit channel.
+miss throws at the adapter, naming the three places; a composition
+built without mkLib (no manifest) accepts only the explicit argument.
 Common conventions:
 
 - `pkgSets`: an attrset of package sets; `pkgSets.pkgs` is required
