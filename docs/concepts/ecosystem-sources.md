@@ -1,7 +1,7 @@
 # Ecosystem sources
 
-Integrations do not pin their targets. `caisson.nixos` does not carry
-a nixpkgs; `caisson.home-manager` does not carry a home-manager. The
+Integrations do not pin their targets: `caisson.nixos` has no
+nixpkgs pin, and `caisson.home-manager` has no home-manager pin. The
 target arrives as a value, called the ecosystem source, and the
 integration is glue over that target's own evaluator. This is what
 lets one caisson serve any nixpkgs, home-manager, or colmena revision
