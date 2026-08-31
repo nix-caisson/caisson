@@ -185,8 +185,8 @@ in the config module's `perSystem` or at the top level:
   };
 ```
 
-Instead of passing `ecosystemSrc` at every call, a flake can declare
-its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs`)
+Instead of passing `ecosystemSrc` at every call, a flake can set a
+flake-level default at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs`)
 and drop the argument; an explicit argument still wins, and an input
 named exactly `nixpkgs` is the last fallback.
 

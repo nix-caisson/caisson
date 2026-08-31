@@ -111,7 +111,7 @@ two. Flakes keep acquisition. Composition moves to the evaluation
 layer, with real semantics: deduplication is
 key identity, override is wholesale replacement of a keyed entry,
 local patches are the keyless tail, and ecosystems (nixpkgs,
-home-manager, and the rest) are handed in once as explicit
+home-manager, and the rest) are handed in as explicit
 `ecosystemSrc` arguments instead of being re-pinned and re-wired
 through every level of an input graph.
 

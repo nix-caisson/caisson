@@ -32,7 +32,7 @@ A source comes from one of three places, in priority order:
 
 1. **Explicit argument.** `ecosystemSrc = inputs.nixpkgs` at the
    call site always wins.
-2. **Declared once.** `ecosystems.nixpkgs = inputs.nixpkgs` at
+2. **Flake-level default.** `ecosystems.nixpkgs = inputs.nixpkgs` at
    `mkLib` declares the composition's default for that name.
 3. **Exact-name input.** As a final fallback, an input of the
    composing flake named exactly like the ecosystem (`nixpkgs`,
