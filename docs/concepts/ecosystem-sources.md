@@ -33,9 +33,8 @@ A source comes from one of three places, in priority order:
 1. **Explicit argument.** `ecosystemSrc = inputs.nixpkgs` at the
    call site always wins.
 2. **Declared once.** `ecosystems.nixpkgs = inputs.nixpkgs` at
-   `mkLib` declares the composition's default for that name; every
-   adapter in the composition picks it up, and the per-call argument
-   disappears from your code.
+   `mkLib` declares the composition's default for that name; adapters
+   use it when the call passes no explicit argument.
 3. **Exact-name input.** As a final fallback, an input of the
    composing flake named exactly like the ecosystem (`nixpkgs`,
    `home-manager`, ...) is used. Handy for leaf flakes that declare
