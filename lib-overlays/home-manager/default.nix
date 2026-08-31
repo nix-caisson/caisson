@@ -7,8 +7,8 @@
   overlay =
     final: prev:
     let
-      mkHomeManagerModule = final.caisson.mkModule "homeManager";
-      mkNixosModule = final.caisson.mkModule "nixos";
+      mkHomeManagerModule = final.caisson-core.mkModule "homeManager";
+      mkNixosModule = final.caisson-core.mkModule "nixos";
 
       assertPkgSets =
         pkgSets:
@@ -148,7 +148,7 @@
         }:
         let
           checkedPkgSets = assertPkgSets pkgSets;
-          selectedModules = moduleImports (final.caisson.modules.homeManager or { });
+          selectedModules = moduleImports (final.caisson-core.modules.homeManager or { });
           hmSource = resolveOutPath ecosystemSrc;
           resolvedSourceMeta =
             if sourceMeta != null then
@@ -209,7 +209,7 @@
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson.modules.homeManager or { });
+          selectedModules = moduleImports (final.caisson-core.modules.homeManager or { });
         in
         {
           homeModules = selectedModules;
@@ -266,7 +266,9 @@
           }:
           let
             checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
-            sharedClassModules = builtins.attrValues (moduleImports (final.caisson.modules.homeManager or { }));
+            sharedClassModules = builtins.attrValues (
+              moduleImports (final.caisson-core.modules.homeManager or { })
+            );
             hmSource = resolveOutPath ecosystemSrc;
             resolvedSourceMeta =
               if sourceMeta != null then
@@ -289,7 +291,7 @@
               let
                 userModuleImports = userArgs.moduleImports or (_modules: { });
                 userClassModules = builtins.attrValues (
-                  userModuleImports (final.caisson.modules.homeManager or { })
+                  userModuleImports (final.caisson-core.modules.homeManager or { })
                 );
                 configModule =
                   if userArgs ? configModule then

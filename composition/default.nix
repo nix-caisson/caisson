@@ -2,10 +2,10 @@
 #
 # caisson's contributions to the caisson-core composition calculus
 # (https://github.com/nix-caisson/caisson-core), exported as
-# `lib.composition` on the flake.  This surface is additive: caisson's
-# own mkLib still composes via the library-lifecycle machinery, and
-# these entries let calculus consumers compose the same library ahead
-# of that cutover.
+# `lib.composition` on the flake. These entries let calculus consumers
+# compose the same library that caisson's own mkLib builds: the
+# machinery entry injects the `caisson-core` namespace, and each
+# integration is an entry importing it.
 { inputs }:
 {
 
@@ -15,9 +15,12 @@
   entriesFor =
     { ecosystemSrc }:
     let
-      coreOverlay =
-        (import ../lib-overlays/core { inherit inputs; } { closure-inputs = inputs; }).overlay;
-      defaultOverlay = (import ../lib-overlays/default { closure-inputs = inputs; }).overlay;
+      engine = import ../vendor/caisson-core/lib;
+      baseLib = import ecosystemSrc;
+      machineryOverlay = engine.mkCoreOverlay {
+        inherit inputs;
+        defaultBaseLib = baseLib;
+      };
     in
     let
       integrationEntry = target: {
@@ -31,21 +34,17 @@
         base = {
           key = "caisson.nixpkgs-lib";
           imports = [ ];
-          overlay = _final: _prev: import ecosystemSrc;
+          overlay = _final: _prev: baseLib;
         };
 
         caisson-lib = {
           key = "caisson.lib";
           imports = [ entries.base ];
-          overlay =
-            final: prev:
-            let
-              coreDelta = coreOverlay final prev;
-              afterCore = prev // coreDelta;
-            in
-            coreDelta // defaultOverlay final afterCore;
+          overlay = machineryOverlay.overlay;
         };
 
+        flake-parts = integrationEntry "flake-parts";
+        tooling = integrationEntry "tooling";
         nixpkgs = integrationEntry "nixpkgs";
         nixos = integrationEntry "nixos";
         home-manager = integrationEntry "home-manager";

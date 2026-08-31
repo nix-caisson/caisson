@@ -19,8 +19,12 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      lib = parent.lib.mkLib {
+      lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
+
+        libOverlays = _mkLibOverlay: {
+          flake-parts = parent.libOverlays.flake-parts;
+        };
 
         modules = lib: {
           flake = {

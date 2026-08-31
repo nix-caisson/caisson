@@ -1,26 +1,32 @@
 # Library Reference
 
-This reference documents the `lib.caisson` API exported by the core library overlay.
+A composed library carries two framework namespaces. `lib.caisson-core`
+holds the machinery, injected by `mkLib` itself (its code lives in
+caisson-core, vendored under `vendor/caisson-core`). `lib.caisson`
+holds the integrations and the pkgs-dependent tooling, contributed by
+the overlays this flake exports. The flake-level `lib` output mirrors
+both namespaces (`caisson.lib.caisson-core`, `caisson.lib.caisson`).
 
 Type notation used below:
 
-- `lib` — a composed nixpkgs-style library attrset
-- `module` — a module for some module class's module system
-- `overlayFn` — `final: prev: attrs`, the standard overlay function
-- `libOverlay` — `{ imports : listOf libOverlay; overlay : overlayFn }`,
+- `lib`: a composed nixpkgs-style library attrset
+- `module`: a module for some module class's module system
+- `overlayFn`: `final: prev: attrs`, the standard overlay function
+- `libOverlay`: `{ imports : listOf libOverlay; overlay : overlayFn }`,
   the built overlay produced by `mkLibOverlay` (both keys always present)
 - `path` arguments are imported before the rules below apply
 
-## Functions
+## The caisson-core namespace
+
+- **Source:** `vendor/caisson-core/lib/` (`lifecycle.nix` for the
+  machinery, `default.nix` for the calculus)
 
 ### `mkLib`
-
-- **Source:** `lib-overlays/core/default.nix`
 
 ```
 mkLib :
   { inputs            : attrs                              # the defining flake's inputs
-  , baseLib           ? inputs.nixpkgs-lib.lib : lib
+  , baseLib           : lib                                # the base library, a plain argument
   , modules           ? (lib: { })
                       : lib -> attrsOf (attrsOf module)    # class -> name -> module
   , libOverlays       ? (mkLibOverlay: { })
@@ -30,31 +36,58 @@ mkLib :
   } -> lib
 ```
 
-Builds a composed library by extending `baseLib` with the core overlay and the selected local overlays. This is the primary entry point for creating the final `lib` used by `mkFlake`.
+Builds a composed library by extending `baseLib` with the
+`caisson-core` namespace injection and the selected registered
+overlays, then two synthetic overlays: the local module registrations
+(so local names win over overlay-borne contributions) and the
+manifest. Nothing is looked up by input name: `baseLib` is a plain
+argument, and the `caisson-core.mkLib` found in a composed library
+defaults it to that composition's own base.
 
-- `modules` receives the composed `lib` (usable through the fixpoint) and returns the class-keyed registration, typically built with helpers like `lib.caisson.mkFlakeModule`.
-- `libOverlays` receives the input-closed `mkLibOverlay` helper and returns the registered overlays. Both arguments take exactly the function shape shown; passing anything else is an error.
-- `libOverlayImports` selects which registered overlays apply to this flake's own `lib`; registration also feeds export, so the two can differ.
+- `modules` receives the composed `lib` (usable through the fixpoint)
+  and returns the class-keyed registration, typically built with
+  helpers like `lib.caisson-core.mkModule` and
+  `lib.caisson.mkFlakeModule`.
+- `libOverlays` receives the input-closed `mkLibOverlay` helper and
+  returns the registered overlays. Both arguments take exactly the
+  function shape shown; passing anything else is an error.
+- `libOverlayImports` selects which registered overlays apply to this
+  flake's own `lib`; registration also feeds export, so the two can
+  differ.
 
-### `mkFlake`
-
-- **Source:** `lib-overlays/core/default.nix`
+### `mkLibOverlay`
 
 ```
-mkFlake :
-  { configModule  : module                                  # flake class
-  , moduleImports ? (modules: modules)
-                  : attrsOf module -> attrsOf module        # selection from modules.flake
-  , name          ? null : nullOr string                    # rev-independent module identity
-  , ...                                                     # forwarded to flake-parts mkFlake
-  } -> flakeOutputs
+mkLibOverlay : freeformOverlay -> libOverlay
+
+freeformOverlay = path | (closure -> { imports ? listOf libOverlay
+                                     ; overlay : overlayFn })
+closure = { closure-inputs     : attrs
+          ; mkLibOverlay       : freeformOverlay -> libOverlay
+          ; mkModule           : string -> freeformModule -> module
+          ; contributeModules  : attrs -> attrsOf (attrsOf module) -> attrs
+          }
 ```
 
-Builds final flake outputs via `flake-parts` using the composed `lib` and module graph assembled by `mkLib`. `name` sets flake-parts' `moduleLocation` (so exported modules deduplicate across revs) and defaults `caisson.configInfo.configName`.
+Applies the closure attrset to an overlay given as a function or a path
+to one, and normalizes the result: the built `libOverlay` always carries
+both keys, with `imports` defaulted to `[ ]`. Already-built overlays are
+registered directly, never wrapped.
+
+The closure's `mkModule` is bound to the defining composition, so
+modules contributed by an overlay close over the definer's inputs and
+library. `contributeModules prev { <class>.<name> = module; }`
+returns the `caisson-core.modules` registry merge for the overlay's
+output (merge its result with any namespace contributions); it
+arrives through the closure rather than the composed library because
+an overlay's output attribute names must not depend on `final`.
+Qualify contributed names with your project prefix
+(`my-flake/my-service`); the composing flake's local registrations
+apply last and win over same-named contributions. See
+[Module classes](../concepts/module-classes.md) for the two
+registration channels.
 
 ### `mkModule`
-
-- **Source:** `lib-overlays/core/default.nix`
 
 ```
 mkModule : string -> freeformModule -> module
@@ -72,50 +105,33 @@ Factory for class-specific module normalizers. Given a class name, returns a nor
 
 The `mkModule` closure member is bound to the same class, so nested module composition stays in that class.
 
-### `mkFlakeModule`
-
-- **Source:** `lib-overlays/core/default.nix`
+### `modules`
 
 ```
-mkFlakeModule : freeformModule -> module    # = mkModule "flake"
+modules : attrsOf (attrsOf module)    # class -> name -> module
 ```
 
-Convenience form of `mkModule "flake"` for flake-parts modules.
+The class-keyed module registry of this composition: the flake's own
+registrations merged with every overlay-borne contribution, locals
+winning on name conflicts. Integration adapters read their class from
+here (`caisson-core.modules.<class>`) as the default module
+selection.
 
-### `mkLibOverlay`
-
-- **Source:** `lib-overlays/core/default.nix`
+### `manifest`
 
 ```
-mkLibOverlay : freeformOverlay -> libOverlay
-
-freeformOverlay = path | (closure -> { imports ? listOf libOverlay
-                                     ; overlay : overlayFn })
-closure = { closure-inputs     : attrs
-          ; mkLibOverlay       : freeformOverlay -> libOverlay
-          ; mkModule           : string -> freeformModule -> module
-          ; contributeModules  : attrs -> attrsOf (attrsOf module) -> attrs
-          }
+manifest : { inputs : attrs; modules : attrsOf (attrsOf module);
+             libOverlays : attrsOf libOverlay }
 ```
 
-Applies the closure attrset to an overlay given as a function or a path to one, and normalizes the result: the built `libOverlay` always carries both keys, with `imports` defaulted to `[ ]`. Already-built overlays are registered directly, never wrapped.
-
-The closure's `mkModule` is bound to the defining composition, so
-modules contributed by an overlay close over the definer's inputs and
-library. `contributeModules prev { <class>.<name> = module; }`
-returns the `caisson.modules` registry merge for the overlay's output
-(merge its result with any namespace contributions); it arrives
-through the closure rather than the composed library because an
-overlay's output attribute names must not depend on `final`. Qualify
-contributed names with your project prefix (`my-flake/my-service`);
-the composing flake's local registrations apply last and win over
-same-named contributions. See
-[Module classes](../concepts/module-classes.md) for the two
-registration channels.
+The capture of what `mkLib` consumed, injected as the composition's
+final overlay. Every mkLib composition self-describes: a consumer's
+composed library carries the consumer's own manifest. Checks live on
+the export side only (the flake-parts integration type-checks it and
+projects the `flake.libOverlays` and `flake.modules` outputs from
+it); producers validate their own manifests in their own CI.
 
 ### `importApply`
-
-- **Source:** `lib-overlays/core/default.nix`
 
 ```
 importApply : freeformModule -> attrs -> module
@@ -124,8 +140,6 @@ importApply : freeformModule -> attrs -> module
 Applies static arguments to a module through `_file`/`imports` wrappers while preserving wrapper metadata. Used for threading arguments through module import chains.
 
 ### `callConsumerFlake`
-
-- **Source:** `lib-overlays/core/default.nix`
 
 ```
 callConsumerFlake :
@@ -137,7 +151,7 @@ callConsumerFlake :
 ```
 
 Evaluates a consumer-style flake from source with explicitly supplied
-inputs — the heart of integration testing. The flake's declared inputs
+inputs: the heart of integration testing. The flake's declared inputs
 resolve by name: `overrides` first, then `follows` chains through the
 other resolved inputs, then `pool`; an unresolvable input throws an
 error naming it. The self fixpoint and decoration are handled by the
@@ -145,20 +159,69 @@ shared `call-flake` kernel (also used by the eval-weight harness).
 Nothing is fetched: locks are not read, and `sourceInfo` attrs appear
 only if supplied. See [Testing](../testing.md).
 
+### `compose`, `resolve`, `partitionExtraInputs`
+
+The composition calculus (`compose`), the layered ecosystem-source
+resolver (`resolve`), and the read-only-eval-safe partition
+extra-inputs loader, re-exposed from caisson-core. See
+[The composition calculus](../concepts/composition-calculus.md) and
+caisson-core's own documentation.
+
+## The caisson namespace
+
+### `mkFlake`
+
+- **Source:** `lib-overlays/flake-parts/default.nix`
+
+```
+mkFlake :
+  { configModule  : module                                  # flake class
+  , moduleImports ? (modules: modules)
+                  : attrsOf module -> attrsOf module        # selection from modules.flake
+  , name          ? null : nullOr string                    # rev-independent module identity
+  , ...                                                     # forwarded to flake-parts mkFlake
+  } -> flakeOutputs
+```
+
+Builds final flake outputs via `flake-parts` using the composed `lib`
+and the composition's manifest: the flake's `inputs` and registered
+modules are read from `lib.caisson-core.manifest`, so `mkFlake`
+requires a manifest-carrying (mkLib-built) composition. The
+flake-parts pin is caisson's own, closed over at the integration's
+definition; consumers declare no flake-parts input. `name` sets
+flake-parts' `moduleLocation` (so exported modules deduplicate across
+revs) and defaults `caisson.configInfo.configName`.
+
+### `mkFlakeModule`
+
+- **Source:** `lib-overlays/flake-parts/default.nix`
+
+```
+mkFlakeModule : freeformModule -> module    # = caisson-core.mkModule "flake"
+```
+
+Convenience form of `mkModule "flake"` for flake-parts modules.
+
 ### `eval-weight`
 
-- **Source:** `lib-overlays/core/eval-weight/`
+- **Source:** `lib-overlays/tooling/eval-weight/`
 
 The evaluation-cost measurement harness: `eval-weight.mkCheck` builds a
 check derivation that measures eval scenarios in a sandbox and gates
 deterministic metrics against a committed baseline. Documented in
 [Evaluation weight](../eval-weight.md).
 
+### `mkMemoizedDerivationRead`
+
+- **Source:** `lib-overlays/tooling/mk-memoized-derivation-read.nix`
+
+Builds memoized derivation-content readers; see the source header.
+
 ## Types
 
 ### `types.libOverlay`
 
-- **Source:** `lib-overlays/core/default.nix`
+- **Source:** `lib-overlays/flake-parts/default.nix`
 
 A module-system option type for built library overlays. Its `check`
 verifies the structure recursively: an attrset with an `overlay`
@@ -166,20 +229,34 @@ function and a (possibly absent) `imports` list whose entries are
 themselves valid `libOverlay`s. Used by options that carry overlays,
 such as `caisson.libOverlays.exported`.
 
+### `types.manifest`
+
+- **Source:** `lib-overlays/flake-parts/default.nix`
+
+A structural option type for the caisson-core manifest
+(`{ inputs, modules, libOverlays }`). The export-side check: the core
+flake-parts module reads `lib.caisson-core.manifest` through an
+option of this type before projecting the `flake.libOverlays` and
+`flake.modules` outputs.
+
 ## Integration namespaces
 
 Each integration is a library overlay exported by this flake
 (`libOverlays.<target>`) and available as a calculus entry via
 `lib.composition.entriesFor`. Composing one contributes its
-`lib.caisson.<target>` namespace, documented below. Every entry point takes its target
-ecosystem as an explicit `ecosystemSrc` argument; the integrations
-pin nothing themselves. Common conventions:
+`lib.caisson.<target>` namespace, documented below (the flake-parts
+integration contributes directly under `lib.caisson`, plus the
+`lib.flake-parts` mirror of flake-parts' own library). Every entry
+point takes its target ecosystem as an explicit `ecosystemSrc`
+argument; the integrations pin nothing themselves, with one
+exception: flake-parts, whose pin is caisson's own hidden input.
+Common conventions:
 
 - `pkgSets`: an attrset of package sets; `pkgSets.pkgs` is required
   where present and becomes the evaluation's package set (also passed
   through in `specialArgs`/`extraSpecialArgs`).
 - `moduleImports`: a selection function over the corresponding class
-  registry (`lib.caisson.modules.<class>`), defaulting to all
+  registry (`lib.caisson-core.modules.<class>`), defaulting to all
   registered modules.
 - Framework-provided special arguments compose first; the caller's
   win on conflict.

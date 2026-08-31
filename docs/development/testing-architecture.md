@@ -136,7 +136,7 @@ In the raw-import path, `follows` doesn't apply — there's no lockfile resoluti
 The direct inputs (`nixpkgs`, `nix-unit`, etc.) are provided explicitly in
 `unitTestInputs`. But `deps` still needs to be provided because the test flake's
 `outputs` function receives the full `inputs` attrset (via `inputs@{ ... }`), and
-that attrset is passed onward to `parent.lib.mkLib { inherit inputs; }` and to the
+that attrset is passed onward to `parent.lib.caisson-core.mkLib { inherit inputs; ... }` and to the
 nix-unit module via `perSystem.nix-unit = { inherit inputs; }`. If any code path
 accesses `inputs.deps`, it must resolve to something sensible.
 
@@ -193,14 +193,19 @@ The unit test flake (`tests/unit/flake.nix`) bootstraps itself using caisson's o
 framework:
 
 ```nix
-lib = parent.lib.mkLib { inherit inputs; };
+lib = parent.lib.caisson-core.mkLib {
+  inherit inputs;
+  libOverlays = _mkLibOverlay: {
+    flake-parts = parent.libOverlays.flake-parts;
+  };
+};
 
 lib.caisson.mkFlake {
   configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/unit-tests;
 };
 ```
 
-The `parent` input is caisson itself. By using `parent.lib.mkLib` and
+The `parent` input is caisson itself. By using `parent.lib.caisson-core.mkLib` and
 `lib.caisson.mkFlake`, the test flake exercises the same module composition path
 that downstream consumers use. This means the tests are not just testing library
 functions in isolation — they verify that the framework's composition machinery
@@ -258,7 +263,7 @@ module composition behave as expected from a consumer's perspective.
 Each integration test is a standalone flake under `tests/integration/<name>/` that:
 
 1. Takes `parent` (caisson) as an input
-2. Calls `parent.lib.mkLib { inherit inputs; }` to bootstrap
+2. Calls `parent.lib.caisson-core.mkLib { inherit inputs; ... }` to bootstrap
 3. Uses `lib.caisson.mkFlake` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
    worked

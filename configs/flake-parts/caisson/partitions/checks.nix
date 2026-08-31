@@ -8,7 +8,7 @@
 {
 
   partitions.checks = {
-    extraInputs = lib.caisson.partitionExtraInputs ../../../../tests/dependencies;
+    extraInputs = lib.caisson-core.partitionExtraInputs ../../../../tests/dependencies;
     module =
       { inputs, self, ... }:
       {
@@ -31,7 +31,7 @@
             };
             callConsumer =
               args:
-              lib.caisson.callConsumerFlake (
+              lib.caisson-core.callConsumerFlake (
                 {
                   pool = consumerPool;
                 }
@@ -83,7 +83,7 @@
 
             # Imported directly (not via lib) because a partition's
             # inputs.self is the extra-inputs flake, not caisson itself.
-            evalWeight = import (self.outPath + "/lib-overlays/core/eval-weight") {
+            evalWeight = import (self.outPath + "/lib-overlays/tooling/eval-weight") {
               lib = pkgs.lib;
             };
             evalWeightArgs = {

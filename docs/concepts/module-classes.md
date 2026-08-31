@@ -11,7 +11,7 @@ This builds on flake-parts' generic `flake.modules` support while adding closed-
 
 ## mkModule Factory
 
-`lib.caisson.mkModule` is class-parameterized:
+`lib.caisson-core.mkModule` is class-parameterized:
 
 ```nix
 mkModule = class: freeformModule: ...
@@ -26,7 +26,7 @@ modules = {
   };
 
   generic = {
-    helper = lib.caisson.mkModule "generic" ./modules/generic/helper;
+    helper = lib.caisson-core.mkModule "generic" ./modules/generic/helper;
   };
 };
 ```
@@ -38,8 +38,8 @@ nested use of `mkModule` stays in that class.
 
 ## Registration APIs
 
-Modules enter the class-keyed registry (`lib.caisson.modules`) through
-two channels:
+Modules enter the class-keyed registry (`lib.caisson-core.modules`)
+through two channels:
 
 - **Local registration**, `mkLib`'s `modules` hook: a function
   `lib: { ... }` receiving the composed `lib` (whose helpers, like

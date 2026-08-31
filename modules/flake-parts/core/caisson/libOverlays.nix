@@ -1,10 +1,4 @@
 # SPDX-License-Identifier: MIT
-{
-  libOverlays,
-  ...
-}:
-
-{ ... }:
 { config, lib, ... }:
 {
   options.caisson.libOverlays = {
@@ -29,7 +23,7 @@
 
     flake.libOverlays =
       if config.caisson.libOverlays.export.enabled then
-        config.caisson.libOverlays.exported libOverlays
+        config.caisson.libOverlays.exported config.caisson.manifest.libOverlays
       else
         { };
 

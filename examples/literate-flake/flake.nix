@@ -45,9 +45,11 @@
       /*
         Step 1: Bootstrap a composed library.
 
-        `mkLib` extends nixpkgs-lib with the framework's core overlay and any
-        local overlays you provide. The resulting `lib` has the full `caisson`
-        namespace plus your own extensions (here, `lib.literate`).
+        `caisson-core.mkLib` composes a library from registered overlays and
+        injects the machinery, the module registry, and the manifest under
+        `lib.caisson-core`. Registering caisson's `flake-parts` integration
+        overlay contributes `lib.caisson` (mkFlake and friends); your own
+        overlays contribute your extensions (here, `lib.literate`).
 
         - `inputs` are closed over so that modules and overlays can reference
           them without threading inputs explicitly through every call site.
@@ -57,14 +59,14 @@
           helper, used to register library overlays without a separate bootstrap
           library in downstream flakes.
       */
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
 
         modules = lib: {
           # Demonstrate class-keyed module registration.
           # This class is not imported by mkFlake in this example.
           generic = {
-            noop = lib.caisson.mkModule "generic" ({ ... }: { });
+            noop = lib.caisson-core.mkModule "generic" ({ ... }: { });
           };
           flake = {
             # Import the framework's default module, which provides configInfo,
@@ -80,6 +82,10 @@
         };
 
         libOverlays = mkLibOverlay: {
+          # Register caisson's flake-parts integration (already built, so
+          # it registers directly), which contributes lib.caisson.mkFlake.
+          flake-parts = caisson.libOverlays.flake-parts;
+
           # Register a local library overlay. After mkLib completes, its
           # attributes are available on the composed `lib` (e.g. lib.literate).
           default = mkLibOverlay ./lib-overlays/default;

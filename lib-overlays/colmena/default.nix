@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkColmenaModule = final.caisson.mkModule "colmena";
+      mkColmenaModule = final.caisson-core.mkModule "colmena";
 
       assertColmenaEcosystemSrc =
         ecosystemSrc:
@@ -24,7 +24,7 @@
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson.modules.colmena or { });
+          selectedModules = moduleImports (final.caisson-core.modules.colmena or { });
         in
         {
           modules = (builtins.attrValues selectedModules) ++ modules;

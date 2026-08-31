@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkSystemManagerModule = final.caisson.mkModule "systemManager";
+      mkSystemManagerModule = final.caisson-core.mkModule "systemManager";
 
       assertSystemManagerEcosystemSrc =
         ecosystemSrc:
@@ -24,7 +24,7 @@
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson.modules.systemManager or { });
+          selectedModules = moduleImports (final.caisson-core.modules.systemManager or { });
         in
         {
           modules = (builtins.attrValues selectedModules) ++ modules;

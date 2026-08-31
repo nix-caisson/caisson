@@ -16,28 +16,30 @@
 
   caisson = {
 
-    libOverlays.exported =
-      libOverlays:
-      let
-        # Integration overlays export with the framework overlay in their
-        # import chain, so composing one from outside is self-contained.
-        selfContained = name: {
-          imports = [ libOverlays.default ];
-          inherit (libOverlays.${name}) overlay;
-        };
-      in
-      {
-        inherit (libOverlays) default;
-        nixpkgs = selfContained "nixpkgs";
-        nixos = selfContained "nixos";
-        home-manager = selfContained "home-manager";
-        colmena = selfContained "colmena";
-        terranix = selfContained "terranix";
-        system-manager = selfContained "system-manager";
-      };
+    # Every registered overlay exports as-is: integrations carry no
+    # hidden framework dependency (their machinery is baked in at
+    # registration, and the registry arrives through the consumer's
+    # own mkLib), so no import chain is added.
+    libOverlays.exported = libOverlays: {
+      inherit (libOverlays)
+        flake-parts
+        tooling
+        nixpkgs
+        nixos
+        home-manager
+        colmena
+        terranix
+        system-manager
+        ;
+    };
     modules.flake.exported = modules: { inherit (modules) default; };
 
-    lib.export.enabled = true;
+    lib = {
+      export.enabled = true;
+      # The native surface mirrors the composed library's framework
+      # namespaces, so flake-level and composed-level addresses match.
+      exported = composedLib: { inherit (composedLib) caisson caisson-core; };
+    };
 
   };
 

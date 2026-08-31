@@ -4,12 +4,44 @@
   inputs ? { },
 }:
 let
-  # The passed lib is the composed library from the unit test flake.
-  # It contains caisson namespace.
-  caisson = lib.caisson;
-  mkFlakeModule = caisson.mkFlakeModule;
-  mkLibOverlay = caisson.mkLibOverlay;
-  mkModule = caisson.mkModule;
+  # The passed lib is the composed library from the unit test flake,
+  # carrying both framework namespaces: `caisson-core` (machinery,
+  # registry, manifest) and `caisson` (the integrations).
+  mkFlakeModule = lib.caisson.mkFlakeModule;
+  mkLibOverlay = lib.caisson-core.mkLibOverlay;
+  mkModule = lib.caisson-core.mkModule;
+
+  # caisson's flake-parts integration overlay, recovered from this
+  # composition's own manifest, so test compositions can register it
+  # the way a consumer registering the exported overlay would.
+  flakePartsOverlay = lib.caisson-core.manifest.libOverlays.flake-parts;
+
+  # Test-facing mkLib: registers the flake-parts integration into
+  # every test composition (so composed test libraries carry
+  # caisson.mkFlake), and otherwise defers to caisson-core.mkLib.
+  # Malformed arguments pass through untouched so the machinery's own
+  # shape errors stay observable.
+  testMkLib =
+    args:
+    let
+      raw = args.libOverlays or (_mkLibOverlay: { });
+    in
+    if !(builtins.isAttrs args) || !(builtins.isFunction raw) then
+      lib.caisson-core.mkLib args
+    else
+      lib.caisson-core.mkLib (
+        args
+        // {
+          libOverlays = mkLibOverlay': { flake-parts = flakePartsOverlay; } // raw mkLibOverlay';
+        }
+      );
+
+  # The names the test bodies use: the caisson namespace, with the
+  # machinery reachable the way the pre-split surface exposed it.
+  caisson = lib.caisson // {
+    inherit (lib.caisson-core) mkLibOverlay mkModule importApply;
+    mkLib = testMkLib;
+  };
 
   mockInputs = {
     nixpkgs-lib.lib = lib;
@@ -658,7 +690,7 @@ in
             };
           };
         in
-        builtins.attrNames (myLib.caisson.modules.nixos or { });
+        builtins.attrNames (myLib.caisson-core.modules.nixos or { });
       expected = [ "probe" ];
     };
 
@@ -667,7 +699,7 @@ in
         let
           myLib = mkTestLib {
             modules = testLib: {
-              nixos.local = testLib.caisson.mkModule "nixos" ({ ... }: { config.local = true; });
+              nixos.local = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.local = true; });
             };
             libOverlays = _mkLibOverlay: {
               contrib = mkLibOverlay (
@@ -688,7 +720,7 @@ in
             };
           };
         in
-        builtins.attrNames (myLib.caisson.modules.nixos or { });
+        builtins.attrNames (myLib.caisson-core.modules.nixos or { });
       expected = [
         "contributed"
         "local"
@@ -725,7 +757,7 @@ in
             };
           };
         in
-        builtins.attrNames (myLib.caisson.modules.homeManager or { });
+        builtins.attrNames (myLib.caisson-core.modules.homeManager or { });
       expected = [ "carried" ];
     };
 
@@ -734,7 +766,7 @@ in
         let
           myLib = mkTestLib {
             modules = testLib: {
-              nixos.shared = testLib.caisson.mkModule "nixos" ({ ... }: { config.origin = "local"; });
+              nixos.shared = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.origin = "local"; });
             };
             libOverlays = _mkLibOverlay: {
               contrib = mkLibOverlay (
@@ -755,7 +787,7 @@ in
             };
           };
         in
-        myLib.caisson.modules.nixos.shared.config.origin;
+        myLib.caisson-core.modules.nixos.shared.config.origin;
       expected = "local";
     };
 
@@ -787,7 +819,7 @@ in
         in
         {
           marker = myLib.probe-ns.marker or "missing";
-          stillHasMkLib = builtins.isFunction (myLib.caisson.mkLib or null);
+          stillHasMkLib = builtins.isFunction (myLib.caisson-core.mkLib or null);
         };
       expected = {
         marker = "ok";
@@ -891,10 +923,10 @@ in
                   {
                     flake.inspect = {
                       hasNamespace = callbackLib ? caisson;
-                      hasMkModule = builtins.isFunction callbackLib.caisson.mkModule;
+                      hasMkModule = builtins.isFunction callbackLib.caisson-core.mkModule;
                       hasMkFlakeModule = builtins.isFunction callbackLib.caisson.mkFlakeModule;
-                      hasMkLibOverlay = builtins.isFunction callbackLib.caisson.mkLibOverlay;
-                      hasImportApply = builtins.isFunction callbackLib.caisson.importApply;
+                      hasMkLibOverlay = builtins.isFunction callbackLib.caisson-core.mkLibOverlay;
+                      hasImportApply = builtins.isFunction callbackLib.caisson-core.importApply;
                     };
                   }
                 );
@@ -1069,7 +1101,7 @@ in
           myLib = caisson.mkLib {
             inputs = mockInputs;
             libOverlays = _mkLibOverlay: {
-              fromAlias = lib.caisson.mkLibOverlay (
+              fromAlias = lib.caisson-core.mkLibOverlay (
                 { ... }:
                 {
                   overlay = _final: _prev: {

@@ -26,8 +26,8 @@ reading order:
 - [Library overlays](concepts/library-overlays.md) — namespaced,
   dependency-declaring `lib` composition, and the patterns for writing
   overlays.
-- [Library lifecycle](concepts/library-lifecycle.md) — the mechanics:
-  how `mkLib` bootstraps, selects, and composes the final `lib`.
+- [Library lifecycle](concepts/library-lifecycle.md), the mechanics:
+  how `mkLib` registers, selects, and composes the final `lib`.
 - [The composition calculus](concepts/composition-calculus.md): the
   foundation contract under library composition, implemented in
   caisson-core, and caisson's entries onto it.

@@ -20,7 +20,23 @@ The canonical name of this flake. Used in doc/version strings and as a default n
 - **Default:** `false`
 - **Source:** `modules/flake-parts/default/caisson/lib.nix`
 
-Whether to enable lib export. When enabled, exports `lib.<configName>` as `flake.lib`. Requires `configInfo.configName` to be set.
+Whether to enable lib export. When enabled, publishes the selection made by `caisson.lib.exported` as `flake.lib`.
+
+### `caisson.lib.exported`
+
+- **Type:** `function → lazyAttrsOf raw`
+- **Default:** `composedLib: composedLib.${configName}` (requires `configInfo.configName`)
+- **Source:** `modules/flake-parts/default/caisson/lib.nix`
+
+Function that selects which parts of the composed library to publish as the flake's `lib` output. The default exports the flake's own namespace; caisson itself sets `composedLib: { inherit (composedLib) caisson caisson-core; }` so flake-level and composed-level addresses match.
+
+### `caisson.manifest`
+
+- **Type:** `caisson.types.manifest` (read-only)
+- **Default:** the composed library's `caisson-core.manifest`
+- **Source:** `modules/flake-parts/core/caisson/manifest.nix`
+
+The composition's manifest: the capture of what `mkLib` consumed (`inputs`, `modules`, `libOverlays`). Reading it type-checks the manifest; the `flake.modules` and `flake.libOverlays` projections are drawn from it.
 
 ### `caisson.modules`
 

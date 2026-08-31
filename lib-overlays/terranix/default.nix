@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkTerranixModule = final.caisson.mkModule "terranix";
+      mkTerranixModule = final.caisson-core.mkModule "terranix";
 
       assertTerranixEcosystemSrc =
         ecosystemSrc:
@@ -24,7 +24,7 @@
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson.modules.terranix or { });
+          selectedModules = moduleImports (final.caisson-core.modules.terranix or { });
         in
         {
           modules = (builtins.attrValues selectedModules) ++ modules;

@@ -106,19 +106,20 @@ caisson.lib.composition.entriesFor {
   ecosystemSrc = "${inputs.nixpkgs-lib}/lib";
 }
 # => { base, caisson-lib,
+#      flake-parts, tooling,
 #      nixpkgs, nixos, home-manager,
 #      colmena, terranix, system-manager }
 ```
 
 `base` (key `caisson.nixpkgs-lib`) contributes the nixpkgs library
 the composition builds on; `caisson-lib` (key `caisson.lib`) imports
-it and contributes the `caisson` namespace and its companions.
-Composing `[ caisson-lib ]` with `caisson-core`'s `compose` yields a
-library equivalent to the one caisson's own `mkLib` produces today.
+it and contributes the `caisson-core` machinery namespace, the same
+injection `mkLib` performs.
 
-The remaining entries are caisson's integrations, one per target
-ecosystem, each importing `caisson-lib` and contributing its own
-namespace (`caisson.nixos.mkSystem`,
-`caisson.home-manager.mkHomeConfiguration`, and so on). An
-integration takes its target as an explicit `ecosystemSrc` argument
-at its own entry points and pins nothing itself.
+The remaining entries are caisson's integrations and tooling, each
+importing `caisson-lib` and contributing its own namespace
+(`caisson.mkFlake` from the flake-parts entry,
+`caisson.nixos.mkSystem`, `caisson.home-manager.mkHomeConfiguration`,
+and so on). An integration takes its target as an explicit
+`ecosystemSrc` argument at its own entry points and pins nothing
+itself; flake-parts is the exception, closing over caisson's own pin.

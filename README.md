@@ -75,7 +75,7 @@ an explicit `ecosystemSrc` argument and pins nothing itself.
 
 ## Quick start
 
-Use `mkLib` to compose your library with caisson's, then `mkFlake` to
+Use `caisson-core.mkLib` to compose your library, then `mkFlake` to
 produce the flake outputs. By convention, your primary configuration
 lives in `configs/flake-parts/<flake-name>`.
 
@@ -86,8 +86,10 @@ lives in `configs/flake-parts/<flake-name>`.
   outputs = inputs@{ self, caisson, ... }:
     let
 
-      # Create a composed 'lib' by extending caisson's library
-      lib = caisson.lib.mkLib {
+      # Compose a library: the machinery lands under lib.caisson-core,
+      # and caisson's flake-parts integration overlay contributes
+      # lib.caisson (mkFlake and friends).
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
 
         # Register class-keyed modules. This function receives the composed lib.
@@ -100,15 +102,17 @@ lives in `configs/flake-parts/<flake-name>`.
           };
         };
 
-        # The library overlays this flake defines. This function receives
-        # an input-closed mkLibOverlay helper.
+        # The library overlays this flake registers. This function receives
+        # an input-closed mkLibOverlay helper; already-built overlays (like
+        # caisson's integrations) register directly.
         libOverlays = mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
           # other = inputs.other-flake.libOverlays.default;
         };
 
-        # Select which of the defined overlays to apply to this flake's lib.
-        libOverlayImports = overlays: builtins.attrValues { inherit (overlays) default; };
+        # Select which of the registered overlays to apply to this flake's lib.
+        libOverlayImports = overlays: builtins.attrValues { inherit (overlays) flake-parts default; };
 
       };
 

@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkNixosModule = final.caisson.mkModule "nixos";
+      mkNixosModule = final.caisson-core.mkModule "nixos";
 
       assertPkgSets =
         pkgSets:
@@ -36,7 +36,7 @@
           resolvedSystem =
             args.system
               or (checkedPkgSets.pkgs.stdenv.hostPlatform.system or (checkedPkgSets.pkgs.system or null));
-          selectedModules = moduleImports (final.caisson.modules.nixos or { });
+          selectedModules = moduleImports (final.caisson-core.modules.nixos or { });
           extraModules = builtins.attrValues selectedModules;
           frameworkModule = mkFrameworkModule checkedPkgSets;
         in

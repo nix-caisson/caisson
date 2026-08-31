@@ -16,14 +16,16 @@ Create a directory with this `flake.nix`:
   inputs = {
     caisson.url = "github:nix-caisson/caisson";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.follows = "caisson/flake-parts";
   };
 
   outputs =
     inputs@{ caisson, ... }:
     let
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
+        libOverlays = _mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
+        };
       };
     in
     lib.caisson.mkFlake {
@@ -33,9 +35,12 @@ Create a directory with this `flake.nix`:
 }
 ```
 
-`mkLib` composes a library: nixpkgs' lib, the framework's `caisson`
-namespace, and (later) your own overlays. `mkFlake` then evaluates
-flake-parts with that library and your config module.
+`caisson-core.mkLib` composes a library: nixpkgs' lib, the machinery
+under `lib.caisson-core`, and the overlays you register. Registering
+caisson's `flake-parts` integration overlay contributes `lib.caisson`
+(`mkFlake` and friends); `mkFlake` then evaluates flake-parts with
+that library and your config module, using caisson's own flake-parts
+pin, so your flake declares none.
 
 The config module is the flake's own top-level configuration. Create
 `configs/flake-parts/my-flake/default.nix`:
@@ -89,9 +94,10 @@ Register it in `flake.nix` and export it, and turn on the lib export
 in the config module:
 
 ```nix
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
         libOverlays = mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -120,12 +126,13 @@ integration classes (`nixos`, `homeManager`, ...) feed their module
 systems. Register a flake-class module:
 
 ```nix
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
         modules = lib: {
           flake.default = lib.caisson.mkFlakeModule ./modules/flake-parts/default;
         };
         libOverlays = mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -178,8 +185,9 @@ in the composition; register it from caisson's exports:
 
 ```nix
         libOverlays = mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
+          nixos = caisson.libOverlays.nixos;
           default = mkLibOverlay ./lib-overlays/default;
-          nixos = inputs.caisson.libOverlays.nixos;
         };
 ```
 
@@ -195,15 +203,15 @@ A consumer registers your exported overlay the same way:
   inputs = {
     caisson.url = "github:nix-caisson/caisson";
     my-flake.url = "github:you/my-flake";
-    flake-parts.follows = "caisson/flake-parts";
   };
 
   outputs =
     inputs@{ caisson, my-flake, ... }:
     let
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
         libOverlays = _mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
           my-flake = my-flake.libOverlays.default;
         };
       };

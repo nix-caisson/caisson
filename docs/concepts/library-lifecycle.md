@@ -2,19 +2,20 @@
 
 ## Overview
 
-caisson builds a composed `lib` by layering overlays on top of `nixpkgs-lib`. This process happens during `mkLib` and determines what functions are available to every module in the flake. Understanding this lifecycle is essential for writing overlays that compose correctly.
+caisson builds a composed `lib` by layering overlays on top of a base library. This process happens during `caisson-core.mkLib` and determines what functions are available to every module in the flake. Understanding this lifecycle is essential for writing overlays that compose correctly.
 
 ## Phases
 
-### 1. Bootstrap
+### 1. Arguments
 
-`mkLib` starts by extending the base library (`nixpkgs-lib` by default;
-overridable via the `baseLib` argument) with the framework's core
-overlay, closed over the caller's `inputs`. This bootstrap library
-exists only to mint the input-closed helpers — most importantly the
-`mkLibOverlay` passed to the `libOverlays` function. The final `lib` is
-**not** built on top of it; composition restarts from the base library
-in phase 4.
+`mkLib` takes the base library as a plain `baseLib` argument; nothing
+is looked up by input name. When called from a composed library
+(`lib.caisson-core.mkLib`), `baseLib` defaults to that composition's
+own base, so a typical flake passes only `inputs`, registrations, and
+selections. The input-closed helpers (most importantly the
+`mkLibOverlay` passed to the `libOverlays` function) are minted
+directly from the caller's `inputs`; no bootstrap library is
+involved.
 
 ### 2. Registration
 
@@ -54,11 +55,16 @@ downstream consumers that it does not apply to itself.
 
 ### 4. Composition
 
-Starting again from the base library, the framework applies the core
-overlay and then the selected overlays, left to right:
+Starting from the base library, the framework applies the
+`caisson-core` namespace injection (machinery and module registry),
+then the selected overlays left to right, then two synthetic
+overlays: the flake's own module registrations (so local names win
+over overlay-borne contributions) and the manifest, the capture of
+what `mkLib` consumed (`inputs`, `modules`, `libOverlays`), placed at
+`lib.caisson-core.manifest`:
 
 ```
-baseLib  →  extend(core)  →  extend(selected overlays...)  →  final lib
+baseLib -> caisson-core injection -> selected overlays... -> local registrations -> manifest
 ```
 
 Each overlay receives `final` (the fully composed lib) and `prev` (the lib before this overlay). This is the standard Nix overlay contract.
@@ -84,7 +90,7 @@ This is intentional:
 
 - **Minimal API surface.** The full composed lib includes all of nixpkgs-lib plus every registered overlay. Exporting it would turn every function — including internal overlays and nixpkgs internals — into an implicit public contract, making it much harder to evolve the implementation.
 - **Pin hygiene.** The full lib is built against the exporting flake's own nixpkgs-lib pin. A downstream consumer using functions from that lib would couple themselves to a specific pin they may not control. The `follows` convention exists precisely to let consumers manage their own pin; exporting the full lib undermines it.
-- **Consumer model.** A downstream flake can build its own composed lib against its own inputs by calling `mkLib`; the bootstrap functions that takes (`mkLib`, `mkFlake`, etc.) are available directly on `flake.lib`.
+- **Consumer model.** A downstream flake builds its own composed lib against its own inputs by calling `caisson-core.mkLib`. caisson itself exports both framework namespaces (`flake.lib.caisson-core` and `flake.lib.caisson`) via the `caisson.lib.exported` selection, so flake-level and composed-level addresses match.
 
 This convention applies to any flake built on caisson: export your namespace, not your full lib.
 

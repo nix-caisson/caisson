@@ -6,34 +6,42 @@ change is part of its contract.
 
 | Repository | Moves | Holds |
 |---|---|---|
-| [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | the composition calculus: `compose`, `resolve` |
-| caisson (this repository) | at ecosystem speed | the framework: `mkLib`, `mkFlake`, module classes, integrations |
+| [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | the composition calculus (`compose`, `resolve`) and the library lifecycle (`mkLib`, registration, the manifest) |
+| caisson (this repository) | at ecosystem speed | the seven integrations (flake-parts included) and the pkgs-dependent tooling |
 | [caisson-compat](https://github.com/nix-caisson/caisson-compat) | at upstream speed | pinned-world tests and compatibility exports |
 
 ## caisson-core
 
 The engine. A zero-input flake whose library code references nothing
 but builtins (CI enforces this with a lint), implementing the
-[composition calculus](../concepts/composition-calculus.md). Its
+[composition calculus](../concepts/composition-calculus.md) and the
+library lifecycle: `mkLib` is the point of core. It takes the base
+library as a plain argument (nothing is looked up by input name) and
+injects the machinery, the class-keyed module registry, and the
+manifest under the composed library's `caisson-core` namespace. Its
 contract is intended to freeze: consumers should be able to pin it and
 never think about the pin again. Anyone who wants overlay composition
 without nixpkgs can depend on it directly.
 
 ## caisson
 
-The layer users reach for. It composes libraries, registers and
-exports class-keyed modules, speaks flake-parts, and contains the
-integrations (`nixpkgs`, `nixos`,
-`home-manager`, `colmena`, `terranix`,
-`system-manager`), each a library overlay registering its own
-module class and taking its target ecosystem as an explicit
-`ecosystemSrc` argument. `mkLib` composes on the caisson-core engine
-(vendored under `vendor/caisson-core` while the repositories are
-private; the copy's PROVENANCE.md carries the revision and refresh
-ritual, and caisson-compat pins both repositories and catches drift
-between the copy and caisson-core's main). caisson also exports its
-library contributions, integrations included, in keyed calculus form
-via `lib.composition.entriesFor`.
+The layer users reach for: the seven integrations (`flake-parts`,
+`nixpkgs`, `nixos`, `home-manager`, `colmena`, `terranix`,
+`system-manager`), each a library overlay contributing its
+`lib.caisson` namespace, registering its own module class where it
+has one, and taking its target ecosystem as an explicit
+`ecosystemSrc` argument (flake-parts is the exception: its pin is
+caisson's own hidden input, and it carries the export machinery that
+projects a composition's manifest into flake outputs). The
+pkgs-dependent tooling (`eval-weight`,
+`mkMemoizedDerivationRead`) lives here too. caisson's own flake
+composes on the caisson-core engine (vendored under
+`vendor/caisson-core` while the repositories are private; the copy's
+PROVENANCE.md carries the revision and refresh ritual, and
+caisson-compat pins both repositories and catches drift between the
+copy and caisson-core's main). caisson also exports its library
+contributions, integrations included, in keyed calculus form via
+`lib.composition.entriesFor`.
 
 ## caisson-compat
 

@@ -27,8 +27,11 @@
     let
       # Create a composed 'lib' using the framework's mkLib
       # Note: parent.lib IS lib.caisson because of how it is exported
-      lib = parent.lib.mkLib {
+      lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
+        libOverlays = _mkLibOverlay: {
+          flake-parts = parent.libOverlays.flake-parts;
+        };
       };
 
     in

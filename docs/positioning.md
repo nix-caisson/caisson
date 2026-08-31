@@ -71,3 +71,25 @@ distinctive here rather than variations on a shared theme:
 - **Evaluation-weight gates** ([guide](eval-weight.md)): framework
   overhead is measured and held to committed ceilings in CI rather
   than described.
+
+## The relationship to flakes
+
+Flakes do two jobs today: acquisition (fetching, pinning, integrity)
+and composition (deciding which copy of each dependency an evaluation
+actually uses, via the `follows` pin bucket). caisson separates the
+two. Flakes keep acquisition. Composition moves to the evaluation
+layer, where the calculus gives it real semantics: deduplication is
+key identity, override is wholesale replacement of a keyed entry,
+local patches are the keyless tail, and ecosystems (nixpkgs,
+home-manager, and the rest) are handed in once as explicit
+`ecosystemSrc` arguments instead of being re-pinned and re-wired
+through every level of an input graph.
+
+Everything caisson adds travels through the flake schema's one
+freeform slot, the `lib` output: composed libraries, the module
+registry, and the manifest (the capture of what `mkLib` consumed) all
+live there, and the remaining flake outputs (`modules.<class>`,
+`libOverlays`, per-system products) are projections from it that keep
+the standard schema's addresses. A flake built this way needs only a
+small, regular subset of the flake schema; nothing about it requires
+upstream changes to evaluate.

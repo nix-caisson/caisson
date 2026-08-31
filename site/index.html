@@ -208,11 +208,11 @@
         <h2>Module classes</h2>
         <p>
           Modules register under a class key naming the module system
-          they belong to — <code>flake</code> for flake-parts modules.
+          they belong to: <code>flake</code> for flake-parts modules.
           The class keeps a module from being imported into an
-          evaluation that can't understand it; companion
-          <code>caisson-*</code> integration flakes register further
-          classes for other module ecosystems.
+          evaluation that can't understand it; each shipped
+          integration registers its own class for its module
+          ecosystem.
         </p>
       </div>
 <pre><code>modules = lib: {
@@ -230,7 +230,7 @@
     <h2>Get started</h2>
     <ol class="steps">
       <li><strong>Add the input.</strong> <code>inputs.caisson.url = "github:nix-caisson/caisson";</code></li>
-      <li><strong>Compose your library.</strong> <code>mkLib</code> merges your overlays with caisson's into one <code>lib</code>.</li>
+      <li><strong>Compose your library.</strong> <code>caisson-core.mkLib</code> merges your overlays with caisson's into one <code>lib</code>.</li>
       <li><strong>Emit your outputs.</strong> <code>mkFlake</code> evaluates your config module and module selections into flake outputs.</li>
     </ol>
 <pre><code><span class="c"># flake.nix</span>
@@ -239,9 +239,10 @@
 
   outputs = inputs@{ caisson, ... }:
     let
-      lib = caisson.lib.mkLib {
+      lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
         libOverlays = mkLibOverlay: {
+          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -264,13 +265,14 @@
   <section class="integrations" id="integrations">
     <h2>Integrations</h2>
     <p>
-      caisson itself speaks flake-parts, and it ships integrations that
-      carry the same conventions (closed inputs, library overlays,
-      class-keyed modules) into other module ecosystems, each
-      registering its own module class:
+      caisson ships integrations that carry the same conventions
+      (closed inputs, library overlays, class-keyed modules) into
+      other module ecosystems, each registering its own module class.
+      flake-parts itself is one of them:
     </p>
     <table class="where">
       <tr><th>Integration</th><th>brings caisson's conventions to…</th></tr>
+      <tr><td><code>flake-parts</code></td><td>flake outputs: mkFlake, module export, the manifest projection</td></tr>
       <tr><td><code>nixpkgs</code></td><td>nixpkgs package sets and overlays</td></tr>
       <tr><td><code>nixos</code></td><td>NixOS configurations</td></tr>
       <tr><td><code>home-manager</code></td><td>Home Manager configurations</td></tr>

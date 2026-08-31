@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: MIT
-mkLibArgs@{
-  libOverlays,
-  modules,
-}:
-{ mkModule, ... }:
-{ config, lib, ... }:
+#
+# The core flake-parts module, wired into every mkFlake evaluation by
+# the flake-parts integration. Plain modules on purpose: everything
+# they need arrives through `lib` (the composed library in
+# specialArgs), so no closure application is involved.
+{ ... }:
 {
-  imports = [
-    (mkModule (lib.caisson.importApply ./caisson mkLibArgs))
-  ];
+  imports = [ ./caisson ];
 }

@@ -3,7 +3,7 @@
 {
 
   partitions.formatter = {
-    extraInputs = lib.caisson.partitionExtraInputs ../../../../tests/dependencies;
+    extraInputs = lib.caisson-core.partitionExtraInputs ../../../../tests/dependencies;
     module =
       { inputs, ... }:
       {

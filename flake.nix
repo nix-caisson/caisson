@@ -14,36 +14,34 @@
 
   outputs =
     {
-      flake-parts,
       nixpkgs-lib,
-      self,
       ...
     }@inputs:
     (
 
       let
 
-        # We need to hack things to make a bootstrap version of `lib` that
-        # we can use to gain access to a version of `lib` that has all of
-        # our core overlay applied. We assume that at least the caisson overlay
-        # does not have any dependencies on other lib overlays.
-        bootLib = (
-          nixpkgs-lib.lib.extend
-            (import ./lib-overlays/core { inherit inputs; } { closure-inputs = inputs; }).overlay
-        );
+        # The composition engine, vendored from caisson-core (see
+        # vendor/caisson-core/PROVENANCE.md). Its mkLib takes the base
+        # library as a plain argument and injects the machinery, the
+        # module registry, and the manifest under `caisson-core`.
+        engine = import ./vendor/caisson-core/lib;
 
-        lib = bootLib.caisson.mkLib {
+        lib = engine.mkLib {
 
           inherit inputs;
 
-          modules = lib: {
+          baseLib = nixpkgs-lib.lib;
+
+          modules = composedLib: {
             flake = {
-              default = lib.caisson.mkFlakeModule ./modules/flake-parts/default;
+              default = composedLib.caisson.mkFlakeModule ./modules/flake-parts/default;
             };
           };
 
           libOverlays = mkLibOverlay: {
-            default = mkLibOverlay ./lib-overlays/default;
+            flake-parts = mkLibOverlay ./lib-overlays/flake-parts;
+            tooling = mkLibOverlay ./lib-overlays/tooling;
             nixpkgs = mkLibOverlay ./lib-overlays/nixpkgs;
             nixos = mkLibOverlay ./lib-overlays/nixos;
             home-manager = mkLibOverlay ./lib-overlays/home-manager;

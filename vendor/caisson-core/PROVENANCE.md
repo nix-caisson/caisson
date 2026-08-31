@@ -1,7 +1,7 @@
 # Vendored caisson-core
 
 Source: https://github.com/nix-caisson/caisson-core
-Revision: ce8522476a71f79ef7daf26659c615968a1c65fe
+Revision: 3790a73 (migrate the library lifecycle into core)
 Contents: `lib/` (the composition calculus and kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and
