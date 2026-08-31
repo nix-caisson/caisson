@@ -23,9 +23,9 @@ without nixpkgs can depend on it directly.
 
 The layer users reach for. It composes libraries, registers and
 exports class-keyed modules, speaks flake-parts, and contains the
-integrations (`caisson-nixpkgs`, `caisson-nixos`,
-`caisson-home-manager`, `caisson-colmena`, `caisson-terranix`,
-`caisson-system-manager`), each a library overlay registering its own
+integrations (`nixpkgs`, `nixos`,
+`home-manager`, `colmena`, `terranix`,
+`system-manager`), each a library overlay registering its own
 module class and taking its target ecosystem as an explicit
 `ecosystemSrc` argument. `mkLib` composes on the caisson-core engine
 (vendored under `vendor/caisson-core` while the repositories are

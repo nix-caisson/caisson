@@ -23,7 +23,7 @@
       integrationEntry = target: {
         key = "caisson.${target}";
         imports = [ entries.caisson-lib ];
-        overlay = (import ../lib-overlays/caisson-${target} { closure-inputs = inputs; }).overlay;
+        overlay = (import (../lib-overlays + "/${target}") { closure-inputs = inputs; }).overlay;
       };
 
       entries = {
@@ -46,12 +46,12 @@
             coreDelta // defaultOverlay final afterCore;
         };
 
-        caisson-nixpkgs = integrationEntry "nixpkgs";
-        caisson-nixos = integrationEntry "nixos";
-        caisson-home-manager = integrationEntry "home-manager";
-        caisson-colmena = integrationEntry "colmena";
-        caisson-terranix = integrationEntry "terranix";
-        caisson-system-manager = integrationEntry "system-manager";
+        nixpkgs = integrationEntry "nixpkgs";
+        nixos = integrationEntry "nixos";
+        home-manager = integrationEntry "home-manager";
+        colmena = integrationEntry "colmena";
+        terranix = integrationEntry "terranix";
+        system-manager = integrationEntry "system-manager";
 
       };
     in

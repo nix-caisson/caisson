@@ -106,8 +106,8 @@ caisson.lib.composition.entriesFor {
   ecosystemSrc = "${inputs.nixpkgs-lib}/lib";
 }
 # => { base, caisson-lib,
-#      caisson-nixpkgs, caisson-nixos, caisson-home-manager,
-#      caisson-colmena, caisson-terranix, caisson-system-manager }
+#      nixpkgs, nixos, home-manager,
+#      colmena, terranix, system-manager }
 ```
 
 `base` (key `caisson.nixpkgs-lib`) contributes the nixpkgs library
@@ -118,7 +118,7 @@ library equivalent to the one caisson's own `mkLib` produces today.
 
 The remaining entries are caisson's integrations, one per target
 ecosystem, each importing `caisson-lib` and contributing its own
-namespace (`caisson-nixos.mkSystem`,
-`caisson-home-manager.mkHomeConfiguration`, and so on). An
+namespace (`caisson.nixos.mkSystem`,
+`caisson.home-manager.mkHomeConfiguration`, and so on). An
 integration takes its target as an explicit `ecosystemSrc` argument
 at its own entry points and pins nothing itself.

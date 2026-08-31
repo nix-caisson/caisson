@@ -26,7 +26,7 @@ knowing the chain exists.
 **Why do integrations take `ecosystemSrc` instead of pinning their
 targets?**
 So the consumer controls every ecosystem version and caisson imposes
-no transitive pins. An integration is glue: `caisson-nixos` composes
+no transitive pins. An integration is glue: `caisson.nixos` composes
 whatever nixpkgs you hand it, and two consumers of the same caisson
 can run different nixpkgs revisions. The argument is explicit rather
 than resolved from input names by convention.

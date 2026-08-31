@@ -14,7 +14,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? terranixConfiguration then
           ecosystemSrc
         else
-          throw "lib.caisson-terranix.mkTerranixConfiguration requires `ecosystemSrc.lib.terranixConfiguration`.";
+          throw "lib.caisson.terranix.mkTerranixConfiguration requires `ecosystemSrc.lib.terranixConfiguration`.";
 
       mkCommonArgs =
         args@{
@@ -62,11 +62,13 @@
         );
     in
     {
-      caisson-terranix = (prev.caisson-terranix or { }) // {
-        inherit
-          mkTerranixConfiguration
-          mkTerranixModule
-          ;
+      caisson = (prev.caisson or { }) // {
+        terranix = ((prev.caisson or { }).terranix or { }) // {
+          inherit
+            mkTerranixConfiguration
+            mkTerranixModule
+            ;
+        };
       };
     };
 

@@ -14,7 +14,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
           ecosystemSrc
         else
-          throw "lib.caisson-system-manager.mkSystemConfig requires `ecosystemSrc.lib.makeSystemConfig`.";
+          throw "lib.caisson.system-manager.mkSystemConfig requires `ecosystemSrc.lib.makeSystemConfig`.";
 
       mkCommonArgs =
         args@{
@@ -135,11 +135,13 @@
         );
     in
     {
-      caisson-system-manager = (prev.caisson-system-manager or { }) // {
-        inherit
-          mkSystemConfig
-          mkSystemManagerModule
-          ;
+      caisson = (prev.caisson or { }) // {
+        system-manager = ((prev.caisson or { }).system-manager or { }) // {
+          inherit
+            mkSystemConfig
+            mkSystemManagerModule
+            ;
+        };
       };
     };
 

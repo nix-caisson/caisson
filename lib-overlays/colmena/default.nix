@@ -14,7 +14,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeHive then
           ecosystemSrc
         else
-          throw "lib.caisson-colmena.mkColmenaHive requires `ecosystemSrc.lib.makeHive`.";
+          throw "lib.caisson.colmena.mkColmenaHive requires `ecosystemSrc.lib.makeHive`.";
 
       mkCommonArgs =
         args@{
@@ -68,11 +68,13 @@
         );
     in
     {
-      caisson-colmena = (prev.caisson-colmena or { }) // {
-        inherit
-          mkColmenaHive
-          mkColmenaModule
-          ;
+      caisson = (prev.caisson or { }) // {
+        colmena = ((prev.caisson or { }).colmena or { }) // {
+          inherit
+            mkColmenaHive
+            mkColmenaModule
+            ;
+        };
       };
     };
 

@@ -157,7 +157,7 @@ and take their target as an explicit `ecosystemSrc`. A NixOS system,
 in the config module's `perSystem` or at the top level:
 
 ```nix
-  flake.nixosConfigurations.example = lib.caisson-nixos.mkSystem {
+  flake.nixosConfigurations.example = lib.caisson.nixos.mkSystem {
     ecosystemSrc = inputs.nixpkgs;
     pkgSets.pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
     configModule =
@@ -173,13 +173,13 @@ in the config module's `perSystem` or at the top level:
   };
 ```
 
-The composed library only contains `caisson-nixos` if its overlay is
+The composed library only contains `caisson.nixos` if its overlay is
 in the composition; register it from caisson's exports:
 
 ```nix
         libOverlays = mkLibOverlay: {
           default = mkLibOverlay ./lib-overlays/default;
-          caisson-nixos = inputs.caisson.libOverlays.caisson-nixos;
+          nixos = inputs.caisson.libOverlays.nixos;
         };
 ```
 

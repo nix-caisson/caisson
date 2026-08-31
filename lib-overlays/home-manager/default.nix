@@ -15,7 +15,7 @@
         if pkgSets ? pkgs then
           pkgSets
         else
-          throw "lib.caisson-home-manager.mkHomeConfiguration requires `pkgSets.pkgs` to be defined.";
+          throw "lib.caisson.home-manager.mkHomeConfiguration requires `pkgSets.pkgs` to be defined.";
 
       resolveOutPath =
         value:
@@ -451,16 +451,18 @@
           '';
     in
     {
-      caisson-home-manager = (prev.caisson-home-manager or { }) // {
-        inherit
-          assertSourceCoherence
-          mkHomeConfiguration
-          mkHomeConfigurationMinimal
-          mkHomeManagerModule
-          mkNixosAdapter
-          mkSourceMeta
-          mkStandaloneAdapter
-          ;
+      caisson = (prev.caisson or { }) // {
+        home-manager = ((prev.caisson or { }).home-manager or { }) // {
+          inherit
+            assertSourceCoherence
+            mkHomeConfiguration
+            mkHomeConfigurationMinimal
+            mkHomeManagerModule
+            mkNixosAdapter
+            mkSourceMeta
+            mkStandaloneAdapter
+            ;
+        };
       };
     };
 

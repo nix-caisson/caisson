@@ -28,12 +28,12 @@
       in
       {
         inherit (libOverlays) default;
-        caisson-nixpkgs = selfContained "caisson-nixpkgs";
-        caisson-nixos = selfContained "caisson-nixos";
-        caisson-home-manager = selfContained "caisson-home-manager";
-        caisson-colmena = selfContained "caisson-colmena";
-        caisson-terranix = selfContained "caisson-terranix";
-        caisson-system-manager = selfContained "caisson-system-manager";
+        nixpkgs = selfContained "nixpkgs";
+        nixos = selfContained "nixos";
+        home-manager = selfContained "home-manager";
+        colmena = selfContained "colmena";
+        terranix = selfContained "terranix";
+        system-manager = selfContained "system-manager";
       };
     modules.flake.exported = modules: { inherit (modules) default; };
 

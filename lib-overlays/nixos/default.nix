@@ -14,7 +14,7 @@
         if pkgSets ? pkgs then
           pkgSets
         else
-          throw "lib.caisson-nixos.mkSystem requires `pkgSets.pkgs` to be defined.";
+          throw "lib.caisson.nixos.mkSystem requires `pkgSets.pkgs` to be defined.";
 
       mkFrameworkModule = pkgSets: {
         _file = "caisson-nixos:framework";
@@ -123,13 +123,15 @@
         };
     in
     {
-      caisson-nixos = (prev.caisson-nixos or { }) // {
-        inherit
-          mkNixosModule
-          mkSystem
-          mkSystemMinimal
-          mkSystemFull
-          ;
+      caisson = (prev.caisson or { }) // {
+        nixos = ((prev.caisson or { }).nixos or { }) // {
+          inherit
+            mkNixosModule
+            mkSystem
+            mkSystemMinimal
+            mkSystemFull
+            ;
+        };
       };
     };
 

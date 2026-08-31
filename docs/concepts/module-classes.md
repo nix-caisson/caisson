@@ -44,7 +44,7 @@ nested use of `mkModule` stays in that class.
   (whose helpers, like `lib.caisson.mkFlakeModule`, build the entries)
   and returning the class-keyed registration
 
-Use `modules.flake` for flake-parts modules and other class keys for other module ecosystems. The companion integration flakes — `caisson-nixos`, `caisson-home-manager`, `caisson-terranix`, `caisson-colmena`, `caisson-system-manager`, and `caisson-nixpkgs` — each register their own class this way. They are in active use but not yet published.
+Use `modules.flake` for flake-parts modules and other class keys for other module ecosystems. The shipped integrations (`caisson.nixos`, `caisson.home-manager`, `caisson.terranix`, `caisson.colmena`, `caisson.system-manager`, and `caisson.nixpkgs`) each register their own class this way; see the [library reference](../reference/lib.md).
 
 ## Consuming Exported Modules
 

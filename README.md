@@ -58,21 +58,20 @@ global pollution and without bloated module arguments.
 ### Module classes
 
 Modules register under a class key naming the module system they belong
-to — `flake` for flake-parts modules. The class keeps a module from
-being imported into an evaluation that can't understand it, and
-companion integration flakes register further classes for other module
+to: `flake` for flake-parts modules. The class keeps a module from
+being imported into an evaluation that can't understand it, and the
+shipped integrations register further classes for other module
 ecosystems (NixOS, Home Manager, and friends).
 
 ## Integrations
 
-Companion flakes carry the same conventions into other module
-ecosystems, each registering its own module class: `caisson-nixpkgs`
-(nixpkgs package sets and overlays), `caisson-nixos` (NixOS),
-`caisson-home-manager` (Home Manager), `caisson-terranix`
-(Terranix/Terraform), `caisson-colmena` (Colmena deployment hives), and
-`caisson-system-manager` (system-manager on foreign distros). The
-integrations are in active use but not yet published; caisson itself is
-being released first.
+caisson ships integrations that carry the same conventions into other
+module ecosystems, each a library overlay contributing a
+`lib.caisson.<target>` namespace and registering its own module class:
+`nixpkgs` (package sets and overlays), `nixos`, `home-manager`,
+`terranix` (Terranix/Terraform), `colmena` (deployment hives), and
+`system-manager` (foreign distros). Each takes its target ecosystem as
+an explicit `ecosystemSrc` argument and pins nothing itself.
 
 ## Quick start
 

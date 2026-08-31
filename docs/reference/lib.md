@@ -154,9 +154,9 @@ such as `caisson.libOverlays.exported`.
 ## Integration namespaces
 
 Each integration is a library overlay exported by this flake
-(`libOverlays.caisson-<target>`) and available as a calculus entry
-via `lib.composition.entriesFor`. Composing one contributes the
-namespace documented below. Every entry point takes its target
+(`libOverlays.<target>`) and available as a calculus entry via
+`lib.composition.entriesFor`. Composing one contributes its
+`lib.caisson.<target>` namespace, documented below. Every entry point takes its target
 ecosystem as an explicit `ecosystemSrc` argument; the integrations
 pin nothing themselves. Common conventions:
 
@@ -169,9 +169,9 @@ pin nothing themselves. Common conventions:
 - Framework-provided special arguments compose first; the caller's
   win on conflict.
 
-### `caisson-nixos` (module class `nixos`)
+### `caisson.nixos` (module class `nixos`)
 
-- **Source:** `lib-overlays/caisson-nixos/default.nix`
+- **Source:** `lib-overlays/nixos/default.nix`
 - `mkNixosModule : freeformModule -> module`: class-bound `mkModule`.
 - `mkSystem : { ecosystemSrc, pkgSets, configModule, moduleImports?,
   specialArgs?, ... } -> nixosSystem`: evaluates
@@ -185,9 +185,9 @@ pin nothing themselves. Common conventions:
   `evalModules` from `<ecosystemSrc>/nixos/lib`; no NixOS base
   modules, so the config module declares any options it uses.
 
-### `caisson-home-manager` (module class `homeManager`)
+### `caisson.home-manager` (module class `homeManager`)
 
-- **Source:** `lib-overlays/caisson-home-manager/default.nix`
+- **Source:** `lib-overlays/home-manager/default.nix`
 - `mkHomeManagerModule : freeformModule -> module`.
 - `mkHomeConfiguration : { ecosystemSrc, pkgSets, configModule,
   moduleImports?, extraSpecialArgs?, osConfig?, check?, minimal?,
@@ -214,9 +214,9 @@ pin nothing themselves. Common conventions:
 - `mkSourceMeta`, `assertSourceCoherence`: source-provenance records
   and the fingerprint comparison used by the drift machinery.
 
-### `caisson-nixpkgs`
+### `caisson.nixpkgs`
 
-- **Source:** `lib-overlays/caisson-nixpkgs/default.nix`
+- **Source:** `lib-overlays/nixpkgs/default.nix`
 - `mkScope : pkgs -> (callPackage -> attrs) -> scope`: a
   `makeScope` wrapper handing the scope function its `callPackage`.
 - `mkPackagesOverlay : pkgsFn -> name -> overlayFn`: turns a scope
@@ -228,27 +228,27 @@ pin nothing themselves. Common conventions:
   alongside package overlays; the name is ignored.
 - `types.nixpkgsOverlay`, `types.nixpkgs`: option types.
 
-### `caisson-colmena` (module class `colmena`)
+### `caisson.colmena` (module class `colmena`)
 
-- **Source:** `lib-overlays/caisson-colmena/default.nix`
+- **Source:** `lib-overlays/colmena/default.nix`
 - `mkColmenaModule : freeformModule -> module`.
 - `mkColmenaHive : { ecosystemSrc, modules?, moduleImports?,
   specialArgs?, ... } -> hive`: `ecosystemSrc.lib.makeHive` over the
   passthrough arguments, with the selected class modules and
   framework `specialArgs` merged into `meta` and `defaults`.
 
-### `caisson-terranix` (module class `terranix`)
+### `caisson.terranix` (module class `terranix`)
 
-- **Source:** `lib-overlays/caisson-terranix/default.nix`
+- **Source:** `lib-overlays/terranix/default.nix`
 - `mkTerranixModule : freeformModule -> module`.
 - `mkTerranixConfiguration : { ecosystemSrc, modules?, moduleImports?,
   extraArgs?, ... } -> derivation`:
   `ecosystemSrc.lib.terranixConfiguration` with the selected class
   modules and framework `extraArgs`.
 
-### `caisson-system-manager` (module class `systemManager`)
+### `caisson.system-manager` (module class `systemManager`)
 
-- **Source:** `lib-overlays/caisson-system-manager/default.nix`
+- **Source:** `lib-overlays/system-manager/default.nix`
 - `mkSystemManagerModule : freeformModule -> module`.
 - `mkSystemConfig : { ecosystemSrc, modules?, moduleImports?,
   specialArgs?, ... } -> systemConfig`:
