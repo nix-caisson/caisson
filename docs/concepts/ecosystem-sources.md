@@ -41,6 +41,5 @@ A source comes from one of three places, in priority order:
    `home-manager`, ...) is used. Handy for leaf flakes that declare
    the input anyway.
 
-A full miss is an error at the adapter, naming all three places. A
-composition built without `mkLib` carries no declarations, so only
-the explicit argument works there.
+If none of the three places can provide a needed ecosystem source,
+it triggers an evaluation error.
