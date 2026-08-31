@@ -1,7 +1,7 @@
 # Repository Layout
 
 caisson mandates nothing about layout beyond the repository being a
-flake — registration takes paths, and any arrangement evaluates. We
+flake: registration takes paths, and any arrangement evaluates. We
 recommend the conventions below because they have proven to work for
 us, they resolve ambiguity about where a thing belongs, and they make
 it easier for someone new to a repository to come up to speed. This
@@ -21,9 +21,9 @@ configs/<class>/<config>/
 
 Configurations, grouped by module class and named for **what they
 configure**. A flake-parts config configures the flake itself, so there
-is typically exactly one — named after the flake (this repository uses
-`configs/flake-parts/caisson/`) or simply `default`. In other classes,
-a config is named for the thing it describes — a machine, a home, a
+is typically exactly one, named after the flake (this repository uses
+`configs/flake-parts/caisson/`) or `default`. In other classes,
+a config is named for the thing it describes: a machine, a home, a
 deployment.
 
 ## lib-overlays/
@@ -34,7 +34,7 @@ lib-overlays/<overlay>/
 
 Library overlays by overlay name; most flakes start with a single
 overlay called `default`. Each is a file taking the closure arg list
-and returning `{ imports ? [ ], overlay }` — see
+and returning `{ imports ? [ ], overlay }`; see
 [Library Overlays](concepts/library-overlays.md).
 
 ## modules/
@@ -49,7 +49,7 @@ ecosystem's name: `flake-parts`, `nixos`, `home-manager`), then by the
 module's own name; the conventional exported module is
 `modules/<class>/default/`. `default.nix` is the module's entry point,
 and its implementation files sit under a directory named for the
-defining flake, grouped by the option namespace they declare — in this
+defining flake, grouped by the option namespace they declare, in this
 repository, `modules/flake-parts/default/caisson/lib.nix` declares the
 `caisson.lib.*` options.
 
@@ -67,8 +67,8 @@ is best read as the conventional home for package expressions.
 
 ## Package overlays
 
-Package overlays follow the same safety ideas as library overlays —
-namespacing, input closure — but their tooling belongs to
+Package overlays follow the same safety ideas as library overlays
+(namespacing, input closure) but their tooling belongs to
 `caisson-nixpkgs`, not to caisson itself. See
 [Library Overlays](concepts/library-overlays.md) for the
 shared principles.
@@ -83,7 +83,7 @@ tests/dependencies/   # a small flake whose lock pins test-only inputs
 
 Unit tests are pure Nix expressions evaluated as a check. Integration
 tests are nested flakes that take the project as an input and assert
-that composition behaves as documented — consumption tested from the
+that composition behaves as documented: consumption tested from the
 outside, the way a consumer would experience it. `tests/dependencies/`
 is a lock-bearing flake that pins inputs used only by the test and
 formatter machinery, so the main `flake.lock` stays free of
@@ -93,7 +93,7 @@ nested flakes are evaluated.
 
 ## Other directories
 
-`examples/` (worked examples — `examples/literate-flake/` here),
+`examples/` (worked examples; `examples/literate-flake/` here),
 `vendor/` (vendored upstream code, each tree carrying its upstream
 license and a provenance note), and `docs/` (these pages) appear where
 a repository has use for them.

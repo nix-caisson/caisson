@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
-# Eval-weight subject: the tests/integration/minimal-consumer flake — a
-# trivial user of caisson — wired up hermetically from store paths and
+# Eval-weight subject: the tests/integration/minimal-consumer flake (a
+# trivial user of caisson) wired up hermetically from store paths and
 # forced through its checks output. Compare against raw-flake-parts.nix
 # (the same flake without caisson) to isolate framework overhead.
 {
@@ -38,7 +38,7 @@ let
   minimalConsumer = callFlake {
     src = caisson + "/tests/integration/minimal-consumer";
     inputs = {
-      # deps only exists for lock-level input sharing; outputs never use it.
+      # deps only exists for lock-level input sharing; the outputs do not use it.
       deps = { };
       parent = caissonFlake;
       nixpkgs = nixpkgsFlake;

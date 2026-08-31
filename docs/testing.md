@@ -6,7 +6,7 @@ of it).
 
 ## Unit tests
 
-`tests/unit/` holds pure evaluation tests, wired into `checks` — this
+`tests/unit/` holds pure evaluation tests, wired into `checks`; this
 repository runs them with nix-unit. Anything that can be asserted by
 evaluating `lib` belongs here.
 
@@ -47,8 +47,8 @@ partition.
 
 ## Evaluating the nested flakes
 
-Hand-threading a nested flake's inputs — the recursive self fixpoint,
-the resolved input graph — is the genuinely hard part, and
+Hand-threading a nested flake's inputs (the recursive self fixpoint,
+the resolved input graph) is the genuinely hard part, and
 `callConsumerFlake` owns it. In the parent's checks:
 
 ```nix
@@ -69,8 +69,8 @@ in
 }
 ```
 
-The nested flake's declared inputs resolve by name — `overrides` first,
-then `follows` chains, then the pool — and an unresolvable input throws
+The nested flake's declared inputs resolve by name (`overrides` first,
+then `follows` chains, then the pool), and an unresolvable input throws
 an error naming it and what to do. The contract is deliberately
 explicit, in the same spirit as closed inputs: nothing is fetched, no
 lock is read, and you supply exactly the input graph you mean the test
@@ -83,5 +83,5 @@ full signature.
 
 ## Gating evaluation cost
 
-Beyond correctness, `checks` can gate what evaluation *costs* — see
+Beyond correctness, `checks` can gate what evaluation *costs*; see
 [Evaluation weight](eval-weight.md).

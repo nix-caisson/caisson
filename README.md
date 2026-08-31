@@ -10,7 +10,7 @@
 ---
 
 A caisson is the watertight structure used to sink a bridge foundation to
-bedrock. It is not scaffolding: once sealed, it *becomes* the foundation —
+bedrock. It is not scaffolding: once sealed, it *becomes* the foundation:
 the part of the bridge no one sees, and the part everything else stands
 on. caisson can provide that structure for a Nix flake: closed inputs, disciplined
 library composition, and class-keyed modules, built on
@@ -31,14 +31,14 @@ downstream user, which quietly discourages modularity.
 **The solution:** caisson closes modules and library overlays over the
 inputs *of the flake that defines them*. A module can rely on its
 dependencies being satisfied without assuming anything about the
-consumer's inputs, so internal dependencies stay internal — while the
+consumer's inputs, so internal dependencies stay internal, while the
 standard flake mechanisms for overriding any input remain available to
 consumers who need a specific version.
 
 ### Library overlays
 
 **The status quo:** library composition is rare in the Nix ecosystem and
-sometimes dismissed as an anti-pattern — a caution inherited from a
+sometimes dismissed as an anti-pattern, a caution inherited from a
 history of monkey-patching, where extensions overwrote global functions
 and produced fragile dependency graphs.
 
@@ -49,8 +49,8 @@ module authors compensate with ad-hoc, inconsistently named module
 parameters to inject logic that should have been a `lib` reference.
 
 **The solution:** caisson structures composition through namespacing.
-A flake exports its logic under `lib.<namespace>` — by
-convention, the flake's own name — instead of competing for the global
+A flake exports its logic under `lib.<namespace>` (by
+convention, the flake's own name) instead of competing for the global
 namespace, and library overlays declare their dependencies on each other
 explicitly, composing in dependency order. Layered abstractions without
 global pollution and without bloated module arguments.
@@ -130,12 +130,12 @@ lives in `configs/flake-parts/<flake-name>`.
 
 ## Going deeper
 
-- [`docs/concepts/`](docs/concepts/) — closed inputs, module classes,
+- [`docs/concepts/`](docs/concepts/): closed inputs, module classes,
   library overlays, and the library lifecycle, each explained with the
   reasoning behind the design.
-- [`docs/reference/`](docs/reference/) — the `lib.caisson` API and module
+- [`docs/reference/`](docs/reference/): the `lib.caisson` API and module
   options.
-- [`examples/literate-flake/`](examples/literate-flake/) — a working,
+- [`examples/literate-flake/`](examples/literate-flake/): a working,
   annotated flake demonstrating the whole structure in one place.
 
 ## Verification
@@ -151,7 +151,7 @@ this project and assert that composition behaves as documented).
 
 CI publishes the store paths it builds to a public cache at
 `caisson.cachix.org`, signed with the project's own key. Using it is
-optional — everything builds from source without it.
+optional; everything builds from source without it.
 
 ```
 cachix use caisson

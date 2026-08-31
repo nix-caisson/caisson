@@ -63,7 +63,8 @@
             inherit nixpkgsOutPath homeManagerOutPath;
             # The out path of the host's NixOS system *without* home-manager:
             # the coherence check compares this string, so it must not carry
-            # derivation context (embedding it may never force a build).
+            # derivation context; stripping it keeps embedding from forcing
+            # a build.
             baseSystemOutPath =
               if baseSystem == null then
                 null
@@ -251,7 +252,7 @@
           #
           # "user-service": a complete user unit in /etc, gated by
           # ConditionUser, that runs `activate` when the user's service
-          # manager starts.  Never touches `users.users`, so it is safe for
+          # manager starts.  It leaves `users.users` untouched, so it is safe for
           # systemd-homed hosts, where a NixOS-created passwd entry would
           # conflict with the homed user record and the home directory is
           # only mounted at login anyway.  Currently limited to exactly one

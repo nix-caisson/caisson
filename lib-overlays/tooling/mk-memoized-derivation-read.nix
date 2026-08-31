@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# mkMemoizedDerivationRead — escape import-from-derivation (IFD) by
+# mkMemoizedDerivationRead: escape import-from-derivation (IFD) by
 # *memoizing* the read.
 #
 # IFD's sin is not that it builds; it is that it makes *evaluation* build,
@@ -11,11 +11,11 @@
 #
 # So we split the IFD in two:
 #
-#   * `value` — the cached result of the read, taken from a committed file
+#   * `value`: the cached result of the read, taken from a committed file
 #     in the source tree. `readFile` of a source path is pure and needs no
 #     store build, so evaluation stays cheap and `--no-build` succeeds.
-#   * `check` — a derivation that rebuilds `drv`, reads `${drv}/${subpath}`
-#     *at build time* (which is not IFD — a derivation reading its own build
+#   * `check`: a derivation that rebuilds `drv`, reads `${drv}/${subpath}`
+#     *at build time* (which is not IFD; a derivation reading its own build
 #     inputs is ordinary), canonicalizes it, and diffs it against the
 #     committed memo. If the derivation's output has drifted from the memo,
 #     the check fails loud. This is the memo's cache-invalidation: a memo
@@ -25,16 +25,16 @@
 # this helper hands back both and will not let you take one without the
 # other.
 #
-# Equivalence is compared under a `canonicalize` filter, never as raw bytes:
+# Equivalence is compared under a `canonicalize` filter, not as raw bytes:
 # build outputs legitimately carry ordering / timestamp / host-detected
-# noise that does not change meaning. `canonicalize` is a first-class input.
+# noise that does not change meaning. `canonicalize` is an explicit argument.
 # The committed memo is stored *already canonical*, so at check time we only
 # have to canonicalize the freshly built side and byte-compare.
 #
 # The eval-time `value` is produced by `normalize` (an arbitrary Nix
 # function, e.g. a kconfig parser) applied to the memo. `normalize` and
-# `canonicalize` describe the same equivalence at two phases — `normalize`
-# in Nix for eval, `canonicalize` in shell for the build-time check — so a
+# `canonicalize` describe the same equivalence at two phases (`normalize`
+# in Nix for eval, `canonicalize` in shell for the build-time check) so a
 # canonical memo makes them agree by construction.
 #
 # This is the small general kernel of what haskell.nix "materialization"
@@ -44,7 +44,7 @@
 # Imported by the core lib overlay as `{ lib = final; }`, exposing
 # `lib.caisson.mkMemoizedDerivationRead` for every consumer (mirrors how
 # `eval-weight` is wired). Lives in core, not the `default` overlay, because
-# `mkLib` only re-applies core to downstream flakes — a helper in `default`
+# `mkLib` only re-applies its own injection downstream; a helper in `default`
 # would be invisible to consumers that don't import caisson's own overlay.
 { lib }:
 

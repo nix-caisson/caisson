@@ -4,7 +4,7 @@
 # NIX_SHOW_STATS counters, and (optionally) gates the deterministic ones
 # against a committed baseline. Thunk/value/env/allocation counts are
 # reproducible for a fixed lock set and Nix version; CPU and wall-clock
-# time are machine-dependent, so they are always reported but never gated.
+# time are machine-dependent, so they are always reported but not gated.
 { lib }:
 let
 
@@ -36,8 +36,8 @@ let
   # per-position call counts, keyed by stable anchors rather than line
   # numbers (which shift between nixpkgs revs):
   # - nixpkgsEvals: calls of the top-level lambda of
-  #   pkgs/top-level/default.nix — one per full nixpkgs instantiation.
-  # - nixpkgsLibEvals: calls of makeExtensible' in lib/default.nix — one
+  #   pkgs/top-level/default.nix, one per full nixpkgs instantiation.
+  # - nixpkgsLibEvals: calls of makeExtensible' in lib/default.nix, one
   #   per nixpkgs-lib bootstrap (the import cache dedups repeat imports of
   #   the same source, so this counts distinct lib sources evaluated).
   # - moduleSystemEvals: calls of evalModules in lib/modules.nix,
@@ -167,7 +167,7 @@ in
         mkdir -p "$out/scenarios"
 
         echo "eval-weight [$name]"
-        echo "(cpuSeconds/wallMs are informational only; they are never gated)"
+        echo "(cpuSeconds/wallMs vary by machine, so they are reported but not gated)"
 
         for scenario in $(jq -r 'keys[]' "$scenariosJsonPath"); do
           subject=$(jq -r --arg s "$scenario" '.[$s]' "$scenariosJsonPath")
@@ -244,7 +244,7 @@ in
               echo "FAIL [$gname] $metric = $actual exceeds ceiling $ceiling (baseline $base)"
               fail=1
             elif [ "$actual" -lt "$floor" ]; then
-              echo "note [$gname] $metric = $actual is well below baseline $base — consider tightening"
+              echo "note [$gname] $metric = $actual is well below baseline $base; consider tightening"
               stale=1
             fi
           done

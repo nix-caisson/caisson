@@ -2,7 +2,7 @@
 
 **Why closure attrsets instead of detecting what a file wants?**
 Registered files take the closure attrset (`{ closure-inputs,
-mkLibOverlay, ... }`) as an explicit first argument list, always.
+mkLibOverlay, ... }`) as an explicit first argument list in every case.
 Shape or arity detection would make the contract depend on how a file
 happens to be written; the fixed extra argument list makes it visible
 in the file and identical everywhere. There is no detection: a
@@ -31,7 +31,7 @@ whatever nixpkgs you hand it, and two consumers of the same caisson
 can run different nixpkgs revisions. The argument is explicit rather
 than resolved from input names by convention.
 
-**What exactly does `key = null` mean in a engine entry?**
+**What exactly does `key = null` mean in an engine entry?**
 No identity: the entry can never be deduplicated, replaced, or
 imported by another entry, and it applies in list order. Keyed
 entries are the shareable units; keyless entries are a consumer's

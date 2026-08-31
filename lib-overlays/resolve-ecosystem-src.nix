@@ -4,8 +4,9 @@
 # layered `resolve` (the explicit argument, then the composition's
 # declared `ecosystems.<name>`, then an input with exactly the
 # declared name), with the miss interpreted here, where the
-# integration knows what to say; the resolver itself never formats a
-# message. The declarations and inputs are the serving composition's
+# integration knows what to say; the resolver itself can never format
+# a message, because a miss is the plain value null. The declarations
+# and inputs are the serving composition's
 # mkLib-time facts, read from its manifest; a manifest-less
 # composition (composed without mkLib) has only the explicit channel.
 let

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nix flake modules often need access to the defining flake's `inputs`, but `flake-parts` does not provide a built-in mechanism for closing over them. This means every module and library overlay would need inputs threaded explicitly through its call site -- a tedious and error-prone pattern.
+Nix flake modules often need access to the defining flake's `inputs`, but `flake-parts` does not provide a built-in mechanism for closing over them. This means every module and library overlay would need inputs threaded explicitly through its call site, a tedious and error-prone pattern.
 
 caisson solves this with an **explicit closure convention**: everything registered through `mkModule` or `mkLibOverlay` takes a single closure attrset as its first arg list. Plain modules and already-built overlays are registered directly instead.
 
@@ -39,7 +39,7 @@ Everything passed to the class-specific normalizer takes the closure attrset as 
 { config, lib, ... }:
 { ... }
 
-# Ignores the closure -- still takes the arg list
+# Ignores the closure but still takes the arg list
 { ... }:
 { config, lib, ... }:
 { ... }
@@ -56,11 +56,11 @@ The closure attrset contains:
 
 Path modules are wrapped with `_file` for error locations and `key = toString path`, so a file passed through `mkModule` at two sites deduplicates exactly like importing the same path twice.
 
-Passing a non-function (attrset, path to a plain module, `null`) is an error: plain modules are imported or registered directly, never wrapped in `mkModule`.
+Passing a non-function (attrset, path to a plain module, `null`) is an error: plain modules are imported or registered directly rather than wrapped in `mkModule`.
 
 ### mkLibOverlay
 
-`mkLibOverlay` follows the same convention. A registered overlay takes `{ closure-inputs, mkLibOverlay, ... }` as its first arg list and returns an `{ imports ? [ ], overlay }` attrset — the `final: prev:` function under `overlay`, and the overlays it depends on under `imports`:
+`mkLibOverlay` follows the same convention. A registered overlay takes `{ closure-inputs, mkLibOverlay, ... }` as its first arg list and returns an `{ imports ? [ ], overlay }` attrset: the `final: prev:` function under `overlay`, and the overlays it depends on under `imports`:
 
 ```nix
 { closure-inputs, ... }:
@@ -70,7 +70,7 @@ Passing a non-function (attrset, path to a plain module, `null`) is an error: pl
 }
 ```
 
-Already-built overlays (for example another flake's exported `libOverlays.default`) are registered directly, never wrapped in `mkLibOverlay`.
+Already-built overlays (for example another flake's exported `libOverlays.default`) are registered directly rather than wrapped in `mkLibOverlay`.
 
 ## Key Functions
 
@@ -84,6 +84,6 @@ Already-built overlays (for example another flake's exported `libOverlays.defaul
 
 ## Further Reading
 
-- [Library Lifecycle](./library-lifecycle.md) -- how overlays are composed during `mkLib`
-- [Module Classes](./module-classes.md) -- class-keyed module registration and export
-- `examples/literate-flake/` -- working example demonstrating closed input wiring
+- [Library Lifecycle](./library-lifecycle.md): how overlays are composed during `mkLib`
+- [Module Classes](./module-classes.md): class-keyed module registration and export
+- `examples/literate-flake/`: a working example demonstrating closed input wiring

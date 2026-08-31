@@ -183,7 +183,7 @@ in the config module's `perSystem` or at the top level:
 Instead of passing `ecosystemSrc` at every call, a flake can declare
 its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs;`)
 and drop the argument; an explicit argument still wins, and an input
-named exactly `nixpkgs` serves as the last fallback.
+named exactly `nixpkgs` is the last fallback.
 
 The composed library only contains `caisson.nixos` if its overlay is
 in the composition; register it from caisson's exports:
@@ -241,8 +241,8 @@ who import modules without composing your overlay.
 
 - [Closed inputs](concepts/closed-inputs.md), the convention every
   registered file follows.
-- [The composition engine](concepts/composition-engine.md), the
-  engine underneath, and composing with `caisson-core` directly.
+- [The composition engine](concepts/composition-engine.md): the
+  contract underneath, and composing with `caisson-core` directly.
 - [Testing](./testing.md), including `callConsumerFlake` for testing
   consumer flakes without a push/lock cycle.
 - [FAQ](faq.md) for the questions this page tends to raise.

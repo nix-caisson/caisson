@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>caisson — the foundation framework for composable Nix flakes</title>
+<title>caisson: the foundation framework for composable Nix flakes</title>
 <meta name="description" content="caisson is a structural framework for building composable Nix flakes on flake-parts: closed inputs, disciplined library overlays, and class-keyed module composition.">
 <meta property="og:title" content="caisson">
 <meta property="og:description" content="The foundation framework for composable Nix flakes.">
@@ -52,7 +52,7 @@
   <h1>caisson</h1>
   <p class="tagline">The foundation framework for composable Nix flakes.</p>
   <p class="lede">
-    A caisson is sunk to bedrock, sealed, and becomes the foundation —
+    A caisson is sunk to bedrock, sealed, and becomes the foundation:
     the part of the bridge no one sees, and the part everything else
     stands on. caisson can provide that structure for your flake: closed inputs,
     disciplined library composition, and module classes, all on
@@ -164,7 +164,7 @@
         <p>
           Modules and overlays close over <em>your</em> flake's inputs, not
           your consumer's. Downstream users are not required to re-declare
-          your internal dependencies — and can still override any input
+          your internal dependencies, and can still override any input
           through standard flake mechanisms.
         </p>
       </div>
@@ -185,7 +185,7 @@
       <div class="feature-text">
         <h2>Library overlays</h2>
         <p>
-          Every flake exports its logic under <code>lib.&lt;namespace&gt;</code> —
+          Every flake exports its logic under <code>lib.&lt;namespace&gt;</code>:
           namespacing instead of a fight over the global namespace.
           Overlays declare their dependencies explicitly and compose in
           dependency order, so layered abstractions stay predictable.
@@ -254,9 +254,9 @@
     <p>
       The <a href="https://github.com/nix-caisson/caisson">repository</a>'s
       <code>examples/literate-flake</code> walks the whole structure with
-      commentary; <a href="docs/">the docs</a> explain each concept —
-      closed inputs, module classes, library overlays, and the library
-      lifecycle — with the reasoning behind the design, and the
+      commentary; <a href="docs/">the docs</a> explain each concept
+      (closed inputs, module classes, library overlays, and the library
+      lifecycle) with the reasoning behind the design, and the
       <a href="docs/layout.html">layout conventions</a> cover how a
       caisson repository is arranged.
     </p>

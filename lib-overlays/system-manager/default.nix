@@ -106,7 +106,7 @@
           # distro's existing file, flakes stay on by default, and
           # `nix.enable` keeps the stub's off-by-default (the NixOS
           # declaration defaults it on, which would materialize nixbld
-          # users on hosts whose configs never asked for nix management).
+          # users on hosts whose configs did not ask for nix management).
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
           nixStubReplacementModule = {
             _file = "caisson-system-manager:nixpkgs-compat-nix-stub";

@@ -105,7 +105,7 @@ Per-class export controls live under:
 
 For flake-parts compatibility, `flake.flakeModules` mirrors
 `flake.modules.flake`, and the `flake` class always exports a `default`
-entry — an empty module unless the selection provides one — so
+entry (an empty module unless the selection provides one) so
 `flakeModules.default` exists for consumers that import it by
 convention.
 

@@ -25,13 +25,13 @@ overlays (`_mkLibOverlay: { ... }` when everything registered is
 already built).
 
 Everything passed through `mkLibOverlay` takes the closure attrset as
-its first arg list — `{ closure-inputs, mkLibOverlay, ... }:` — and
+its first arg list, `{ closure-inputs, mkLibOverlay, ... }:`, and
 returns an `{ imports ? [ ], overlay }` attrset: the `final: prev:`
 function under `overlay`, and the overlays it depends on under
 `imports` (see
 [Library Overlays](./library-overlays.md)). Already-built
 overlays (for example another flake's exported `libOverlays.default`)
-are registered directly, never wrapped in `mkLibOverlay`:
+are registered directly rather than wrapped in `mkLibOverlay`:
 
 ```nix
 libOverlays = mkLibOverlay: {
@@ -82,13 +82,13 @@ The composed `lib` is threaded into the flake via `mkFlake`:
 
 #### What `flake.lib` contains
 
-`flake.lib` exports **only the flake's own namespace** — `lib.${configName}` — not the full composed library. For a flake with `configName = "my-project"`, `flake.lib` is a flat attrset of that project's public functions: `{ mkHelper = ...; myThing = ...; }`.
+`flake.lib` exports **only the flake's own namespace**, `lib.${configName}`, not the full composed library. For a flake with `configName = "my-project"`, `flake.lib` is a flat attrset of that project's public functions: `{ mkHelper = ...; myThing = ...; }`.
 
 It surfaces to consumers as `my-project.lib.mkHelper`, not `my-project.lib.my-project.mkHelper`.
 
 This is intentional:
 
-- **Minimal API surface.** The full composed lib includes all of nixpkgs-lib plus every registered overlay. Exporting it would turn every function — including internal overlays and nixpkgs internals — into an implicit public contract, making it much harder to evolve the implementation.
+- **Minimal API surface.** The full composed lib includes all of nixpkgs-lib plus every registered overlay. Exporting it would turn every function (including internal overlays and nixpkgs internals) into an implicit public contract, making it much harder to evolve the implementation.
 - **Pin hygiene.** The full lib is built against the exporting flake's own nixpkgs-lib pin. A downstream consumer using functions from that lib would couple themselves to a specific pin they may not control. The `follows` convention exists precisely to let consumers manage their own pin; exporting the full lib undermines it.
 - **Consumer model.** A downstream flake builds its own composed lib against its own inputs by calling `caisson-core.mkLib`. caisson itself exports both framework namespaces (`flake.lib.caisson-core` and `flake.lib.caisson`) via the `caisson.lib.exported` selection, so flake-level and composed-level addresses match.
 
@@ -98,7 +98,7 @@ This convention applies to any flake built on caisson: export your namespace, no
 
 - **Namespace your additions.** Use a dedicated attribute (e.g., `lib.myProject`) to avoid collisions with nixpkgs-lib.
 - **Use `prev` for extension.** Always merge with `prev.myNamespace or {}` to allow upstream overlays to contribute to the same namespace.
-- **Keep overlays pure.** Overlays should not depend on `pkgs` or system-specific values -- they operate on `lib`, which is system-independent.
+- **Keep overlays pure.** Overlays should not depend on `pkgs` or system-specific values; they operate on `lib`, which is system-independent.
 
 ## Example
 
@@ -116,7 +116,7 @@ This convention applies to any flake built on caisson: export your namespace, no
 }
 ```
 
-The closure arg list always comes first — `closure-inputs` is the
+The closure arg list always comes first: `closure-inputs` is the
 defining flake's inputs (see [Closed Inputs](./closed-inputs.md)); an
 overlay that needs nothing from the closure still takes the arg list,
 as `{ ... }:`.
@@ -143,6 +143,6 @@ nix eval .#lib --apply 'lib: lib.myProject.helper 41'
 
 ## Further Reading
 
-- [Library Overlays](./library-overlays.md) -- why overlays are safe with proper namespacing, input closure, and dependency tracking
-- [Closed Inputs](./closed-inputs.md) -- how inputs are closed over in overlays and modules
-- `examples/literate-flake/` -- working example with a custom library overlay
+- [Library Overlays](./library-overlays.md): why overlays are safe with proper namespacing, input closure, and dependency tracking
+- [Closed Inputs](./closed-inputs.md): how inputs are closed over in overlays and modules
+- `examples/literate-flake/`: a working example with a custom library overlay

@@ -97,7 +97,7 @@
 
           in
           {
-            # Duplicated in formatter.nix — partitions evaluate independently,
+            # Duplicated in formatter.nix: partitions evaluate independently,
             # so sharing would require more boilerplate than the duplication.
             treefmt = {
               programs.nixfmt.enable = true;

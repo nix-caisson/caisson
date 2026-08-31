@@ -3,24 +3,24 @@
 `lib.caisson.eval-weight` measures what an evaluation costs and can
 gate that cost in `checks`, so a framework regression is caught by CI
 rather than noticed as slowness later. This repository uses it to gate
-its own overhead — the numbers quoted in these docs come from it.
+its own overhead; the numbers quoted in these docs come from it.
 
 ## How it measures
 
 A scenario runs a pinned Nix evaluator inside a derivation sandbox
 against explicitly wired inputs and captures the evaluator's own
-statistics. The deterministic counters — thunks, values, environments,
-function and primop calls, total allocations — are reproducible for a
+statistics. The deterministic counters (thunks, values, environments,
+function and primop calls, total allocations) are reproducible for a
 fixed lock set and Nix version, so they can be gated. CPU and
 wall-clock time are machine-dependent, so they are always reported but
-never gated.
+not gated.
 
-Three semantic counters ride on top, keyed to stable anchors in the
+Three semantic counters are derived from the same run, keyed to stable anchors in the
 evaluated source rather than line numbers:
 
-- `nixpkgsEvals` — full nixpkgs instantiations
-- `nixpkgsLibEvals` — nixpkgs-lib bootstraps (distinct lib sources)
-- `moduleSystemEvals` — `evalModules` runs, including submodules
+- `nixpkgsEvals`: full nixpkgs instantiations
+- `nixpkgsLibEvals`: nixpkgs-lib bootstraps (distinct lib sources)
+- `moduleSystemEvals`: `evalModules` runs, including submodules
 
 These are gated **exactly**, with no growth allowance: one extra
 nixpkgs instantiation *is* the regression.
@@ -63,18 +63,18 @@ checks.eval-weight = lib.caisson.eval-weight.mkCheck {
 };
 ```
 
-- **scenarios** — `entry` is a self-contained file imported inside the
+- **scenarios**: `entry` is a self-contained file imported inside the
   sandbox and applied to `args` (store paths arrive as absolute-path
   strings); the resulting value is forced strictly, so the entry decides
   exactly what evaluation gets measured. Entries that need to evaluate a
   flake import the shared `call-flake.nix` kernel from a store path in
-  `args` — the same kernel under
+  `args`, the same kernel under
   [`callConsumerFlake`](reference/lib.md#callconsumerflake).
-- **gates** — one per scenario by default. A subtraction gate measures
+- **gates**: one per scenario by default. A subtraction gate measures
   the *difference* between two scenarios, which is the important trick:
   a 2× regression in framework machinery is invisible in a
   whole-nixpkgs total but obvious in the delta.
-- **baseline** — `null` runs in measure-only bootstrap mode: metrics
+- **baseline**: `null` runs in measure-only bootstrap mode: metrics
   are printed, including a paste-ready baseline, and the check passes.
   Commit the pasted baseline (this repository keeps it at
   `tests/eval-weight/baseline.json`) and subsequent runs gate against
@@ -89,5 +89,5 @@ checks.eval-weight = lib.caisson.eval-weight.mkCheck {
    `tests/eval-weight/baseline.json`.
 3. Wire `mkCheck` into `checks` with the committed baseline.
 4. When a gate fails, the report shows which metric moved and by how
-   much; either fix the regression or — for intended changes — update
+   much; either fix the regression or, for intended changes, update
    the baseline in the same change, where review can see both.

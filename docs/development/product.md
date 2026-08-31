@@ -11,6 +11,6 @@ This project provides a structural framework for composing Nix flakes using `fla
 - **Flake Composition:** To act as a framework for building flakes that might export their own flake modules and library overlays, promoting modularity and reusability.
 - **Abstract Module Composition:** To provide class-parameterized module composition primitives that close over inputs and can be reused across different module ecosystems.
 - **Library Overlay System:** To expose a library overlay system, tightly integrated with `flake-parts` module composition, to enable the creation of layered abstractions and composed libraries through ad-hoc namespacing.
-- **Input Flake Management:** To provide tools and mechanisms for helping flakes to close over their input flakes, addressing a limitation not well-supported by `flake-parts` out of the box.
+- **Input Flake Management:** To provide tools and mechanisms for helping flakes to close over their input flakes, addressing a limitation `flake-parts` does not cover on its own.
 - **Developer Experience:** To provide a clear entry point and documentation (via README) that explains the core philosophy and offers a predictable Quick Start for downstream adoption.
 - **Downstream Focus:** To serve as a dependency for other Nix flakes, providing them with a solid structural base. The actual configurations for packages, development environments, and system settings are expected to live in these downstream flakes.

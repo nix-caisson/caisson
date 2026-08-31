@@ -77,7 +77,7 @@ closure = { closure-inputs     : attrs
 Applies the closure attrset to an overlay given as a function or a path
 to one, and normalizes the result: the built `libOverlay` always carries
 both keys, with `imports` defaulted to `[ ]`. Already-built overlays are
-registered directly, never wrapped.
+registered directly rather than wrapped.
 
 The closure's `mkModule` is bound to the defining composition, so
 modules contributed by an overlay close over the definer's inputs and
@@ -106,7 +106,7 @@ closure = { closure-inputs        : attrs    # the defining flake's inputs
           }
 ```
 
-Factory for class-specific module normalizers. Given a class name, returns a normalizer that applies the closure attrset to a module given as a function or a path to one; the module takes the closure as its first arg list (`{ ... }:` when unused). Plain modules are imported/registered directly, never wrapped. Path modules gain `_file` and a path-based dedup `key`.
+Factory for class-specific module normalizers. Given a class name, returns a normalizer that applies the closure attrset to a module given as a function or a path to one; the module takes the closure as its first arg list (`{ ... }:` when unused). Plain modules are imported/registered directly rather than wrapped. Path modules gain `_file` and a path-based dedup `key`.
 
 The `mkModule` closure member is bound to the same class, so nested module composition stays in that class.
 
@@ -247,7 +247,7 @@ option of this type before projecting the `flake.libOverlays` and
 ## Integration namespaces
 
 Each integration is a library overlay exported by this flake
-(`libOverlays.<target>`) and available as a engine entry via
+(`libOverlays.<target>`) and available as an engine entry via
 `lib.composition.entriesFor`. Composing one contributes its
 `lib.caisson.<target>` namespace, documented below (the flake-parts
 integration contributes directly under `lib.caisson`, plus the
@@ -314,7 +314,7 @@ Common conventions:
   home-manager in a NixOS generation. `activationMode = "upstream"`
   uses home-manager's own NixOS module; `"user-service"` embeds
   standalone activation packages behind a `ConditionUser` user unit
-  and never touches `users.users` (safe for systemd-homed hosts; one
+  and leaves `users.users` untouched, which keeps it safe for systemd-homed hosts (one
   hosted user). Both write `/etc/caisson-home-manager/source.json`
   for the drift check.
 - `mkSourceMeta`, `assertSourceCoherence`: source-provenance records

@@ -24,7 +24,7 @@ Whether to enable lib export. When enabled, publishes the selection made by `cai
 
 ### `caisson.lib.exported`
 
-- **Type:** `function → lazyAttrsOf raw`
+- **Type:** `function -> lazyAttrsOf raw`
 - **Default:** `composedLib: composedLib.${configName}` (requires `configInfo.configName`)
 - **Source:** `modules/flake-parts/default/caisson/lib.nix`
 
@@ -47,7 +47,7 @@ The composition's manifest: the capture of what `mkLib` consumed (`inputs`, `mod
 Export settings for each registered module class. Each class key defines:
 
 - `export.enabled` (`bool`, default `true`)
-- `exported` (`function → attrsOf deferredModule`, default `modules: { }`)
+- `exported` (`function -> attrsOf deferredModule`, default `modules: { }`)
 
 The selected modules are published under `flake.modules.<class>`. For the `"flake"`
 class specifically, the same modules are also mirrored to `flake.flakeModules`.
@@ -62,7 +62,7 @@ Whether to export modules for a given class.
 
 ### `caisson.modules.<class>.exported`
 
-- **Type:** `function → attrsOf deferredModule`
+- **Type:** `function -> attrsOf deferredModule`
 - **Default:** `modules: { }`
 - **Source:** `modules/flake-parts/core/caisson/modules.nix`
 
@@ -78,7 +78,7 @@ Whether to enable lib overlay export. When enabled, publishes the overlays selec
 
 ### `caisson.libOverlays.exported`
 
-- **Type:** `function → attrsOf libOverlay`
+- **Type:** `function -> attrsOf libOverlay`
 - **Default:** `overlays: { }`
 - **Source:** `modules/flake-parts/core/caisson/libOverlays.nix`
 

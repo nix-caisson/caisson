@@ -64,7 +64,7 @@ distinctive here rather than variations on a shared theme:
   library composition with identity, dedup, wholesale replacement,
   and reliable polyfills, implemented in a zero-dependency engine
   (caisson-core) that is usable without caisson.
-- **Explicit ecosystem sources**: integrations never pin their
+- **Explicit ecosystem sources**: integrations pin none of their
   targets; the consumer hands every ecosystem in, so one caisson
   serves any nixpkgs, home-manager, or colmena revision the consumer
   chooses.

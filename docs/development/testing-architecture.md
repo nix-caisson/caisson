@@ -33,11 +33,11 @@ to replace the main evaluation's `checks` with the partition's `checks`, so
 
 ## The Checks Partition
 
-### Why a partition?
+### The reason for the partition
 
 flake-parts partitions allow a flake to declare outputs that depend on inputs not
 listed in the main `flake.nix`. caisson's main inputs are only `nixpkgs-lib` and
-`flake-parts` — it deliberately avoids depending on full `nixpkgs` or development
+`flake-parts`; it deliberately avoids depending on full `nixpkgs` or development
 tools like `nix-unit`. The checks partition brings in these heavier dependencies
 without polluting the main flake's input set or forcing consumers to fetch them.
 
@@ -66,10 +66,10 @@ with its own `perSystem`, `imports`, etc.
 
 ## The Raw-Import-and-Wire Pattern
 
-### Why not evaluate test flakes normally?
+### Raw imports instead of normal flake evaluation
 
 The test flakes under `tests/unit/` and `tests/integration/` are standalone
-`flake.nix` files, but their lockfiles are gitignored — they are not committed.
+`flake.nix` files, but their lockfiles are gitignored, not committed.
 When used standalone (e.g., `cd tests/unit && nix flake check`), Nix generates a
 local lockfile on first use and evaluates normally. Because all inputs use `follows`
 pointing at the shared dependencies flake, the generated lockfile resolves to the
@@ -80,7 +80,7 @@ evaluation of a nested flake. `extraInputsFlake` resolves one dependency flake;
 it's not a general-purpose nested-flake evaluator. The partition needs to reach into
 the test flake's outputs to extract `checks`, which means it needs to call the
 test flake's `outputs` function directly. No lockfiles are generated or consulted
-in this path — inputs are supplied directly by the partition.
+in this path; inputs are supplied directly by the partition.
 
 ### How it works
 
@@ -105,7 +105,7 @@ unitTestOutputs = unitTestFlake.outputs unitTestInputs // {
 };
 ```
 
-Step 1 bypasses flake evaluation entirely — `import` just loads the file as a Nix
+Step 1 bypasses flake evaluation entirely: `import` just loads the file as a Nix
 attrset. The imported value is not a resolved flake: it has no resolved inputs, no
 `outPath`, no `self`.
 
@@ -120,7 +120,7 @@ The key mappings for the unit test flake are:
 | `nixpkgs-lib` | `inputs.nixpkgs-lib` | From dependencies flake |
 | `deps` | `inputs.self` | See "The `deps` mapping" below |
 | `parent` | `self` | caisson itself, as seen by the partition |
-| `self` | `unitTestOutputs` | Circular — explained below |
+| `self` | `unitTestOutputs` | Circular (explained below) |
 
 Integration test flakes use the same pattern with simpler input sets (no `nix-unit`,
 no `nixpkgs-lib`).
@@ -132,7 +132,7 @@ and uses `follows` to pull inputs through it (e.g., `nixpkgs.follows = "deps/nix
 The `deps` input is the shared dependencies flake, and `follows` resolution means
 the test flake ends up with `deps.inputs.nixpkgs`, `deps.inputs.nix-unit`, etc.
 
-In the raw-import path, `follows` doesn't apply — there's no lockfile resolution.
+In the raw-import path, `follows` doesn't apply, because there's no lockfile resolution.
 The direct inputs (`nixpkgs`, `nix-unit`, etc.) are provided explicitly in
 `unitTestInputs`. But `deps` still needs to be provided because the test flake's
 `outputs` function receives the full `inputs` attrset (via `inputs@{ ... }`), and
@@ -141,7 +141,7 @@ nix-unit module via `perSystem.nix-unit = { inherit inputs; }`. If any code path
 accesses `inputs.deps`, it must resolve to something sensible.
 
 The partition provides `deps = inputs.self`. Inside a partition module, `inputs.self`
-is not plain caisson — it's caisson with an augmented `.inputs` attrset. The
+is not plain caisson; it's caisson with an augmented `.inputs` attrset. The
 partition machinery (in `flake-parts/extras/partitions.nix`) constructs:
 
 ```nix
@@ -160,7 +160,7 @@ its `.inputs` is a superset of the dependencies flake's inputs.
 
 The line `self = unitTestOutputs` creates a circular dependency:
 `unitTestInputs` references `unitTestOutputs`, and `unitTestOutputs` is defined as
-`unitTestFlake.outputs unitTestInputs // { ... }`. This works because Nix is lazy —
+`unitTestFlake.outputs unitTestInputs // { ... }`. This works because Nix is lazy:
 `self` is a thunk that is only forced when the test flake's `outputs` function
 actually accesses it, at which point the value has been defined.
 
@@ -208,7 +208,7 @@ lib.caisson.mkFlake {
 The `parent` input is caisson itself. By using `parent.lib.caisson-core.mkLib` and
 `lib.caisson.mkFlake`, the test flake exercises the same module composition path
 that downstream consumers use. This means the tests are not just testing library
-functions in isolation — they verify that the framework's composition machinery
+functions in isolation; they verify that the framework's composition machinery
 works end-to-end.
 
 ### nix-unit integration
@@ -222,9 +222,9 @@ imports = [ inputs.nix-unit.modules.flake.default ];
 
 This module adds two key options:
 
-- `flake.tests` — a nested attrset of test groups, each containing named tests
+- `flake.tests`: a nested attrset of test groups, each containing named tests
   with `{ expr; expected; }` pairs
-- `perSystem.nix-unit.inputs` — the inputs to pass to nix-unit for evaluation
+- `perSystem.nix-unit.inputs`: the inputs to pass to nix-unit for evaluation
 
 The config sets these:
 
@@ -255,7 +255,7 @@ consumer.
 ### Purpose
 
 Integration test flakes verify that caisson works correctly when consumed as a
-dependency — that `mkLib`, `mkFlake`, class-keyed module registration, and
+dependency: that `mkLib`, `mkFlake`, class-keyed module registration, and
 module composition behave as expected from a consumer's perspective.
 
 ### Structure
@@ -343,7 +343,7 @@ The dependencies flake uses `follows` internally to deduplicate transitive input
 
 The checks partition also wires in example flakes (e.g., `examples/literate-flake/`)
 using the same raw-import pattern. These serve as both documentation and regression
-tests — if the example stops evaluating, `nix flake check` fails.
+tests: if the example stops evaluating, `nix flake check` fails.
 
 ## Complete Check Inventory
 

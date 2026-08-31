@@ -6,7 +6,7 @@
 
 usage() {
   cat <<'EOF'
-eval-weight-report — measure Nix evaluation weight of flake configurations
+eval-weight-report: measure Nix evaluation weight of flake configurations
 
 Usage: eval-weight-report [options] [TARGET...]
 
@@ -136,7 +136,7 @@ stageExpr() {
 }
 
 attrPath() {
-  # $1: kind, $2: name — leaf always quoted (names may contain @)
+  # $1: kind, $2: name; leaf always quoted (names may contain @)
   case "$1" in
     nixos) printf 'nixosConfigurations."%s"' "$2" ;;
     home) printf 'homeConfigurations."%s"' "$2" ;;

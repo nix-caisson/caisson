@@ -1,8 +1,8 @@
 # Vendored caisson-core
 
 Source: https://github.com/nix-caisson/caisson-core
-Revision: c8c5d18 (call the engine an engine)
-Contents: `lib/` (the composition calculus and kernel) and `vendor/`
+Revision: 29071ef (state the reason beside each impossibility claim)
+Contents: `lib/` (the composition engine and kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and
 provenance header.

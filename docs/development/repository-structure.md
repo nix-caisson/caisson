@@ -20,7 +20,7 @@ library as a plain argument (nothing is looked up by input name) and
 injects the machinery, the class-keyed module registry, and the
 manifest under the composed library's `caisson-core` namespace. Its
 contract is intended to freeze: consumers should be able to pin it and
-never think about the pin again. Anyone who wants overlay composition
+not think about the pin again. Anyone who wants overlay composition
 without nixpkgs can depend on it directly.
 
 ## caisson

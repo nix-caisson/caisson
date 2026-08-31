@@ -12,5 +12,5 @@
 - **nixfmt (RFC-style):** The official formatter, enforcing **Nix RFC 166** style rules.
 
 ## Integration
-- The framework is designed to be consumed as a Nix flake input by downstream projects.
+- The framework is consumed as a Nix flake input by downstream projects.
 - It integrates deeply with the `flake-parts` module system to provide its structural features.

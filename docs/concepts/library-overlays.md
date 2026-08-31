@@ -2,7 +2,7 @@
 
 ## The Problem People Actually Had
 
-Nix overlays have a reputation problem. Package overlays in nixpkgs caused real pain -- attribute collisions, silent shadowing, unpredictable evaluation order -- and the community learned to be cautious. That caution has grown into a broader skepticism that prevented the community from really embracing library overlays, out of fear that a worse version of the same problems might occur.
+Nix overlays have a reputation problem. Package overlays in nixpkgs caused real pain (attribute collisions, silent shadowing, unpredictable evaluation order), and the community learned to be cautious. That caution has grown into a broader skepticism that prevented the community from really embracing library overlays, out of fear that a worse version of the same problems might occur.
 
 The skepticism is understandable but misdirected. The problems were never inherent to overlays as a mechanism. They came from how overlays were used: global modifications to shared namespaces, no convention for scoping additions, no way to declare dependencies between overlays, and no isolation between unrelated consumers. Fix those problems and overlays become a safe, composable extension mechanism.
 
@@ -24,7 +24,7 @@ overlay = final: prev: {
 };
 ```
 
-This means two independent projects do not collide unless the project names do -- `lib.projectA.helper` and `lib.projectB.helper` coexist without interference, just as they would in any language with a module system. caisson's `configInfo.configName` convention helps here: if every project uses its canonical flake name as the namespace, collisions are unlikely in practice. Choose a distinctive name for your flake -- generic names like `utils` or `helpers` invite collisions, while project-specific names like `caisson` or `acme-infra` make them vanishingly rare. This is a convention, not an enforcement mechanism -- if two upstream flakes happen to choose the same `configName`, their `lib` contributions will merge into the same namespace.
+This means two independent projects do not collide unless the project names do: `lib.projectA.helper` and `lib.projectB.helper` coexist without interference, just as they would in any language with a module system. caisson's `configInfo.configName` convention helps here: if every project uses its canonical flake name as the namespace, collisions are unlikely in practice. Choose a distinctive name for your flake; generic names like `utils` or `helpers` invite collisions, while project-specific names like `caisson` or `acme-infra` make them vanishingly rare. This is a convention, not an enforcement mechanism: if two upstream flakes happen to choose the same `configName`, their `lib` contributions will merge into the same namespace.
 
 ### prev-Based Merging
 
@@ -38,9 +38,9 @@ See [Closed Inputs](./closed-inputs.md) for the full mechanism.
 
 ### Dependency Tracking
 
-Library overlays sometimes need to call functions defined by other library overlays. Without explicit dependency management, this requires manually ensuring that overlays are applied in the right order -- a fragile arrangement that breaks when overlays are reorganized or new ones are added.
+Library overlays sometimes need to call functions defined by other library overlays. Without explicit dependency management, this requires manually ensuring that overlays are applied in the right order, a fragile arrangement that breaks when overlays are reorganized or new ones are added.
 
-caisson solves this. Every registered overlay is an `{ imports ? [ ], overlay }` attrset, and `imports` is where its dependencies go. Entries are built overlays — the closure's `mkLibOverlay` member exists exactly so a dependency can be built in place:
+caisson solves this. Every registered overlay is an `{ imports ? [ ], overlay }` attrset, and `imports` is where its dependencies go. Entries are built overlays; the closure's `mkLibOverlay` member exists exactly so a dependency can be built in place:
 
 ```nix
 { mkLibOverlay, ... }:
@@ -60,7 +60,7 @@ The resolution is recursive: imported overlays can themselves declare imports, a
 
 ## Package Overlays and Library Overlays
 
-The safety techniques described here -- namespacing, input closure, dependency tracking -- apply equally to package overlays and library overlays. The underlying mechanism is the same: both are functions of `final: prev:` that extend an attribute set.
+The safety techniques described here (namespacing, input closure, dependency tracking) apply equally to package overlays and library overlays. The underlying mechanism is the same: both are functions of `final: prev:` that extend an attribute set.
 
 caisson provides the tooling for safe library overlays. The same principles apply to package overlays, but package overlay tooling is the domain of `caisson-nixpkgs` (not yet published), which builds on caisson's foundation.
 
@@ -76,7 +76,7 @@ so overriding one of its attributes changes what readers of the
 composed library see, without re-tying the base's own internal
 references.
 
-For most flakes the overhead is negligible, but it's worth being aware of -- especially if you're composing a large number of upstream library overlays. The eval-weight harness (see the guides) is the tool for holding it to a measured ceiling.
+For most flakes the overhead is negligible, but it's worth being aware of, especially if you're composing a large number of upstream library overlays. The eval-weight harness (see the guides) is the tool for holding it to a measured ceiling.
 
 ## Practical Patterns
 
@@ -149,6 +149,6 @@ libOverlays = mkLibOverlay: {
 
 ## Further Reading
 
-- [Library Lifecycle](./library-lifecycle.md) -- how overlays are composed during `mkLib`
-- [Closed Inputs](./closed-inputs.md) -- how inputs are closed over in overlays and modules
-- `examples/literate-flake/` -- working example with a custom library overlay
+- [Library Lifecycle](./library-lifecycle.md): how overlays are composed during `mkLib`
+- [Closed Inputs](./closed-inputs.md): how inputs are closed over in overlays and modules
+- `examples/literate-flake/`: a working example with a custom library overlay
