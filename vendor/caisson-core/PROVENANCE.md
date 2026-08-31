@@ -2,13 +2,13 @@
 
 Source: https://github.com/nix-caisson/caisson-core
 Revision: 09ffdb5 (drop the branded noun)
-Contents: `lib/` (the composition engine and kernel) and `vendor/`
+Contents: `lib/` (composition and the kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and
 provenance header.
 
 Why vendored rather than pinned: caisson composes its own library
-through this engine, and check builds evaluate in sandboxes that
+through this copy, and check builds evaluate in sandboxes that
 cannot fetch. While the caisson repositories are private no fetchable
 reference works there at all; after publication this copy is expected
 to become a narHash-pinned lazy fetch. caisson-compat pins both
