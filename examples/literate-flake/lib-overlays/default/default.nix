@@ -9,14 +9,14 @@
   depends on go under `imports`. Overlays are composed left-to-right
   during `mkLib`, imports first.
 
-  Convention: namespace your additions (here `literate`) to avoid collisions
+  Convention: namespace your additions (here `literate-flake`) to avoid collisions
   with nixpkgs-lib and other overlays.
 */
 { ... }:
 {
   imports = [ ];
   overlay = final: prev: {
-    literate = (prev.literate or { }) // {
+    literate-flake = (prev.literate-flake or { }) // {
       greet = name: "Hello from literate-flake, ${name}!";
     };
   };

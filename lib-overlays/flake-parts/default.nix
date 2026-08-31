@@ -44,13 +44,14 @@
         # CI; consumers assume shape.
         manifest = final.mkOptionType {
           name = "caissonManifest";
-          description = "caisson-core manifest ({ inputs, modules, libOverlays, ecosystems })";
+          description = "caisson-core manifest ({ inputs, modules, libOverlays, ecosystems, projects })";
           descriptionClass = "noun";
           check =
             v:
             builtins.isAttrs v
             && builtins.isAttrs (v.inputs or null)
             && builtins.isAttrs (v.ecosystems or { })
+            && builtins.isAttrs (v.projects or { })
             && builtins.isAttrs (v.modules or null)
             && builtins.all builtins.isAttrs (builtins.attrValues v.modules)
             && builtins.isAttrs (v.libOverlays or null)
@@ -114,10 +115,11 @@
                   // filteredArgs.specialArgs or { };
                 };
 
-              localModules = manifest.modules // {
-                flake = manifest.modules.flake or { };
-              };
-              importedModules = moduleImports localModules.flake;
+              # Selection over the flake class of the registry, the
+              # same source every adapter selects from, so modules
+              # arriving by any channel (local registration, overlay
+              # contribution, consumed project) are selectable here.
+              importedModules = moduleImports (final.caisson-core.modules.flake or { });
 
               finalModule = (
                 { lib, ... }:

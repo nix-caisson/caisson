@@ -47,20 +47,29 @@
 
         `caisson-core.mkLib` composes a library from registered overlays and
         injects the machinery, the module registry, and the manifest under
-        `lib.caisson-core`. Registering caisson's `flake-parts` integration
-        overlay contributes `lib.caisson` (mkFlake and friends); your own
-        overlays contribute your extensions (here, `lib.literate`).
+        `lib.caisson-core`. Your own overlays contribute your extensions
+        (here, `lib.literate-flake`).
 
         - `inputs` are closed over so that modules and overlays can reference
           them without threading inputs explicitly through every call site.
+        - `projects` registers whole upstream contributions: a consumed
+          project's exported overlays and modules become available under
+          `<project>/<name>`, and the usual selections pick from them per
+          item. Registering caisson this way brings in its integrations
+          (`lib.caisson`, mkFlake included) and its exported modules.
         - `modules` is a function from the composed `lib`, used to register
-          class-keyed modules.
+          this flake's own class-keyed modules.
         - `libOverlays` is a function from an input-closed `mkLibOverlay`
-          helper, used to register library overlays without a separate bootstrap
-          library in downstream flakes.
+          helper, used to register individual library overlays; registering
+          one by hand stays useful for cherry-picking or renaming a single
+          overlay from elsewhere.
       */
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
+
+        projects = {
+          inherit caisson;
+        };
 
         modules = lib: {
           # Demonstrate class-keyed module registration.
@@ -69,10 +78,6 @@
             noop = lib.caisson-core.mkModule "generic" ({ ... }: { });
           };
           flake = {
-            # Import the framework's default module, which provides configInfo,
-            # lib export, module export, and libOverlays export options.
-            caisson-default = inputs.caisson.modules.flake.default;
-
             # Register this flake's own module. Everything passed to mkModule
             # takes the closure attrset ({ closure-inputs, closure-lib,
             # mkModule, ... }) as its first arg list; files that don't need it
@@ -82,12 +87,8 @@
         };
 
         libOverlays = mkLibOverlay: {
-          # Register caisson's flake-parts integration (already built, so
-          # it registers directly), which contributes lib.caisson.mkFlake.
-          flake-parts = caisson.libOverlays.flake-parts;
-
           # Register a local library overlay. After mkLib completes, its
-          # attributes are available on the composed `lib` (e.g. lib.literate).
+          # attributes are available on the composed `lib` (e.g. lib.literate-flake).
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -101,15 +102,17 @@
 
       - `configModule` is the flake's top-level configuration (systems,
         caisson settings, per-system packages, etc.).
-      - `moduleImports` selects which of the registered flake-class modules to
-        activate. This is how you control which modules participate in
-        evaluation.
+      - `moduleImports` selects which of the registered flake-class modules
+        to activate; the consumed project's modules select under their
+        prefixed names ("caisson/default" is caisson's default module,
+        providing configInfo and the export options).
     */
     lib.caisson.mkFlake {
       configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/literate-flake;
 
       moduleImports = modules: {
-        inherit (modules) caisson-default default;
+        "caisson/default" = modules."caisson/default";
+        inherit (modules) default;
       };
     };
 }

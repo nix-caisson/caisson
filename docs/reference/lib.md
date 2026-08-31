@@ -34,6 +34,7 @@ mkLib :
   , libOverlayImports ? builtins.attrValues
                       : attrsOf libOverlay -> listOf libOverlay
   , ecosystems        ? { } : attrs                        # declared ecosystem sources, by exact name
+  , projects          ? { } : attrs                        # consumed upstream contributions, by project name
   } -> lib
 ```
 
@@ -59,6 +60,17 @@ defaults it to that composition's own base.
   composition (`{ nixpkgs = inputs.nixpkgs; ... }`), keyed by the
   exact names the integrations resolve. mkLib only captures them into
   the manifest; the integrations interpret them.
+- `projects` consumes whole upstream contributions
+  (`{ my-dep = inputs.my-dep; }`): each value carries `libOverlays`
+  and class-keyed `modules` dictionaries, which a caisson-built
+  flake's outputs already do. A project's overlays join the
+  registered dictionary and its modules join the class registry under
+  `<project>/<name>`, so the existing selections keep per-item
+  choice: `libOverlayImports` decides which overlays apply, the
+  registry selection at each use site decides which modules load, and
+  a local registration beats a same-named project entry. Registering
+  a single overlay by hand stays the way to cherry-pick or rename
+  one.
 
 ### `mkLibOverlay`
 
@@ -126,7 +138,8 @@ selection.
 
 ```
 manifest : { inputs : attrs; modules : attrsOf (attrsOf module);
-             libOverlays : attrsOf libOverlay; ecosystems : attrs }
+             libOverlays : attrsOf libOverlay; ecosystems : attrs;
+             projects : attrs }
 ```
 
 The capture of what `mkLib` consumed, injected as the composition's
@@ -182,16 +195,19 @@ caisson-core's own documentation.
 mkFlake :
   { configModule  : module                                  # flake class
   , moduleImports ? (modules: modules)
-                  : attrsOf module -> attrsOf module        # selection from modules.flake
+                  : attrsOf module -> attrsOf module        # selection from the flake class registry
   , name          ? null : nullOr string                    # rev-independent module identity
   , ...                                                     # forwarded to flake-parts mkFlake
   } -> flakeOutputs
 ```
 
-Builds final flake outputs via `flake-parts` using the composed `lib`
-and the composition's manifest: the flake's `inputs` and registered
-modules are read from `lib.caisson-core.manifest`, so `mkFlake`
-requires a manifest-carrying (mkLib-built) composition. The
+Builds final flake outputs via `flake-parts` using the composed
+`lib`: the flake's `inputs` come from `lib.caisson-core.manifest`
+(so `mkFlake` requires a manifest-carrying, mkLib-built composition),
+and `moduleImports` selects over the `flake` class of
+`lib.caisson-core.modules`, the same registry every adapter selects
+from, so modules arriving by local registration, overlay
+contribution, or consumed project are all selectable. The
 flake-parts pin is caisson's own, closed over at the integration's
 definition; consumers declare no flake-parts input. `name` sets
 flake-parts' `moduleLocation` (so exported modules deduplicate across

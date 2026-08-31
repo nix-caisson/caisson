@@ -22,7 +22,11 @@ involved.
 The `libOverlays` argument to `mkLib` is a function that receives the
 input-closed `mkLibOverlay` helper and returns the set of registered
 overlays (`_mkLibOverlay: { ... }` when everything registered is
-already built).
+already built). The `projects` argument registers whole upstream
+contributions beside them: a consumed project's exported overlays
+enter the same dictionary under `<project>/<name>`, and its exported
+modules enter the class registry under the same prefix, so the
+selection phases below choose from local and consumed entries alike.
 
 Everything passed through `mkLibOverlay` takes the closure attrset as
 its first arg list, `{ closure-inputs, mkLibOverlay, ... }:`, and

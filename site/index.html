@@ -243,8 +243,8 @@
     let
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
+        projects = { inherit caisson; };
         libOverlays = mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };

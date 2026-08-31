@@ -13,8 +13,8 @@
 
   caisson = {
     # Identifies this flake in doc strings and as the lib export namespace.
-    # With this set, `flake.lib` exposes `lib.literate` (our overlay output).
-    configInfo.configName = "literate";
+    # With this set, `flake.lib` exposes `lib.literate-flake` (our overlay output).
+    configInfo.configName = "literate-flake";
 
     # Opt in to exporting the composed library as a flake output.
     # Requires configName to be set.
@@ -24,7 +24,7 @@
   perSystem =
     { pkgs, ... }:
     {
-      # Uses the composed library -- lib.literate.greet comes from our overlay.
-      packages.default = pkgs.writeText "literate-demo" (lib.literate.greet "Nix");
+      # Uses the composed library -- lib.literate-flake.greet comes from our overlay.
+      packages.default = pkgs.writeText "literate-flake-demo" (lib.literate-flake.greet "Nix");
     };
 }

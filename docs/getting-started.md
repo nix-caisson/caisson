@@ -23,8 +23,8 @@ Create a directory with this `flake.nix`:
     let
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
-        libOverlays = _mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
+        projects = {
+          inherit caisson;
         };
       };
     in
@@ -36,11 +36,12 @@ Create a directory with this `flake.nix`:
 ```
 
 `caisson-core.mkLib` composes a library: nixpkgs' lib, the machinery
-under `lib.caisson-core`, and the overlays you register. Registering
-caisson's `flake-parts` integration overlay contributes `lib.caisson`
-(`mkFlake` and friends); `mkFlake` then evaluates flake-parts with
-that library and your config module, using caisson's own flake-parts
-pin, so your flake declares none.
+under `lib.caisson-core`, and the overlays you register. Consuming
+caisson as a project registers everything it exports at once, its
+integrations included, which contributes `lib.caisson` (`mkFlake`
+and friends); `mkFlake` then evaluates flake-parts with that library
+and your config module, using caisson's own flake-parts pin, so your
+flake declares none.
 
 The config module is the flake's own top-level configuration. Create
 `configs/flake-parts/my-flake/default.nix`:
@@ -96,8 +97,10 @@ in the config module:
 ```nix
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
+        projects = {
+          inherit caisson;
+        };
         libOverlays = mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -128,11 +131,13 @@ systems. Register a flake-class module:
 ```nix
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
+        projects = {
+          inherit caisson;
+        };
         modules = lib: {
           flake.default = lib.caisson.mkFlakeModule ./modules/flake-parts/default;
         };
         libOverlays = mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
           default = mkLibOverlay ./lib-overlays/default;
         };
       };
@@ -185,19 +190,23 @@ its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs;`)
 and drop the argument; an explicit argument still wins, and an input
 named exactly `nixpkgs` is the last fallback.
 
-The composed library only contains `caisson.nixos` if its overlay is
-in the composition; register it from caisson's exports:
+With caisson consumed as a project, every integration overlay is
+already registered and applied, so `caisson.nixos` is present. To
+compose only some of them, keep the project registration and select
+per item over the combined dictionary:
 
 ```nix
-        libOverlays = mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
-          nixos = caisson.libOverlays.nixos;
-          default = mkLibOverlay ./lib-overlays/default;
-        };
+        libOverlayImports = overlays: [
+          overlays."caisson/flake-parts"
+          overlays."caisson/nixos"
+          overlays.default
+        ];
 ```
 
-The [library reference](reference/lib.md) documents every
-integration namespace.
+Registering a single overlay by hand
+(`nixos = caisson.libOverlays.nixos;`) remains the way to cherry-pick
+or rename one. The [library reference](reference/lib.md) documents
+every integration namespace.
 
 ## 5. Consume your flake from another flake
 
@@ -215,9 +224,8 @@ A consumer registers your exported overlay the same way:
     let
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
-        libOverlays = _mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
-          my-flake = my-flake.libOverlays.default;
+        projects = {
+          inherit caisson my-flake;
         };
       };
     in
@@ -228,14 +236,18 @@ A consumer registers your exported overlay the same way:
 }
 ```
 
-The consumer's composed library now has `lib.my-flake.greet`, and the
-overlay's `imports` chain guarantees anything your overlay depends on
-composes with it. Modules can travel with the overlay too: an overlay
-that contributes entries via `contributeModules` (see
-[Module classes](concepts/module-classes.md)) delivers them into the
-consumer's registry through the same single registration. The
+The consumer's composed library now has `lib.my-flake.greet`: the
+project registration brings in every overlay you exported, each
+overlay's `imports` chain guarantees anything it depends on composes
+with it, and your exported modules land in the consumer's registry
+under `my-flake/<name>`, selectable at every use site. Overlays that
+contribute modules via `contributeModules` (see
+[Module classes](concepts/module-classes.md)) deliver them the same
+way. A consumer who wants only part of your project selects with
+`libOverlayImports`, or registers single overlays from
+`my-flake.libOverlays.<name>` by hand; the
 `my-flake.modules.<class>.<name>` flake outputs remain for consumers
-who import modules without composing your overlay.
+who import modules without composing anything.
 
 ## Where next
 
