@@ -1,6 +1,6 @@
 # Ecosystem sources
 
-An integration never pins its target. `caisson.nixos` does not carry
+Integrations do not pin their targets. `caisson.nixos` does not carry
 a nixpkgs; `caisson.home-manager` does not carry a home-manager. The
 target arrives as a value, called the ecosystem source, and the
 integration is glue over that target's own evaluator. This is what
