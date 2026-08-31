@@ -186,7 +186,7 @@ in the config module's `perSystem` or at the top level:
 ```
 
 Instead of passing `ecosystemSrc` at every call, a flake can declare
-its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs;`)
+its ecosystems once at `mkLib` (`ecosystems.nixpkgs = inputs.nixpkgs`)
 and drop the argument; an explicit argument still wins, and an input
 named exactly `nixpkgs` is the last fallback.
 
@@ -204,7 +204,7 @@ per item over the combined dictionary:
 ```
 
 Registering a single overlay by hand
-(`nixos = caisson.libOverlays.nixos;`) remains the way to cherry-pick
+(`nixos = caisson.libOverlays.nixos`) remains the way to cherry-pick
 or rename one. The [library reference](reference/lib.md) documents
 every integration namespace.
 

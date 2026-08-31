@@ -71,7 +71,7 @@ in three ways:
   its library namespace and its modules together, transitively through
   the overlay's `imports` chain; no re-registration is involved.
 - **Project consumption**, `mkLib`'s `projects` hook: registering a
-  whole upstream contribution (`projects.my-dep = inputs.my-dep;`)
+  whole upstream contribution (`projects.my-dep = inputs.my-dep`)
   places its exported modules in the registry under
   `<project>/<name>` per class, beside its overlays in the overlay
   dictionary. Selection stays per item at every use site, and a

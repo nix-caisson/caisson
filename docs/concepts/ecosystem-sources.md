@@ -30,9 +30,9 @@ documents the shape it takes; in practice:
 
 A source comes from one of three places, in priority order:
 
-1. **Explicit argument.** `ecosystemSrc = inputs.nixpkgs;` at the
+1. **Explicit argument.** `ecosystemSrc = inputs.nixpkgs` at the
    call site always wins.
-2. **Declared once.** `ecosystems.nixpkgs = inputs.nixpkgs;` at
+2. **Declared once.** `ecosystems.nixpkgs = inputs.nixpkgs` at
    `mkLib` declares the composition's default for that name; every
    adapter in the composition picks it up, and the per-call argument
    disappears from your code.
