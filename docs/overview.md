@@ -22,7 +22,7 @@ reading order:
   overlays.
 - [Library lifecycle](concepts/library-lifecycle.md) — the mechanics:
   how `mkLib` bootstraps, selects, and composes the final `lib`.
-- [The composition calculus](concepts/composition-calculus.md) — the
+- [The composition calculus](concepts/composition-calculus.md): the
   foundation contract under library composition, implemented in
   caisson-core, and caisson's entries onto it.
 

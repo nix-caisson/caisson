@@ -86,7 +86,7 @@ over old and new bases.
 ## Ecosystem sources
 
 The calculus deliberately fetches nothing. Sources for whole
-ecosystems — a nixpkgs `lib` directory, a flake-parts tree — arrive as
+ecosystems (a nixpkgs `lib` directory, a flake-parts tree) arrive as
 explicit arguments, and `caisson-core` ships a layered resolver for
 them: an explicit argument wins, then the client repository's declared
 defaults, then an input with exactly the declared name. A full miss
@@ -104,7 +104,9 @@ caisson.lib.composition.entriesFor {
   # or "${nixpkgs-lib}/lib" for the nixpkgs.lib mirror
   ecosystemSrc = "${inputs.nixpkgs-lib}/lib";
 }
-# => { base, caisson-lib }
+# => { base, caisson-lib,
+#      caisson-nixpkgs, caisson-nixos, caisson-home-manager,
+#      caisson-colmena, caisson-terranix, caisson-system-manager }
 ```
 
 `base` (key `caisson.nixpkgs-lib`) contributes the nixpkgs library
@@ -112,3 +114,10 @@ the composition builds on; `caisson-lib` (key `caisson.lib`) imports
 it and contributes the `caisson` namespace and its companions.
 Composing `[ caisson-lib ]` with `caisson-core`'s `compose` yields a
 library equivalent to the one caisson's own `mkLib` produces today.
+
+The remaining entries are caisson's integrations, one per target
+ecosystem, each importing `caisson-lib` and contributing its own
+namespace (`caisson-nixos.mkSystem`,
+`caisson-home-manager.mkHomeConfiguration`, and so on). An
+integration takes its target as an explicit `ecosystemSrc` argument
+at its own entry points and pins nothing itself.

@@ -22,8 +22,13 @@ without nixpkgs can depend on it directly.
 ## caisson
 
 The layer users reach for. It composes libraries, registers and
-exports class-keyed modules, and speaks flake-parts. caisson exports
-its own library contributions in calculus form via
+exports class-keyed modules, speaks flake-parts, and contains the
+integrations (`caisson-nixpkgs`, `caisson-nixos`,
+`caisson-home-manager`, `caisson-colmena`, `caisson-terranix`,
+`caisson-system-manager`), each a library overlay registering its own
+module class and taking its target ecosystem as an explicit
+`ecosystemSrc` argument. caisson exports its library contributions,
+integrations included, in calculus form via
 `lib.composition.entriesFor`, alongside the current `mkLib` surface;
 moving `mkLib` itself onto the calculus is the pending cutover, and
 until then both surfaces are exported and tested.

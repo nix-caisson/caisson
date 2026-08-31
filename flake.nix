@@ -44,6 +44,12 @@
 
           libOverlays = mkLibOverlay: {
             default = mkLibOverlay ./lib-overlays/default;
+            caisson-nixpkgs = mkLibOverlay ./lib-overlays/caisson-nixpkgs;
+            caisson-nixos = mkLibOverlay ./lib-overlays/caisson-nixos;
+            caisson-home-manager = mkLibOverlay ./lib-overlays/caisson-home-manager;
+            caisson-colmena = mkLibOverlay ./lib-overlays/caisson-colmena;
+            caisson-terranix = mkLibOverlay ./lib-overlays/caisson-terranix;
+            caisson-system-manager = mkLibOverlay ./lib-overlays/caisson-system-manager;
           };
 
         };

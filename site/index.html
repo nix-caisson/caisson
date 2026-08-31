@@ -264,14 +264,13 @@
   <section class="integrations" id="integrations">
     <h2>Integrations</h2>
     <p>
-      caisson itself speaks flake-parts. Companion flakes carry the same
-      conventions — closed inputs, library overlays, class-keyed modules
-      — into other module ecosystems, each registering its own module
-      class:
+      caisson itself speaks flake-parts, and it ships integrations that
+      carry the same conventions (closed inputs, library overlays,
+      class-keyed modules) into other module ecosystems, each
+      registering its own module class:
     </p>
     <table class="where">
-      <tr><th>Flake</th><th>brings caisson's conventions to…</th></tr>
-      <tr><td><code>caisson</code></td><td>flake-parts — this flake</td></tr>
+      <tr><th>Integration</th><th>brings caisson's conventions to…</th></tr>
       <tr><td><code>caisson-nixpkgs</code></td><td>nixpkgs package sets and overlays</td></tr>
       <tr><td><code>caisson-nixos</code></td><td>NixOS configurations</td></tr>
       <tr><td><code>caisson-home-manager</code></td><td>Home Manager configurations</td></tr>
@@ -280,8 +279,12 @@
       <tr><td><code>caisson-system-manager</code></td><td>system-manager configurations on foreign distros</td></tr>
     </table>
     <p>
-      The integrations are in active use but not yet published; caisson
-      itself is being released first.
+      Each integration is a library overlay exported by this flake and
+      a set of entries onto the
+      <a href="https://github.com/nix-caisson/caisson-core">caisson-core</a>
+      composition calculus. Integrations take their target ecosystem as
+      an explicit <code>ecosystemSrc</code> argument and pin nothing
+      themselves.
     </p>
   </section>
 
