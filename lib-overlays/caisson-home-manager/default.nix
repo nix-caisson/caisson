@@ -266,9 +266,7 @@
           }:
           let
             checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
-            sharedClassModules = builtins.attrValues (
-              moduleImports (final.caisson.modules.homeManager or { })
-            );
+            sharedClassModules = builtins.attrValues (moduleImports (final.caisson.modules.homeManager or { }));
             hmSource = resolveOutPath ecosystemSrc;
             resolvedSourceMeta =
               if sourceMeta != null then

@@ -23,8 +23,7 @@
       integrationEntry = target: {
         key = "caisson.${target}";
         imports = [ entries.caisson-lib ];
-        overlay =
-          (import ../lib-overlays/caisson-${target} { closure-inputs = inputs; }).overlay;
+        overlay = (import ../lib-overlays/caisson-${target} { closure-inputs = inputs; }).overlay;
       };
 
       entries = {
