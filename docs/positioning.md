@@ -117,7 +117,7 @@ through the input graph.
 
 Everything caisson adds is published through the flake schema's only
 freeform slot, the `lib` output: composed libraries, the module
-registry, and the manifest (the capture of what `mkLib` consumed) all
+registry, and the manifest (the composition's self-description) all
 live there, and the remaining flake outputs (`modules.<class>`,
 `libOverlays`, per-system products) are projections from it that keep
 the standard schema's addresses. A flake built this way needs only a

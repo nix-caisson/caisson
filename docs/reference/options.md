@@ -36,7 +36,7 @@ Function that selects which parts of the composed library to publish as the flak
 - **Default:** the composed library's `caisson-core.manifest`
 - **Source:** `modules/flake-parts/core/caisson/manifest.nix`
 
-The composition's manifest: the capture of what `mkLib` consumed (`inputs`, `modules`, `libOverlays`). Reading it type-checks the manifest; the `flake.modules` and `flake.libOverlays` projections are drawn from it.
+The composition's manifest: `inputs`, `ecosystems`, and `projects` as given to `mkLib`, plus the registered `libOverlays` and `modules` dictionaries (project entries under `<project>/<name>`, locals winning). Reading it type-checks the manifest; the `flake.modules` and `flake.libOverlays` projections are drawn from it.
 
 ### `caisson.modules`
 

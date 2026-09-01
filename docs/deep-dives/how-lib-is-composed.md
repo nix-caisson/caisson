@@ -46,7 +46,7 @@ baseLib
 
 The first added overlay injects the machinery and the empty module
 registry under `caisson-core`. The last one records the manifest,
-the capture of what `mkLib` was given, at
+the composition's self-description, at
 `lib.caisson-core.manifest`. Module registrations apply after every
 selected overlay so that a local name always beats a same-named
 contribution from an overlay or a consumed project.
