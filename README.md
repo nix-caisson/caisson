@@ -24,9 +24,9 @@ to your declared inputs, so a consumer does not have to re-declare your
 dependencies or `follows`-pin them to make your modules work. They can
 still override a pin when they want to.
 
-If you consume one, adopting caisson yourself gives you the machinery to
-compose what you pull in: libraries and modules from several flakes fit
-together instead of colliding.
+If you consume a flake, adopting caisson yourself gives you the machinery
+to compose what you pull in: libraries and modules from several flakes
+fit together instead of colliding.
 
 ## Quick start
 
