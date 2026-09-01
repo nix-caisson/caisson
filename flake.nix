@@ -71,6 +71,10 @@
           modules = composedLib: {
             flake = {
               default = composedLib.caisson.mkFlakeModule ./modules/flake-parts/default;
+              # flake-parts' partitions module, registered so consumers
+              # can select it from the registry instead of declaring a
+              # flake-parts input of their own.
+              partitions = flake-parts-flake.flakeModules.partitions;
             };
           };
 
@@ -96,7 +100,10 @@
 
           configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/caisson;
 
-          moduleImports = modules: [ modules.default ];
+          moduleImports = modules: [
+            modules.default
+            modules.partitions
+          ];
 
         };
 

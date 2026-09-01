@@ -230,6 +230,13 @@ mkFlakeModule : freeformModule -> module    # = caisson-core.mkModule "flake"
 
 Convenience form of `mkModule "flake"` for flake-parts modules.
 
+### `modules.flake."caisson/partitions"`
+
+flake-parts' partitions module, registered and exported in caisson's
+flake class so a consumer selects it from the registry
+(`moduleImports = modules: [ modules."caisson/partitions" ... ]`)
+rather than declaring a flake-parts input for it.
+
 ### `eval-weight`
 
 - **Source:** `lib-overlays/tooling/eval-weight/`

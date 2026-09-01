@@ -4,7 +4,8 @@
 {
 
   imports = [
-    inputs.flake-parts.flakeModules.partitions
+    # The partitions module itself arrives through the registry (the
+    # flake.partitions registration, selected by moduleImports).
     ./partitions
   ];
 
@@ -32,7 +33,7 @@
         system-manager
         ;
     };
-    modules.flake.exported = modules: { inherit (modules) default; };
+    modules.flake.exported = modules: { inherit (modules) default partitions; };
 
     lib = {
       export.enabled = true;
