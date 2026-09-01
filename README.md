@@ -71,14 +71,23 @@ lives in `configs/flake-parts/<flake-name>`.
 
 ## Integrations
 
-caisson ships integrations that carry closed inputs, library overlays, and
-class-keyed modules into other module ecosystems, each a library overlay
-contributing a `lib.caisson.<ecosystem>` namespace and registering its own
-module class:
-`nixpkgs` (package sets and overlays), `nixos`, `home-manager`,
-`terranix` (Terranix/Terraform), `colmena` (deployment hives), and
-`system-manager` (foreign distros). Each takes its ecosystem as
-an explicit `ecosystemSrc` argument and pins nothing itself.
+caisson ships integrations that carry its benefits throughout the Nix
+ecosystem:
+
+| Integration | for |
+| --- | --- |
+| `flake-parts` | flake outputs |
+| `nixpkgs` | package sets and overlays |
+| `nixos` | NixOS configurations |
+| `home-manager` | Home Manager configurations |
+| `terranix` | Terranix and Terraform configurations |
+| `colmena` | Colmena deployment hives |
+| `system-manager` | system-manager configurations on foreign distros |
+
+Each integration works against the version of its ecosystem that you
+already have. caisson pins none of them, and declares no flake inputs of
+its own, so adding it does not put anything in your lock file to keep
+aligned, and there is no chain of `follows` to enumerate downstream.
 
 ## Going deeper
 
