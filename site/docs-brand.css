@@ -24,3 +24,40 @@
 ::selection { background: var(--caisson-violet); color: #fff; }
 
 .menu-title { letter-spacing: -0.02em; font-weight: 600; }
+
+/* Site bar: the way back up from the book to the caisson landing page,
+   rendered by theme/header.hbs above mdBook's own menu bar. */
+
+.caisson-sitebar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--table-border-color, rgba(128, 128, 128, 0.25));
+}
+
+.caisson-sitebar-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: var(--links);
+  text-decoration: none;
+}
+
+.caisson-sitebar-home:hover { text-decoration: underline; }
+
+.caisson-sitebar-home img { display: block; }
+
+.caisson-sitebar-here {
+  color: var(--fg);
+  opacity: 0.65;
+}
+
+.caisson-sitebar-here::before {
+  content: "/";
+  margin-right: 0.75rem;
+  opacity: 0.5;
+}
