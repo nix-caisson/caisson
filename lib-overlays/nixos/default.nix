@@ -38,7 +38,7 @@
         args@{
           pkgSets,
           configModule,
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
           specialArgs ? { },
           ...
         }:
@@ -48,7 +48,7 @@
             args.system
               or (checkedPkgSets.pkgs.stdenv.hostPlatform.system or (checkedPkgSets.pkgs.system or null));
           selectedModules = moduleImports (final.caisson-core.modules.nixos or { });
-          extraModules = builtins.attrValues selectedModules;
+          extraModules = selectedModules;
           frameworkModule = mkFrameworkModule checkedPkgSets;
         in
         {

@@ -150,7 +150,7 @@
           ecosystemSrc ? null,
           pkgSets,
           configModule,
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
           extraSpecialArgs ? { },
           osConfig ? null,
           check ? true,
@@ -179,7 +179,7 @@
             ;
           sourceMeta = resolvedSourceMeta;
           configuration = {
-            imports = (builtins.attrValues selectedModules) ++ [
+            imports = selectedModules ++ [
               configModule
               (mkSourceMetaModule resolvedSourceMeta)
               { programs.home-manager.path = final.mkDefault hmSource; }
@@ -217,7 +217,7 @@
 
       mkStandaloneAdapter =
         args@{
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
           ...
         }:
         let
@@ -240,7 +240,7 @@
           # marker cannot vouch for coherence.
           baseSystem ? null,
           sourceMeta ? null,
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
           sharedModules ? [ ],
           useGlobalPkgs ? true,
           useUserPackages ? true,
@@ -278,9 +278,7 @@
           }:
           let
             checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
-            sharedClassModules = builtins.attrValues (
-              moduleImports (final.caisson-core.modules.homeManager or { })
-            );
+            sharedClassModules = moduleImports (final.caisson-core.modules.homeManager or { });
             hmSource = resolveOutPath (resolveSrc ecosystemSrc);
             resolvedSourceMeta =
               if sourceMeta != null then
@@ -301,10 +299,8 @@
             mkUserConfig =
               _username: userArgs:
               let
-                userModuleImports = userArgs.moduleImports or (_modules: { });
-                userClassModules = builtins.attrValues (
-                  userModuleImports (final.caisson-core.modules.homeManager or { })
-                );
+                userModuleImports = userArgs.moduleImports or (_modules: [ ]);
+                userClassModules = userModuleImports (final.caisson-core.modules.homeManager or { });
                 configModule =
                   if userArgs ? configModule then
                     userArgs.configModule

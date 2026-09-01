@@ -61,7 +61,7 @@
 
           configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/caisson;
 
-          moduleImports = modules: { inherit (modules) default; };
+          moduleImports = modules: [ modules.default ];
 
         };
 

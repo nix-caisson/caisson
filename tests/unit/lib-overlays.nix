@@ -940,7 +940,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: { inherit (modules) inspect; };
+            moduleImports = modules: [ modules.inspect ];
           };
         in
         outputs.inspect;
@@ -986,7 +986,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: { inherit (modules) inspect; };
+            moduleImports = modules: [ modules.inspect ];
           };
         in
         outputs.callbackSawOverlay;
@@ -1030,7 +1030,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: { inherit (modules) inspect; };
+            moduleImports = modules: [ modules.inspect ];
           };
         in
         outputs.fixpoint;
@@ -1088,7 +1088,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: { inherit (modules) fromAlias; };
+            moduleImports = modules: [ modules.fromAlias ];
           };
         in
         outputs.fromAlias or false;
@@ -1174,7 +1174,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: { inherit (modules) inspect; };
+            moduleImports = modules: [ modules.inspect ];
           };
         in
         outputs.functionModules;
@@ -1352,16 +1352,16 @@ in
     };
 
     "test: moduleImports default selects all modules" = {
-      # The default moduleImports is the identity function.
+      # The default moduleImports is builtins.attrValues.
       expr =
         let
-          moduleImports = modules: modules;
+          moduleImports = builtins.attrValues;
           localModules = {
             a = "mod-a";
             b = "mod-b";
           };
         in
-        builtins.attrValues (moduleImports localModules);
+        moduleImports localModules;
       expected = [
         "mod-a"
         "mod-b"
@@ -1371,7 +1371,7 @@ in
     "test: moduleImports can filter modules" = {
       expr =
         let
-          moduleImports = modules: { inherit (modules) a; };
+          moduleImports = modules: [ modules.a ];
           localModules = {
             a = "mod-a";
             b = "mod-b";
@@ -1379,8 +1379,8 @@ in
           selected = moduleImports localModules;
         in
         {
-          hasA = selected ? a;
-          hasB = selected ? b;
+          hasA = builtins.elem "mod-a" selected;
+          hasB = builtins.elem "mod-b" selected;
         };
       expected = {
         hasA = true;
@@ -1417,9 +1417,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: {
-              inherit (modules) fromModules;
-            };
+            moduleImports = modules: [ modules.fromModules ];
           };
         in
         outputs.fromModules or false;
@@ -1452,9 +1450,7 @@ in
                 systems = [ "x86_64-linux" ];
               }
             );
-            moduleImports = modules: {
-              inherit (modules) fromModulesOnly;
-            };
+            moduleImports = modules: [ modules.fromModulesOnly ];
           };
         in
         outputs.fromModulesOnly or false;

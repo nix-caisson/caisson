@@ -158,7 +158,8 @@ systems. Register a flake-class module:
 ```
 
 `mkFlake` applies the selected flake-class modules alongside the
-config module (`moduleImports` selects; the default is all of them).
+config module (`moduleImports` returns the list to apply, like
+`libOverlayImports`; the default is all of them).
 [Module classes](concepts/module-classes.md) covers registration,
 selection, and export.
 

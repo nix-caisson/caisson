@@ -65,7 +65,7 @@
 
           configModule,
 
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
 
           # The flake's canonical name. Exported modules are keyed by
           # flake-parts' moduleLocation, which defaults to self.outPath,
@@ -129,7 +129,7 @@
                     closure-inputs.flake-parts.flakeModules.modules
                     ../../modules/flake-parts/core
                   ]
-                  ++ (builtins.attrValues importedModules)
+                  ++ importedModules
                   ++ [ configModule ]
                   ++ (if name != null then [ { caisson.configInfo.configName = lib.mkDefault name; } ] else [ ]);
                 }

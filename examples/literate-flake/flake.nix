@@ -102,17 +102,18 @@
 
       - `configModule` is the flake's top-level configuration (systems,
         caisson settings, per-system packages, etc.).
-      - `moduleImports` selects which of the registered flake-class modules
-        to activate; the consumed project's modules select under their
-        prefixed names ("caisson/default" is caisson's default module,
-        providing configInfo and the export options).
+      - `moduleImports` returns the list of registered flake-class modules
+        to activate, like `libOverlayImports` for overlays; the consumed
+        project's modules select under their prefixed names
+        ("caisson/default" is caisson's default module, providing
+        configInfo and the export options).
     */
     lib.caisson.mkFlake {
       configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/literate-flake;
 
-      moduleImports = modules: {
-        "caisson/default" = modules."caisson/default";
-        inherit (modules) default;
-      };
+      moduleImports = modules: [
+        modules."caisson/default"
+        modules.default
+      ];
     };
 }

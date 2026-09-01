@@ -24,7 +24,7 @@
       mkCommonArgs =
         args@{
           modules ? [ ],
-          moduleImports ? modules: modules,
+          moduleImports ? builtins.attrValues,
           extraArgs ? { },
           ...
         }:
@@ -32,7 +32,7 @@
           selectedModules = moduleImports (final.caisson-core.modules.terranix or { });
         in
         {
-          modules = (builtins.attrValues selectedModules) ++ modules;
+          modules = selectedModules ++ modules;
           # Framework defaults first; caller's extraArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem.
           extraArgs = {

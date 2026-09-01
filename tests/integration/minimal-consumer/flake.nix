@@ -36,8 +36,6 @@
     lib.caisson.mkFlake {
       configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/minimal-consumer;
 
-      moduleImports = modules: {
-        inherit (modules) caisson-default;
-      };
+      moduleImports = modules: [ modules.caisson-default ];
     };
 }

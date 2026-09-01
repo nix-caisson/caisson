@@ -200,8 +200,8 @@ caisson-core's own documentation.
 ```
 mkFlake :
   { configModule  : module                                  # flake class
-  , moduleImports ? (modules: modules)
-                  : attrsOf module -> attrsOf module        # selection from the flake class registry
+  , moduleImports ? builtins.attrValues
+                  : attrsOf module -> listOf module          # selection from the flake class registry
   , name          ? null : nullOr string                    # rev-independent module identity
   , ...                                                     # forwarded to flake-parts mkFlake
   } -> flakeOutputs
@@ -292,8 +292,11 @@ Common conventions:
   where present and becomes the evaluation's package set (also passed
   through in `specialArgs`/`extraSpecialArgs`).
 - `moduleImports`: a selection function over the corresponding class
-  registry (`lib.caisson-core.modules.<class>`), defaulting to all
-  registered modules.
+  registry (`lib.caisson-core.modules.<class>`), returning the list
+  of modules to apply; the default, `builtins.attrValues`, applies
+  all registered modules. The list shape matches `libOverlayImports`;
+  for order-sensitive list-typed options, prefer `mkOrder` over
+  selection position.
 - Framework-provided special arguments compose first; the caller's
   win on conflict.
 
@@ -327,8 +330,8 @@ Common conventions:
 - `mkHomeConfigurationMinimal`: `mkHomeConfiguration` with
   `minimal = true`.
 - `mkStandaloneAdapter : { moduleImports?, ... } -> { homeModules,
-  buildHome }`: the selected class modules plus a `buildHome`
-  closure over the same arguments.
+  buildHome }`: the selected class modules as a list plus a
+  `buildHome` closure over the same arguments.
 - `mkNixosAdapter : { users, ecosystemSrc, hostName?, hostKind?,
   baseSystem?, sourceMeta?, moduleImports?, sharedModules?,
   useGlobalPkgs?, useUserPackages?, activationMode?,
