@@ -50,6 +50,6 @@ covers the philosophy and the quick start.
 
 ---
 
-Despite the org name, caisson is an independent project and is not affiliated with, endorsed
-by, or sponsored by the NixOS Foundation. Nix and NixOS are trademarks
-of the NixOS Foundation.
+Despite the org name, caisson is an independent project and is not
+affiliated with, endorsed by, or sponsored by the NixOS Foundation.
+Nix and NixOS are trademarks of the NixOS Foundation.
