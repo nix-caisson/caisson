@@ -18,8 +18,8 @@
 
     # Every registered overlay exports as-is: integrations carry no
     # hidden framework dependency (their machinery is baked in at
-    # registration, and the registry arrives through the consumer's
-    # own mkLib), so no import chain is added.
+    # registration, and the registry comes from the consumer's
+    # mkLib).
     libOverlays.exported = libOverlays: {
       inherit (libOverlays)
         flake-parts

@@ -96,8 +96,8 @@ Two consequences of the fixpoint are worth knowing:
 Keys change the rules. A keyed entry applies once no matter how many
 entries import it; the first occurrence of a key fixes its position
 and the last occurrence supplies its value, so mentioning a key again
-replaces that entry wholesale, which is the override mechanism: no
-priority annotations, just replacement. An entry with `key = null`
+replaces that entry wholesale; replacement is the only override
+mechanism. An entry with `key = null`
 cannot be imported, applies after the whole keyed world in list
 order, and can never be replaced by another entry, because
 replacement addresses keys and it has none; keyless entries are a
