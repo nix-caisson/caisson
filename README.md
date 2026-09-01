@@ -84,7 +84,7 @@ ecosystem:
 | `colmena` | Colmena deployment hives |
 | `system-manager` | system-manager configurations on foreign distros |
 
-Each integration works against the version of its ecosystem that you
+The integrations work against the versions of these dependencies that you
 already have. caisson pins none of them, and declares no flake inputs of
 its own, so adding it does not put anything in your lock file to keep
 aligned, and there is no chain of `follows` to enumerate downstream.
