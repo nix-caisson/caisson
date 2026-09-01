@@ -17,8 +17,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          # Upstream Nix, not Determinate Nix: the action has
+          # defaulted determinate to true since v21, and this
+          # project targets the Nix everyone else runs.
+          determinate: false
       - run: nix run 'nixpkgs#mdbook' -- build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
