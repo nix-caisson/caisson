@@ -25,39 +25,27 @@
 
 .menu-title { letter-spacing: -0.02em; font-weight: 600; }
 
-/* Site bar: the way back up from the book to the caisson landing page,
-   rendered by theme/header.hbs above mdBook's own menu bar. */
 
-.caisson-sitebar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 1rem;
-  font-size: 0.85rem;
-  background: var(--sidebar-bg);
-  border-bottom: 1px solid var(--table-border-color, rgba(128, 128, 128, 0.25));
-}
+/* The way back up to the landing page, in mdBook's sticky menu bar so
+   it stays reachable while reading. theme/index.hbs places it. */
 
-.caisson-sitebar-home {
+.caisson-site-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  padding: 0 0.5rem;
+  height: var(--menu-bar-height);
+  color: var(--icons);
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--links);
   text-decoration: none;
 }
 
-.caisson-sitebar-home:hover { text-decoration: underline; }
+.caisson-site-link:hover { color: var(--icons-hover); }
 
-.caisson-sitebar-home img { display: block; }
+.caisson-site-link img { display: block; }
 
-.caisson-sitebar-here {
-  color: var(--fg);
-  opacity: 0.65;
-}
-
-.caisson-sitebar-here::before {
-  content: "/";
-  margin-right: 0.75rem;
-  opacity: 0.5;
+/* On narrow screens the icon alone carries it. */
+@media only screen and (max-width: 500px) {
+  .caisson-site-link span { display: none; }
 }
