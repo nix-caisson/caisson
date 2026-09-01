@@ -46,7 +46,7 @@ evaluation cost.
 
 For a complete working flake with commentary, see
 `examples/literate-flake/` in the repository. The repository README
-covers the philosophy and the quick start.
+covers the quick start.
 
 ---
 
