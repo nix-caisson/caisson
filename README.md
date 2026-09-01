@@ -21,8 +21,8 @@ caisson exists to make a flake ecosystem practical to build on.
 If you publish a flake, caisson lets you depend on whatever you need
 without making that your consumer's problem. What you export is already
 wired to your own inputs, so a consumer does not have to re-declare your
-dependencies, thread them through, or `follows`-pin them to make your
-modules work. They can still override a pin when they want to.
+dependencies or `follows`-pin them to make your modules work. They can
+still override a pin when they want to.
 
 If you consume one, adopting caisson yourself gives you the machinery to
 compose what you pull in: libraries and modules from several flakes fit
