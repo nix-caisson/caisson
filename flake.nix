@@ -21,13 +21,13 @@
 
       let
 
-        # The composition engine, vendored from caisson-core (see
+        # The composition machinery, vendored from caisson-core (see
         # vendor/caisson-core/PROVENANCE.md). Its mkLib takes the base
         # library as a plain argument and injects the machinery, the
         # module registry, and the manifest under `caisson-core`.
-        engine = import ./vendor/caisson-core/lib;
+        caisson-core = import ./vendor/caisson-core/lib;
 
-        lib = engine.mkLib {
+        lib = caisson-core.mkLib {
 
           inherit inputs;
 
