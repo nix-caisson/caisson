@@ -1,7 +1,7 @@
 # Vendored caisson-core
 
 Source: https://github.com/nix-caisson/caisson-core
-Revision: e9e36ad (manifest: record the registered dictionaries)
+Revision: 7ad0139 (maint: prepare for publication)
 Contents: `lib/` (composition and the kernel) and `vendor/`
 (its patched flake-compat), copied verbatim. MIT, like this
 repository; the flake-compat copy carries its own license and
