@@ -38,7 +38,7 @@
         nixpkgs-lib-flake =
           inputs.nixpkgs-lib or (
             let
-              src = fetchPin "nixpkgs";
+              src = fetchPin "nixpkgs-lib";
             in
             {
               lib = import (src + "/lib");

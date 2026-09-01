@@ -19,13 +19,13 @@
     rev = "f0670d3a2419bfa603fc7041ce77d8915ecbb915";
     narHash = "sha256-smVchmdqGUAwe6lw4hUjWTdmvPKa1ePPEkk6piyFWps=";
   };
-  # The base library: nixpkgs' lib directory (the fetch is the whole
-  # nixpkgs tree; only /lib is imported).
-  nixpkgs = {
-    owner = "NixOS";
-    repo = "nixpkgs";
-    rev = "b5aa0fbd538984f6e3d201be0005b4463d8b09f8";
-    narHash = "sha256-oPXCU/SSUokcGaJREHibG1CBX3+s/W7orDWQOZDsEeQ=";
+  # The base library: the nixpkgs.lib mirror (nixpkgs' lib directory
+  # published on its own, a small fetch; the lib sits under /lib).
+  nixpkgs-lib = {
+    owner = "nix-community";
+    repo = "nixpkgs.lib";
+    rev = "596e2e3940e09b2abbeb03f75fa1828c57fcd72c";
+    narHash = "sha256-DTQSMxzDWmT0zhguthvegnVkn7CFqGCv4IHCzk5ZUpM=";
   };
   flake-parts = {
     owner = "hercules-ci";
