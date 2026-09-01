@@ -1,20 +1,5 @@
 {
   "nodes": {
-    "caisson-core": {
-      "locked": {
-        "lastModified": 1788229803,
-        "narHash": "sha256-3r/rwEziAquGPzbCEvzJu+CX3OG+kVwZzHq+6XwQa7M=",
-        "owner": "nix-caisson",
-        "repo": "caisson-core",
-        "rev": "7ad01396e6b56b8db584c6b509a81f4904f48d5c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-caisson",
-        "repo": "caisson-core",
-        "type": "github"
-      }
-    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -55,7 +40,6 @@
     },
     "root": {
       "inputs": {
-        "caisson-core": "caisson-core",
         "flake-parts": "flake-parts",
         "nixpkgs-lib": "nixpkgs-lib"
       }

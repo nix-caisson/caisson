@@ -12,7 +12,11 @@
 
     deps.url = "path:../dependencies";
 
+    # Source-only: the tests register the parent's overlay files into
+    # their own composition and never evaluate the parent's outputs
+    # (which would force the parent's own caisson-core pin).
     parent.url = "path:../..";
+    parent.flake = false;
 
     nixpkgs.follows = "deps/nixpkgs";
     nixpkgs-lib.follows = "deps/nixpkgs-lib";
@@ -23,9 +27,10 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.flake-parts.follows = "flake-parts";
 
-    parent-flake-parts.follows = "parent/flake-parts";
-
-    parent-caisson-core.follows = "parent/caisson-core";
+    # A downstream that cares which caisson-core composes its library
+    # declares its own; this flake does, so the tests are pinned to
+    # the deps world's core rather than to caisson's hidden pin.
+    caisson-core.follows = "deps/caisson-core";
 
   };
 
@@ -39,10 +44,14 @@
       ...
     }:
     let
-      lib = parent.lib.caisson-core.mkLib {
+      lib = inputs.caisson-core.lib.caisson-core.mkLib {
         inherit inputs;
-        libOverlays = _mkLibOverlay: {
-          flake-parts = parent.libOverlays.flake-parts;
+        baseLib = inputs.nixpkgs-lib.lib;
+        # Registered from the parent's source path: a flake cannot
+        # reference files outside its own tree, and reading the
+        # source forces none of the parent's outputs.
+        libOverlays = mkLibOverlay: {
+          flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
         };
       };
     in

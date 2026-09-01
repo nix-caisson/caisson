@@ -1567,15 +1567,16 @@ in
         };
       };
       # Test compositions register caisson's real colmena integration
-      # (from the parent flake's exports) alongside the harness's
-      # flake-parts registration.
+      # (built from its source file, like the flake-parts
+      # registration) alongside the harness's flake-parts
+      # registration.
       mkResolutionLib =
         extra:
         caisson.mkLib (
           {
             inputs = mockInputs;
             libOverlays = _mkLibOverlay: {
-              colmena = inputs.parent.libOverlays.colmena;
+              colmena = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/colmena");
             };
           }
           // extra

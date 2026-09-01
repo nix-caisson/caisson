@@ -5,8 +5,6 @@
 
   inputs = {
 
-    caisson-core.url = "github:nix-caisson/caisson-core";
-
     nixpkgs-lib.url = "github:NixOS/nixpkgs/nixos-unstable?dir=lib";
 
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs-lib";
@@ -23,11 +21,32 @@
 
       let
 
-        # The composition machinery, from the caisson-core input. Its
+        # The composition machinery. Hand-wired evaluations (callFlake
+        # in the sandboxed harnesses, the compat shim) inject
+        # `caisson-core` beside the declared inputs; everywhere else
+        # it is fetched lazily at the hidden pin in
+        # caisson-core-pin.nix (see that file for the design). Its
         # mkLib takes the base library as a plain argument and injects
         # the machinery, the module registry, and the manifest under
         # `caisson-core`.
-        caisson-core = inputs.caisson-core.lib.caisson-core;
+        caisson-core-flake =
+          inputs.caisson-core or (
+            let
+              src = builtins.fetchTree (
+                {
+                  type = "github";
+                  owner = "nix-caisson";
+                  repo = "caisson-core";
+                }
+                // import ./caisson-core-pin.nix
+              );
+            in
+            {
+              lib.caisson-core = import (src + "/lib");
+              inherit (src) outPath;
+            }
+          );
+        caisson-core = caisson-core-flake.lib.caisson-core;
 
         lib = caisson-core.mkLib {
 
@@ -71,7 +90,7 @@
       flakeOutputs
       // {
         lib = flakeOutputs.lib // {
-          composition = import ./composition { inherit inputs; };
+          composition = import ./composition { inherit caisson-core inputs; };
         };
       }
 

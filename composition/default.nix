@@ -7,7 +7,7 @@
 # mkLib builds: the
 # machinery entry injects the `caisson-core` namespace, and each
 # integration is an entry importing it.
-{ inputs }:
+{ caisson-core, inputs }:
 {
 
   # ecosystemSrc: a directory importable as nixpkgs' lib, e.g.
@@ -16,7 +16,6 @@
   entriesFor =
     { ecosystemSrc }:
     let
-      caisson-core = inputs.caisson-core.lib.caisson-core;
       baseLib = import ecosystemSrc;
       machineryOverlay = caisson-core.mkCoreOverlay {
         inherit inputs;

@@ -35,11 +35,16 @@ caisson's own hidden input, and it carries the export machinery that
 projects a composition's manifest into flake outputs). The
 pkgs-dependent tooling (`eval-weight`,
 `mkMemoizedDerivationRead`) lives here too. caisson's own flake
-composes with caisson-core through an ordinary flake input
-(caisson-core is public), and the sandboxed test harnesses receive
-its store path as an argument, the same way they receive nixpkgs and
-flake-parts. caisson also exports its library contributions,
-integrations included, as keyed entries via
+composes with caisson-core through a hidden lazy pin
+(`caisson-core-pin.nix`: revision plus NAR hash, not a flake input),
+so consumers' locks never carry the entry. A downstream that cares
+which core composes its library declares its own caisson-core input
+and calls that core's mkLib directly, registering caisson's exported
+overlays and modules; such a composition never forces the pin's
+fetch. Hand-wired evaluations (the sandboxed test harnesses) inject
+`caisson-core` beside the declared inputs, the same way they inject
+nixpkgs and flake-parts. caisson also exports its library
+contributions, integrations included, as keyed entries via
 `lib.composition.entriesFor`.
 
 ## caisson-compat
