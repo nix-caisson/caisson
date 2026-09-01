@@ -31,21 +31,22 @@ The layer users reach for: the seven integrations (`flake-parts`,
 `lib.caisson` namespace, registering its own module class where it
 has one, and taking its ecosystem as an explicit
 `ecosystemSrc` argument (flake-parts is the exception: its pin is
-caisson's own hidden input, and it carries the export machinery that
+caisson's own hidden pin, and it carries the export machinery that
 projects a composition's manifest into flake outputs). The
 pkgs-dependent tooling (`eval-weight`,
-`mkMemoizedDerivationRead`) lives here too. caisson's own flake
-composes with caisson-core through a hidden lazy pin
-(`caisson-core-pin.nix`: revision plus NAR hash, not a flake input),
-so consumers' locks never carry the entry. A downstream that cares
-which core composes its library declares its own caisson-core input
-and calls that core's mkLib directly, registering caisson's exported
-overlays and modules; such a composition never forces the pin's
-fetch. Hand-wired evaluations (the sandboxed test harnesses) inject
-`caisson-core` beside the declared inputs, the same way they inject
-nixpkgs and flake-parts. caisson also exports its library
-contributions, integrations included, as keyed entries via
-`lib.composition.entriesFor`.
+`mkMemoizedDerivationRead`) lives here too. caisson declares no
+flake inputs at all: the three trees its own evaluation composes
+with (caisson-core, nixpkgs' lib as the base, flake-parts) are
+hidden lazy pins (`pins.nix`: revision plus NAR hash per tree), so
+consumers' locks carry no entries for them. A downstream that cares
+which core or base composes its library declares its own inputs and
+calls that core's mkLib directly, registering caisson's exported
+overlays and modules; such a composition never forces the pins'
+fetches. Hand-wired evaluations (the sandboxed test harnesses, which
+receive every tree as an argument) inject the same names beside
+`self`, and an injected value wins over the pin. caisson also
+exports its library contributions, integrations included, as keyed
+entries via `lib.composition.entriesFor`.
 
 ## caisson-compat
 

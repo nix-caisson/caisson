@@ -3,43 +3,28 @@
 
   description = "The foundation framework for composable Nix flakes";
 
-  inputs = {
-
-    nixpkgs-lib.url = "github:NixOS/nixpkgs/nixos-unstable?dir=lib";
-
-    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs-lib";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-
-  };
-
   outputs =
-    {
-      nixpkgs-lib,
-      ...
-    }@inputs:
+    inputs:
     (
 
       let
 
-        # The composition machinery. Hand-wired evaluations (callFlake
-        # in the sandboxed harnesses, the compat shim) inject
-        # `caisson-core` beside the declared inputs; everywhere else
-        # it is fetched lazily at the hidden pin in
-        # caisson-core-pin.nix (see that file for the design). Its
-        # mkLib takes the base library as a plain argument and injects
-        # the machinery, the module registry, and the manifest under
-        # `caisson-core`.
+        # caisson declares no flake inputs; the three trees its own
+        # evaluation composes with are fetched lazily at the pins in
+        # pins.nix (see that file for the design). A hand-wired
+        # evaluation (callFlake in the sandboxed harnesses, the
+        # compat shim) may inject any of them beside `self`; the
+        # injected value wins and nothing fetches.
+        pins = import ./pins.nix;
+        fetchPin = name: builtins.fetchTree ({ type = "github"; } // pins.${name});
+
+        # The composition machinery. Its mkLib takes the base library
+        # as a plain argument and injects the machinery, the module
+        # registry, and the manifest under `caisson-core`.
         caisson-core-flake =
           inputs.caisson-core or (
             let
-              src = builtins.fetchTree (
-                {
-                  type = "github";
-                  owner = "nix-caisson";
-                  repo = "caisson-core";
-                }
-                // import ./caisson-core-pin.nix
-              );
+              src = fetchPin "caisson-core";
             in
             {
               lib.caisson-core = import (src + "/lib");
@@ -48,11 +33,40 @@
           );
         caisson-core = caisson-core-flake.lib.caisson-core;
 
+        callFlake = import (caisson-core-flake.outPath + "/lib/kernel/call-flake.nix");
+
+        nixpkgs-lib-flake =
+          inputs.nixpkgs-lib or (
+            let
+              src = fetchPin "nixpkgs";
+            in
+            {
+              lib = import (src + "/lib");
+              outPath = src + "/lib";
+            }
+          );
+
+        flake-parts-flake =
+          inputs.flake-parts or (callFlake {
+            src = fetchPin "flake-parts";
+            inputs = {
+              nixpkgs-lib = nixpkgs-lib-flake;
+            };
+          });
+
+        # What registered files close over: the constructed trees
+        # under the names the integrations read.
+        effectiveInputs = {
+          inherit (inputs) self;
+          nixpkgs-lib = nixpkgs-lib-flake;
+          flake-parts = flake-parts-flake;
+        };
+
         lib = caisson-core.mkLib {
 
-          inherit inputs;
+          inputs = effectiveInputs;
 
-          baseLib = nixpkgs-lib.lib;
+          baseLib = nixpkgs-lib-flake.lib;
 
           modules = composedLib: {
             flake = {
@@ -90,7 +104,10 @@
       flakeOutputs
       // {
         lib = flakeOutputs.lib // {
-          composition = import ./composition { inherit caisson-core inputs; };
+          composition = import ./composition {
+            inherit caisson-core;
+            inputs = effectiveInputs;
+          };
         };
       }
 

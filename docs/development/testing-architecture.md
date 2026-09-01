@@ -37,10 +37,11 @@ to replace the main evaluation's `checks` with the partition's `checks`, so
 ### The reason for the partition
 
 flake-parts partitions allow a flake to declare outputs that depend on inputs not
-listed in the main `flake.nix`. caisson's main inputs are only `nixpkgs-lib` and
-`flake-parts`; it deliberately avoids depending on full `nixpkgs` or development
-tools like `nix-unit`. The checks partition brings in these heavier dependencies
-without polluting the main flake's input set or forcing consumers to fetch them.
+listed in the main `flake.nix`. caisson declares no flake inputs (its own
+composition trees are hidden pins in `pins.nix`), and it deliberately avoids
+depending on full `nixpkgs` or development tools like `nix-unit`. The checks
+partition brings in these heavier dependencies without polluting the main
+flake's input set or forcing consumers to fetch them.
 
 ### How the extra inputs load
 
