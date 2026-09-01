@@ -11,6 +11,6 @@
 # prints the revision and NAR hash; tests/dependencies pins the same
 # revision for the test world, and CI holds the two together.
 {
-  rev = "7ad01396e6b56b8db584c6b509a81f4904f48d5c";
-  narHash = "sha256-3r/rwEziAquGPzbCEvzJu+CX3OG+kVwZzHq+6XwQa7M=";
+  rev = "f0670d3a2419bfa603fc7041ce77d8915ecbb915";
+  narHash = "sha256-smVchmdqGUAwe6lw4hUjWTdmvPKa1ePPEkk6piyFWps=";
 }

@@ -6,10 +6,15 @@ on:
 jobs:
   flake-check:
     runs-on: ubuntu-latest
+    env:
+      # Fork pull requests carry no secrets; the cache step skips
+      # there and the check still runs.
+      HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v16
-      - uses: cachix/cachix-action@v17
+      - if: env.HAVE_CACHIX == 'true'
+        uses: cachix/cachix-action@v17
         with:
           name: caisson
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}

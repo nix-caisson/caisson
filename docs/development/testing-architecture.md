@@ -2,30 +2,31 @@
 
 This document explains how caisson's tests are wired into the flake's check
 infrastructure. The setup is non-obvious: test flakes live as independent
-`flake.nix` files in the source tree but are not evaluated as normal flakes.
-Instead, they are imported as raw Nix expressions inside a flake-parts partition,
-with manually constructed inputs and lazy circular self-references.
+`flake.nix` files in the source tree but are not evaluated by the Nix flake
+machinery. Instead, a flake-parts partition evaluates each one from source with
+`lib.caisson-core.callConsumerFlake`, which wires inputs explicitly.
 
-> **Nix version note (2.31.3, March 2026):** The raw-import-and-wire pattern
+> **Nix version note (2.31.3, March 2026):** The evaluate-from-source pattern
 > exists because the Nix flake machinery cannot natively evaluate nested flakes
 > within a parent flake's evaluation, and `builtins.getFlake` cannot handle paths
 > in pure mode. If future Nix versions add first-class support for nested flake
-> evaluation or lift the pure-mode path restriction, much of this manual wiring
-> could be replaced with direct flake calls.
+> evaluation or lift the pure-mode path restriction, this wiring could be
+> replaced with direct flake calls.
 
 For commands and test conventions, see [testing.md](./testing.md).
 
 ## Overview
 
 All checks are produced by the **checks partition**
-(`configs/flake-parts/partitions/checks.nix`). This partition:
+(`configs/flake-parts/caisson/partitions/checks.nix`). This partition:
 
-1. Pulls in development-time dependencies via `extraInputsFlake` pointing to
-   `tests/dependencies/flake.nix`
-2. Imports each test flake as a raw Nix expression
-3. Manually constructs the input attrset each test flake expects
-4. Calls the test flake's `outputs` function and merges the resulting
-   `checks.<system>` into caisson's top-level `checks` output
+1. Pulls in development-time dependencies from `tests/dependencies` via
+   `lib.caisson-core.partitionExtraInputs`
+2. Evaluates each test and example flake from source with
+   `callConsumerFlake`, resolving the flake's declared inputs from a shared
+   pool
+3. Merges the resulting `checks.<system>` attrsets, plus a few inline checks
+   and the eval-weight gate, into caisson's top-level `checks` output
 
 The partition mechanism (`partitionedAttrs.checks = "checks"`) causes flake-parts
 to replace the main evaluation's `checks` with the partition's `checks`, so
@@ -41,21 +42,22 @@ listed in the main `flake.nix`. caisson's main inputs are only `nixpkgs-lib` and
 tools like `nix-unit`. The checks partition brings in these heavier dependencies
 without polluting the main flake's input set or forcing consumers to fetch them.
 
-### How `extraInputsFlake` works
+### How the extra inputs load
 
 The partition declares:
 
 ```nix
-extraInputsFlake = ../../../tests/dependencies;
+extraInputs = lib.caisson-core.partitionExtraInputs ../../../../tests/dependencies;
 ```
 
-flake-parts resolves this path using its vendored `flake-compat` (not
-`builtins.getFlake`, which cannot handle paths in pure evaluation mode). The
-resolved flake's `inputs` are merged into the partition's `inputs` module argument.
-This is how `nixpkgs`, `nix-unit`, `treefmt-nix`, etc. become available inside the
-partition module without being declared in the main `flake.nix`.
-
-Source: the upstream `flake-parts/extras/partitions.nix` `get-flake` function.
+`partitionExtraInputs` (part of caisson-core's kernel) loads the lockfile'd
+dependencies flake and returns its resolved inputs. It goes through the
+kernel's patched `flake-compat` rather than `builtins.getFlake`, which cannot
+handle paths in pure evaluation mode, and it stays safe under read-only
+evaluation (`nix flake check --no-build`). The returned inputs are merged into
+the partition's `inputs` module argument; this is how `nixpkgs`, `nix-unit`,
+`treefmt-nix`, and the rest become available inside the partition module
+without being declared in the main `flake.nix`.
 
 ### Partition module structure
 
@@ -64,86 +66,59 @@ extra inputs from the dependencies flake. `self` refers to caisson's own outputs
 (as seen by the partition). The module has a full flake-parts evaluation context
 with its own `perSystem`, `imports`, etc.
 
-## The Raw-Import-and-Wire Pattern
+## Evaluating Consumer Flakes with `callConsumerFlake`
 
-### Raw imports instead of normal flake evaluation
+### The pattern
 
-The test flakes under `tests/unit/` and `tests/integration/` are standalone
-`flake.nix` files, but their lockfiles are gitignored, not committed.
-When used standalone (e.g., `cd tests/unit && nix flake check`), Nix generates a
-local lockfile on first use and evaluates normally. Because all inputs use `follows`
-pointing at the shared dependencies flake, the generated lockfile resolves to the
-same versions.
-
-Inside the checks partition, there is no mechanism to trigger normal flake
-evaluation of a nested flake. `extraInputsFlake` resolves one dependency flake;
-it's not a general-purpose nested-flake evaluator. The partition needs to reach into
-the test flake's outputs to extract `checks`, which means it needs to call the
-test flake's `outputs` function directly. No lockfiles are generated or consulted
-in this path; inputs are supplied directly by the partition.
-
-### How it works
-
-For each test flake, `checks.nix` follows this pattern:
+For each test or example flake, `checks.nix` builds one call:
 
 ```nix
-# 1. Import the flake.nix as a plain Nix expression
-unitTestFlake = import (self.outPath + "/tests/unit/flake.nix");
-
-# 2. Manually construct the inputs the outputs function expects
-unitTestInputs = {
-  inherit (inputs) flake-parts nix-unit nixpkgs nixpkgs-lib;
+consumerPool = {
+  inherit (inputs) flake-parts nixpkgs nixpkgs-lib nix-unit;
   deps = inputs.self;
   parent = self;
-  self = unitTestOutputs;   # lazy circular reference
 };
+callConsumer = args: lib.caisson-core.callConsumerFlake ({ pool = consumerPool; } // args);
 
-# 3. Call outputs and patch the result to look like a resolved flake
-unitTestOutputs = unitTestFlake.outputs unitTestInputs // {
-  inputs = unitTestInputs;
-  outPath = self.outPath + "/tests/unit";
-};
+unitTestOutputs = callConsumer { path = self.outPath + "/tests/unit"; };
 ```
 
-Step 1 bypasses flake evaluation entirely: `import` loads the file as a Nix
-attrset. The imported value is not a resolved flake: it has no resolved inputs, no
-`outPath`, no `self`.
+`callConsumerFlake` imports the directory's `flake.nix` as a plain Nix
+expression and applies its `outputs` function to explicitly constructed
+inputs. Each input the flake declares resolves by name: an entry in
+`overrides` wins, then a `follows` chain, then the `pool`; a name that
+resolves nowhere throws. Nothing is fetched and no lockfile is read or
+written. The [library reference](../reference/lib.md) documents the full
+signature.
 
-Step 2 maps the partition's resolved inputs onto the names the test flake expects.
-The key mappings for the unit test flake are:
+The imported `flake.nix` is not a resolved flake: it has no resolved inputs, no
+`outPath`, no `self`. `callConsumerFlake` supplies each piece:
 
-| Test flake input | Partition value | Why |
-|---|---|---|
-| `flake-parts` | `inputs.flake-parts` | From dependencies flake |
-| `nix-unit` | `inputs.nix-unit` | From dependencies flake |
-| `nixpkgs` | `inputs.nixpkgs` | From dependencies flake |
-| `nixpkgs-lib` | `inputs.nixpkgs-lib` | From dependencies flake |
-| `deps` | `inputs.self` | See "The `deps` mapping" below |
-| `parent` | `self` | caisson itself, as seen by the partition |
-| `self` | `unitTestOutputs` | Circular (explained below) |
+- **`self`** becomes a lazy fixpoint over the outputs, mirroring normal flake
+  evaluation, where `self` is always a lazy reference to the flake's own
+  outputs.
+- **`outPath`** is set to the evaluated directory. This matters because config
+  modules use relative paths (the unit test config imports
+  `../../../lib-overlays.nix`), and those resolve against `outPath`.
+- **`inputs`** is attached to the result so the outputs attrset matches the
+  shape of a normally resolved flake.
 
-Integration test flakes use the same pattern with simpler input sets (no `nix-unit`,
-no `nixpkgs-lib`).
+`overrides` carries per-flake injections. The lib-consumer-chain tests use it
+to thread markers and to hand the middle flake's evaluated outputs to the
+final consumer, and the example flakes use `overrides.caisson = self` so the
+example consumes the current source tree.
 
 ### The `deps` mapping
 
-In standalone mode, the unit test flake declares `deps.url = "path:../dependencies"`
-and uses `follows` to pull inputs through it (e.g., `nixpkgs.follows = "deps/nixpkgs"`).
+In standalone mode, the test flakes declare `deps.url = "path:../dependencies"`
+and use `follows` to pull inputs through it (e.g., `nixpkgs.follows = "deps/nixpkgs"`).
 The `deps` input is the shared dependencies flake, and `follows` resolution means
-the test flake ends up with `deps.inputs.nixpkgs`, `deps.inputs.nix-unit`, etc.
+a test flake ends up with `deps.inputs.nixpkgs`, `deps.inputs.nix-unit`, etc.
 
-In the raw-import path, `follows` doesn't apply, because there's no lockfile resolution.
-The direct inputs (`nixpkgs`, `nix-unit`, etc.) are provided explicitly in
-`unitTestInputs`. But `deps` still needs to be provided because the test flake's
-`outputs` function receives the full `inputs` attrset (via `inputs@{ ... }`), and
-that attrset is passed onward to
-`inputs.caisson-core.lib.caisson-core.mkLib { inherit inputs; ... }` and to the
-nix-unit module via `perSystem.nix-unit = { inherit inputs; }`. If any code path
-accesses `inputs.deps`, it must resolve to something sensible.
-
-The partition provides `deps = inputs.self`. Inside a partition module, `inputs.self`
-is not plain caisson; it's caisson with an augmented `.inputs` attrset. The
-partition machinery (in `flake-parts/extras/partitions.nix`) constructs:
+In the partition, the pool provides `deps = inputs.self`. Inside a partition
+module, `inputs.self` is not plain caisson; it is caisson with an augmented
+`.inputs` attrset. The partition machinery (in
+`flake-parts/extras/partitions.nix`) constructs:
 
 ```nix
 inputs2 = inputs // config.extraInputs // { self = self2; };
@@ -157,47 +132,20 @@ So `inputs.self` is `self2`: caisson's outputs merged with
 partition's augmented `self` is a valid stand-in for the dependencies flake because
 its `.inputs` is a superset of the dependencies flake's inputs.
 
-### Circular self-reference
-
-The line `self = unitTestOutputs` creates a circular dependency:
-`unitTestInputs` references `unitTestOutputs`, and `unitTestOutputs` is defined as
-`unitTestFlake.outputs unitTestInputs // { ... }`. This works because Nix is lazy:
-`self` is a thunk that is only forced when the test flake's `outputs` function
-actually accesses it, at which point the value has been defined.
-
-This mirrors normal flake evaluation, where `self` is always a lazy reference to
-the flake's own outputs.
-
-### `outPath` patching
-
-```nix
-outPath = self.outPath + "/tests/unit";
-```
-
-A normally-evaluated flake has an `outPath` set by the Nix flake machinery to the
-store path of the flake's source tree. A raw-imported `flake.nix` has no such
-attribute. The partition patches it manually to point at the correct subdirectory
-within caisson's source tree.
-
-This is critical because the test flake's config module uses relative paths. For
-example, the unit test config imports `../../../lib-overlays.nix`, which resolves
-relative to the `outPath`. Without patching, these paths would fail.
-
-`inputs = unitTestInputs` is also attached so that the outputs attrset includes
-`.inputs`, matching the shape of a normally-resolved flake.
-
 ## Unit Testing with nix-unit
 
-### Self-hosting
+### A downstream composition
 
-The unit test flake (`tests/unit/flake.nix`) bootstraps itself using caisson's own
-framework:
+The unit test flake (`tests/unit/flake.nix`) composes the way a downstream
+consumer that cares about its core revision does: with its own `caisson-core`
+input, registering caisson's overlay files from the parent's source path.
 
 ```nix
-lib = parent.lib.caisson-core.mkLib {
+lib = inputs.caisson-core.lib.caisson-core.mkLib {
   inherit inputs;
-  libOverlays = _mkLibOverlay: {
-    flake-parts = parent.libOverlays.flake-parts;
+  baseLib = inputs.nixpkgs-lib.lib;
+  libOverlays = mkLibOverlay: {
+    flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
   };
 };
 
@@ -206,13 +154,16 @@ lib.caisson.mkFlake {
 };
 ```
 
-The `parent` input is caisson's source tree (a source-only input). The
-test flake composes with its own `caisson-core` input, registering the
-parent's overlay files, and builds outputs with `lib.caisson.mkFlake`,
-so it exercises the same composition path that downstream consumers
-use. The tests are not only testing library functions in isolation;
-they verify that the framework's composition machinery works
-end-to-end.
+The `parent` input is caisson's source tree, declared `flake = false`:
+evaluating a flake input's value applies its outputs function, which would
+force caisson's own hidden core pin inside the nix-unit sandbox, where nothing
+can fetch. A source-only input carries the path and applies nothing. The
+overlay files register from that path because a flake cannot reference files
+outside its own source tree.
+
+The tests are not only testing library functions in isolation; the composition
+and `mkFlake` path is the same one a downstream consumer exercises, so they
+verify that the framework's composition machinery works end-to-end.
 
 ### nix-unit integration
 
@@ -232,14 +183,17 @@ This module adds two key options:
 The config sets these:
 
 ```nix
-flake.tests = import ../../../lib-overlays.nix { inherit lib; };
+flake.tests = import ../../../lib-overlays.nix { inherit inputs lib; };
 
 perSystem.nix-unit = { inherit inputs; };
 ```
 
 The nix-unit module generates a check derivation (`checks.<system>.nix-unit`) that
-invokes the `nix-unit` binary against the test attrset. Each `expr` is evaluated and
-compared to its `expected` value.
+invokes the `nix-unit` binary against the test attrset, wiring each declared
+input to a store path with `--override-input`; the evaluation runs inside the
+build sandbox, which is why every value a test forces must be reachable
+without fetching. Each `expr` is evaluated and compared to its `expected`
+value.
 
 ### Test attrset structure
 
@@ -250,8 +204,8 @@ compared to its `expected` value.
 - Each group contains named tests as `{ expr; expected; }` pairs
 
 The `lib` argument is the composed library from the unit test flake (which includes
-all caisson overlays), so the tests exercise the library as it would appear to a
-consumer.
+the registered caisson overlays), so the tests exercise the library as it would
+appear to a consumer.
 
 ## Integration Testing
 
@@ -265,7 +219,7 @@ module composition behave as expected from a consumer's perspective.
 
 Each integration test is a standalone flake under `tests/integration/<name>/` that:
 
-1. Takes `parent` (caisson) as an input
+1. Takes `parent` (caisson's evaluated outputs, from the pool) as an input
 2. Calls `parent.lib.caisson-core.mkLib { inherit inputs; ... }` to bootstrap
 3. Uses `lib.caisson.mkFlake` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
@@ -282,42 +236,24 @@ checks.composition-success =
 
 `minimal-consumer` goes further by also exercising `flakeModules.default` and
 `configInfo.configName`, and verifying that the consumer's outputs include expected
-attributes (`flakeModule`, `lib`).
+attributes (`flakeModule`, `lib`). `module-class-export` tests the generic
+module class system: it registers modules under synthetic classes via the
+`modules` attrset, configures per-class export controls, and asserts that
+enabled classes appear in `flake.modules` while disabled classes have their
+module content suppressed. `lib-consumer-chain` evaluates a two-hop consumer
+chain (caisson, a middle flake, a final consumer) to verify that exported
+overlays and modules compose transitively.
 
-`module-class-export` tests the generic module class system: it registers modules
-under synthetic classes via the `modules` attrset, configures per-class export
-controls, and asserts that enabled classes appear in `flake.modules` while disabled
-classes have their module content suppressed.
-
-### Wiring in `checks.nix`
-
-Integration tests use the same raw-import-and-wire pattern as unit tests, with
-simpler inputs:
-
-```nix
-integrationInputs = {
-  inherit (inputs) flake-parts nixpkgs;
-  deps = inputs.self;
-  self = integrationOutputs;
-  parent = self;
-};
-```
-
-No `nix-unit` or `nixpkgs-lib` is needed. The `deps` mapping and `self` circular
-reference follow the same principles described above.
-
-Integration test outputs don't require `outPath` patching because their config
-modules don't use paths that depend on it.
-
-Like the unit test wiring, integration tests provide `deps = inputs.self` so that
-the full `inputs` attrset passed to `mkLib` matches the shape of a standalone
-evaluation (see "The `deps` mapping" above for why this works).
+Integration flakes read caisson through `parent`, which in the partition is
+caisson's real evaluated outputs, so unlike the unit tests they exercise the
+export projections exactly as a published consumer would.
 
 ## Shared Dependencies Flake
 
 `tests/dependencies/flake.nix` declares the development-time inputs shared by the test and example flakes:
 
 ```nix
+inputs.caisson-core.url = "github:nix-caisson/caisson-core";
 inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 inputs.flake-parts.url = "github:hercules-ci/flake-parts";
 inputs.nix-unit.url = "github:nix-community/nix-unit";
@@ -327,9 +263,9 @@ inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 
 Its `outputs` is empty. It exists for three reasons:
 
-1. **Partition input source:** The checks and formatter partitions use
-   `extraInputsFlake = tests/dependencies` to pull these inputs into their
-   evaluation without adding them to caisson's main `flake.nix`.
+1. **Partition input source:** The checks and formatter partitions load it
+   through `partitionExtraInputs` to pull these inputs into their evaluation
+   without adding them to caisson's main `flake.nix`.
 
 2. **`follows` target for test flakes:** The standalone test flakes use
    `nixpkgs.follows = "deps/nixpkgs"` (etc.) to share the same locked versions
@@ -338,6 +274,8 @@ Its `outputs` is empty. It exists for three reasons:
 
 3. **Single lockfile:** All development dependencies are locked in
    `tests/dependencies/flake.lock`, making version management straightforward.
+   The test flakes' own lockfiles are gitignored; standalone use generates
+   them locally, and the `follows` wiring resolves them to the same versions.
 
 The dependencies flake uses `follows` internally to deduplicate transitive inputs
 (e.g., `inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs"`).
@@ -345,8 +283,9 @@ The dependencies flake uses `follows` internally to deduplicate transitive input
 ## Example Flakes
 
 The checks partition also wires in example flakes (e.g., `examples/literate-flake/`)
-using the same raw-import pattern. These are both documentation and regression
-tests: if the example stops evaluating, `nix flake check` fails.
+through the same `callConsumer` calls, with `overrides.caisson = self`. These are
+both documentation and regression tests: if the example stops evaluating,
+`nix flake check` fails.
 
 ## Complete Check Inventory
 
@@ -360,7 +299,8 @@ The checks partition merges outputs from all test and example flakes into a sing
 | `minimal-consumer-success` | `tests/integration/minimal-consumer/` | Minimal consumption pattern |
 | `minimal-consumer-all-outputs` | `checks.nix` (inline) | Consumer exposes `flakeModule` and `lib` |
 | `module-class-export-success` | `tests/integration/module-class-export/` | Class-keyed module export and disable |
+| `lib-consumer-chain-success` | `tests/integration/lib-consumer-chain/` | Transitive consumption through a middle flake |
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
 | `debug-disabled` | `checks.nix` (inline) | `self.debug` is not exposed in production |
-| `treefmt` | treefmt-nix module | All Nix files are formatted |
+| `eval-weight` | `checks.nix` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](../eval-weight.md)) |
