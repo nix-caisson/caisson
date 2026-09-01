@@ -142,12 +142,18 @@ manifest : { inputs : attrs; modules : attrsOf (attrsOf module);
              projects : attrs }
 ```
 
-The capture of what `mkLib` consumed, injected as the composition's
-final overlay. An mkLib composition self-describes: a consumer's
-composed library carries the consumer's own manifest. Checks live on
-the export side only (the flake-parts integration type-checks it and
-projects the `flake.libOverlays` and `flake.modules` outputs from
-it); producers validate their own manifests in their own CI.
+The composition's self-description, injected as its final overlay.
+`inputs`, `ecosystems`, and `projects` are the `mkLib` arguments as
+given; `libOverlays` and `modules` are the registered dictionaries,
+so consumed projects' entries appear under `<project>/<name>` beside
+the local registrations, with a local winning a name collision. An
+mkLib composition self-describes: a consumer's composed library
+carries the consumer's own manifest. Checks live on the export side
+only (the flake-parts integration type-checks it and projects the
+`flake.libOverlays` and `flake.modules` outputs from it, so an
+`exported` selection can re-export a project-borne entry the same
+way as a hand-registered one); producers validate their own
+manifests in their own CI.
 
 ### `importApply`
 
