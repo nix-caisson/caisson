@@ -7,61 +7,33 @@
 
 <p align="center"><em>The foundation framework for composable Nix flakes.</em></p>
 
+<p align="center">
+  <strong><a href="https://nix-caisson.github.io/caisson/">Website</a></strong> ·
+  <strong><a href="https://nix-caisson.github.io/caisson/docs/">Documentation</a></strong> ·
+  <a href="https://nix-caisson.github.io/caisson/docs/getting-started.html">Getting started</a> ·
+  <a href="https://nix-caisson.github.io/caisson/docs/reference/lib.html">Reference</a>
+</p>
+
 ---
 
-A caisson is the watertight structure used to sink a bridge foundation to
-bedrock. It is not scaffolding: once sealed, it *becomes* the foundation:
-the part of the bridge no one sees, and the part everything else stands
-on. caisson can provide that structure for a Nix flake: closed inputs, disciplined
-library composition, and class-keyed modules, built on
-[flake-parts](https://flake.parts).
+A caisson is sunk to bedrock, sealed, and becomes the foundation: the part
+of the bridge no one sees, and the part everything else stands on. caisson
+can provide that structure for a Nix flake, built on
+[flake-parts](https://flake.parts):
 
-## Philosophy
+- **Closed inputs.** Modules and library overlays close over the inputs of
+  the flake that defines them, so internal dependencies stay internal and
+  consumers are not asked to re-declare them.
+- **Library overlays.** A flake exports its logic under `lib.<namespace>`
+  rather than competing for the global namespace, and overlays declare
+  their dependencies on each other and compose in dependency order.
+- **Module classes.** Modules register under a class key naming the module
+  system they belong to, which keeps a module from being imported into an
+  evaluation that cannot understand it.
 
-### Closed inputs
-
-**The problem:** in a typical `flake-parts` setup, modules rely on utility
-libraries or helper flakes being passed down from the top level. This
-creates an unhygienic closure: a module implicitly assumes that the
-*consumer's* flake has declared and forwarded every specialized dependency
-it needs, forcing users to add another flake's internal dependencies to
-their own `flake.nix`. A new internal dependency adds drag for
-downstream users, which quietly discourages modularity.
-
-**The solution:** caisson closes modules and library overlays over the
-inputs *of the flake that defines them*. A module can rely on its
-dependencies being satisfied without assuming anything about the
-consumer's inputs, so internal dependencies stay internal, while the
-standard flake mechanisms for overriding any input remain available to
-consumers who need a specific version.
-
-### Library overlays
-
-**The status quo:** library composition is rare in the Nix ecosystem and
-sometimes dismissed as an anti-pattern, a caution inherited from a
-history of monkey-patching, where extensions overwrote global functions
-and produced fragile dependency graphs.
-
-**The thesis:** the community has overcorrected. The problem was never
-composition; it was composition without discipline. Giving up on it costs
-us doubly: shared abstractions become impossible at the library level, and
-module authors compensate with ad-hoc, inconsistently named module
-parameters to inject logic that should have been a `lib` reference.
-
-**The solution:** caisson structures composition through namespacing.
-A flake exports its logic under `lib.<namespace>` (by
-convention, the flake's own name) instead of competing for the global
-namespace, and library overlays declare their dependencies on each other
-explicitly, composing in dependency order. Layered abstractions without
-global pollution and without bloated module arguments.
-
-### Module classes
-
-Modules register under a class key naming the module system they belong
-to: `flake` for flake-parts modules. The class keeps a module from
-being imported into an evaluation that can't understand it, and the
-shipped integrations register further classes for other module
-ecosystems (NixOS, Home Manager, and friends).
+The reasoning behind each, with examples, is on
+[the website](https://nix-caisson.github.io/caisson/) and in
+[the documentation](https://nix-caisson.github.io/caisson/docs/).
 
 ## Integrations
 
@@ -130,13 +102,18 @@ lives in `configs/flake-parts/<flake-name>`.
 
 ## Going deeper
 
-- [`docs/concepts/`](docs/concepts/): closed inputs, module classes,
-  library overlays, and the library lifecycle, each explained with the
-  reasoning behind the design.
-- [`docs/reference/`](docs/reference/): the `lib.caisson` API and module
-  options.
+- [Concepts](https://nix-caisson.github.io/caisson/docs/concepts/closed-inputs.html):
+  closed inputs, module classes, library overlays, and ecosystem sources,
+  each explained with the reasoning behind the design.
+- [Reference](https://nix-caisson.github.io/caisson/docs/reference/lib.html):
+  the `lib.caisson` API and module options.
+- [Deep dives](https://nix-caisson.github.io/caisson/docs/deep-dives/how-lib-is-composed.html):
+  how `lib` is composed and how inputs are closed over.
 - [`examples/literate-flake/`](examples/literate-flake/): a working,
   annotated flake demonstrating the whole structure end to end.
+
+The documentation in this repository lives under [`docs/`](docs/) and is
+published as [the caisson docs](https://nix-caisson.github.io/caisson/docs/).
 
 ## Verification
 
