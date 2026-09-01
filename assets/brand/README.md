@@ -6,7 +6,8 @@ structure above it).
 
 | File | Use |
 |---|---|
-| `emblem.svg` | Square mark (512), avatars and large surfaces |
+| `emblem.svg` | Square mark (512), large surfaces |
+| `badge.svg` | Reduced mark for avatar sizes (32–260 px); the org profile picture |
 | `favicon.svg` | Reduced mark for 16–64 px |
 | `wordmark.svg` | Horizontal logotype |
 | `social-card.svg` | GitHub social preview source (1280×640) |
