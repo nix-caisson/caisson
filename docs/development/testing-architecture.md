@@ -105,7 +105,7 @@ unitTestOutputs = unitTestFlake.outputs unitTestInputs // {
 };
 ```
 
-Step 1 bypasses flake evaluation entirely: `import` just loads the file as a Nix
+Step 1 bypasses flake evaluation entirely: `import` loads the file as a Nix
 attrset. The imported value is not a resolved flake: it has no resolved inputs, no
 `outPath`, no `self`.
 
@@ -136,7 +136,8 @@ In the raw-import path, `follows` doesn't apply, because there's no lockfile res
 The direct inputs (`nixpkgs`, `nix-unit`, etc.) are provided explicitly in
 `unitTestInputs`. But `deps` still needs to be provided because the test flake's
 `outputs` function receives the full `inputs` attrset (via `inputs@{ ... }`), and
-that attrset is passed onward to `parent.lib.caisson-core.mkLib { inherit inputs; ... }` and to the
+that attrset is passed onward to
+`inputs.caisson-core.lib.caisson-core.mkLib { inherit inputs; ... }` and to the
 nix-unit module via `perSystem.nix-unit = { inherit inputs; }`. If any code path
 accesses `inputs.deps`, it must resolve to something sensible.
 
@@ -205,11 +206,13 @@ lib.caisson.mkFlake {
 };
 ```
 
-The `parent` input is caisson itself. By using `parent.lib.caisson-core.mkLib` and
-`lib.caisson.mkFlake`, the test flake exercises the same module composition path
-that downstream consumers use. This means the tests are not just testing library
-functions in isolation; they verify that the framework's composition machinery
-works end-to-end.
+The `parent` input is caisson's source tree (a source-only input). The
+test flake composes with its own `caisson-core` input, registering the
+parent's overlay files, and builds outputs with `lib.caisson.mkFlake`,
+so it exercises the same composition path that downstream consumers
+use. The tests are not only testing library functions in isolation;
+they verify that the framework's composition machinery works
+end-to-end.
 
 ### nix-unit integration
 

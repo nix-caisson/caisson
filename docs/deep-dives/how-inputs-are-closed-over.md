@@ -122,7 +122,7 @@ an accident: each flake's files run against the pins that flake
 tested with, the pins are visible in each flake's lock, and
 nothing forces the fleet to upgrade in lockstep. Where a consumer
 does want to override a definer's pin, flake-level `follows` on the
-definer's input still works, because `closure-inputs` is just the
+definer's input still works, because `closure-inputs` is the
 definer's `inputs` attrset and `follows` rewrites what that attrset
 contains.
 

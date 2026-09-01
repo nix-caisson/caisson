@@ -24,7 +24,7 @@ overlay = final: prev: {
 };
 ```
 
-This means two independent projects do not collide unless the project names do: `lib.projectA.helper` and `lib.projectB.helper` coexist without interference, just as they would in any language with a module system. caisson's `configInfo.configName` convention helps here: if every project uses its canonical flake name as the namespace, collisions are unlikely in practice. Choose a distinctive name for your flake; generic names like `utils` or `helpers` invite collisions, while project-specific names like `caisson` or `acme-infra` make them vanishingly rare. This is a convention, not an enforcement mechanism: if two upstream flakes happen to choose the same `configName`, their `lib` contributions will merge into the same namespace.
+This means two independent projects do not collide unless the project names do: `lib.projectA.helper` and `lib.projectB.helper` coexist without interference, as they would in any language with a module system. caisson's `configInfo.configName` convention helps here: if every project uses its canonical flake name as the namespace, collisions are unlikely in practice. Choose a distinctive name for your flake; generic names like `utils` or `helpers` invite collisions, while project-specific names like `caisson` or `acme-infra` make them vanishingly rare. This is a convention, not an enforcement mechanism: if two upstream flakes happen to choose the same `configName`, their `lib` contributions will merge into the same namespace.
 
 ### prev-Based Merging
 
