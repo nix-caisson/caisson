@@ -45,8 +45,8 @@ in three ways:
   `lib: { ... }` receiving the composed `lib` (whose helpers, like
   `lib.caisson.mkFlakeModule`, build the entries) and returning the
   class-keyed registration. This is for the flake's own modules.
-- **Overlay contribution**, for modules that travel with a library
-  overlay: the overlay closure carries `mkModule` and
+- **Overlay contribution**, for modules contributed by a library
+  overlay: the overlay closure contains `mkModule` and
   `contributeModules`, and the overlay merges its entries into the
   registry:
 

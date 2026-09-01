@@ -65,7 +65,7 @@ implements one feature across all the configurations it touches, and
 lower-level modules (NixOS, home-manager, nix-darwin) live as
 `deferredModule` values inside the top-level config, merged by name.
 Files are commonly auto-imported with import-tree, and cross-cutting
-values travel through the shared top-level `config` instead of
+values are read from the shared top-level `config` instead of
 `specialArgs` threading.
 
 caisson agrees with more of this than with the generators above:
@@ -115,7 +115,7 @@ home-manager, and the rest) are handed in as explicit
 `ecosystemSrc` arguments instead of being re-pinned and re-wired
 through the input graph.
 
-Everything caisson adds travels through the flake schema's only
+Everything caisson adds is published through the flake schema's only
 freeform slot, the `lib` output: composed libraries, the module
 registry, and the manifest (the capture of what `mkLib` consumed) all
 live there, and the remaining flake outputs (`modules.<class>`,
