@@ -67,12 +67,9 @@ current stable repositories signals an upstream evaluation-shape
 change that caisson must absorb. The stable repositories rev on those
 events, not on a schedule.
 
-While caisson-compat is private (caisson-core and caisson are
-public; compat publishes next), cross-repository fetches that read
-it in CI need the `CAISSON_CI_SSH_KEY` secret (an SSH key able to
-read the nix-caisson repositories); jobs without it skip with a
-notice. caisson-compat runs on push, pull request, weekly schedule
-(the pin advance that doubles as drift detection, auto-landed when
-green), and manual dispatch, and the stable repositories carry
-non-blocking `compat-suite` jobs under the same gate. Once compat
-publishes, the secret becomes unnecessary.
+All three repositories are public, so cross-repository fetches in CI
+need no credential. caisson-compat runs on push, pull request,
+weekly schedule (the pin advance that doubles as drift detection,
+auto-landed when green), and manual dispatch, and the stable
+repositories carry non-blocking `compat-suite` jobs that fetch
+compat at HEAD and override their own pin with the working tree.
