@@ -11,8 +11,13 @@ jobs:
       # there and the check still runs.
       HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          # Upstream Nix, not Determinate Nix: the action has
+          # defaulted determinate to true since v21, and this
+          # project targets the Nix everyone else runs.
+          determinate: false
       - if: env.HAVE_CACHIX == 'true'
         uses: cachix/cachix-action@v17
         with:
@@ -27,8 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          # Upstream Nix, not Determinate Nix: the action has
+          # defaulted determinate to true since v21, and this
+          # project targets the Nix everyone else runs.
+          determinate: false
       - run: |
           nix eval 'github:nix-caisson/caisson-compat#lib.caisson-compat.tests.summary' \
             --override-input caisson "path:$PWD"
