@@ -14,37 +14,6 @@
   <a href="https://nix-caisson.github.io/caisson/docs/reference/lib.html">Reference</a>
 </p>
 
----
-
-A caisson is sunk to bedrock, sealed, and becomes the foundation: the part
-of the bridge no one sees, and the part everything else stands on. caisson
-can provide that structure for a Nix flake, built on
-[flake-parts](https://flake.parts):
-
-- **Closed inputs.** Modules and library overlays close over the inputs of
-  the flake that defines them, so internal dependencies stay internal and
-  consumers are not asked to re-declare them.
-- **Library overlays.** A flake exports its logic under `lib.<namespace>`
-  rather than competing for the global namespace, and overlays declare
-  their dependencies on each other and compose in dependency order.
-- **Module classes.** Modules register under a class key naming the module
-  system they belong to, which keeps a module from being imported into an
-  evaluation that cannot understand it.
-
-The reasoning behind each, with examples, is on
-[the website](https://nix-caisson.github.io/caisson/) and in
-[the documentation](https://nix-caisson.github.io/caisson/docs/).
-
-## Integrations
-
-caisson ships integrations that carry the same conventions into other
-module ecosystems, each a library overlay contributing a
-`lib.caisson.<ecosystem>` namespace and registering its own module class:
-`nixpkgs` (package sets and overlays), `nixos`, `home-manager`,
-`terranix` (Terranix/Terraform), `colmena` (deployment hives), and
-`system-manager` (foreign distros). Each takes its ecosystem as
-an explicit `ecosystemSrc` argument and pins nothing itself.
-
 ## Quick start
 
 Use `caisson-core.mkLib` to compose your library, then `mkFlake` to
@@ -99,6 +68,17 @@ lives in `configs/flake-parts/<flake-name>`.
     };
 }
 ```
+
+## Integrations
+
+caisson ships integrations that carry closed inputs, library overlays, and
+class-keyed modules into other module ecosystems, each a library overlay
+contributing a `lib.caisson.<ecosystem>` namespace and registering its own
+module class:
+`nixpkgs` (package sets and overlays), `nixos`, `home-manager`,
+`terranix` (Terranix/Terraform), `colmena` (deployment hives), and
+`system-manager` (foreign distros). Each takes its ecosystem as
+an explicit `ecosystemSrc` argument and pins nothing itself.
 
 ## Going deeper
 
