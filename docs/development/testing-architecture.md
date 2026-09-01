@@ -49,7 +49,7 @@ The partition declares:
 extraInputsFlake = ../../../tests/dependencies;
 ```
 
-flake-parts resolves this path using a vendored `flake-compat` (not
+flake-parts resolves this path using its vendored `flake-compat` (not
 `builtins.getFlake`, which cannot handle paths in pure evaluation mode). The
 resolved flake's `inputs` are merged into the partition's `inputs` module argument.
 This is how `nixpkgs`, `nix-unit`, `treefmt-nix`, etc. become available inside the

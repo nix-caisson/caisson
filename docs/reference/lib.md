@@ -2,7 +2,8 @@
 
 A composed library carries two framework namespaces. `lib.caisson-core`
 holds the machinery, injected by `mkLib` itself (its code lives in
-caisson-core, vendored under `vendor/caisson-core`). `lib.caisson`
+[caisson-core](https://github.com/nix-caisson/caisson-core), a flake
+input of caisson). `lib.caisson`
 holds the integrations and the pkgs-dependent tooling, contributed by
 the overlays this flake exports. The flake-level `lib` output mirrors
 both namespaces (`caisson.lib.caisson-core`, `caisson.lib.caisson`).
@@ -18,7 +19,7 @@ Type notation used below:
 
 ## The caisson-core namespace
 
-- **Source:** `vendor/caisson-core/lib/` (`lifecycle.nix` for the
+- **Source:** caisson-core's `lib/` (`lifecycle.nix` for the
   machinery, `default.nix` for keyed composition and the resolver)
 
 ### `mkLib`

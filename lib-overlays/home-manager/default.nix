@@ -13,6 +13,7 @@
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "home-manager";
         context = "caisson.home-manager";
+        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:

@@ -6,13 +6,14 @@
 # flake-parts and nixpkgs, which would otherwise drown it out.
 {
   caisson,
+  caisson-core,
   flake-parts,
   nixpkgs,
   nixpkgs-lib,
   system,
 }:
 let
-  callFlake = import (caisson + "/vendor/caisson-core/lib/kernel/call-flake.nix");
+  callFlake = import (caisson-core + "/lib/kernel/call-flake.nix");
 
   nixpkgsLibFlake = callFlake { src = nixpkgs-lib; };
   flakePartsFlake = callFlake {

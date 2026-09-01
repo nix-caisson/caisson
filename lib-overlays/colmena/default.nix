@@ -12,6 +12,7 @@
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "colmena";
         context = "caisson.colmena";
+        resolve = final.caisson-core.resolve;
       };
 
       assertColmenaEcosystemSrc =

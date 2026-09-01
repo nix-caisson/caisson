@@ -12,9 +12,6 @@
         # so sharing would require more boilerplate than the duplication.
         perSystem.treefmt = {
           programs.nixfmt.enable = true;
-          # Vendored upstream code keeps upstream formatting so the
-          # local patch delta stays reviewable against its source.
-          settings.global.excludes = [ "vendor/*" ];
         };
       };
   };

@@ -93,7 +93,5 @@ nested flakes are evaluated.
 
 ## Other directories
 
-`examples/` (worked examples; `examples/literate-flake/` here),
-`vendor/` (vendored upstream code, each tree carrying its upstream
-license and a provenance note), and `docs/` (these pages) appear where
-a repository has use for them.
+`examples/` (worked examples; `examples/literate-flake/` here) and
+`docs/` (these pages) appear where a repository has use for them.

@@ -75,8 +75,6 @@ let
 in
 {
 
-  callFlake = import ../../../vendor/caisson-core/lib/kernel/call-flake.nix;
-
   # Build a check derivation that measures one or more eval scenarios and
   # gates deterministic metrics against a baseline.
   #

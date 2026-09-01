@@ -16,7 +16,7 @@
   entriesFor =
     { ecosystemSrc }:
     let
-      caisson-core = import ../vendor/caisson-core/lib;
+      caisson-core = inputs.caisson-core.lib.caisson-core;
       baseLib = import ecosystemSrc;
       machineryOverlay = caisson-core.mkCoreOverlay {
         inherit inputs;

@@ -6,25 +6,26 @@
 # declared name), with the miss interpreted here, where the
 # integration knows what to say; the resolver itself can never format
 # a message, because a miss is the plain value null. The declarations
-# and inputs are the serving composition's
-# mkLib-time facts, read from its manifest; a manifest-less
-# composition (composed without mkLib) has only the explicit channel.
-let
-  caisson-core = import ../vendor/caisson-core/lib;
-in
+# and inputs are the composition's mkLib-time facts, read from its
+# manifest; a manifest-less composition (composed without mkLib)
+# resolves only the explicit argument. Adapters pass the injected
+# `final.caisson-core.resolve`, so this file needs no import of its
+# own.
 {
-  # the integration's name for its target ecosystem, e.g. "nixpkgs"
+  # the integration's name for its ecosystem, e.g. "nixpkgs"
   name,
   # names the caller in the miss message, e.g. "caisson.nixos"
   context,
+  # the composition's caisson-core.resolve
+  resolve,
 }:
 {
   explicit ? null,
-  # the serving composition's caisson-core.manifest, or { }
+  # the composition's caisson-core.manifest, or { }
   manifest ? { },
 }:
 let
-  resolved = caisson-core.resolve {
+  resolved = resolve {
     inherit name explicit;
     defaults = manifest.ecosystems or { };
     inputs = manifest.inputs or { };

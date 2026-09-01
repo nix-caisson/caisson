@@ -5,6 +5,8 @@
 
   inputs = {
 
+    caisson-core.url = "github:nix-caisson/caisson-core";
+
     nixpkgs-lib.url = "github:NixOS/nixpkgs/nixos-unstable?dir=lib";
 
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs-lib";
@@ -21,11 +23,11 @@
 
       let
 
-        # The composition machinery, vendored from caisson-core (see
-        # vendor/caisson-core/PROVENANCE.md). Its mkLib takes the base
-        # library as a plain argument and injects the machinery, the
-        # module registry, and the manifest under `caisson-core`.
-        caisson-core = import ./vendor/caisson-core/lib;
+        # The composition machinery, from the caisson-core input. Its
+        # mkLib takes the base library as a plain argument and injects
+        # the machinery, the module registry, and the manifest under
+        # `caisson-core`.
+        caisson-core = inputs.caisson-core.lib.caisson-core;
 
         lib = caisson-core.mkLib {
 

@@ -5,14 +5,16 @@
 # (the same flake without caisson) to isolate framework overhead.
 {
   caisson,
+  caisson-core,
   flake-parts,
   nixpkgs,
   nixpkgs-lib,
   system,
 }:
 let
-  callFlake = import (caisson + "/vendor/caisson-core/lib/kernel/call-flake.nix");
+  callFlake = import (caisson-core + "/lib/kernel/call-flake.nix");
 
+  caissonCoreFlake = callFlake { src = caisson-core; };
   nixpkgsLibFlake = callFlake { src = nixpkgs-lib; };
   flakePartsFlake = callFlake {
     src = flake-parts;
@@ -30,6 +32,7 @@ let
   caissonFlake = callFlake {
     src = caisson;
     inputs = {
+      caisson-core = caissonCoreFlake;
       flake-parts = flakePartsFlake;
       nixpkgs-lib = nixpkgsLibFlake;
     };

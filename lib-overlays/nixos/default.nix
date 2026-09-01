@@ -12,6 +12,7 @@
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "nixpkgs";
         context = "caisson.nixos";
+        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:

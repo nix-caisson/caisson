@@ -8,14 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: vendored caisson-core matches its pin
-        run: |
-          rev=$(sed -n 's/^Revision: \([0-9a-f]\{40\}\).*/\1/p' vendor/caisson-core/PROVENANCE.md)
-          test -n "$rev"
-          git clone --quiet https://github.com/nix-caisson/caisson-core "$RUNNER_TEMP/core"
-          git -C "$RUNNER_TEMP/core" checkout --quiet "$rev"
-          diff -r "$RUNNER_TEMP/core/lib" vendor/caisson-core/lib
-          diff -r "$RUNNER_TEMP/core/vendor" vendor/caisson-core/vendor
       - uses: DeterminateSystems/nix-installer-action@v16
       - uses: cachix/cachix-action@v17
         with:

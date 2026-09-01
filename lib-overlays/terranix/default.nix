@@ -12,6 +12,7 @@
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "terranix";
         context = "caisson.terranix";
+        resolve = final.caisson-core.resolve;
       };
 
       assertTerranixEcosystemSrc =

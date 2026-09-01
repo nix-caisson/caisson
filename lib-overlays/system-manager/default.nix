@@ -12,6 +12,7 @@
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "system-manager";
         context = "caisson.system-manager";
+        resolve = final.caisson-core.resolve;
       };
 
       assertSystemManagerEcosystemSrc =

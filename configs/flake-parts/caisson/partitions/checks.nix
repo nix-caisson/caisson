@@ -88,6 +88,7 @@
             };
             evalWeightArgs = {
               caisson = self.outPath;
+              caisson-core = inputs.caisson-core.outPath;
               flake-parts = inputs.flake-parts.outPath;
               nixpkgs = inputs.nixpkgs.outPath;
               nixpkgs-lib = inputs.nixpkgs-lib.outPath;
@@ -101,9 +102,6 @@
             # so sharing would require more boilerplate than the duplication.
             treefmt = {
               programs.nixfmt.enable = true;
-              # Vendored upstream code keeps upstream formatting so the
-              # local patch delta stays reviewable against its source.
-              settings.global.excludes = [ "vendor/*" ];
             };
             checks =
               integrationOutputs.checks.${system}

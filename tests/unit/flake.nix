@@ -25,6 +25,8 @@
 
     parent-flake-parts.follows = "parent/flake-parts";
 
+    parent-caisson-core.follows = "parent/caisson-core";
+
   };
 
   outputs =
