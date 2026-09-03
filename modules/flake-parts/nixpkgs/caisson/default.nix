@@ -102,7 +102,11 @@ in
             in
             {
               pkgSets = pkgSets;
-              pkgs = lib.mkDefault pkgSets.pkgs;
+              # Claim the default `pkgs` only when a `pkgs` package set
+              # is configured: the module reaches every composition that
+              # selects the full registry, and a flake with no package
+              # sets keeps flake-parts' own `pkgs` default.
+              pkgs = lib.mkIf (config.caisson.nixpkgs.pkgSets ? pkgs) (lib.mkDefault pkgSets.pkgs);
             }
           );
           legacyPackages = lib.mkIf config.caisson.nixpkgs.pkgs.export.enabled pkgs;

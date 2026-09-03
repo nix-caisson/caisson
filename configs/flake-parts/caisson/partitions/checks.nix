@@ -80,6 +80,10 @@
               path = self.outPath + "/tests/integration/nixpkgs-interface-consumer";
             };
 
+            nixpkgsNoPkgSetsOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-no-pkg-sets";
+            };
+
             # Unit Tests
             unitTestOutputs = callConsumer {
               path = self.outPath + "/tests/unit";
@@ -123,6 +127,7 @@
               // nixpkgsConsumerOutputs.checks.${system}
               // nixpkgsOverlayExportOutputs.checks.${system}
               // nixpkgsInterfaceConsumerOutputs.checks.${system}
+              // nixpkgsNoPkgSetsOutputs.checks.${system}
               // unitTestOutputs.checks.${system}
               // {
                 literate-flake-default = exampleOutputs.packages.${system}.default;
