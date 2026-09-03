@@ -237,6 +237,35 @@ flake class so a consumer selects it from the registry
 (`moduleImports = modules: [ modules."caisson/partitions" ... ]`)
 rather than declaring a flake-parts input for it.
 
+### `modules.flake."caisson/nixpkgs"`, `modules.flake."caisson/nixpkgs-interface"`
+
+- **Source:** `modules/flake-parts/nixpkgs/`,
+  `modules/flake-parts/nixpkgs-interface/`
+
+The nixpkgs integration's flake modules. `nixpkgs-interface` declares
+only the overlay registry, `caisson.nixpkgs.overlays.all`: an attrset
+of named overlay-producing functions (each takes the flake's
+`configName` and returns an overlay; `mkPackagesOverlay` and
+`mkPolyfillOverlay` below build them). Registering an overlay does
+nothing by itself; a sibling flake module imports the interface to
+make an overlay available and leaves selection to the consumer.
+
+`nixpkgs` imports the interface and adds the package-set machinery,
+the `caisson.nixpkgs.*` options:
+
+- `pkgSets.<name>`: a package-set definition: `pkgFunction` (a
+  nixpkgs-style entry point, e.g. `import inputs.nixpkgs`) and
+  `overlayImports` (a selection function from the registry to the
+  overlays to apply, default all). Each set is reified per system and
+  handed to `perSystem` modules as the `pkgSets` argument;
+  `pkgSets.pkgs` also becomes the default `perSystem` `pkgs`.
+- `config`: the nixpkgs config applied to every generated package set.
+- `overlays.exported` and `overlays.export.enabled`: the selection
+  from the registry published as the flake's `overlays` output.
+- `pkgs.export.enabled`, `packages.export.enabled`: whether to export
+  `legacyPackages`, and the flake's own package scope
+  (`pkgs.<configName>`) as `packages`.
+
 ### `eval-weight`
 
 - **Source:** `lib-overlays/tooling/eval-weight/`

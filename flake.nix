@@ -75,6 +75,12 @@
               # can select it from the registry instead of declaring a
               # flake-parts input of their own.
               partitions = flake-parts-flake.flakeModules.partitions;
+              # The nixpkgs integration's module layer: the overlay
+              # registry (nixpkgs-interface) and the package-set
+              # machinery that reifies `caisson.nixpkgs.pkgSets` per
+              # system (nixpkgs, which imports the interface).
+              nixpkgs = composedLib.caisson.mkFlakeModule ./modules/flake-parts/nixpkgs;
+              nixpkgs-interface = composedLib.caisson.mkFlakeModule ./modules/flake-parts/nixpkgs-interface;
             };
           };
 

@@ -33,7 +33,14 @@
         system-manager
         ;
     };
-    modules.flake.exported = modules: { inherit (modules) default partitions; };
+    modules.flake.exported = modules: {
+      inherit (modules)
+        default
+        partitions
+        nixpkgs
+        nixpkgs-interface
+        ;
+    };
 
     lib = {
       export.enabled = true;

@@ -68,6 +68,18 @@
               };
             };
 
+            nixpkgsConsumerOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-consumer";
+            };
+
+            nixpkgsOverlayExportOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-overlay-export";
+            };
+
+            nixpkgsInterfaceConsumerOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-interface-consumer";
+            };
+
             # Unit Tests
             unitTestOutputs = callConsumer {
               path = self.outPath + "/tests/unit";
@@ -108,6 +120,9 @@
               // minimalConsumerOutputs.checks.${system}
               // moduleClassExportOutputs.checks.${system}
               // libConsumerChainFinalOutputs.checks.${system}
+              // nixpkgsConsumerOutputs.checks.${system}
+              // nixpkgsOverlayExportOutputs.checks.${system}
+              // nixpkgsInterfaceConsumerOutputs.checks.${system}
               // unitTestOutputs.checks.${system}
               // {
                 literate-flake-default = exampleOutputs.packages.${system}.default;
