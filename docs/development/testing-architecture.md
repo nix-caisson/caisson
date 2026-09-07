@@ -89,7 +89,7 @@ expression and applies its `outputs` function to explicitly constructed
 inputs. Each input the flake declares resolves by name: an entry in
 `overrides` wins, then a `follows` chain, then the `pool`; a name that
 resolves nowhere throws. Nothing is fetched and no lockfile is read or
-written. The [library reference](../reference/lib.md) documents the full
+written. The [library reference](https://nix-caisson.github.io/docs/reference/lib.html) documents the full
 signature.
 
 The imported `flake.nix` is not a resolved flake: it has no resolved inputs, no
@@ -304,4 +304,4 @@ The checks partition merges outputs from all test and example flakes into a sing
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
 | `debug-disabled` | `checks.nix` (inline) | `self.debug` is not exposed in production |
-| `eval-weight` | `checks.nix` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](../eval-weight.md)) |
+| `eval-weight` | `checks.nix` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |
