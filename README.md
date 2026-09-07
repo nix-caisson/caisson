@@ -1,17 +1,17 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-dark.svg">
-    <img alt="caisson" src="assets/brand/wordmark.svg" width="480">
+    <source media="(prefers-color-scheme: dark)" srcset="https://nix-caisson.github.io/assets/brand/wordmark-dark.svg">
+    <img alt="caisson" src="https://nix-caisson.github.io/assets/brand/wordmark.svg" width="480">
   </picture>
 </p>
 
 <p align="center"><em>The foundation framework for composable Nix flakes.</em></p>
 
 <p align="center">
-  <strong><a href="https://nix-caisson.github.io/caisson/">Website</a></strong> ·
-  <strong><a href="https://nix-caisson.github.io/caisson/docs/">Documentation</a></strong> ·
-  <a href="https://nix-caisson.github.io/caisson/docs/getting-started.html">Getting started</a> ·
-  <a href="https://nix-caisson.github.io/caisson/docs/reference/lib.html">Reference</a>
+  <strong><a href="https://nix-caisson.github.io/">Website</a></strong> ·
+  <strong><a href="https://nix-caisson.github.io/docs/">Documentation</a></strong> ·
+  <a href="https://nix-caisson.github.io/docs/getting-started.html">Getting started</a> ·
+  <a href="https://nix-caisson.github.io/docs/reference/lib.html">Reference</a>
 </p>
 
 ---
@@ -105,18 +105,21 @@ aligned, and there is no chain of `follows` to enumerate downstream.
 
 ## Going deeper
 
-- [Concepts](https://nix-caisson.github.io/caisson/docs/concepts/closed-inputs.html):
+- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-inputs.html):
   closed inputs, module classes, library overlays, and ecosystem sources,
   each explained with the reasoning behind the design.
-- [Reference](https://nix-caisson.github.io/caisson/docs/reference/lib.html):
+- [Reference](https://nix-caisson.github.io/docs/reference/lib.html):
   the `lib.caisson` API and module options.
-- [Deep dives](https://nix-caisson.github.io/caisson/docs/deep-dives/how-lib-is-composed.html):
+- [Deep dives](https://nix-caisson.github.io/docs/deep-dives/how-lib-is-composed.html):
   how `lib` is composed and how inputs are closed over.
 - [`examples/literate-flake/`](examples/literate-flake/): a working,
   annotated flake demonstrating the whole structure end to end.
 
-The documentation in this repository lives under [`docs/`](docs/) and is
-published as [the caisson docs](https://nix-caisson.github.io/caisson/docs/).
+The documentation is maintained in
+[nix-caisson/nix-caisson.github.io](https://github.com/nix-caisson/nix-caisson.github.io)
+and published as [the caisson docs](https://nix-caisson.github.io/docs/);
+this repository carries only the contributor notes under
+[`docs/development/`](docs/development/).
 
 ## Verification
 
