@@ -27,6 +27,7 @@
           configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
+          pkgSets ? null,
           ...
         }:
         let
@@ -39,7 +40,9 @@
           specialArgs = {
             inputs = closure-inputs;
           }
+          // (if pkgSets != null then { inherit pkgSets; } else { })
           // specialArgs;
+          inherit pkgSets;
         };
 
       mkConfiguration =
@@ -58,8 +61,15 @@
             "configModule"
             "moduleImports"
             "specialArgs"
+            "pkgSets"
           ];
-          baseMeta = passthroughArgs.meta or { };
+          # The hive's package set is meta.nixpkgs; pkgSets.pkgs is its
+          # default, an explicit meta.nixpkgs wins.
+          baseMeta =
+            (
+              if common.pkgSets != null && common.pkgSets ? pkgs then { nixpkgs = common.pkgSets.pkgs; } else { }
+            )
+            // (passthroughArgs.meta or { });
           baseDefaults = passthroughArgs.defaults or { };
         in
         checkedEcosystemSrc.lib.makeHive (

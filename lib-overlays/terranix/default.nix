@@ -27,6 +27,7 @@
           configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
+          pkgSets ? null,
           ...
         }:
         let
@@ -34,12 +35,14 @@
         in
         {
           modules = selectedModules ++ [ configModule ];
+          inherit pkgSets;
           # Framework defaults first; caller's specialArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem. terranix
           # calls these extraArgs; the caisson surface uses one name.
           extraArgs = {
             inputs = closure-inputs;
           }
+          // (if pkgSets != null then { inherit pkgSets; } else { })
           // specialArgs;
         };
 
@@ -59,10 +62,19 @@
             "configModule"
             "moduleImports"
             "specialArgs"
+            "pkgSets"
           ];
+          # terranix evaluates against `pkgs`; pkgSets.pkgs is its default,
+          # an explicit pkgs (or system) wins.
+          pkgsDefault =
+            if common.pkgSets != null && common.pkgSets ? pkgs && !(passthroughArgs ? pkgs) then
+              { pkgs = common.pkgSets.pkgs; }
+            else
+              { };
         in
         checkedEcosystemSrc.lib.terranixConfiguration (
-          passthroughArgs
+          pkgsDefault
+          // passthroughArgs
           // {
             inherit (common)
               extraArgs

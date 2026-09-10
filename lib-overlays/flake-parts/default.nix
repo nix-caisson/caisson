@@ -83,6 +83,13 @@
           # exists.
           name ? null,
 
+          # Package sets for the flake evaluation itself, handed to the
+          # flake-class modules as the `pkgSets` special argument. Per
+          # system package sets are the nixpkgs integration's business
+          # (caisson.nixpkgs.pkgSets); this is the flake-level slot the
+          # other integrations also carry.
+          pkgSets ? null,
+
           ...
         }:
         (
@@ -104,6 +111,7 @@
                 "modules"
                 "moduleImports"
                 "name"
+                "pkgSets"
               ];
 
               finalArgs =
@@ -114,6 +122,7 @@
                   specialArgs = {
                     lib = final;
                   }
+                  // (if pkgSets != null then { inherit pkgSets; } else { })
                   // filteredArgs.specialArgs or { };
                 };
 

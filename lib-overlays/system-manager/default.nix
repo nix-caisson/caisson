@@ -27,18 +27,34 @@
           configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
+          pkgSets ? null,
           ...
         }:
         let
           selectedModules = moduleImports (final.caisson-core.modules.systemManager or { });
+          # system-manager instantiates its own nixpkgs from
+          # `nixpkgs.hostPlatform`; a supplied package set seeds that
+          # platform (an explicit hostPlatform wins) and rides along as
+          # the `pkgSets` module argument.
+          pkgSetsModule =
+            if pkgSets != null && pkgSets ? pkgs then
+              [
+                {
+                  _file = "caisson-system-manager:pkgSets";
+                  nixpkgs.hostPlatform = final.mkDefault pkgSets.pkgs.stdenv.hostPlatform.system;
+                }
+              ]
+            else
+              [ ];
         in
         {
-          modules = selectedModules ++ [ configModule ];
+          modules = selectedModules ++ pkgSetsModule ++ [ configModule ];
           # Framework defaults first; caller's specialArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem.
           specialArgs = {
             inputs = closure-inputs;
           }
+          // (if pkgSets != null then { inherit pkgSets; } else { })
           // specialArgs;
         };
 
@@ -58,6 +74,7 @@
             "configModule"
             "moduleImports"
             "specialArgs"
+            "pkgSets"
           ];
 
           # system-manager imports selected NixOS modules from its own
