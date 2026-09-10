@@ -199,21 +199,68 @@
           evaluatorPath = "${hmSource}/modules";
         };
 
+      # home-manager's evaluator takes exactly the arguments mkCommonArgs
+      # composes, so there is nothing to forward: the evaluator's own
+      # names are refused with a pointer to the caisson argument, and any
+      # other name is refused as unknown.
+      hints = {
+        configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+        pkgs = "pass the package set as `pkgSets.pkgs`.";
+        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+      };
+      configurationArgs = [
+        "ecosystemSrc"
+        "pkgSets"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+        "osConfig"
+        "check"
+        "minimal"
+        "sourceMeta"
+      ];
+      checkArgs = import ../check-args.nix {
+        context = "lib.caisson.home-manager.mkConfiguration";
+        accepted = configurationArgs;
+        inherit hints;
+        open = "lib.caisson.home-manager.mkConfigurationUnsupervised";
+      };
+      checkOpenArgs = import ../check-args.nix {
+        context = "lib.caisson.home-manager.mkConfigurationUnsupervised";
+        accepted = configurationArgs ++ [ "evaluatorArgs" ];
+        inherit hints;
+      };
+      evaluatorArgsOf = common: {
+        inherit (common)
+          check
+          configuration
+          extraSpecialArgs
+          minimal
+          pkgs
+          ;
+      };
+
       mkConfiguration =
-        args:
+        rawArgs:
         let
+          common = mkCommonArgs (checkArgs rawArgs);
+          evaluator = import common.evaluatorPath;
+        in
+        evaluator (evaluatorArgsOf common);
+
+      # The same composition, then `evaluatorArgs` merged over the
+      # evaluator call verbatim: everything home-manager's evaluator
+      # takes (configuration, pkgs, lib, minimal, check,
+      # extraSpecialArgs) can be set or replaced there.
+      mkConfigurationUnsupervised =
+        rawArgs:
+        let
+          args = checkOpenArgs rawArgs;
           common = mkCommonArgs args;
           evaluator = import common.evaluatorPath;
         in
-        evaluator {
-          inherit (common)
-            check
-            configuration
-            extraSpecialArgs
-            minimal
-            pkgs
-            ;
-        };
+        evaluator (evaluatorArgsOf common // (args.evaluatorArgs or { }));
 
       mkConfigurationMinimal = args: mkConfiguration (args // { minimal = true; });
 
@@ -230,7 +277,16 @@
           buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
+      # The adapter keeps `...` (its extras are NixOS-module options,
+      # not evaluator arguments); only the old special-arguments name is
+      # refused.
       mkNixosAdapter =
+        rawArgs:
+        if rawArgs ? extraSpecialArgs then
+          throw "lib.caisson.home-manager.mkNixosAdapter does not accept `extraSpecialArgs`: pass extra module arguments as `specialArgs`."
+        else
+          mkNixosAdapterChecked rawArgs;
+      mkNixosAdapterChecked =
         args@{
           users,
           ecosystemSrc ? null,
@@ -469,6 +525,7 @@
             assertSourceCoherence
             mkConfiguration
             mkConfigurationMinimal
+            mkConfigurationUnsupervised
             mkModule
             mkNixosAdapter
             mkSourceMeta

@@ -28,15 +28,53 @@
         else
           throw "lib.caisson.nixos.mkConfiguration requires `pkgSets.pkgs` to be defined.";
 
+      # eval-config evaluations carry the nixpkgs module, so the package
+      # set lands on `nixpkgs.pkgs`; the minimal evaluator has no such
+      # module, so there it is the `pkgs` module argument instead.
       mkFrameworkModule = pkgSets: {
         _file = "caisson-nixos:framework";
         config = {
           nixpkgs.pkgs = pkgSets.pkgs;
         };
       };
+      mkMinimalFrameworkModule = pkgSets: {
+        _file = "caisson-nixos:framework-minimal";
+        config = {
+          _module.args.pkgs = final.mkDefault pkgSets.pkgs;
+        };
+      };
 
-      mkCommonArgs =
-        args@{
+      commonAccepted = [
+        "ecosystemSrc"
+        "pkgSets"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+      ];
+      hints = {
+        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+        pkgs = "pass the package set as `pkgSets.pkgs`.";
+        baseModules = "the base module list belongs to the variant: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, mkConfigurationMinimal without it.";
+      };
+      mkCheck =
+        name: extra: open:
+        import ../check-args.nix {
+          context = "lib.caisson.nixos.${name}";
+          accepted = commonAccepted ++ extra;
+          inherit hints open;
+        };
+
+      # What every variant composes from the caisson arguments: the
+      # selected class modules, the config module and the framework
+      # module as `modules`, and pkgSets threaded through `specialArgs`
+      # (framework defaults first; the caller's win on conflict, as is
+      # normal in the Nix ecosystem).
+      compose =
+        {
+          minimal ? false,
+        }:
+        {
+          ecosystemSrc ? null,
           pkgSets,
           configModule,
           moduleImports ? builtins.attrValues,
@@ -45,97 +83,102 @@
         }:
         let
           checkedPkgSets = assertPkgSets pkgSets;
-          resolvedSystem =
-            args.system
-              or (checkedPkgSets.pkgs.stdenv.hostPlatform.system or (checkedPkgSets.pkgs.system or null));
           selectedModules = moduleImports (final.caisson-core.modules.nixos or { });
-          extraModules = selectedModules;
-          frameworkModule = mkFrameworkModule checkedPkgSets;
+          frameworkModule =
+            if minimal then mkMinimalFrameworkModule checkedPkgSets else mkFrameworkModule checkedPkgSets;
         in
         {
+          src = resolveSrc ecosystemSrc;
           inherit checkedPkgSets;
-          system = resolvedSystem;
-          modules = extraModules ++ [
+          modules = selectedModules ++ [
             configModule
             frameworkModule
           ];
-          # Framework defaults first; caller's specialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem.
           specialArgs = {
             pkgSets = checkedPkgSets;
           }
           // specialArgs;
         };
 
+      # eval-config evaluations. `system` defaults to the package set's
+      # host platform.
+      evalConfigArgs = args: common: {
+        modules = common.modules;
+        specialArgs = common.specialArgs;
+        system =
+          args.system or (common.checkedPkgSets.pkgs.stdenv.hostPlatform.system
+            or (common.checkedPkgSets.pkgs.system or null)
+          );
+      };
+      evalConfig = common: import "${common.src}/nixos/lib/eval-config.nix";
+
       mkConfiguration =
-        args@{
-          ecosystemSrc ? null,
-          ...
-        }:
+        rawArgs:
         let
-          src = resolveSrc ecosystemSrc;
-          common = mkCommonArgs args;
-          passthroughArgs = builtins.removeAttrs args [
-            "ecosystemSrc"
-            "pkgSets"
-            "configModule"
-            "moduleImports"
-            "specialArgs"
-          ];
-          evalConfig = import "${src}/nixos/lib/eval-config.nix";
+          args = mkCheck "mkConfiguration" [
+            "system"
+          ] "lib.caisson.nixos.mkConfigurationUnsupervised" rawArgs;
+          common = compose { } args;
         in
-        evalConfig (
-          passthroughArgs
+        evalConfig common (evalConfigArgs args common);
+
+      # eval-config with nixpkgs' module list passed explicitly as
+      # `baseModules`.
+      mkConfigurationFull =
+        rawArgs:
+        let
+          args = mkCheck "mkConfigurationFull" [
+            "system"
+          ] "lib.caisson.nixos.mkConfigurationUnsupervised" rawArgs;
+          common = compose { } args;
+        in
+        evalConfig common (
+          evalConfigArgs args common
           // {
-            modules = common.modules;
-            specialArgs = common.specialArgs;
-            system = common.system;
+            baseModules = import "${common.src}/nixos/modules/module-list.nix";
           }
         );
 
-      mkConfigurationFull =
-        args@{
-          ecosystemSrc ? null,
-          ...
-        }:
+      # The same composition as mkConfiguration, then `evaluatorArgs`
+      # merged over the eval-config call verbatim: everything
+      # eval-config takes (system, pkgs, baseModules, specialArgs,
+      # modules, modulesLocation, prefix, lib, extraModules) can be set
+      # or replaced there.
+      mkConfigurationUnsupervised =
+        rawArgs:
         let
-          src = resolveSrc ecosystemSrc;
-          common = mkCommonArgs args;
-          passthroughArgs = builtins.removeAttrs args [
-            "ecosystemSrc"
-            "pkgSets"
-            "configModule"
-            "moduleImports"
-            "specialArgs"
-          ];
-          evalConfig = import "${src}/nixos/lib/eval-config.nix";
+          args = mkCheck "mkConfigurationUnsupervised" [ "system" "evaluatorArgs" ] null rawArgs;
+          common = compose { } args;
         in
-        evalConfig (
-          passthroughArgs
-          // {
-            baseModules = import "${src}/nixos/modules/module-list.nix";
-            modules = common.modules;
-            specialArgs = common.specialArgs;
-            system = common.system;
-          }
-        );
+        evalConfig common (evalConfigArgs args common // (args.evaluatorArgs or { }));
+
+      # nixos/lib's evalModules: no NixOS base modules, so the config
+      # module declares any options it uses; the package set arrives as
+      # the `pkgs` module argument.
+      evalMinimalArgs = args: common: {
+        prefix = args.prefix or [ ];
+        modules = common.modules;
+        specialArgs = common.specialArgs;
+      };
+      evalMinimal = common: (import "${common.src}/nixos/lib" { }).evalModules;
 
       mkConfigurationMinimal =
-        args@{
-          ecosystemSrc ? null,
-          prefix ? [ ],
-          ...
-        }:
+        rawArgs:
         let
-          src = resolveSrc ecosystemSrc;
-          common = mkCommonArgs args;
-          nixosLib = import "${src}/nixos/lib" { };
+          args = mkCheck "mkConfigurationMinimal" [
+            "prefix"
+          ] "lib.caisson.nixos.mkConfigurationMinimalUnsupervised" rawArgs;
+          common = compose { minimal = true; } args;
         in
-        nixosLib.evalModules {
-          inherit prefix;
-          modules = common.modules;
-          specialArgs = common.specialArgs;
-        };
+        evalMinimal common (evalMinimalArgs args common);
+
+      mkConfigurationMinimalUnsupervised =
+        rawArgs:
+        let
+          args = mkCheck "mkConfigurationMinimalUnsupervised" [ "prefix" "evaluatorArgs" ] null rawArgs;
+          common = compose { minimal = true; } args;
+        in
+        evalMinimal common (evalMinimalArgs args common // (args.evaluatorArgs or { }));
     in
     {
       caisson = (prev.caisson or { }) // {
@@ -143,8 +186,10 @@
           inherit
             mkModule
             mkConfiguration
-            mkConfigurationMinimal
             mkConfigurationFull
+            mkConfigurationMinimal
+            mkConfigurationUnsupervised
+            mkConfigurationMinimalUnsupervised
             ;
         };
       };

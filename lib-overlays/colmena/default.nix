@@ -22,32 +22,46 @@
         else
           throw "lib.caisson.colmena.mkConfiguration requires `ecosystemSrc.lib.makeHive`.";
 
-      mkCommonArgs =
-        args@{
+      accepted = [
+        "ecosystemSrc"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+        "pkgSets"
+        "meta"
+        "nodes"
+      ];
+      hints = {
+        modules = "pass the hive-wide module as `configModule`; registered class modules are selected with `moduleImports`.";
+        defaults = "pass the hive-wide module as `configModule`.";
+        network = "pass hive metadata as `meta`.";
+      };
+      checkArgs = import ../check-args.nix {
+        context = "lib.caisson.colmena.mkConfiguration";
+        inherit accepted hints;
+        open = "lib.caisson.colmena.mkConfigurationUnsupervised";
+      };
+      checkOpenArgs = import ../check-args.nix {
+        context = "lib.caisson.colmena.mkConfigurationUnsupervised";
+        accepted = accepted ++ [ "evaluatorArgs" ];
+        inherit hints;
+      };
+
+      # The hive makeHive receives, composed from the caisson arguments:
+      # the selected class modules and the config module become
+      # `defaults`, framework special arguments merge into
+      # `meta.specialArgs` (the caller's win on conflict, as is normal
+      # in the Nix ecosystem), and pkgSets.pkgs is the default
+      # `meta.nixpkgs`.
+      compose =
+        {
+          ecosystemSrc ? null,
           configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
           pkgSets ? null,
-          ...
-        }:
-        let
-          selectedModules = moduleImports (final.caisson-core.modules.colmena or { });
-        in
-        {
-          modules = selectedModules ++ [ configModule ];
-          # Framework defaults first; caller's specialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem.
-          specialArgs = {
-            inputs = closure-inputs;
-          }
-          // (if pkgSets != null then { inherit pkgSets; } else { })
-          // specialArgs;
-          inherit pkgSets;
-        };
-
-      mkConfiguration =
-        args@{
-          ecosystemSrc ? null,
+          meta ? { },
+          nodes ? { },
           ...
         }:
         let
@@ -55,42 +69,54 @@
             explicit = ecosystemSrc;
             manifest = final.caisson-core.manifest or { };
           });
-          common = mkCommonArgs args;
-          passthroughArgs = builtins.removeAttrs args [
-            "ecosystemSrc"
-            "configModule"
-            "moduleImports"
-            "specialArgs"
-            "pkgSets"
-          ];
-          # The hive's package set is meta.nixpkgs; pkgSets.pkgs is its
-          # default, an explicit meta.nixpkgs wins.
-          baseMeta =
-            (
-              if common.pkgSets != null && common.pkgSets ? pkgs then { nixpkgs = common.pkgSets.pkgs; } else { }
-            )
-            // (passthroughArgs.meta or { });
-          baseDefaults = passthroughArgs.defaults or { };
+          selectedModules = moduleImports (final.caisson-core.modules.colmena or { });
         in
-        checkedEcosystemSrc.lib.makeHive (
-          passthroughArgs
-          // {
-            meta = baseMeta // {
-              specialArgs = (baseMeta.specialArgs or { }) // common.specialArgs;
-            };
+        {
+          inherit checkedEcosystemSrc;
+          hive = nodes // {
+            meta =
+              (if pkgSets != null && pkgSets ? pkgs then { nixpkgs = pkgSets.pkgs; } else { })
+              // meta
+              // {
+                specialArgs = {
+                  inputs = closure-inputs;
+                }
+                // (if pkgSets != null then { inherit pkgSets; } else { })
+                // (meta.specialArgs or { })
+                // specialArgs;
+              };
             defaults =
               { ... }:
               {
-                imports = common.modules ++ [ baseDefaults ];
+                imports = selectedModules ++ [ configModule ];
               };
-          }
-        );
+          };
+        };
+
+      mkConfiguration =
+        rawArgs:
+        let
+          composed = compose (checkArgs rawArgs);
+        in
+        composed.checkedEcosystemSrc.lib.makeHive composed.hive;
+
+      # The same composition, then `evaluatorArgs` merged over the hive
+      # verbatim: every attribute makeHive reads (meta, defaults, the
+      # nodes) can be set or replaced there.
+      mkConfigurationUnsupervised =
+        rawArgs:
+        let
+          args = checkOpenArgs rawArgs;
+          composed = compose args;
+        in
+        composed.checkedEcosystemSrc.lib.makeHive (composed.hive // (args.evaluatorArgs or { }));
     in
     {
       caisson = (prev.caisson or { }) // {
         colmena = ((prev.caisson or { }).colmena or { }) // {
           inherit
             mkConfiguration
+            mkConfigurationUnsupervised
             mkModule
             ;
         };

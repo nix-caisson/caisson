@@ -1262,25 +1262,42 @@ in
   };
 
   flake-parts-mkConfiguration = {
-    "test: rejects inputs arg via hasAttr guard" = {
-      # flake-parts.mkConfiguration uses builtins.abort (not throw) when inputs is present,
-      # so tryEval cannot catch it. Instead we test the guard condition
-      # directly: flake-parts.mkConfiguration checks builtins.hasAttr "inputs" args.
-      expr = builtins.hasAttr "inputs" {
-        inputs = { };
-        configModule = { };
-      };
-      expected = true;
+    "test: refuses inputs (they belong to mkLib)" = {
+      expr =
+        (builtins.tryEval (
+          lib.caisson.flake-parts.mkConfiguration {
+            inputs = { };
+            configModule = { };
+          }
+        )).success;
+      expected = false;
     };
 
-    "test: does not reject args without inputs" = {
-      expr = builtins.hasAttr "inputs" { configModule = { }; };
+    "test: refuses modules (configModule and moduleImports carry them)" = {
+      expr =
+        (builtins.tryEval (
+          lib.caisson.flake-parts.mkConfiguration {
+            modules = [ ];
+            configModule = { };
+          }
+        )).success;
+      expected = false;
+    };
+
+    "test: refuses evaluator arguments outside the unsupervised twin" = {
+      expr =
+        (builtins.tryEval (
+          lib.caisson.flake-parts.mkConfiguration {
+            configModule = { };
+            evaluatorArgs = { };
+          }
+        )).success;
       expected = false;
     };
 
     "test: filteredArgs strips reserved keys" = {
-      # flake-parts.mkConfiguration removes configModule, modules, and moduleImports before
-      # forwarding to flake-parts. Verify the stripping logic in isolation.
+      # The composed mkFlake call is built from named arguments; this
+      # checks the removeAttrs idiom in isolation.
       expr =
         let
           args = {
@@ -1590,7 +1607,7 @@ in
           let
             myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
           in
-          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
         expected = "declared";
       };
 
@@ -1599,7 +1616,10 @@ in
           let
             myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
           in
-          (myLib.caisson.colmena.mkConfiguration { ecosystemSrc = colmenaStub "explicit"; }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration {
+            ecosystemSrc = colmenaStub "explicit";
+            configModule = { };
+          }).stubbed;
         expected = "explicit";
       };
 
@@ -1612,7 +1632,7 @@ in
               };
             };
           in
-          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
         expected = "input";
       };
 
@@ -1626,12 +1646,14 @@ in
               ecosystems.colmena = colmenaStub "declared";
             };
           in
-          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
         expected = "declared";
       };
 
       "test: a full miss throws at the adapter" = {
-        expr = builtins.tryEval ((mkResolutionLib { }).caisson.colmena.mkConfiguration { }).stubbed;
+        expr =
+          builtins.tryEval
+            ((mkResolutionLib { }).caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
         expected = {
           success = false;
           value = false;

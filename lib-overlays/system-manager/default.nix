@@ -58,24 +58,37 @@
           // specialArgs;
         };
 
-      mkConfiguration =
-        args@{
-          ecosystemSrc ? null,
-          ...
-        }:
+      accepted = [
+        "ecosystemSrc"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+        "pkgSets"
+      ];
+      hints = {
+        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+      };
+      checkArgs = import ../check-args.nix {
+        context = "lib.caisson.system-manager.mkConfiguration";
+        inherit accepted hints;
+        open = "lib.caisson.system-manager.mkConfigurationUnsupervised";
+      };
+      checkOpenArgs = import ../check-args.nix {
+        context = "lib.caisson.system-manager.mkConfigurationUnsupervised";
+        accepted = accepted ++ [ "evaluatorArgs" ];
+        inherit hints;
+      };
+      # makeSystemConfig's arguments, composed from the caisson arguments,
+      # plus the compatibility bridge below.
+      compose =
+        args:
         let
           checkedEcosystemSrc = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
-            explicit = ecosystemSrc;
+            explicit = args.ecosystemSrc or null;
             manifest = final.caisson-core.manifest or { };
           });
           common = mkCommonArgs args;
-          passthroughArgs = builtins.removeAttrs args [
-            "ecosystemSrc"
-            "configModule"
-            "moduleImports"
-            "specialArgs"
-            "pkgSets"
-          ];
 
           # system-manager imports selected NixOS modules from its own
           # nixpkgs input; current nixos-unstable restructured
@@ -152,12 +165,33 @@
             final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
             ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
         in
-        checkedEcosystemSrc.lib.makeSystemConfig (
-          passthroughArgs
-          // {
+        {
+          inherit checkedEcosystemSrc;
+          evaluatorArgs = {
             inherit (common) specialArgs;
             modules = common.modules ++ compatModules;
-          }
+          };
+        };
+
+      mkConfiguration =
+        rawArgs:
+        let
+          composed = compose (checkArgs rawArgs);
+        in
+        composed.checkedEcosystemSrc.lib.makeSystemConfig composed.evaluatorArgs;
+
+      # The same composition, then `evaluatorArgs` merged over the
+      # evaluator call verbatim: everything makeSystemConfig takes
+      # (modules, overlays, specialArgs, allowUnsupportedNixpkgs) can be
+      # set or replaced there.
+      mkConfigurationUnsupervised =
+        rawArgs:
+        let
+          args = checkOpenArgs rawArgs;
+          composed = compose args;
+        in
+        composed.checkedEcosystemSrc.lib.makeSystemConfig (
+          composed.evaluatorArgs // (args.evaluatorArgs or { })
         );
     in
     {
@@ -165,6 +199,7 @@
         system-manager = ((prev.caisson or { }).system-manager or { }) // {
           inherit
             mkConfiguration
+            mkConfigurationUnsupervised
             mkModule
             ;
         };
