@@ -80,18 +80,18 @@
       checkArgs = import ../check-args.nix {
         context = "lib.caisson.flake-parts.mkConfiguration";
         inherit accepted hints;
-        open = "lib.caisson.flake-parts.mkConfigurationUnsupervised";
+        open = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
       };
       checkOpenArgs = import ../check-args.nix {
-        context = "lib.caisson.flake-parts.mkConfigurationUnsupervised";
-        accepted = accepted ++ [ "evaluatorArgs" ];
+        context = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
+        accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
       };
       mkConfiguration = rawArgs: mkConfigurationChecked (checkArgs rawArgs);
-      # The same composition, then `evaluatorArgs` merged over the
+      # The same composition, then `ecosystemArgs` merged over the
       # flake-parts mkFlake call verbatim: everything it takes (inputs,
       # specialArgs, self, moduleLocation) can be set or replaced there.
-      mkConfigurationUnsupervised = rawArgs: mkConfigurationChecked (checkOpenArgs rawArgs);
+      mkConfigurationWithEcosystemArgs = rawArgs: mkConfigurationChecked (checkOpenArgs rawArgs);
       mkConfigurationChecked =
         args@{
 
@@ -122,7 +122,7 @@
 
           specialArgs ? { },
 
-          evaluatorArgs ? { },
+          ecosystemArgs ? { },
         }:
         (
           let
@@ -145,7 +145,7 @@
                 // (if pkgSets != null then { inherit pkgSets; } else { })
                 // specialArgs;
               }
-              // evaluatorArgs;
+              // ecosystemArgs;
 
             # Selection over the flake class of the registry, the
             # same source every adapter selects from, so modules
@@ -176,7 +176,7 @@
 
       caisson = (prev.caisson or { }) // {
         flake-parts = prevNs // {
-          inherit mkConfiguration mkConfigurationUnsupervised types;
+          inherit mkConfiguration mkConfigurationWithEcosystemArgs types;
           mkModule = final.caisson-core.mkModule "flake";
         };
       };

@@ -224,14 +224,14 @@
         context = "lib.caisson.home-manager.mkConfiguration";
         accepted = configurationArgs;
         inherit hints;
-        open = "lib.caisson.home-manager.mkConfigurationUnsupervised";
+        open = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
       };
       checkOpenArgs = import ../check-args.nix {
-        context = "lib.caisson.home-manager.mkConfigurationUnsupervised";
-        accepted = configurationArgs ++ [ "evaluatorArgs" ];
+        context = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
+        accepted = configurationArgs ++ [ "ecosystemArgs" ];
         inherit hints;
       };
-      evaluatorArgsOf = common: {
+      ecosystemArgsOf = common: {
         inherit (common)
           check
           configuration
@@ -247,20 +247,20 @@
           common = mkCommonArgs (checkArgs rawArgs);
           evaluator = import common.evaluatorPath;
         in
-        evaluator (evaluatorArgsOf common);
+        evaluator (ecosystemArgsOf common);
 
-      # The same composition, then `evaluatorArgs` merged over the
+      # The same composition, then `ecosystemArgs` merged over the
       # evaluator call verbatim: everything home-manager's evaluator
       # takes (configuration, pkgs, lib, minimal, check,
       # extraSpecialArgs) can be set or replaced there.
-      mkConfigurationUnsupervised =
+      mkConfigurationWithEcosystemArgs =
         rawArgs:
         let
           args = checkOpenArgs rawArgs;
           common = mkCommonArgs args;
           evaluator = import common.evaluatorPath;
         in
-        evaluator (evaluatorArgsOf common // (args.evaluatorArgs or { }));
+        evaluator (ecosystemArgsOf common // (args.ecosystemArgs or { }));
 
       mkConfigurationMinimal = args: mkConfiguration (args // { minimal = true; });
 
@@ -525,7 +525,7 @@
             assertSourceCoherence
             mkConfiguration
             mkConfigurationMinimal
-            mkConfigurationUnsupervised
+            mkConfigurationWithEcosystemArgs
             mkModule
             mkNixosAdapter
             mkSourceMeta

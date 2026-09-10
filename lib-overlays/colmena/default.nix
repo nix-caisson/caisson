@@ -39,11 +39,11 @@
       checkArgs = import ../check-args.nix {
         context = "lib.caisson.colmena.mkConfiguration";
         inherit accepted hints;
-        open = "lib.caisson.colmena.mkConfigurationUnsupervised";
+        open = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
       };
       checkOpenArgs = import ../check-args.nix {
-        context = "lib.caisson.colmena.mkConfigurationUnsupervised";
-        accepted = accepted ++ [ "evaluatorArgs" ];
+        context = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
+        accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
       };
 
@@ -100,23 +100,23 @@
         in
         composed.checkedEcosystemSrc.lib.makeHive composed.hive;
 
-      # The same composition, then `evaluatorArgs` merged over the hive
+      # The same composition, then `ecosystemArgs` merged over the hive
       # verbatim: every attribute makeHive reads (meta, defaults, the
       # nodes) can be set or replaced there.
-      mkConfigurationUnsupervised =
+      mkConfigurationWithEcosystemArgs =
         rawArgs:
         let
           args = checkOpenArgs rawArgs;
           composed = compose args;
         in
-        composed.checkedEcosystemSrc.lib.makeHive (composed.hive // (args.evaluatorArgs or { }));
+        composed.checkedEcosystemSrc.lib.makeHive (composed.hive // (args.ecosystemArgs or { }));
     in
     {
       caisson = (prev.caisson or { }) // {
         colmena = ((prev.caisson or { }).colmena or { }) // {
           inherit
             mkConfiguration
-            mkConfigurationUnsupervised
+            mkConfigurationWithEcosystemArgs
             mkModule
             ;
         };

@@ -117,7 +117,7 @@
         let
           args = mkCheck "mkConfiguration" [
             "system"
-          ] "lib.caisson.nixos.mkConfigurationUnsupervised" rawArgs;
+          ] "lib.caisson.nixos.mkConfigurationWithEcosystemArgs" rawArgs;
           common = compose { } args;
         in
         evalConfig common (evalConfigArgs args common);
@@ -129,7 +129,7 @@
         let
           args = mkCheck "mkConfigurationFull" [
             "system"
-          ] "lib.caisson.nixos.mkConfigurationUnsupervised" rawArgs;
+          ] "lib.caisson.nixos.mkConfigurationWithEcosystemArgs" rawArgs;
           common = compose { } args;
         in
         evalConfig common (
@@ -139,18 +139,18 @@
           }
         );
 
-      # The same composition as mkConfiguration, then `evaluatorArgs`
+      # The same composition as mkConfiguration, then `ecosystemArgs`
       # merged over the eval-config call verbatim: everything
       # eval-config takes (system, pkgs, baseModules, specialArgs,
       # modules, modulesLocation, prefix, lib, extraModules) can be set
       # or replaced there.
-      mkConfigurationUnsupervised =
+      mkConfigurationWithEcosystemArgs =
         rawArgs:
         let
-          args = mkCheck "mkConfigurationUnsupervised" [ "system" "evaluatorArgs" ] null rawArgs;
+          args = mkCheck "mkConfigurationWithEcosystemArgs" [ "system" "ecosystemArgs" ] null rawArgs;
           common = compose { } args;
         in
-        evalConfig common (evalConfigArgs args common // (args.evaluatorArgs or { }));
+        evalConfig common (evalConfigArgs args common // (args.ecosystemArgs or { }));
 
       # nixos/lib's evalModules: no NixOS base modules, so the config
       # module declares any options it uses; the package set arrives as
@@ -167,18 +167,18 @@
         let
           args = mkCheck "mkConfigurationMinimal" [
             "prefix"
-          ] "lib.caisson.nixos.mkConfigurationMinimalUnsupervised" rawArgs;
+          ] "lib.caisson.nixos.mkConfigurationMinimalWithEcosystemArgs" rawArgs;
           common = compose { minimal = true; } args;
         in
         evalMinimal common (evalMinimalArgs args common);
 
-      mkConfigurationMinimalUnsupervised =
+      mkConfigurationMinimalWithEcosystemArgs =
         rawArgs:
         let
-          args = mkCheck "mkConfigurationMinimalUnsupervised" [ "prefix" "evaluatorArgs" ] null rawArgs;
+          args = mkCheck "mkConfigurationMinimalWithEcosystemArgs" [ "prefix" "ecosystemArgs" ] null rawArgs;
           common = compose { minimal = true; } args;
         in
-        evalMinimal common (evalMinimalArgs args common // (args.evaluatorArgs or { }));
+        evalMinimal common (evalMinimalArgs args common // (args.ecosystemArgs or { }));
     in
     {
       caisson = (prev.caisson or { }) // {
@@ -188,8 +188,8 @@
             mkConfiguration
             mkConfigurationFull
             mkConfigurationMinimal
-            mkConfigurationUnsupervised
-            mkConfigurationMinimalUnsupervised
+            mkConfigurationWithEcosystemArgs
+            mkConfigurationMinimalWithEcosystemArgs
             ;
         };
       };

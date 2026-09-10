@@ -38,11 +38,11 @@
       checkArgs = import ../check-args.nix {
         context = "lib.caisson.terranix.mkConfiguration";
         inherit accepted hints;
-        open = "lib.caisson.terranix.mkConfigurationUnsupervised";
+        open = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
       };
       checkOpenArgs = import ../check-args.nix {
-        context = "lib.caisson.terranix.mkConfigurationUnsupervised";
-        accepted = accepted ++ [ "evaluatorArgs" ];
+        context = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
+        accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
       };
 
@@ -71,7 +71,7 @@
         in
         {
           inherit checkedEcosystemSrc;
-          evaluatorArgs = (if pkgSets != null && pkgSets ? pkgs then { pkgs = pkgSets.pkgs; } else { }) // {
+          ecosystemArgs = (if pkgSets != null && pkgSets ? pkgs then { pkgs = pkgSets.pkgs; } else { }) // {
             modules = selectedModules ++ [ configModule ];
             extraArgs = {
               inputs = closure-inputs;
@@ -90,21 +90,21 @@
         if !(args ? pkgSets && args.pkgSets ? pkgs) then
           throw "lib.caisson.terranix.mkConfiguration requires `pkgSets.pkgs` to be defined."
         else
-          composed.checkedEcosystemSrc.lib.terranixConfiguration composed.evaluatorArgs;
+          composed.checkedEcosystemSrc.lib.terranixConfiguration composed.ecosystemArgs;
 
-      # The same composition, then `evaluatorArgs` merged over the
+      # The same composition, then `ecosystemArgs` merged over the
       # evaluator call verbatim: everything terranixConfiguration takes
       # (system, pkgs, modules, extraArgs, strip_nulls) can be set or
       # replaced there; pkgSets is optional here since `system` or
       # `pkgs` may come that way.
-      mkConfigurationUnsupervised =
+      mkConfigurationWithEcosystemArgs =
         rawArgs:
         let
           args = checkOpenArgs rawArgs;
           composed = compose args;
         in
         composed.checkedEcosystemSrc.lib.terranixConfiguration (
-          composed.evaluatorArgs // (args.evaluatorArgs or { })
+          composed.ecosystemArgs // (args.ecosystemArgs or { })
         );
     in
     {
@@ -112,7 +112,7 @@
         terranix = ((prev.caisson or { }).terranix or { }) // {
           inherit
             mkConfiguration
-            mkConfigurationUnsupervised
+            mkConfigurationWithEcosystemArgs
             mkModule
             ;
         };

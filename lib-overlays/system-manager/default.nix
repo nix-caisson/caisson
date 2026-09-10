@@ -72,11 +72,11 @@
       checkArgs = import ../check-args.nix {
         context = "lib.caisson.system-manager.mkConfiguration";
         inherit accepted hints;
-        open = "lib.caisson.system-manager.mkConfigurationUnsupervised";
+        open = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
       };
       checkOpenArgs = import ../check-args.nix {
-        context = "lib.caisson.system-manager.mkConfigurationUnsupervised";
-        accepted = accepted ++ [ "evaluatorArgs" ];
+        context = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
+        accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
       };
       # makeSystemConfig's arguments, composed from the caisson arguments,
@@ -167,7 +167,7 @@
         in
         {
           inherit checkedEcosystemSrc;
-          evaluatorArgs = {
+          ecosystemArgs = {
             inherit (common) specialArgs;
             modules = common.modules ++ compatModules;
           };
@@ -178,20 +178,20 @@
         let
           composed = compose (checkArgs rawArgs);
         in
-        composed.checkedEcosystemSrc.lib.makeSystemConfig composed.evaluatorArgs;
+        composed.checkedEcosystemSrc.lib.makeSystemConfig composed.ecosystemArgs;
 
-      # The same composition, then `evaluatorArgs` merged over the
+      # The same composition, then `ecosystemArgs` merged over the
       # evaluator call verbatim: everything makeSystemConfig takes
       # (modules, overlays, specialArgs, allowUnsupportedNixpkgs) can be
       # set or replaced there.
-      mkConfigurationUnsupervised =
+      mkConfigurationWithEcosystemArgs =
         rawArgs:
         let
           args = checkOpenArgs rawArgs;
           composed = compose args;
         in
         composed.checkedEcosystemSrc.lib.makeSystemConfig (
-          composed.evaluatorArgs // (args.evaluatorArgs or { })
+          composed.ecosystemArgs // (args.ecosystemArgs or { })
         );
     in
     {
@@ -199,7 +199,7 @@
         system-manager = ((prev.caisson or { }).system-manager or { }) // {
           inherit
             mkConfiguration
-            mkConfigurationUnsupervised
+            mkConfigurationWithEcosystemArgs
             mkModule
             ;
         };

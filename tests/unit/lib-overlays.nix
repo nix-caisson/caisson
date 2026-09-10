@@ -1284,12 +1284,12 @@ in
       expected = false;
     };
 
-    "test: refuses evaluator arguments outside the unsupervised twin" = {
+    "test: refuses evaluator arguments outside the ecosystem-args twin" = {
       expr =
         (builtins.tryEval (
           lib.caisson.flake-parts.mkConfiguration {
             configModule = { };
-            evaluatorArgs = { };
+            ecosystemArgs = { };
           }
         )).success;
       expected = false;

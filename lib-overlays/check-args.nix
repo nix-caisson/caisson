@@ -6,9 +6,9 @@
 # call from them. Nothing else is forwarded: an evaluator argument
 # handed in directly would be silently overwritten, silently dropped,
 # or surface as a conflict deep inside the evaluator. The
-# `...Unsupervised` twin of each entry point is the way to the
+# `...WithEcosystemArgs` twin of each entry point is the way to the
 # evaluator's full surface: it takes the same arguments plus
-# `evaluatorArgs`, merged over the composed call verbatim, last.
+# `ecosystemArgs`, merged over the composed call verbatim, last.
 #
 # context:  the entry point, for the message.
 # accepted: the argument names it takes.
@@ -29,8 +29,8 @@ let
     if hints ? ${name} then
       "${context} does not accept `${name}`: ${hints.${name}}"
     else if open != null then
-      "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. The evaluator's own arguments are available through ${open}, in `evaluatorArgs`."
+      "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. The evaluator's own arguments are available through ${open}, in `ecosystemArgs`."
     else
-      "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. Evaluator arguments go in `evaluatorArgs`.";
+      "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. Evaluator arguments go in `ecosystemArgs`.";
 in
 if unknown == [ ] then args else throw message
