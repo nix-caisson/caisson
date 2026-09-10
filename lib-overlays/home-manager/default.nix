@@ -152,7 +152,7 @@
           pkgSets,
           configModule,
           moduleImports ? builtins.attrValues,
-          extraSpecialArgs ? { },
+          specialArgs ? { },
           osConfig ? null,
           check ? true,
           minimal ? false,
@@ -187,14 +187,15 @@
             ];
           };
           pkgs = checkedPkgSets.pkgs;
-          # Framework defaults first; caller's extraSpecialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem.
+          # Framework defaults first; caller's specialArgs wins on conflict.
+          # This is intentional and normal in the Nix ecosystem. home-manager
+          # calls these extraSpecialArgs; the caisson surface uses one name.
           extraSpecialArgs = {
             pkgSets = checkedPkgSets;
             inherit osConfig;
             sourceMeta = resolvedSourceMeta;
           }
-          // extraSpecialArgs;
+          // specialArgs;
           evaluatorPath = "${hmSource}/modules";
         };
 
@@ -259,7 +260,7 @@
           # only mounted at login anyway.  Currently limited to exactly one
           # hosted user (one shared unit cannot carry per-user ExecStarts).
           activationMode ? "upstream",
-          extraSpecialArgs ? { },
+          specialArgs ? { },
           ...
         }:
         assert final.assertMsg (builtins.elem activationMode [
@@ -327,7 +328,7 @@
                 userActivations = builtins.mapAttrs (
                   _username: userArgs:
                   (mkConfiguration {
-                    inherit ecosystemSrc extraSpecialArgs;
+                    inherit ecosystemSrc specialArgs;
                     pkgSets = checkedPkgSets;
                     configModule =
                       if userArgs ? configModule then
@@ -392,13 +393,13 @@
                   useGlobalPkgs
                   useUserPackages
                   ;
-                # Framework defaults first; caller's extraSpecialArgs wins on conflict.
+                # Framework defaults first; caller's specialArgs wins on conflict.
                 # This is intentional and normal in the Nix ecosystem.
                 extraSpecialArgs = {
                   pkgSets = checkedPkgSets;
                   sourceMeta = resolvedSourceMeta;
                 }
-                // extraSpecialArgs;
+                // specialArgs;
                 # The extra entries mirror mkCommonArgs/standalone defaults so a
                 # hosted user generation evaluates to the same derivation as the
                 # standalone profile built from the same source.

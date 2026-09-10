@@ -24,22 +24,23 @@
 
       mkCommonArgs =
         args@{
-          modules ? [ ],
+          configModule,
           moduleImports ? builtins.attrValues,
-          extraArgs ? { },
+          specialArgs ? { },
           ...
         }:
         let
           selectedModules = moduleImports (final.caisson-core.modules.terranix or { });
         in
         {
-          modules = selectedModules ++ modules;
-          # Framework defaults first; caller's extraArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem.
+          modules = selectedModules ++ [ configModule ];
+          # Framework defaults first; caller's specialArgs wins on conflict.
+          # This is intentional and normal in the Nix ecosystem. terranix
+          # calls these extraArgs; the caisson surface uses one name.
           extraArgs = {
             inputs = closure-inputs;
           }
-          // extraArgs;
+          // specialArgs;
         };
 
       mkConfiguration =
@@ -55,9 +56,9 @@
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"
-            "extraArgs"
+            "configModule"
             "moduleImports"
-            "modules"
+            "specialArgs"
           ];
         in
         checkedEcosystemSrc.lib.terranixConfiguration (

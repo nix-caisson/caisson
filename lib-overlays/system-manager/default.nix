@@ -24,7 +24,7 @@
 
       mkCommonArgs =
         args@{
-          modules ? [ ],
+          configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
           ...
@@ -33,7 +33,7 @@
           selectedModules = moduleImports (final.caisson-core.modules.systemManager or { });
         in
         {
-          modules = selectedModules ++ modules;
+          modules = selectedModules ++ [ configModule ];
           # Framework defaults first; caller's specialArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem.
           specialArgs = {
@@ -55,7 +55,7 @@
           common = mkCommonArgs args;
           passthroughArgs = builtins.removeAttrs args [
             "ecosystemSrc"
-            "modules"
+            "configModule"
             "moduleImports"
             "specialArgs"
           ];
