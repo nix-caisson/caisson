@@ -1607,7 +1607,10 @@ in
           let
             myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
           in
-          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration {
+            configModule = { };
+            pkgSets.pkgs = { };
+          }).stubbed;
         expected = "declared";
       };
 
@@ -1619,6 +1622,7 @@ in
           (myLib.caisson.colmena.mkConfiguration {
             ecosystemSrc = colmenaStub "explicit";
             configModule = { };
+            pkgSets.pkgs = { };
           }).stubbed;
         expected = "explicit";
       };
@@ -1632,7 +1636,10 @@ in
               };
             };
           in
-          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration {
+            configModule = { };
+            pkgSets.pkgs = { };
+          }).stubbed;
         expected = "input";
       };
 
@@ -1646,14 +1653,20 @@ in
               ecosystems.colmena = colmenaStub "declared";
             };
           in
-          (myLib.caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration {
+            configModule = { };
+            pkgSets.pkgs = { };
+          }).stubbed;
         expected = "declared";
       };
 
       "test: a full miss throws at the adapter" = {
         expr =
           builtins.tryEval
-            ((mkResolutionLib { }).caisson.colmena.mkConfiguration { configModule = { }; }).stubbed;
+            ((mkResolutionLib { }).caisson.colmena.mkConfiguration {
+              configModule = { };
+              pkgSets.pkgs = { };
+            }).stubbed;
         expected = {
           success = false;
           value = false;
