@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkNixosModule = final.caisson-core.mkModule "nixos";
+      mkModule = final.caisson-core.mkModule "nixos";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "nixpkgs";
@@ -26,7 +26,7 @@
         if pkgSets ? pkgs then
           pkgSets
         else
-          throw "lib.caisson.nixos.mkSystem requires `pkgSets.pkgs` to be defined.";
+          throw "lib.caisson.nixos.mkConfiguration requires `pkgSets.pkgs` to be defined.";
 
       mkFrameworkModule = pkgSets: {
         _file = "caisson-nixos:framework";
@@ -67,7 +67,7 @@
           // specialArgs;
         };
 
-      mkSystem =
+      mkConfiguration =
         args@{
           ecosystemSrc ? null,
           ...
@@ -93,7 +93,7 @@
           }
         );
 
-      mkSystemFull =
+      mkConfigurationFull =
         args@{
           ecosystemSrc ? null,
           ...
@@ -120,7 +120,7 @@
           }
         );
 
-      mkSystemMinimal =
+      mkConfigurationMinimal =
         args@{
           ecosystemSrc ? null,
           prefix ? [ ],
@@ -141,10 +141,10 @@
       caisson = (prev.caisson or { }) // {
         nixos = ((prev.caisson or { }).nixos or { }) // {
           inherit
-            mkNixosModule
-            mkSystem
-            mkSystemMinimal
-            mkSystemFull
+            mkModule
+            mkConfiguration
+            mkConfigurationMinimal
+            mkConfigurationFull
             ;
         };
       };

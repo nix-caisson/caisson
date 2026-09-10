@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkColmenaModule = final.caisson-core.mkModule "colmena";
+      mkModule = final.caisson-core.mkModule "colmena";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "colmena";
@@ -20,7 +20,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeHive then
           ecosystemSrc
         else
-          throw "lib.caisson.colmena.mkColmenaHive requires `ecosystemSrc.lib.makeHive`.";
+          throw "lib.caisson.colmena.mkConfiguration requires `ecosystemSrc.lib.makeHive`.";
 
       mkCommonArgs =
         args@{
@@ -42,7 +42,7 @@
           // specialArgs;
         };
 
-      mkColmenaHive =
+      mkConfiguration =
         args@{
           ecosystemSrc ? null,
           ...
@@ -80,8 +80,8 @@
       caisson = (prev.caisson or { }) // {
         colmena = ((prev.caisson or { }).colmena or { }) // {
           inherit
-            mkColmenaHive
-            mkColmenaModule
+            mkConfiguration
+            mkModule
             ;
         };
       };

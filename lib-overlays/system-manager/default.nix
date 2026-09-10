@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkSystemManagerModule = final.caisson-core.mkModule "systemManager";
+      mkModule = final.caisson-core.mkModule "systemManager";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "system-manager";
@@ -20,7 +20,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
           ecosystemSrc
         else
-          throw "lib.caisson.system-manager.mkSystemConfig requires `ecosystemSrc.lib.makeSystemConfig`.";
+          throw "lib.caisson.system-manager.mkConfiguration requires `ecosystemSrc.lib.makeSystemConfig`.";
 
       mkCommonArgs =
         args@{
@@ -42,7 +42,7 @@
           // specialArgs;
         };
 
-      mkSystemConfig =
+      mkConfiguration =
         args@{
           ecosystemSrc ? null,
           ...
@@ -147,8 +147,8 @@
       caisson = (prev.caisson or { }) // {
         system-manager = ((prev.caisson or { }).system-manager or { }) // {
           inherit
-            mkSystemConfig
-            mkSystemManagerModule
+            mkConfiguration
+            mkModule
             ;
         };
       };

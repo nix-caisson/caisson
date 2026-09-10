@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkHomeManagerModule = final.caisson-core.mkModule "homeManager";
+      mkModule = final.caisson-core.mkModule "homeManager";
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
@@ -27,7 +27,7 @@
         if pkgSets ? pkgs then
           pkgSets
         else
-          throw "lib.caisson.home-manager.mkHomeConfiguration requires `pkgSets.pkgs` to be defined.";
+          throw "lib.caisson.home-manager.mkConfiguration requires `pkgSets.pkgs` to be defined.";
 
       resolveOutPath =
         value:
@@ -80,7 +80,7 @@
 
       mkSourceMetaModule =
         sourceMeta:
-        mkHomeManagerModule (
+        mkModule (
           { ... }:
           {
             config,
@@ -198,7 +198,7 @@
           evaluatorPath = "${hmSource}/modules";
         };
 
-      mkHomeConfiguration =
+      mkConfiguration =
         args:
         let
           common = mkCommonArgs args;
@@ -214,7 +214,7 @@
             ;
         };
 
-      mkHomeConfigurationMinimal = args: mkHomeConfiguration (args // { minimal = true; });
+      mkConfigurationMinimal = args: mkConfiguration (args // { minimal = true; });
 
       mkStandaloneAdapter =
         args@{
@@ -226,7 +226,7 @@
         in
         {
           homeModules = selectedModules;
-          buildHome = configModule: mkHomeConfiguration (args // { inherit configModule moduleImports; });
+          buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
       mkNixosAdapter =
@@ -317,7 +317,7 @@
             # a `users.users.<name>` entry (its injected defs dereference the
             # user record), and creating one would conflict with
             # systemd-homed's ownership of the account.  Instead each user is
-            # evaluated with the same standalone evaluator (mkHomeConfiguration)
+            # evaluated with the same standalone evaluator (mkConfiguration)
             # that `home-manager switch` uses (the embedded generation is the
             # standalone one by construction), and a complete /etc user unit
             # runs its activation when the user's service manager starts.
@@ -326,7 +326,7 @@
                 username = builtins.head (builtins.attrNames users);
                 userActivations = builtins.mapAttrs (
                   _username: userArgs:
-                  (mkHomeConfiguration {
+                  (mkConfiguration {
                     inherit ecosystemSrc extraSpecialArgs;
                     pkgSets = checkedPkgSets;
                     configModule =
@@ -466,9 +466,9 @@
         home-manager = ((prev.caisson or { }).home-manager or { }) // {
           inherit
             assertSourceCoherence
-            mkHomeConfiguration
-            mkHomeConfigurationMinimal
-            mkHomeManagerModule
+            mkConfiguration
+            mkConfigurationMinimal
+            mkModule
             mkNixosAdapter
             mkSourceMeta
             mkStandaloneAdapter

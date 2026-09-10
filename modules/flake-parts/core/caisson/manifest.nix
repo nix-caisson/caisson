@@ -2,7 +2,7 @@
 { lib, ... }:
 {
   options.caisson.manifest = lib.mkOption {
-    type = lib.caisson.types.manifest;
+    type = lib.caisson.flake-parts.types.manifest;
     readOnly = true;
     default = lib.caisson-core.manifest;
     defaultText = "the composed library's caisson-core.manifest";

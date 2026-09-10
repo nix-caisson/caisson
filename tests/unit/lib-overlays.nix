@@ -7,7 +7,7 @@ let
   # The passed lib is the composed library from the unit test flake,
   # carrying both framework namespaces: `caisson-core` (machinery,
   # registry, manifest) and `caisson` (the integrations).
-  mkFlakeModule = lib.caisson.mkFlakeModule;
+  mkFlakePartsModule = lib.caisson.flake-parts.mkModule;
   mkLibOverlay = lib.caisson-core.mkLibOverlay;
   mkModule = lib.caisson-core.mkModule;
 
@@ -18,7 +18,7 @@ let
 
   # Test-facing mkLib: registers the flake-parts integration into
   # every test composition (so composed test libraries carry
-  # caisson.mkFlake), and otherwise defers to caisson-core.mkLib.
+  # caisson.flake-parts.mkConfiguration), and otherwise defers to caisson-core.mkLib.
   # Malformed arguments pass through untouched so the machinery's own
   # shape errors stay observable.
   testMkLib =
@@ -242,7 +242,7 @@ in
               hasSelfModules = builtins.isAttrs closure-self-modules;
               hasMkMod = builtins.isFunction mkModule;
             };
-          result = mkFlakeModule module;
+          result = mkFlakePartsModule module;
           evaluated = result { config = { }; };
         in
         evaluated.hasInputs && evaluated.hasLib && evaluated.hasSelfModules && evaluated.hasMkMod;
@@ -258,14 +258,14 @@ in
             {
               ok = true;
             };
-          evaluated = (mkFlakeModule module) { config = { }; };
+          evaluated = (mkFlakePartsModule module) { config = { }; };
         in
         evaluated.ok;
       expected = true;
     };
 
     "test: throws on a plain attrset module" = {
-      expr = builtins.tryEval (mkFlakeModule {
+      expr = builtins.tryEval (mkFlakePartsModule {
         options = { };
       });
       expected = {
@@ -280,7 +280,7 @@ in
           modulePath = builtins.toFile "mk-module-path-module.nix" ''
             { ... }: { config, ... }: { ok = true; }
           '';
-          result = mkFlakeModule modulePath;
+          result = mkFlakePartsModule modulePath;
         in
         {
           file = builtins.toString result._file;
@@ -306,8 +306,8 @@ in
           modulePath = builtins.toFile "mk-module-dedup-module.nix" ''
             { ... }: { config, ... }: { ok = true; }
           '';
-          a = mkFlakeModule modulePath;
-          b = mkFlakeModule modulePath;
+          a = mkFlakePartsModule modulePath;
+          b = mkFlakePartsModule modulePath;
         in
         a.key == b.key;
       expected = true;
@@ -326,7 +326,7 @@ in
             _file = "test-wrapper";
             imports = [ innerModule ];
           };
-          result = mkFlakeModule wrapped;
+          result = mkFlakePartsModule wrapped;
         in
         builtins.isAttrs result && builtins.hasAttr "_file" result && builtins.hasAttr "imports" result;
       expected = true;
@@ -414,7 +414,7 @@ in
       };
     };
 
-    "test: mkFlakeModule is equivalent to mkModule \"flake\"" = {
+    "test: flake-parts.mkModule is equivalent to mkModule \"flake\"" = {
       expr =
         let
           module =
@@ -439,7 +439,7 @@ in
                   { config = { }; };
             };
 
-          viaAlias = (caisson.mkFlakeModule module) { config = { }; };
+          viaAlias = (caisson.flake-parts.mkModule module) { config = { }; };
           viaFactory = ((caisson.mkModule "flake") module) { config = { }; };
         in
         {
@@ -918,13 +918,13 @@ in
             inputs = mockInputs;
             modules = callbackLib: {
               flake = {
-                inspect = callbackLib.caisson.mkFlakeModule (
+                inspect = callbackLib.caisson.flake-parts.mkModule (
                   { ... }:
                   {
                     flake.inspect = {
                       hasNamespace = callbackLib ? caisson;
                       hasMkModule = builtins.isFunction callbackLib.caisson-core.mkModule;
-                      hasMkFlakeModule = builtins.isFunction callbackLib.caisson.mkFlakeModule;
+                      hasMkFlakeModule = builtins.isFunction callbackLib.caisson.flake-parts.mkModule;
                       hasMkLibOverlay = builtins.isFunction callbackLib.caisson-core.mkLibOverlay;
                       hasImportApply = builtins.isFunction callbackLib.caisson-core.importApply;
                     };
@@ -933,8 +933,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -970,7 +970,7 @@ in
             };
             modules = callbackLib: {
               flake = {
-                inspect = callbackLib.caisson.mkFlakeModule (
+                inspect = callbackLib.caisson.flake-parts.mkModule (
                   { ... }:
                   {
                     flake.callbackSawOverlay = callbackLib.fromCallbackOverlay or "missing";
@@ -979,8 +979,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1010,7 +1010,7 @@ in
             };
             modules = callbackLib: {
               flake = {
-                inspect = callbackLib.caisson.mkFlakeModule (
+                inspect = callbackLib.caisson.flake-parts.mkModule (
                   { ... }:
                   { lib, ... }:
                   {
@@ -1023,8 +1023,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1040,7 +1040,7 @@ in
       };
     };
 
-    "test: modules.flake attrset receives working modules in mkFlake" = {
+    "test: modules.flake attrset receives working modules in flake-parts.mkConfiguration" = {
       expr =
         let
           myLib = mkTestLib {
@@ -1065,14 +1065,14 @@ in
       expected = true;
     };
 
-    "test: modules registered via lib aliases work in mkFlake" = {
+    "test: modules registered via lib aliases work in flake-parts.mkConfiguration" = {
       expr =
         let
           myLib = caisson.mkLib {
             inputs = mockInputs;
             modules = callbackLib: {
               flake = {
-                fromAlias = callbackLib.caisson.mkFlakeModule (
+                fromAlias = callbackLib.caisson.flake-parts.mkModule (
                   { ... }:
                   {
                     flake.fromAlias = true;
@@ -1081,8 +1081,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1154,7 +1154,7 @@ in
             };
             modules = runtimeLib: {
               flake = {
-                inspect = runtimeLib.caisson.mkFlakeModule (
+                inspect = runtimeLib.caisson.flake-parts.mkModule (
                   { ... }:
                   { lib, ... }:
                   {
@@ -1167,8 +1167,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1261,11 +1261,11 @@ in
     };
   };
 
-  mkFlake = {
+  flake-parts-mkConfiguration = {
     "test: rejects inputs arg via hasAttr guard" = {
-      # mkFlake uses builtins.abort (not throw) when inputs is present,
+      # flake-parts.mkConfiguration uses builtins.abort (not throw) when inputs is present,
       # so tryEval cannot catch it. Instead we test the guard condition
-      # directly: mkFlake checks builtins.hasAttr "inputs" args.
+      # directly: flake-parts.mkConfiguration checks builtins.hasAttr "inputs" args.
       expr = builtins.hasAttr "inputs" {
         inputs = { };
         configModule = { };
@@ -1279,7 +1279,7 @@ in
     };
 
     "test: filteredArgs strips reserved keys" = {
-      # mkFlake removes configModule, modules, and moduleImports before
+      # flake-parts.mkConfiguration removes configModule, modules, and moduleImports before
       # forwarding to flake-parts. Verify the stripping logic in isolation.
       expr =
         let
@@ -1313,7 +1313,7 @@ in
     };
 
     "test: specialArgs merges with user-provided specialArgs" = {
-      # mkFlake merges { lib = final; } with any specialArgs the caller provides.
+      # flake-parts.mkConfiguration merges { lib = final; } with any specialArgs the caller provides.
       expr =
         let
           filteredArgs = {
@@ -1410,8 +1410,8 @@ in
             };
           };
 
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1443,8 +1443,8 @@ in
             };
           };
 
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1457,7 +1457,7 @@ in
       expected = true;
     };
 
-    "test: mkFlake works when modules.flake is absent" = {
+    "test: flake-parts.mkConfiguration works when modules.flake is absent" = {
       expr =
         let
           myLib = caisson.mkLib {
@@ -1468,8 +1468,8 @@ in
               };
             };
           };
-          outputs = myLib.caisson.mkFlake {
-            configModule = myLib.caisson.mkFlakeModule (
+          outputs = myLib.caisson.flake-parts.mkConfiguration {
+            configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
                 systems = [ "x86_64-linux" ];
@@ -1494,7 +1494,7 @@ in
     "test: mkModule with null throws" = {
       # null is not a function taking the closure attrset; plain values must
       # be imported/registered directly, so mkModule rejects them loudly.
-      expr = builtins.tryEval (mkFlakeModule null);
+      expr = builtins.tryEval (mkFlakePartsModule null);
       expected = {
         success = false;
         value = false;
@@ -1504,12 +1504,14 @@ in
 
   types = {
     "test: libOverlay type accepts a built overlay" = {
-      expr = caisson.types.libOverlay.check (mkLibOverlay ({ ... }: { overlay = final: prev: { }; }));
+      expr = caisson.flake-parts.types.libOverlay.check (
+        mkLibOverlay ({ ... }: { overlay = final: prev: { }; })
+      );
       expected = true;
     };
 
     "test: libOverlay type accepts nested imports" = {
-      expr = caisson.types.libOverlay.check {
+      expr = caisson.flake-parts.types.libOverlay.check {
         imports = [
           {
             imports = [ ];
@@ -1522,12 +1524,12 @@ in
     };
 
     "test: libOverlay type rejects a bare overlay function" = {
-      expr = caisson.types.libOverlay.check (final: prev: { });
+      expr = caisson.flake-parts.types.libOverlay.check (final: prev: { });
       expected = false;
     };
 
     "test: libOverlay type rejects a malformed import" = {
-      expr = caisson.types.libOverlay.check {
+      expr = caisson.flake-parts.types.libOverlay.check {
         imports = [ (final: prev: { }) ];
         overlay = final: prev: { };
       };
@@ -1588,7 +1590,7 @@ in
           let
             myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
           in
-          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
         expected = "declared";
       };
 
@@ -1597,7 +1599,7 @@ in
           let
             myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
           in
-          (myLib.caisson.colmena.mkColmenaHive { ecosystemSrc = colmenaStub "explicit"; }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { ecosystemSrc = colmenaStub "explicit"; }).stubbed;
         expected = "explicit";
       };
 
@@ -1610,7 +1612,7 @@ in
               };
             };
           in
-          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
         expected = "input";
       };
 
@@ -1624,12 +1626,12 @@ in
               ecosystems.colmena = colmenaStub "declared";
             };
           in
-          (myLib.caisson.colmena.mkColmenaHive { }).stubbed;
+          (myLib.caisson.colmena.mkConfiguration { }).stubbed;
         expected = "declared";
       };
 
       "test: a full miss throws at the adapter" = {
-        expr = builtins.tryEval ((mkResolutionLib { }).caisson.colmena.mkColmenaHive { }).stubbed;
+        expr = builtins.tryEval ((mkResolutionLib { }).caisson.colmena.mkConfiguration { }).stubbed;
         expected = {
           success = false;
           value = false;

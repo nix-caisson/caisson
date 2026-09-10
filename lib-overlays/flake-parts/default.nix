@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake-parts integration: projecting a composition into flake
-# outputs. A peer of the other integrations, it carries mkFlake, the
-# `flake` module class (mkFlakeModule), the option types (option
+# outputs. A peer of the other integrations, it carries mkConfiguration, the
+# `flake` module class (mkModule), the option types (option
 # types are this integration's medium), the export machinery (the
 # core flake-parts module reads the composition's manifest at
 # `caisson-core.manifest` and projects the `libOverlays` and
@@ -30,7 +30,9 @@
         && builtins.isList (v.imports or [ ])
         && builtins.all isLibOverlay (v.imports or [ ]);
 
-      types = ((prev.caisson or { }).types or { }) // {
+      prevNs = (prev.caisson or { }).flake-parts or { };
+
+      types = (prevNs.types or { }) // {
 
         libOverlay = final.mkOptionType {
           name = "libOverlay";
@@ -60,7 +62,7 @@
 
       };
 
-      mkFlake =
+      mkConfiguration =
         args@{
 
           configModule,
@@ -85,13 +87,13 @@
         }:
         (
           if builtins.hasAttr "inputs" args then
-            builtins.abort "inputs were passed to mkFlake. This is an easy mistake to make, but they should be passed to mkLib."
+            builtins.abort "inputs were passed to lib.caisson.flake-parts.mkConfiguration. This is an easy mistake to make, but they should be passed to mkLib."
           else
             let
 
               manifest =
                 final.caisson-core.manifest or (throw ''
-                  caisson.mkFlake projects a composition's manifest into flake
+                  caisson.flake-parts.mkConfiguration projects a composition's manifest into flake
                   outputs, but this composed library carries no manifest at
                   `caisson-core.manifest`. Compose the library with
                   caisson-core.mkLib, which captures one.
@@ -143,8 +145,10 @@
     {
 
       caisson = (prev.caisson or { }) // {
-        inherit mkFlake types;
-        mkFlakeModule = final.caisson-core.mkModule "flake";
+        flake-parts = prevNs // {
+          inherit mkConfiguration types;
+          mkModule = final.caisson-core.mkModule "flake";
+        };
       };
 
       flake-parts = (prev.flake-parts or { }) // closure-inputs.flake-parts.lib;

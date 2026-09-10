@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkTerranixModule = final.caisson-core.mkModule "terranix";
+      mkModule = final.caisson-core.mkModule "terranix";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "terranix";
@@ -20,7 +20,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? terranixConfiguration then
           ecosystemSrc
         else
-          throw "lib.caisson.terranix.mkTerranixConfiguration requires `ecosystemSrc.lib.terranixConfiguration`.";
+          throw "lib.caisson.terranix.mkConfiguration requires `ecosystemSrc.lib.terranixConfiguration`.";
 
       mkCommonArgs =
         args@{
@@ -42,7 +42,7 @@
           // extraArgs;
         };
 
-      mkTerranixConfiguration =
+      mkConfiguration =
         args@{
           ecosystemSrc ? null,
           ...
@@ -74,8 +74,8 @@
       caisson = (prev.caisson or { }) // {
         terranix = ((prev.caisson or { }).terranix or { }) // {
           inherit
-            mkTerranixConfiguration
-            mkTerranixModule
+            mkConfiguration
+            mkModule
             ;
         };
       };
