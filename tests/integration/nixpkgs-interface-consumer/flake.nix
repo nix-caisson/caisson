@@ -24,8 +24,8 @@
         };
       };
     in
-    lib.caisson.mkFlake {
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/nixpkgs-interface-consumer;
+    lib.caisson.flake-parts.mkConfiguration {
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-interface-consumer;
 
       # Interface only: the registry option without the package-set
       # machinery.

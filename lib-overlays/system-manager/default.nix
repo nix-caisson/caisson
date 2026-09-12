@@ -7,7 +7,7 @@
   overlay =
     final: prev:
     let
-      mkSystemManagerModule = final.caisson-core.mkModule "systemManager";
+      mkModule = final.caisson-core.mkModule "systemManager";
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
         name = "system-manager";
@@ -20,45 +20,75 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
           ecosystemSrc
         else
-          throw "lib.caisson.system-manager.mkSystemConfig requires `ecosystemSrc.lib.makeSystemConfig`.";
+          throw "lib.caisson.system-manager.mkConfiguration requires `ecosystemSrc.lib.makeSystemConfig`.";
 
       mkCommonArgs =
         args@{
-          modules ? [ ],
+          configModule,
           moduleImports ? builtins.attrValues,
           specialArgs ? { },
+          pkgSets ? null,
           ...
         }:
         let
           selectedModules = moduleImports (final.caisson-core.modules.systemManager or { });
+          # system-manager instantiates its own nixpkgs from
+          # `nixpkgs.hostPlatform`; a supplied package set seeds that
+          # platform (an explicit hostPlatform wins) and rides along as
+          # the `pkgSets` module argument.
+          pkgSetsModule =
+            if pkgSets != null && pkgSets ? pkgs then
+              [
+                {
+                  _file = "caisson-system-manager:pkgSets";
+                  nixpkgs.hostPlatform = final.mkDefault pkgSets.pkgs.stdenv.hostPlatform.system;
+                }
+              ]
+            else
+              [ ];
         in
         {
-          modules = selectedModules ++ modules;
+          modules = selectedModules ++ pkgSetsModule ++ [ configModule ];
           # Framework defaults first; caller's specialArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem.
           specialArgs = {
             inputs = closure-inputs;
           }
+          // (if pkgSets != null then { inherit pkgSets; } else { })
           // specialArgs;
         };
 
-      mkSystemConfig =
-        args@{
-          ecosystemSrc ? null,
-          ...
-        }:
+      accepted = [
+        "ecosystemSrc"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+        "pkgSets"
+      ];
+      hints = {
+        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+      };
+      checkArgs = import ../check-args.nix {
+        context = "lib.caisson.system-manager.mkConfiguration";
+        inherit accepted hints;
+        open = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
+      };
+      checkOpenArgs = import ../check-args.nix {
+        context = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
+        accepted = accepted ++ [ "ecosystemArgs" ];
+        inherit hints;
+      };
+      # makeSystemConfig's arguments, composed from the caisson arguments,
+      # plus the compatibility bridge below.
+      compose =
+        args:
         let
           checkedEcosystemSrc = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
-            explicit = ecosystemSrc;
+            explicit = args.ecosystemSrc or null;
             manifest = final.caisson-core.manifest or { };
           });
           common = mkCommonArgs args;
-          passthroughArgs = builtins.removeAttrs args [
-            "ecosystemSrc"
-            "modules"
-            "moduleImports"
-            "specialArgs"
-          ];
 
           # system-manager imports selected NixOS modules from its own
           # nixpkgs input; current nixos-unstable restructured
@@ -135,20 +165,42 @@
             final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
             ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
         in
-        checkedEcosystemSrc.lib.makeSystemConfig (
-          passthroughArgs
-          // {
+        {
+          inherit checkedEcosystemSrc;
+          ecosystemArgs = {
             inherit (common) specialArgs;
             modules = common.modules ++ compatModules;
-          }
+          };
+        };
+
+      mkConfiguration =
+        rawArgs:
+        let
+          composed = compose (checkArgs rawArgs);
+        in
+        composed.checkedEcosystemSrc.lib.makeSystemConfig composed.ecosystemArgs;
+
+      # The same composition, then `ecosystemArgs` merged over the
+      # evaluator call verbatim: everything makeSystemConfig takes
+      # (modules, overlays, specialArgs, allowUnsupportedNixpkgs) can be
+      # set or replaced there.
+      mkConfigurationWithEcosystemArgs =
+        rawArgs:
+        let
+          args = checkOpenArgs rawArgs;
+          composed = compose args;
+        in
+        composed.checkedEcosystemSrc.lib.makeSystemConfig (
+          composed.ecosystemArgs // (args.ecosystemArgs or { })
         );
     in
     {
       caisson = (prev.caisson or { }) // {
         system-manager = ((prev.caisson or { }).system-manager or { }) // {
           inherit
-            mkSystemConfig
-            mkSystemManagerModule
+            mkConfiguration
+            mkConfigurationWithEcosystemArgs
+            mkModule
             ;
         };
       };
