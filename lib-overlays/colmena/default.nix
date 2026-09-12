@@ -4,18 +4,18 @@
 # deployment metadata, and colmena's binary reads it through a small
 # versioned attrset (the hive schema).
 #
-# mkNixosConfiguration evaluates a node: lib.caisson.nixos's
-# composition plus colmena's public node modules (deploymentOptions,
-# keyChownModule, keyServiceModule, assertionModule) from the colmena
-# ecosystem source, with nixos.mkConfiguration's signature. The
-# result is an ordinary NixOS configuration that also declares
-# `deployment`, so `nixosConfigurations.<host>` and the hive node can
-# be one evaluation.
-#
 # mkConfiguration evaluates the hive: a module of class `colmena` with
-# `meta` (the metadata colmena's binary reads) and `nodes.<name>`
-# (configurations from mkNixosConfiguration), projected onto the
-# schema. Projects can contribute hive modules through the registry
+# `meta` (the metadata colmena's binary reads) and `nodes.<name>`,
+# projected onto the schema. The hive module receives
+# `mkNixosConfiguration` as a module argument, closed over the hive's
+# colmena source: lib.caisson.nixos's composition plus colmena's public
+# node modules (deploymentOptions, keyChownModule, keyServiceModule,
+# assertionModule), with nixos.mkConfiguration's signature, so its
+# `ecosystemSrc` is nixpkgs as for any NixOS configuration. A node is
+# an ordinary NixOS configuration that also declares `deployment`; a
+# consumer that exports it as `nixosConfigurations.<host>` reads it
+# back from the hive, one evaluation for nixos-rebuild and colmena
+# apply. Projects can contribute hive modules through the registry
 # like any other class.
 { ... }:
 {
@@ -83,42 +83,44 @@
         deployment = "set `deployment.*` in the host's configModule; the node declares those options.";
       };
       checkNodeArgs = import ../check-args.nix {
-        context = "lib.caisson.colmena.mkNixosConfiguration";
+        context = "mkNixosConfiguration (the hive module argument)";
         accepted = nodeAccepted;
         hints = nodeHints;
-        open = "lib.caisson.colmena.mkNixosConfigurationWithEcosystemArgs";
+        open = "mkNixosConfigurationWithEcosystemArgs";
       };
       checkOpenNodeArgs = import ../check-args.nix {
-        context = "lib.caisson.colmena.mkNixosConfigurationWithEcosystemArgs";
+        context = "mkNixosConfigurationWithEcosystemArgs (the hive module argument)";
         accepted = nodeAccepted ++ [ "ecosystemArgs" ];
         hints = nodeHints;
       };
 
-      # A node: nixos.mkConfiguration over the host's module plus the
-      # deployment module. `ecosystemSrc` is colmena's here; nixpkgs
-      # resolves as nixos.mkConfiguration resolves it without an
-      # explicit source (the declared `ecosystems.nixpkgs`, else the
-      # input named nixpkgs).
-      nodeArgsOf =
-        args:
+      # The node constructors a hive module receives, closed over the
+      # hive's colmena source: nixos.mkConfiguration over the host's
+      # module plus the deployment module. Their `ecosystemSrc` is
+      # nixpkgs, as for any NixOS configuration.
+      mkNodeConstructors =
+        src:
         let
-          src = assertColmenaEcosystemSrc (resolveSrc (args.ecosystemSrc or null));
+          nodeArgsOf =
+            args:
+            args
+            // {
+              configModule = {
+                _file = "caisson-colmena:node";
+                imports = [
+                  args.configModule
+                  (mkDeploymentModule src)
+                ];
+              };
+            };
         in
-        builtins.removeAttrs args [ "ecosystemSrc" ]
-        // {
-          configModule = {
-            _file = "caisson-colmena:node";
-            imports = [
-              args.configModule
-              (mkDeploymentModule src)
-            ];
-          };
+        {
+          mkNixosConfiguration =
+            rawArgs: final.caisson.nixos.mkConfiguration (nodeArgsOf (checkNodeArgs rawArgs));
+          mkNixosConfigurationWithEcosystemArgs =
+            rawArgs:
+            final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf (checkOpenNodeArgs rawArgs));
         };
-      mkNixosConfiguration =
-        rawArgs: final.caisson.nixos.mkConfiguration (nodeArgsOf (checkNodeArgs rawArgs));
-      mkNixosConfigurationWithEcosystemArgs =
-        rawArgs:
-        final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf (checkOpenNodeArgs rawArgs));
 
       # The hive's options. `meta` mirrors the keys colmena's binary
       # reads (its metaOptions also declare per-node package sets and
@@ -154,7 +156,7 @@
             nodes = lib.mkOption {
               type = lib.types.attrsOf lib.types.raw;
               default = { };
-              description = "The hive's nodes: NixOS configurations from lib.caisson.colmena.mkNixosConfiguration.";
+              description = "The hive's nodes: NixOS configurations from the hive module's `mkNixosConfiguration` argument.";
             };
           };
         };
@@ -170,7 +172,7 @@
         modules = "pass the hive module as `configModule`; registered colmena-class modules are selected with `moduleImports`.";
         meta = "hive metadata is the hive module's `meta`.";
         nodes = "the nodes are the hive module's `nodes`.";
-        defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (mkNixosConfiguration); select shared modules there.";
+        defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
         network = "hive metadata is the hive module's `meta`.";
       };
       checkArgs = import ../check-args.nix {
@@ -190,7 +192,7 @@
           node
         else
           throw ''
-            lib.caisson.colmena.mkConfiguration: nodes.${name} is not a colmena node. Evaluate the host with lib.caisson.colmena.mkNixosConfiguration.
+            lib.caisson.colmena.mkConfiguration: nodes.${name} is not a colmena node. Evaluate the host with the hive module's `mkNixosConfiguration` argument.
           '';
 
       compose =
@@ -209,7 +211,8 @@
             (final.evalModules {
               class = "colmena";
               modules = [ hiveOptions ] ++ selectedModules ++ [ configModule ];
-              specialArgs = (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
+              specialArgs =
+                mkNodeConstructors src // (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
             }).config;
           nodes = builtins.mapAttrs checkNode hive.nodes;
           upstreamSchema = (src.lib.makeHive { }).__schema;
@@ -259,8 +262,6 @@
           inherit
             mkConfiguration
             mkConfigurationWithEcosystemArgs
-            mkNixosConfiguration
-            mkNixosConfigurationWithEcosystemArgs
             ;
         };
       };
