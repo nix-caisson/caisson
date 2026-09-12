@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# The composition every NixOS evaluation caisson performs shares: the
-# nixos integration's entry points and the colmena integration's hive
-# nodes (NixOS configurations that colmena evaluates). One definition,
-# so the two cannot express different machines from the same arguments.
+# The composition the nixos integration's entry points share: one
+# definition of the module list and special arguments, so the variants
+# cannot express different machines from the same arguments.
 { final }:
 let
   assertPkgSets =

@@ -1577,15 +1577,16 @@ in
 
   ecosystemResolution =
     let
-      # A minimal colmena "ecosystem": the adapter only needs
-      # lib.makeHive, so a stub shows which channel resolution chose.
-      colmenaStub = probe: {
-        lib.makeHive = hiveArgs: {
+      # A minimal terranix "ecosystem": the adapter only needs
+      # lib.terranixConfiguration, so a stub shows which channel
+      # resolution chose.
+      terranixStub = probe: {
+        lib.terranixConfiguration = evaluatorArgs: {
           stubbed = probe;
-          inherit hiveArgs;
+          inherit evaluatorArgs;
         };
       };
-      # Test compositions register caisson's real colmena integration
+      # Test compositions register caisson's real terranix integration
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
       # registration.
@@ -1595,7 +1596,7 @@ in
           {
             inputs = mockInputs;
             libOverlays = _mkLibOverlay: {
-              colmena = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/colmena");
+              terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
             };
           }
           // extra
@@ -1605,9 +1606,9 @@ in
       "test: a declared ecosystem resolves for an adapter" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.colmena.mkConfiguration {
+          (myLib.caisson.terranix.mkConfiguration {
             configModule = { };
             pkgSets.pkgs = { };
           }).stubbed;
@@ -1617,10 +1618,10 @@ in
       "test: an explicit ecosystemSrc beats the declaration" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.colmena.mkConfiguration {
-            ecosystemSrc = colmenaStub "explicit";
+          (myLib.caisson.terranix.mkConfiguration {
+            ecosystemSrc = terranixStub "explicit";
             configModule = { };
             pkgSets.pkgs = { };
           }).stubbed;
@@ -1632,11 +1633,11 @@ in
           let
             myLib = mkResolutionLib {
               inputs = mockInputs // {
-                colmena = colmenaStub "input";
+                terranix = terranixStub "input";
               };
             };
           in
-          (myLib.caisson.colmena.mkConfiguration {
+          (myLib.caisson.terranix.mkConfiguration {
             configModule = { };
             pkgSets.pkgs = { };
           }).stubbed;
@@ -1648,12 +1649,12 @@ in
           let
             myLib = mkResolutionLib {
               inputs = mockInputs // {
-                colmena = colmenaStub "input";
+                terranix = terranixStub "input";
               };
-              ecosystems.colmena = colmenaStub "declared";
+              ecosystems.terranix = terranixStub "declared";
             };
           in
-          (myLib.caisson.colmena.mkConfiguration {
+          (myLib.caisson.terranix.mkConfiguration {
             configModule = { };
             pkgSets.pkgs = { };
           }).stubbed;
@@ -1663,7 +1664,7 @@ in
       "test: a full miss throws at the adapter" = {
         expr =
           builtins.tryEval
-            ((mkResolutionLib { }).caisson.colmena.mkConfiguration {
+            ((mkResolutionLib { }).caisson.terranix.mkConfiguration {
               configModule = { };
               pkgSets.pkgs = { };
             }).stubbed;
@@ -1676,9 +1677,9 @@ in
       "test: declarations join the manifest" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.colmena = colmenaStub "declared"; };
+            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson-core.manifest.ecosystems.colmena.lib.makeHive { }).stubbed;
+          (myLib.caisson-core.manifest.ecosystems.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
       };
     };
