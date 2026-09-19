@@ -30,8 +30,8 @@ fit together instead of colliding.
 
 ## Quick start
 
-Use `caisson-core.mkLib` to compose your library, then `mkFlake` to
-produce the flake outputs. By convention, your primary configuration
+Use `caisson-core.mkLib` to compose your library, then
+`lib.caisson.flake-parts.mkConfiguration` to produce the flake outputs. By convention, your primary configuration
 lives in `configs/flake-parts/<flake-name>`.
 
 ```nix
@@ -43,7 +43,7 @@ lives in `configs/flake-parts/<flake-name>`.
 
       # Compose a library: the machinery lands under lib.caisson-core,
       # and caisson's flake-parts integration overlay contributes
-      # lib.caisson (mkFlake and friends).
+      # lib.caisson (one namespace per integration target).
       lib = caisson.lib.caisson-core.mkLib {
         inherit inputs;
 
@@ -52,8 +52,8 @@ lives in `configs/flake-parts/<flake-name>`.
           flake = {
             # The flake-parts modules this flake defines: closed over your
             # inputs, importable here, exportable to downstream consumers.
-            default = lib.caisson.mkFlakeModule ./modules/flake-parts/default;
-            # other = lib.caisson.mkFlakeModule inputs.other-flake.flakeModules.default;
+            default = lib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
+            # other = lib.caisson.flake-parts.mkModule inputs.other-flake.flakeModules.default;
           };
         };
 
@@ -71,10 +71,10 @@ lives in `configs/flake-parts/<flake-name>`.
 
       };
 
-    in lib.caisson.mkFlake {
+    in lib.caisson.flake-parts.mkConfiguration {
 
       # Convention: your primary config lives in configs/flake-parts/<flake-name>
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/my-flake;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/my-flake;
 
       # Select which modules (yours or your dependencies') this flake composes.
       moduleImports = modules: { inherit (modules) default; };

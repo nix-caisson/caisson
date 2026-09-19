@@ -24,9 +24,9 @@
         };
       };
     in
-    lib.caisson.mkFlake {
+    lib.caisson.flake-parts.mkConfiguration {
       # The default moduleImports selects every registered flake module,
       # so the nixpkgs machinery arrives through the projects channel.
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/nixpkgs-consumer;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-consumer;
     };
 }

@@ -5,7 +5,7 @@
 
     export.enabled = lib.mkEnableOption "lib overlay export";
     exported = lib.mkOption {
-      type = lib.types.functionTo (lib.types.attrsOf lib.caisson.types.libOverlay);
+      type = lib.types.functionTo (lib.types.attrsOf lib.caisson.flake-parts.types.libOverlay);
       description = ''
         Function that selects which registered library overlays to export as
         flake outputs. Receives the set of overlays registered via `mkLib`

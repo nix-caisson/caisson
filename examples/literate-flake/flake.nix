@@ -56,7 +56,7 @@
           project's exported overlays and modules become available under
           `<project>/<name>`, and the usual selections pick from them per
           item. Registering caisson this way brings in its integrations
-          (`lib.caisson`, mkFlake included) and its exported modules.
+          (`lib.caisson`, the flake-parts one included) and its exported modules.
         - `modules` is a function from the composed `lib`, used to register
           this flake's own class-keyed modules.
         - `libOverlays` is a function from an input-closed `mkLibOverlay`
@@ -73,7 +73,7 @@
 
         modules = lib: {
           # Demonstrate class-keyed module registration.
-          # This class is not imported by mkFlake in this example.
+          # This class is not imported by the flake-parts mkConfiguration in this example.
           generic = {
             noop = lib.caisson-core.mkModule "generic" ({ ... }: { });
           };
@@ -82,7 +82,7 @@
             # takes the closure attrset ({ closure-inputs, closure-lib,
             # mkModule, ... }) as its first arg list; files that don't need it
             # take `{ ... }:`.
-            default = lib.caisson.mkFlakeModule ./modules/flake-parts/default;
+            default = lib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
           };
         };
 
@@ -96,7 +96,7 @@
     /*
       Step 2: Create the flake outputs.
 
-      `mkFlake` wraps flake-parts' mkFlake, injecting the framework's core
+      `lib.caisson.flake-parts.mkConfiguration` wraps flake-parts' mkFlake, injecting the framework's core
       module and threading `lib` as a special arg so modules receive
       the fully composed library.
 
@@ -108,8 +108,8 @@
         ("caisson/default" is caisson's default module, providing
         configInfo and the export options).
     */
-    lib.caisson.mkFlake {
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/literate-flake;
+    lib.caisson.flake-parts.mkConfiguration {
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/literate-flake;
 
       moduleImports = modules: [
         modules."caisson/default"

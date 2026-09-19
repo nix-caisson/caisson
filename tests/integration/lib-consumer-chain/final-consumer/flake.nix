@@ -27,7 +27,7 @@
         };
       };
     in
-    lib.caisson.mkFlake {
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/final-consumer;
+    lib.caisson.flake-parts.mkConfiguration {
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/final-consumer;
     };
 }

@@ -35,8 +35,8 @@
       };
 
     in
-    lib.caisson.mkFlake {
+    lib.caisson.flake-parts.mkConfiguration {
       # Convention: config lives in configs/flake-parts/<name>
-      configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/basic-composition;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/basic-composition;
     };
 }

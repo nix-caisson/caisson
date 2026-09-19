@@ -70,7 +70,7 @@
 
           modules = composedLib: {
             flake = {
-              default = composedLib.caisson.mkFlakeModule ./modules/flake-parts/default;
+              default = composedLib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
               # flake-parts' partitions module, registered so consumers
               # can select it from the registry instead of declaring a
               # flake-parts input of their own.
@@ -79,8 +79,8 @@
               # registry (nixpkgs-interface) and the package-set
               # machinery that reifies `caisson.nixpkgs.pkgSets` per
               # system (nixpkgs, which imports the interface).
-              nixpkgs = composedLib.caisson.mkFlakeModule ./modules/flake-parts/nixpkgs;
-              nixpkgs-interface = composedLib.caisson.mkFlakeModule ./modules/flake-parts/nixpkgs-interface;
+              nixpkgs = composedLib.caisson.flake-parts.mkModule ./modules/flake-parts/nixpkgs;
+              nixpkgs-interface = composedLib.caisson.flake-parts.mkModule ./modules/flake-parts/nixpkgs-interface;
             };
           };
 
@@ -100,11 +100,11 @@
       in
       let
 
-        flakeOutputs = lib.caisson.mkFlake {
+        flakeOutputs = lib.caisson.flake-parts.mkConfiguration {
 
           name = "caisson";
 
-          configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/caisson;
+          configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/caisson;
 
           moduleImports = modules: [
             modules.default

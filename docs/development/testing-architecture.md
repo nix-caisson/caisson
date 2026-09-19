@@ -150,8 +150,8 @@ lib = inputs.caisson-core.lib.caisson-core.mkLib {
   };
 };
 
-lib.caisson.mkFlake {
-  configModule = lib.caisson.mkFlakeModule ./configs/flake-parts/unit-tests;
+lib.caisson.flake-parts.mkConfiguration {
+  configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/unit-tests;
 };
 ```
 
@@ -163,7 +163,7 @@ overlay files register from that path because a flake cannot reference files
 outside its own source tree.
 
 The tests are not only testing library functions in isolation; the composition
-and `mkFlake` path is the same one a downstream consumer exercises, so they
+and `lib.caisson.flake-parts.mkConfiguration` path is the same one a downstream consumer exercises, so they
 verify that the framework's composition machinery works end-to-end.
 
 ### nix-unit integration
@@ -213,7 +213,7 @@ appear to a consumer.
 ### Purpose
 
 Integration test flakes verify that caisson works correctly when consumed as a
-dependency: that `mkLib`, `mkFlake`, class-keyed module registration, and
+dependency: that `mkLib`, `lib.caisson.flake-parts.mkConfiguration`, class-keyed module registration, and
 module composition behave as expected from a consumer's perspective.
 
 ### Structure
@@ -222,7 +222,7 @@ Each integration test is a standalone flake under `tests/integration/<name>/` th
 
 1. Takes `parent` (caisson's evaluated outputs, from the pool) as an input
 2. Calls `parent.lib.caisson-core.mkLib { inherit inputs; ... }` to bootstrap
-3. Uses `lib.caisson.mkFlake` to compose a flake
+3. Uses `lib.caisson.flake-parts.mkConfiguration` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
    worked
 
