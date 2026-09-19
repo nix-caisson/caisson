@@ -65,7 +65,7 @@
         let
           checkedEcosystemSrc = assertTerranixEcosystemSrc (resolveEcosystemSrc {
             explicit = ecosystemSrc;
-            manifest = final.caisson-core.manifest or { };
+            manifest = final.caisson-core.libManifest or { };
           });
           selectedModules = moduleImports (final.caisson-core.modules.terranix or { });
         in

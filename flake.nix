@@ -68,6 +68,10 @@
 
           baseLib = nixpkgs-lib-flake.lib;
 
+          # The platforms this tree builds on, declared once; the core
+          # flake-parts module defaults flake-parts' `systems` from it.
+          systems = [ "x86_64-linux" ];
+
           modules = composedLib: {
             flake = {
               default = composedLib.caisson.flake-parts.mkModule ./modules/flake-parts/default;

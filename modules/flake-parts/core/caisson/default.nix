@@ -5,5 +5,6 @@
     ./manifest.nix
     ./modules.nix
     ./libOverlays.nix
+    ./systems.nix
   ];
 }

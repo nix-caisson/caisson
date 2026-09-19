@@ -14,7 +14,7 @@ let
   # caisson's flake-parts integration overlay, recovered from this
   # composition's own manifest, so test compositions can register it
   # the way a consumer registering the exported overlay would.
-  flakePartsOverlay = lib.caisson-core.manifest.libOverlays.flake-parts;
+  flakePartsOverlay = lib.caisson-core.libManifest.libOverlays.flake-parts;
 
   # Test-facing mkLib: registers the flake-parts integration into
   # every test composition (so composed test libraries carry
@@ -1679,7 +1679,7 @@ in
           let
             myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson-core.manifest.ecosystems.terranix.lib.terranixConfiguration { }).stubbed;
+          (myLib.caisson-core.libManifest.ecosystems.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
       };
     };

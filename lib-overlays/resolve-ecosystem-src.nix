@@ -21,7 +21,7 @@
 }:
 {
   explicit ? null,
-  # the composition's caisson-core.manifest, or { }
+  # the composition's caisson-core.libManifest, or { }
   manifest ? { },
 }:
 let
