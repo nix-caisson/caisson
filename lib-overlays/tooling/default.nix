@@ -4,11 +4,11 @@
 # time. The composition machinery this directory used to hold lives in
 # caisson-core (the caisson-core input) and reaches composed libraries
 # through mkLib's `caisson-core` namespace injection.
-{ ... }:
+{ entries, ... }:
 
 {
 
-  imports = [ ];
+  imports = [ entries.nixpkgs-lib ];
 
   overlay = final: prev: {
 

@@ -17,10 +17,10 @@
 # back from the hive, one evaluation for nixos-rebuild and colmena
 # apply. Projects can contribute hive modules through the registry
 # like any other class.
-{ ... }:
+{ entries, ... }:
 {
 
-  imports = [ ];
+  imports = [ entries.nixpkgs-lib ];
 
   overlay =
     final: prev:

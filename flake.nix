@@ -66,7 +66,10 @@
 
           inputs = effectiveInputs;
 
-          baseLib = nixpkgs-lib-flake.lib;
+          # The source of the nixpkgs-lib part for caisson's own
+          # evaluation: the mirror pinned in pins.nix, or the tree a
+          # hand-wired evaluation injected under that name.
+          defaultEcosystemSrc.nixpkgs-lib = nixpkgs-lib-flake.outPath;
 
           # The platforms this tree builds on, declared once; the core
           # flake-parts module defaults flake-parts' `systems` from it.

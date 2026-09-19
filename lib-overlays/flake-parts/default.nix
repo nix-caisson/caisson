@@ -13,11 +13,11 @@
 # This closes over the inputs of the flake where this overlay is
 # defined, i.e. caisson: the flake-parts pin used to evaluate
 # consumers' flake modules is caisson's own.
-{ closure-inputs, ... }:
+{ closure-inputs, entries, ... }:
 
 {
 
-  imports = [ ];
+  imports = [ entries.nixpkgs-lib ];
 
   overlay =
     final: prev:
@@ -47,13 +47,13 @@
         # CI; consumers assume shape.
         manifest = final.mkOptionType {
           name = "caissonManifest";
-          description = "caisson-core lib manifest ({ inputs, modules, libOverlays, ecosystems, projects, systems })";
+          description = "caisson-core lib manifest ({ inputs, modules, libOverlays, defaultEcosystemSrc, projects, systems })";
           descriptionClass = "noun";
           check =
             v:
             builtins.isAttrs v
             && builtins.isAttrs (v.inputs or null)
-            && builtins.isAttrs (v.ecosystems or { })
+            && builtins.isAttrs (v.defaultEcosystemSrc or { })
             && builtins.isAttrs (v.projects or { })
             && (
               (v.systems or null) == null
