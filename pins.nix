@@ -16,8 +16,8 @@
   caisson-core = {
     owner = "nix-caisson";
     repo = "caisson-core";
-    rev = "32a7fae933827fd953959535af2ddc170366cafb";
-    narHash = "sha256-ari+MqiCE5DrdxI+1yUSCyZQRf2Or82O9gCJcRTuxgY=";
+    rev = "afd557d80bf6b207f7822e075d6a065ca4b2e67a";
+    narHash = "sha256-2vKdpvHCIITaKtndwsbNQ7PZ5aipYHrghXjL2iV8qcw=";
   };
   # The base library: the nixpkgs.lib mirror (nixpkgs' lib directory
   # published on its own, a small fetch; the lib sits under /lib).

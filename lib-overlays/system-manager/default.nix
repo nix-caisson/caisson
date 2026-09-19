@@ -86,7 +86,7 @@
         let
           checkedEcosystemSrc = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
-            manifest = final.caisson-core.manifest or { };
+            manifest = final.caisson-core.libManifest or { };
           });
           common = mkCommonArgs args;
 

@@ -5,9 +5,10 @@
 # `flake` module class (mkModule), the option types (option
 # types are this integration's medium), the export machinery (the
 # core flake-parts module reads the composition's manifest at
-# `caisson-core.manifest` and projects the `libOverlays` and
-# `modules` flake outputs from it), and the `flake-parts` library
-# mirror.
+# `caisson-core.libManifest`, projects the `libOverlays` and
+# `modules` flake outputs from it, and defaults flake-parts' `systems`
+# from the `systems` the composition declared), and the `flake-parts`
+# library mirror.
 #
 # This closes over the inputs of the flake where this overlay is
 # defined, i.e. caisson: the flake-parts pin used to evaluate
@@ -46,7 +47,7 @@
         # CI; consumers assume shape.
         manifest = final.mkOptionType {
           name = "caissonManifest";
-          description = "caisson-core manifest ({ inputs, modules, libOverlays, ecosystems, projects })";
+          description = "caisson-core lib manifest ({ inputs, modules, libOverlays, ecosystems, projects, systems })";
           descriptionClass = "noun";
           check =
             v:
@@ -54,6 +55,10 @@
             && builtins.isAttrs (v.inputs or null)
             && builtins.isAttrs (v.ecosystems or { })
             && builtins.isAttrs (v.projects or { })
+            && (
+              (v.systems or null) == null
+              || (builtins.isList v.systems && builtins.all builtins.isString v.systems)
+            )
             && builtins.isAttrs (v.modules or null)
             && builtins.all builtins.isAttrs (builtins.attrValues v.modules)
             && builtins.isAttrs (v.libOverlays or null)
@@ -128,12 +133,15 @@
           let
 
             manifest =
-              final.caisson-core.manifest or (throw ''
-                caisson.flake-parts.mkConfiguration projects a composition's manifest into flake
-                outputs, but this composed library carries no manifest at
-                `caisson-core.manifest`. Compose the library with
-                caisson-core.mkLib, which captures one.
-              '');
+              if (final.caisson-core.libManifest or null) != null then
+                final.caisson-core.libManifest
+              else
+                throw ''
+                  caisson.flake-parts.mkConfiguration projects a composition's manifest into flake
+                  outputs, but this composed library carries no manifest at
+                  `caisson-core.libManifest`. Compose the library with
+                  caisson-core.mkLib, which captures one.
+                '';
 
             finalArgs =
               (if name != null then { moduleLocation = name; } else { })

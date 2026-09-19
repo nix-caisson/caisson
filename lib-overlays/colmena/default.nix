@@ -36,7 +36,7 @@
         explicit:
         resolveEcosystemSrc {
           inherit explicit;
-          manifest = final.caisson-core.manifest or { };
+          manifest = final.caisson-core.libManifest or { };
         };
 
       assertColmenaEcosystemSrc =

@@ -11,8 +11,6 @@
 
   partitionedAttrs.checks = "checks";
 
-  systems = [ "x86_64-linux" ];
-
   debug = false;
 
   caisson = {
