@@ -16,31 +16,35 @@
   entriesFor =
     { ecosystemSrc }:
     let
-      baseLib = import ecosystemSrc;
-      machineryOverlay = caisson-core.mkCoreOverlay {
-        inherit inputs;
-        defaultBaseLib = baseLib;
-      };
-    in
-    let
       integrationEntry = target: {
         key = "caisson.${target}";
         imports = [ entries.caisson-lib ];
-        overlay = (import (../lib-overlays + "/${target}") { closure-inputs = inputs; }).overlay;
+        overlay =
+          (import (../lib-overlays + "/${target}") {
+            closure-inputs = inputs;
+            entries = {
+              nixpkgs-lib = entries.base;
+            };
+          }).overlay;
       };
 
       entries = {
 
-        base = {
-          key = "caisson.nixpkgs-lib";
-          imports = [ ];
-          overlay = _final: _prev: baseLib;
-        };
+        # caisson-core's published nixpkgs-lib entry over the given
+        # source, under the same key it carries in an mkLib
+        # composition.
+        base = caisson-core.mkNixpkgsLibEntry ecosystemSrc;
 
         caisson-lib = {
           key = "caisson.lib";
           imports = [ entries.base ];
-          overlay = machineryOverlay.overlay;
+          overlay =
+            (caisson-core.mkCoreOverlay {
+              inherit inputs;
+              entries = {
+                nixpkgs-lib = entries.base;
+              };
+            }).overlay;
         };
 
         flake-parts = integrationEntry "flake-parts";

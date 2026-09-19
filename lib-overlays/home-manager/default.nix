@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-{ ... }:
+{ entries, ... }:
 {
 
-  imports = [ ];
+  imports = [ entries.nixpkgs-lib ];
 
   overlay =
     final: prev:

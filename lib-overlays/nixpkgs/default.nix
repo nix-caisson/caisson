@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-{ closure-inputs, ... }:
+{ closure-inputs, entries, ... }:
 {
 
-  imports = [ ];
+  imports = [ entries.nixpkgs-lib ];
 
   overlay = (
     final: prev:

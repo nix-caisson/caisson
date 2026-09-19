@@ -44,7 +44,9 @@ let
   };
 
   mockInputs = {
-    nixpkgs-lib.lib = lib;
+    # The real mirror: a tree with lib/ (the nixpkgs-lib entry reads it
+    # by input name) whose `lib` is what test bodies read.
+    nixpkgs-lib = inputs.nixpkgs-lib;
   }
   // (
     if inputs ? parent-flake-parts then
@@ -1184,22 +1186,25 @@ in
       };
     };
 
-    "test: custom baseLib is used as the extension base" = {
-      # baseLib replaces nixpkgs-lib as the lib that overlays extend.
-      # Attributes added via // don't survive lib.extend's fixpoint
-      # (extend only sees the overlay chain, not extra attrs), but
-      # we can verify baseLib is used by checking that a function from
-      # the custom base is reachable via final.
+    "test: a registration named nixpkgs-lib replaces the published entry" = {
+      # The upstream lib is the published `nixpkgs-lib` entry; a
+      # registration under that name replaces it for every overlay
+      # that imports it, caisson's integrations included.
       expr =
         let
-          customBase = lib.extend (final: prev: { customBaseMarker = "from-base"; });
           myLib = caisson.mkLib {
             inputs = mockInputs;
-            baseLib = customBase;
             libOverlays = _mkLibOverlay: {
-              test = mkLibOverlay (
+              nixpkgs-lib = mkLibOverlay (
                 { ... }:
                 {
+                  overlay = _final: prev: prev // lib // { customBaseMarker = "from-base"; };
+                }
+              );
+              test = mkLibOverlay (
+                { entries, ... }:
+                {
+                  imports = [ entries.nixpkgs-lib ];
                   overlay = final: prev: {
                     sawBase = final.customBaseMarker or "missing";
                   };
@@ -1606,7 +1611,7 @@ in
       "test: a declared ecosystem resolves for an adapter" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
           (myLib.caisson.terranix.mkConfiguration {
             configModule = { };
@@ -1618,7 +1623,7 @@ in
       "test: an explicit ecosystemSrc beats the declaration" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
           (myLib.caisson.terranix.mkConfiguration {
             ecosystemSrc = terranixStub "explicit";
@@ -1651,7 +1656,7 @@ in
               inputs = mockInputs // {
                 terranix = terranixStub "input";
               };
-              ecosystems.terranix = terranixStub "declared";
+              defaultEcosystemSrc.terranix = terranixStub "declared";
             };
           in
           (myLib.caisson.terranix.mkConfiguration {
@@ -1677,9 +1682,9 @@ in
       "test: declarations join the manifest" = {
         expr =
           let
-            myLib = mkResolutionLib { ecosystems.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson-core.libManifest.ecosystems.terranix.lib.terranixConfiguration { }).stubbed;
+          (myLib.caisson-core.libManifest.defaultEcosystemSrc.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
       };
     };

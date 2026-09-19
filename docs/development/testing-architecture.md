@@ -144,7 +144,7 @@ input, registering caisson's overlay files from the parent's source path.
 ```nix
 lib = inputs.caisson-core.lib.caisson-core.mkLib {
   inherit inputs;
-  baseLib = inputs.nixpkgs-lib.lib;
+  defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
   libOverlays = mkLibOverlay: {
     flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
   };

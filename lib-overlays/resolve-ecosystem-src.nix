@@ -2,7 +2,7 @@
 #
 # The integrations' ecosystem-source resolution: caisson-core's
 # layered `resolve` (the explicit argument, then the composition's
-# declared `ecosystems.<name>`, then an input with exactly the
+# declared `defaultEcosystemSrc.<name>`, then an input with exactly the
 # declared name), with the miss interpreted here, where the
 # integration knows what to say; the resolver itself can never format
 # a message, because a miss is the plain value null. The declarations
@@ -27,7 +27,7 @@
 let
   resolved = resolve {
     inherit name explicit;
-    defaults = manifest.ecosystems or { };
+    defaults = manifest.defaultEcosystemSrc or { };
     inputs = manifest.inputs or { };
   };
 in
@@ -36,7 +36,7 @@ if resolved != null then
 else
   throw ''
     ${context}: no ${name} ecosystem source. Pass `ecosystemSrc`
-    explicitly, declare `ecosystems.${name}` in the composition's
+    explicitly, declare `defaultEcosystemSrc.${name}` in the composition's
     mkLib call, or give the composing flake an input named exactly
     `${name}`.
   ''
