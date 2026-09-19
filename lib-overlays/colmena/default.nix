@@ -195,6 +195,26 @@
             lib.caisson.colmena.mkConfiguration: nodes.${name} is not a colmena node. Evaluate the host with the hive module's `mkNixosConfiguration` argument.
           '';
 
+      # colmena's binary selects nodes with a filter whose grammar
+      # reserves two characters: a leading `@` names a tag and a `,`
+      # separates entries. A node whose name uses either, or is empty,
+      # could never be addressed, so the hive refuses it before any node
+      # is evaluated.
+      unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
+      checkNodeNames =
+        nodes:
+        let
+          bad = builtins.filter unaddressable (builtins.attrNames nodes);
+        in
+        if bad == [ ] then
+          nodes
+        else
+          throw ''
+            lib.caisson.colmena.mkConfiguration: colmena's node filter cannot address ${
+              builtins.concatStringsSep ", " (map (n: "\"${n}\"") bad)
+            }. A node name is non-empty, does not start with `@` (a tag) and contains no `,` (a separator).
+          '';
+
       compose =
         {
           ecosystemSrc ? null,
@@ -214,7 +234,7 @@
               specialArgs =
                 mkNodeConstructors src // (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
             }).config;
-          nodes = builtins.mapAttrs checkNode hive.nodes;
+          nodes = builtins.mapAttrs checkNode (checkNodeNames hive.nodes);
           upstreamSchema = (src.lib.makeHive { }).__schema;
         in
         if upstreamSchema != schema then
