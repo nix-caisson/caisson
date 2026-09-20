@@ -56,9 +56,9 @@
             lib = final;
           };
         };
-      # The composition's declared flake-parts, instantiated once per
+      # The composition's declared flake-parts, instantiated per
       # composed library and shared by every evaluation that passes
-      # no source of its own.
+      # no `ecosystemSrc`.
       flakePartsDefault = flakePartsFor null;
 
       # The option types of the core module, re-exported under this

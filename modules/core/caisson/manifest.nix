@@ -15,8 +15,8 @@ in
       `libOverlays` and `modules` dictionaries (project entries under
       `<project>/<name>`, locals winning). Checks live on the export
       side, which is here: reading this option type-checks the
-      manifest, and `caisson.exports` is drawn from it. Producers
-      validate their own manifests in their own CI; consumers assume
+      manifest, and `caisson.exports` is drawn from it. A producer
+      validates the manifest it publishes in its CI; consumers assume
       shape.
     '';
   };

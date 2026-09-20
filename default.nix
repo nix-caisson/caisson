@@ -30,7 +30,7 @@ let
 
   caisson-core = import (builtins.fetchTree pins.caisson-core);
 
-  lib = import ./composition/lib.nix {
+  lib = import ./root.nix {
     inherit caisson-core;
     inputs = {
       nixpkgs-lib = builtins.fetchTree pins.nixpkgs-lib;

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# What the selectors chose, in one place: a top returns it, the
-# flake-parts integration copies it into the flake outputs, and a
-# parent passes it up. Each part is defined by the module that
-# declares its selector.
+# What the selectors chose: a top returns it, the flake-parts
+# integration copies it into the flake outputs, and a parent passes
+# it up. Each part is defined by the module that declares its
+# selector.
 { lib, ... }:
 let
   types = import ../types.nix { inherit lib; };

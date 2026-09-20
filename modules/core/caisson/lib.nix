@@ -14,7 +14,7 @@ in
       description = ''
         Function that selects which parts of the composed library to
         publish as the `lib` export. Receives the composed library;
-        defaults to the configuration's own namespace.
+        defaults to the namespace `configName` names.
       '';
       default =
         composedLib:

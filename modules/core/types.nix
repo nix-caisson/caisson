@@ -23,8 +23,8 @@ in
   };
 
   # The manifest type: structural, checked on the export side only.
-  # Producers validate their own manifests in their own CI; consumers
-  # assume shape.
+  # A producer validates the manifest it publishes in its CI;
+  # consumers assume shape.
   manifest = lib.mkOptionType {
     name = "caissonManifest";
     description = "caisson-core lib manifest ({ inputs, modules, libOverlays, defaultEcosystemSrc, projects, systems })";

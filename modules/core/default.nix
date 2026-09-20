@@ -2,7 +2,7 @@
 #
 # caisson's core module: the part of every framework module that is
 # the same for every integrated class. It declares the composition's
-# manifest, the configuration's name, the three registry selectors
+# manifest, the configuration's name, the registry selectors
 # (`caisson.lib`, `caisson.libOverlays`, `caisson.modules.<class>`) and
 # `caisson.exports`, what the selectors chose, which a top returns and
 # a parent passes up. Plain modules on purpose: everything they need

@@ -12,13 +12,13 @@
     # The composition machinery: mkLib, the module registry and the
     # manifest under `caisson-core`.
     caisson-core.url = "github:nix-caisson/caisson-core";
-    # nixpkgs' lib on its own (the lib directory published as a
-    # repository), the source of the nixpkgs-lib part of caisson's own
-    # composition.
+    # nixpkgs' lib alone (the lib directory published as a
+    # repository), the source of the nixpkgs-lib part of the
+    # composition of caisson itself.
     nixpkgs-lib.url = "github:nix-community/nixpkgs.lib";
     # flake-parts, the source of this top's flake evaluation. The
     # flake-parts integration calls it with the composed library, so
-    # its own nixpkgs-lib input only serves this pin's lock.
+    # the nixpkgs-lib input of flake-parts only serves this pin's lock.
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs-lib";
   };
@@ -27,30 +27,20 @@
     inputs@{ caisson-core, ... }:
     let
 
-      lib = import ./composition/lib.nix {
+      lib = import ./root.nix {
         caisson-core = caisson-core.lib.caisson-core;
         inherit inputs;
       };
 
-      flakeOutputs = lib.caisson.flake-parts.mkConfiguration {
-
-        name = "caisson";
-
-        configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/caisson;
-
-        moduleImports = modules: [ modules.default ];
-
-      };
-
     in
-    flakeOutputs
-    // {
-      lib = flakeOutputs.lib // {
-        composition = import ./composition {
-          caisson-core = caisson-core.lib.caisson-core;
-          inherit inputs;
-        };
-      };
+    lib.caisson.flake-parts.mkConfiguration {
+
+      name = "caisson";
+
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/caisson;
+
+      moduleImports = modules: [ modules.default ];
+
     };
 
 }

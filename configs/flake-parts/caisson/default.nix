@@ -8,8 +8,8 @@
 {
 
   imports = [
-    # flake-parts' partitions module, from this flake's own
-    # flake-parts input (a module file; it binds no library).
+    # flake-parts' partitions module, from the flake-parts input of
+    # this flake (a module file; it binds no library).
     closure-inputs.flake-parts.flakeModules.partitions
     ./partitions
     (lib.caisson.flake-parts.mkModule ../../structural/caisson)
