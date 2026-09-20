@@ -94,17 +94,20 @@ lives in `configs/flake-parts/<flake-name>`.
 ## Integrations
 
 caisson ships integrations that carry its benefits throughout the Nix
-ecosystem:
+ecosystem. Each integration wraps one ecosystem, and one ecosystem may
+be wrapped by several integrations: `nixos` and `nixpkgs` both wrap
+nixpkgs. The ecosystem column is the name an integration resolves its
+source by.
 
-| Integration | for |
-| --- | --- |
-| `flake-parts` | flake outputs |
-| `nixpkgs` | package sets and overlays |
-| `nixos` | NixOS configurations |
-| `home-manager` | Home Manager configurations |
-| `terranix` | Terranix and Terraform configurations |
-| `colmena` | Colmena deployment hives |
-| `system-manager` | system-manager configurations on foreign distros |
+| Integration | Ecosystem | for |
+| --- | --- | --- |
+| `flake-parts` | `flake-parts` | flake outputs |
+| `nixpkgs` | `nixpkgs` | package sets and overlays |
+| `nixos` | `nixpkgs` | NixOS configurations |
+| `home-manager` | `home-manager` | Home Manager configurations |
+| `terranix` | `terranix` | Terranix and Terraform configurations |
+| `colmena` | `colmena` | Colmena deployment hives |
+| `system-manager` | `system-manager` | system-manager configurations on foreign distros |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
 argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then
