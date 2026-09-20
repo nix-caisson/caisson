@@ -30,8 +30,8 @@ The layer users reach for: the seven integrations (`flake-parts`,
 `system-manager`), each a library overlay contributing its
 `lib.caisson` namespace, registering its own module class where it
 has one, and taking its ecosystem as an `ecosystemSrc` argument
-resolved from the composing flake's own declarations (flake-parts
-included: the integration calls the consumer's flake-parts source
+resolved from the declarations of the mkLib call that composes it
+(flake-parts included: the integration calls the consumer's flake-parts source
 with the composed library as its `nixpkgs-lib`, and carries the
 export machinery that projects a composition's manifest into flake
 outputs). The pkgs-dependent tooling (`eval-weight`,
