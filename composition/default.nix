@@ -47,6 +47,7 @@
             }).overlay;
         };
 
+        structural = integrationEntry "structural";
         flake-parts = integrationEntry "flake-parts";
         tooling = integrationEntry "tooling";
         nixpkgs = integrationEntry "nixpkgs";

@@ -29,14 +29,6 @@
     final: prev:
     let
 
-      isLibOverlay =
-        v:
-        builtins.isAttrs v
-        && builtins.hasAttr "overlay" v
-        && builtins.isFunction v.overlay
-        && builtins.isList (v.imports or [ ])
-        && builtins.all isLibOverlay (v.imports or [ ]);
-
       prevNs = (prev.caisson or { }).flake-parts or { };
 
       resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
@@ -69,39 +61,9 @@
       # no source of its own.
       flakePartsDefault = flakePartsFor null;
 
-      types = (prevNs.types or { }) // {
-
-        libOverlay = final.mkOptionType {
-          name = "libOverlay";
-          description = "library overlay ({ imports ? [ ], overlay })";
-          descriptionClass = "noun";
-          check = isLibOverlay;
-        };
-
-        # The manifest type: structural, checked on the export side
-        # only. Producers validate their own manifests in their own
-        # CI; consumers assume shape.
-        manifest = final.mkOptionType {
-          name = "caissonManifest";
-          description = "caisson-core lib manifest ({ inputs, modules, libOverlays, defaultEcosystemSrc, projects, systems })";
-          descriptionClass = "noun";
-          check =
-            v:
-            builtins.isAttrs v
-            && builtins.isAttrs (v.inputs or null)
-            && builtins.isAttrs (v.defaultEcosystemSrc or { })
-            && builtins.isAttrs (v.projects or { })
-            && (
-              (v.systems or null) == null
-              || (builtins.isList v.systems && builtins.all builtins.isString v.systems)
-            )
-            && builtins.isAttrs (v.modules or null)
-            && builtins.all builtins.isAttrs (builtins.attrValues v.modules)
-            && builtins.isAttrs (v.libOverlays or null)
-            && builtins.all isLibOverlay (builtins.attrValues v.libOverlays);
-        };
-
-      };
+      # The option types of the core module, re-exported under this
+      # namespace for the readers of that name.
+      types = (prevNs.types or { }) // import ../../modules/core/types.nix { lib = final; };
 
       # flake-parts' own mkFlake arguments this entry point composes are
       # refused with a pointer to the caisson argument; the rest forward.

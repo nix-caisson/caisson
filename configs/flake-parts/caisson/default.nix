@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: MIT
+#
+# The flake top's configuration: what caisson exports, from the
+# structural configuration both tops share, plus the checks partition
+# only a flake evaluation carries.
 { closure-inputs, ... }:
-{ inputs, config, ... }:
+{ lib, ... }:
 {
 
   imports = [
@@ -8,45 +12,11 @@
     # flake-parts input (a module file; it binds no library).
     closure-inputs.flake-parts.flakeModules.partitions
     ./partitions
+    (lib.caisson.flake-parts.mkModule ../../structural/caisson)
   ];
 
   partitionedAttrs.checks = "checks";
 
   debug = false;
-
-  caisson = {
-
-    # Every registered overlay exports as-is: integrations carry no
-    # hidden framework dependency (their machinery is baked in at
-    # registration, and the registry comes from the consumer's
-    # mkLib).
-    libOverlays.exported = libOverlays: {
-      inherit (libOverlays)
-        flake-parts
-        tooling
-        nixpkgs
-        nixos
-        home-manager
-        colmena
-        terranix
-        system-manager
-        ;
-    };
-    modules.flake.exported = modules: {
-      inherit (modules)
-        default
-        nixpkgs
-        nixpkgs-interface
-        ;
-    };
-
-    lib = {
-      export.enabled = true;
-      # The native surface mirrors the composed library's framework
-      # namespaces, so flake-level and composed-level addresses match.
-      exported = composedLib: { inherit (composedLib) caisson caisson-core; };
-    };
-
-  };
 
 }

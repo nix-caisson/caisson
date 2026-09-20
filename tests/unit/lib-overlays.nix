@@ -15,10 +15,13 @@ let
   # composition's own manifest, so test compositions can register it
   # the way a consumer registering the exported overlay would.
   flakePartsOverlay = lib.caisson-core.libManifest.libOverlays.flake-parts;
+  structuralOverlay = lib.caisson-core.libManifest.libOverlays.structural;
 
-  # Test-facing mkLib: registers the flake-parts integration into
-  # every test composition (so composed test libraries carry
-  # caisson.flake-parts.mkConfiguration), and otherwise defers to caisson-core.mkLib.
+  # Test-facing mkLib: registers the flake-parts and structural
+  # integrations into every test composition (so composed test
+  # libraries carry caisson.flake-parts.mkConfiguration and
+  # caisson.structural.mkTopConfiguration), and otherwise defers to
+  # caisson-core.mkLib.
   # Malformed arguments pass through untouched so the machinery's own
   # shape errors stay observable.
   testMkLib =
@@ -32,7 +35,13 @@ let
       lib.caisson-core.mkLib (
         args
         // {
-          libOverlays = mkLibOverlay': { flake-parts = flakePartsOverlay; } // raw mkLibOverlay';
+          libOverlays =
+            mkLibOverlay':
+            {
+              flake-parts = flakePartsOverlay;
+              structural = structuralOverlay;
+            }
+            // raw mkLibOverlay';
         }
       );
 
@@ -1686,6 +1695,125 @@ in
           in
           (myLib.caisson-core.libManifest.defaultEcosystemSrc.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
+      };
+    };
+
+  # The structural integration: the empty integration, evaluating
+  # caisson's core module over a composition and returning what the
+  # selectors chose.
+  structural =
+    let
+      registeringLib = caisson.mkLib {
+        inputs = mockInputs;
+        modules = composedLib: {
+          flake = {
+            thing = composedLib.caisson.flake-parts.mkModule ({ ... }: { });
+            other = composedLib.caisson.flake-parts.mkModule ({ ... }: { });
+          };
+          structural = {
+            named = composedLib.caisson.structural.mkModule (
+              { ... }:
+              {
+                caisson.configInfo.configName = "from-the-registry";
+              }
+            );
+          };
+        };
+        libOverlays = _mkLibOverlay: {
+          provider = mkLibOverlay (
+            { ... }:
+            {
+              overlay = _final: _prev: {
+                provided = true;
+              };
+            }
+          );
+        };
+      };
+      selectors =
+        { ... }:
+        {
+          caisson.modules.flake.exported = modules: { inherit (modules) thing; };
+          caisson.libOverlays.exported = overlays: { inherit (overlays) provider; };
+        };
+    in
+    {
+      "test: a top returns the selected exports with the manifest beside them" = {
+        expr =
+          let
+            top = registeringLib.caisson.structural.mkTopConfiguration {
+              configModule = registeringLib.caisson.structural.mkModule selectors;
+            };
+          in
+          {
+            modules = builtins.attrNames top.modules.flake;
+            libOverlays = builtins.attrNames top.libOverlays;
+            lib = top.lib;
+            hasManifest = top.caisson.manifest ? modules;
+          };
+        expected = {
+          modules = [ "thing" ];
+          libOverlays = [ "provider" ];
+          lib = { };
+          hasManifest = true;
+        };
+      };
+
+      "test: the flake top and the structural top export the same registries" = {
+        expr =
+          let
+            top = registeringLib.caisson.structural.mkTopConfiguration {
+              configModule = registeringLib.caisson.structural.mkModule selectors;
+            };
+            flake = registeringLib.caisson.flake-parts.mkConfiguration {
+              configModule = registeringLib.caisson.flake-parts.mkModule (
+                { ... }:
+                {
+                  imports = [ selectors ];
+                  systems = [ "x86_64-linux" ];
+                }
+              );
+              moduleImports = _modules: [ ];
+            };
+          in
+          {
+            sameModules =
+              builtins.attrNames flake.modules.flake == [ "default" ] ++ builtins.attrNames top.modules.flake;
+            sameOverlays = builtins.attrNames flake.libOverlays == builtins.attrNames top.libOverlays;
+          };
+        expected = {
+          sameModules = true;
+          sameOverlays = true;
+        };
+      };
+
+      "test: registered structural modules are selected by default" = {
+        expr =
+          (registeringLib.caisson.structural.mkConfiguration {
+            configModule = { };
+          }).value.caisson.configInfo.configName;
+        expected = "from-the-registry";
+      };
+
+      "test: the name argument defaults the configuration name" = {
+        expr =
+          (registeringLib.caisson.structural.mkConfiguration {
+            configModule = { };
+            moduleImports = _modules: [ ];
+            name = "named-top";
+          }).value.caisson.configInfo.configName;
+        expected = "named-top";
+      };
+
+      "test: an evaluator argument is refused with a hint" = {
+        expr =
+          (builtins.tryEval (
+            builtins.deepSeq (registeringLib.caisson.structural.mkConfiguration {
+              configModule = { };
+              modules = [ ];
+            }) true
+          )).success;
+        expected = false;
       };
     };
 }
