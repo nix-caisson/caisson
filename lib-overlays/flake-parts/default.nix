@@ -10,10 +10,15 @@
 # from the `systems` the composition declared), and the `flake-parts`
 # library mirror.
 #
-# This closes over the inputs of the flake where this overlay is
-# defined, i.e. caisson: the flake-parts pin used to evaluate
-# consumers' flake modules is caisson's own.
-{ closure-inputs, entries, ... }:
+# flake-parts itself comes from the composing tree, resolved like
+# every ecosystem (the explicit `ecosystemSrc`, the composition's
+# `defaultEcosystemSrc.flake-parts`, an input named `flake-parts`),
+# and is taken as a source: its flake.nix is called with the composed
+# library standing in for its `nixpkgs-lib` input, so the module
+# evaluation runs on the same library everything else in the
+# composition does, never on a library flake-parts assembled for
+# itself.
+{ entries, ... }:
 
 {
 
@@ -32,6 +37,36 @@
         && builtins.all isLibOverlay (v.imports or [ ]);
 
       prevNs = (prev.caisson or { }).flake-parts or { };
+
+      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+        name = "flake-parts";
+        context = "caisson.flake-parts";
+        resolve = final.caisson-core.resolve;
+      };
+      resolveSrc =
+        explicit:
+        resolveEcosystemSrc {
+          inherit explicit;
+          manifest = final.caisson-core.libManifest or { };
+        };
+      resolveOutPath = value: if builtins.isAttrs value && value ? outPath then value.outPath else value;
+
+      # flake-parts instantiated over this composition: its flake.nix
+      # applied to the composed library as `nixpkgs-lib`. What comes
+      # out (`lib.mkFlake`, `flakeModules`) is flake-parts' machinery
+      # on caisson's library, with no second nixpkgs lib inside it.
+      flakePartsFor =
+        explicit:
+        final.caisson-core.callFlake {
+          src = resolveOutPath (resolveSrc explicit);
+          inputs.nixpkgs-lib = {
+            lib = final;
+          };
+        };
+      # The composition's declared flake-parts, instantiated once per
+      # composed library and shared by every evaluation that passes
+      # no source of its own.
+      flakePartsDefault = flakePartsFor null;
 
       types = (prevNs.types or { }) // {
 
@@ -71,6 +106,7 @@
       # refused with a pointer to the caisson argument; the rest forward.
       accepted = [
         "configModule"
+        "ecosystemSrc"
         "moduleImports"
         "name"
         "specialArgs"
@@ -102,6 +138,10 @@
 
           configModule,
 
+          # The flake-parts source; resolved from the composition's
+          # declarations when absent.
+          ecosystemSrc ? null,
+
           moduleImports ? builtins.attrValues,
 
           # The flake's canonical name. Exported modules are keyed by
@@ -131,6 +171,8 @@
         }:
         (
           let
+
+            flakeParts = if ecosystemSrc == null then flakePartsDefault else flakePartsFor ecosystemSrc;
 
             manifest =
               if (final.caisson-core.libManifest or null) != null then
@@ -165,8 +207,8 @@
               { lib, ... }:
               {
                 imports = [
-                  closure-inputs.flake-parts.flakeModules.flakeModules
-                  closure-inputs.flake-parts.flakeModules.modules
+                  flakeParts.flakeModules.flakeModules
+                  flakeParts.flakeModules.modules
                   ../../modules/flake-parts/core
                 ]
                 ++ importedModules
@@ -176,7 +218,7 @@
             );
 
           in
-          closure-inputs.flake-parts.lib.mkFlake finalArgs finalModule
+          flakeParts.lib.mkFlake finalArgs finalModule
         );
 
     in
@@ -189,7 +231,10 @@
         };
       };
 
-      flake-parts = (prev.flake-parts or { }) // closure-inputs.flake-parts.lib;
+      # The flake-parts library mirrored into the composed library,
+      # from the composition's declared flake-parts; forced only when
+      # read.
+      flake-parts = (prev.flake-parts or { }) // flakePartsDefault.lib;
 
     };
 

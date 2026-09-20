@@ -3,85 +3,40 @@
 
   description = "The foundation framework for composable Nix flakes";
 
+  inputs = {
+    # The composition machinery: mkLib, the module registry and the
+    # manifest under `caisson-core`.
+    caisson-core.url = "github:nix-caisson/caisson-core";
+    # nixpkgs' lib on its own (the lib directory published as a
+    # repository), the source of the nixpkgs-lib part of caisson's own
+    # composition.
+    nixpkgs-lib.url = "github:nix-community/nixpkgs.lib";
+    # flake-parts, the source of caisson's own flake evaluation. The
+    # flake-parts integration calls it with the composed library, so
+    # its own nixpkgs-lib input only serves this pin's lock.
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs-lib";
+  };
+
   outputs =
-    inputs:
+    inputs@{ caisson-core, ... }:
     (
 
       let
 
-        # caisson declares no flake inputs; the three trees its own
-        # evaluation composes with are fetched lazily at the pins in
-        # pins.nix (see that file for the design). A hand-wired
-        # evaluation (callFlake in the sandboxed harnesses, the
-        # compat shim) may inject any of them beside `self`; the
-        # injected value wins and nothing fetches.
-        pins = import ./pins.nix;
-        fetchPin = name: builtins.fetchTree ({ type = "github"; } // pins.${name});
+        lib = caisson-core.lib.caisson-core.mkLib {
 
-        # The composition machinery. Its mkLib takes the base library
-        # as a plain argument and injects the machinery, the module
-        # registry, and the manifest under `caisson-core`.
-        caisson-core-flake =
-          inputs.caisson-core or (
-            let
-              src = fetchPin "caisson-core";
-            in
-            {
-              lib.caisson-core = import (src + "/lib");
-              inherit (src) outPath;
-            }
-          );
-        caisson-core = caisson-core-flake.lib.caisson-core;
-
-        callFlake = import (caisson-core-flake.outPath + "/lib/kernel/call-flake.nix");
-
-        nixpkgs-lib-flake =
-          inputs.nixpkgs-lib or (
-            let
-              src = fetchPin "nixpkgs-lib";
-            in
-            {
-              lib = import (src + "/lib");
-              outPath = src + "/lib";
-            }
-          );
-
-        flake-parts-flake =
-          inputs.flake-parts or (callFlake {
-            src = fetchPin "flake-parts";
-            inputs = {
-              nixpkgs-lib = nixpkgs-lib-flake;
-            };
-          });
-
-        # What registered files close over: the constructed trees
-        # under the names the integrations read.
-        effectiveInputs = {
-          inherit (inputs) self;
-          nixpkgs-lib = nixpkgs-lib-flake;
-          flake-parts = flake-parts-flake;
-        };
-
-        lib = caisson-core.mkLib {
-
-          inputs = effectiveInputs;
-
-          # The source of the nixpkgs-lib part for caisson's own
-          # evaluation: the mirror pinned in pins.nix, or the tree a
-          # hand-wired evaluation injected under that name.
-          defaultEcosystemSrc.nixpkgs-lib = nixpkgs-lib-flake.outPath;
+          inherit inputs;
 
           # The platforms this tree builds on, declared once; the core
           # flake-parts module defaults flake-parts' `systems` from it.
+          # nixpkgs-lib and flake-parts resolve from the inputs of
+          # those names.
           systems = [ "x86_64-linux" ];
 
           modules = composedLib: {
             flake = {
               default = composedLib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
-              # flake-parts' partitions module, registered so consumers
-              # can select it from the registry instead of declaring a
-              # flake-parts input of their own.
-              partitions = flake-parts-flake.flakeModules.partitions;
               # The nixpkgs integration's module layer: the overlay
               # registry (nixpkgs-interface) and the package-set
               # machinery that reifies `caisson.nixpkgs.pkgSets` per
@@ -113,10 +68,7 @@
 
           configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/caisson;
 
-          moduleImports = modules: [
-            modules.default
-            modules.partitions
-          ];
+          moduleImports = modules: [ modules.default ];
 
         };
 
@@ -125,8 +77,8 @@
       // {
         lib = flakeOutputs.lib // {
           composition = import ./composition {
-            inherit caisson-core;
-            inputs = effectiveInputs;
+            caisson-core = caisson-core.lib.caisson-core;
+            inherit inputs;
           };
         };
       }
