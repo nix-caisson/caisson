@@ -10,9 +10,10 @@
 # from the `systems` the composition declared), and the `flake-parts`
 # library mirror.
 #
-# flake-parts itself comes from the composing tree, resolved like
-# every ecosystem (the explicit `ecosystemSrc`, the composition's
-# `defaultEcosystemSrc.flake-parts`, an input named `flake-parts`),
+# flake-parts itself comes from the composition, resolved like every
+# ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
+# in the mkLib call, the entry named `flake-parts` in the inputs passed
+# to mkLib),
 # and is taken as a source: its flake.nix is called with the composed
 # library standing in for its `nixpkgs-lib` input, so the module
 # evaluation runs on the same library everything else in the

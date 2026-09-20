@@ -7,7 +7,7 @@ change is part of its contract.
 | Repository | Moves | Holds |
 |---|---|---|
 | [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | keyed composition (`compose`, `resolve`) and the library lifecycle (`mkLib`, registration, the manifest) |
-| caisson (this repository) | at ecosystem speed | the seven integrations (flake-parts included) and the pkgs-dependent tooling |
+| caisson (this repository) | at ecosystem speed | the integrations and the pkgs-dependent tooling |
 | [caisson-compat](https://github.com/nix-caisson/caisson-compat) | at upstream speed | pinned-world tests and compatibility exports |
 
 ## caisson-core
@@ -25,13 +25,13 @@ without nixpkgs can depend on it directly.
 
 ## caisson
 
-The layer users reach for: the seven integrations (`flake-parts`,
+The layer users reach for: the integrations (`flake-parts`,
 `nixpkgs`, `nixos`, `home-manager`, `colmena`, `terranix`,
 `system-manager`), each a library overlay contributing its
 `lib.caisson` namespace, registering its own module class where it
 has one, and taking its ecosystem as an `ecosystemSrc` argument
-resolved from the composing flake's own declarations (flake-parts
-included: the integration calls the consumer's flake-parts source
+resolved from the declarations of the mkLib call that composes it
+(including flake-parts: the integration calls the consumer's flake-parts source
 with the composed library as its `nixpkgs-lib`, and carries the
 export machinery that projects a composition's manifest into flake
 outputs). The pkgs-dependent tooling (`eval-weight`,

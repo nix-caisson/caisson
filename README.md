@@ -94,22 +94,26 @@ lives in `configs/flake-parts/<flake-name>`.
 ## Integrations
 
 caisson ships integrations that carry its benefits throughout the Nix
-ecosystem:
+ecosystem. Each integration wraps one ecosystem, and one ecosystem may
+be wrapped by several integrations: `nixos` and `nixpkgs` both wrap
+nixpkgs. The ecosystem column is the name an integration resolves its
+source by.
 
-| Integration | for |
-| --- | --- |
-| `flake-parts` | flake outputs |
-| `nixpkgs` | package sets and overlays |
-| `nixos` | NixOS configurations |
-| `home-manager` | Home Manager configurations |
-| `terranix` | Terranix and Terraform configurations |
-| `colmena` | Colmena deployment hives |
-| `system-manager` | system-manager configurations on foreign distros |
+| Integration | Ecosystem | for |
+| --- | --- | --- |
+| `flake-parts` | `flake-parts` | flake outputs |
+| `nixpkgs` | `nixpkgs` | package sets and overlays |
+| `nixos` | `nixpkgs` | NixOS configurations |
+| `home-manager` | `home-manager` | Home Manager configurations |
+| `terranix` | `terranix` | Terranix and Terraform configurations |
+| `colmena` | `colmena` | Colmena deployment hives |
+| `system-manager` | `system-manager` | system-manager configurations on foreign distros |
 
-The integrations work against the versions of these dependencies that you
-already have. caisson pins none of them, and declares no flake inputs of
-its own, so adding it does not put anything in your lock file to keep
-aligned, and there is no chain of `follows` to enumerate downstream.
+Each integration finds its ecosystem in this order: the `ecosystemSrc`
+argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then
+the entry named exactly `<name>` in the `inputs` you passed to `mkLib`.
+caisson pins none of these ecosystems. caisson's flake inputs are
+caisson-core, nixpkgs-lib and flake-parts, used for its own evaluation.
 
 ## Going deeper
 

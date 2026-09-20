@@ -36,7 +36,6 @@ if resolved != null then
 else
   throw ''
     ${context}: no ${name} ecosystem source. Pass `ecosystemSrc`
-    explicitly, declare `defaultEcosystemSrc.${name}` in the composition's
-    mkLib call, or give the composing flake an input named exactly
-    `${name}`.
+    explicitly, declare `defaultEcosystemSrc.${name}` in the mkLib call,
+    or name the source `${name}` in the inputs passed to mkLib.
   ''
