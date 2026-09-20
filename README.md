@@ -106,12 +106,14 @@ ecosystem:
 | `colmena` | Colmena deployment hives |
 | `system-manager` | system-manager configurations on foreign distros |
 
-The integrations work against the versions of these dependencies that you
-already have: each is resolved from your own inputs by name (or from an
-explicit `defaultEcosystemSrc` entry), and caisson pins none of them.
-caisson's own inputs are the three small trees its own evaluation
-composes with, caisson-core, nixpkgs' lib and flake-parts; nothing in
-your lock file needs aligning with them.
+The integrations use the versions of these dependencies that your flake
+already declares. Each integration looks for an input with the name of
+its ecosystem (`nixpkgs`, `home-manager`, `flake-parts`, and so on), or
+for the source you name in `defaultEcosystemSrc`. caisson does not pin
+any of them. caisson itself has three inputs: caisson-core, the nixpkgs
+library, and flake-parts. They are small trees that only caisson uses
+for its own evaluation, and you do not need to align anything in your
+lock file with them.
 
 ## Going deeper
 
