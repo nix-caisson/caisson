@@ -107,9 +107,11 @@ ecosystem:
 | `system-manager` | system-manager configurations on foreign distros |
 
 The integrations work against the versions of these dependencies that you
-already have. caisson pins none of them, and declares no flake inputs of
-its own, so adding it does not put anything in your lock file to keep
-aligned, and there is no chain of `follows` to enumerate downstream.
+already have: each is resolved from your own inputs by name (or from an
+explicit `defaultEcosystemSrc` entry), and caisson pins none of them.
+caisson's own inputs are the three small trees its own evaluation
+composes with, caisson-core, nixpkgs' lib and flake-parts; nothing in
+your lock file needs aligning with them.
 
 ## Going deeper
 
