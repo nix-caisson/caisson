@@ -27,9 +27,8 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.flake-parts.follows = "flake-parts";
 
-    # A downstream that cares which caisson-core composes its library
-    # declares its own; this flake does, so the tests are pinned to
-    # the deps world's core rather than to caisson's hidden pin.
+    # The tests compose with the deps world's caisson-core, not the
+    # one the parent's lock names.
     caisson-core.follows = "deps/caisson-core";
 
   };

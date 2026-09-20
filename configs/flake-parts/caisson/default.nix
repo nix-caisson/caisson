@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: MIT
-{ ... }:
+{ closure-inputs, ... }:
 { inputs, config, ... }:
 {
 
   imports = [
-    # The partitions module itself arrives through the registry (the
-    # flake.partitions registration, selected by moduleImports).
+    # flake-parts' partitions module, from this flake's own
+    # flake-parts input (a module file; it binds no library).
+    closure-inputs.flake-parts.flakeModules.partitions
     ./partitions
   ];
 
@@ -34,7 +35,6 @@
     modules.flake.exported = modules: {
       inherit (modules)
         default
-        partitions
         nixpkgs
         nixpkgs-interface
         ;

@@ -36,7 +36,15 @@ lives in `configs/flake-parts/<flake-name>`.
 
 ```nix
 {
-  inputs.caisson.url = "github:nix-caisson/caisson";
+  inputs = {
+    caisson.url = "github:nix-caisson/caisson";
+    # The ecosystems this flake composes with, declared here and
+    # found by name: nixpkgs (its lib is the nixpkgs-lib part of the
+    # composed library) and flake-parts (the flake evaluation).
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  };
 
   outputs = inputs@{ self, caisson, ... }:
     let
