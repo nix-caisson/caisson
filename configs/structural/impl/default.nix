@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# What caisson exports: every registered overlay and flake module, and
-# the composed library's framework namespaces. Both tops evaluate this
+# What caisson exports: every registered overlay and module, and the
+# composed library's framework namespaces. Both tops evaluate this
 # configuration beneath themselves and merge in what it exports.
 { ... }:
 { ... }:
@@ -17,6 +17,7 @@
     # mkLib).
     libOverlays.exported = libOverlays: {
       inherit (libOverlays)
+        integrations
         structural
         flake-parts
         tooling
@@ -28,12 +29,21 @@
         system-manager
         ;
     };
-    modules.flake.exported = modules: {
-      inherit (modules)
-        default
-        nixpkgs
-        nixpkgs-interface
-        ;
+
+    # Every registered module exports as-is, the `core` of each class
+    # among them: a consumer's composition then carries `caisson/core`
+    # in that class, which its integration forces like any `core`.
+    modules = {
+      flake.exported = modules: {
+        inherit (modules)
+          core
+          default
+          nixpkgs
+          nixpkgs-interface
+          ;
+      };
+      generic.exported = modules: { inherit (modules) core; };
+      structural.exported = modules: { inherit (modules) core; };
     };
 
     lib = {

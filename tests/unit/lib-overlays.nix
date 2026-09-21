@@ -242,7 +242,6 @@ in
             {
               closure-inputs,
               closure-lib,
-              closure-self-modules,
               mkModule,
               ...
             }:
@@ -250,13 +249,12 @@ in
             {
               hasInputs = builtins.isAttrs closure-inputs;
               hasLib = builtins.isAttrs closure-lib;
-              hasSelfModules = builtins.isAttrs closure-self-modules;
               hasMkMod = builtins.isFunction mkModule;
             };
           result = mkFlakePartsModule module;
           evaluated = result { config = { }; };
         in
-        evaluated.hasInputs && evaluated.hasLib && evaluated.hasSelfModules && evaluated.hasMkMod;
+        evaluated.hasInputs && evaluated.hasLib && evaluated.hasMkMod;
       expected = true;
     };
 
@@ -1382,21 +1380,38 @@ in
       expected = [ "lib" ];
     };
 
-    "test: moduleImports default selects all modules" = {
-      # The default moduleImports is builtins.attrValues.
+    "test: the framework module and the default default are selected by name" = {
+      # Every entry named `core`, the local one and the `<project>/core`
+      # of a consumed project, is the framework module of the class;
+      # every entry named `default` is the default default, what
+      # moduleImports selects when omitted.
       expr =
         let
-          moduleImports = builtins.attrValues;
-          localModules = {
-            a = "mod-a";
-            b = "mod-b";
+          selection = lib.caisson.integrations;
+          registry = {
+            core = "c";
+            default = "d";
+            "dep/core" = "dc";
+            "dep/default" = "dd";
+            "dep/other" = "do";
+            not-default = "n";
+            other = "o";
           };
         in
-        moduleImports localModules;
-      expected = [
-        "mod-a"
-        "mod-b"
-      ];
+        {
+          cores = selection.coreModules registry;
+          defaults = selection.defaultModuleImports registry;
+        };
+      expected = {
+        cores = [
+          "c"
+          "dc"
+        ];
+        defaults = [
+          "d"
+          "dd"
+        ];
+      };
     };
 
     "test: moduleImports can filter modules" = {
@@ -1711,6 +1726,14 @@ in
             other = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
           };
           structural = {
+            default = callbackLib.caisson.structural.mkModule (
+              { ... }:
+              {
+                caisson.configInfo.configName = "from-the-default";
+              }
+            );
+            # Applied only when selected by name: with the default default
+            # in force it would conflict with the definition above.
             named = callbackLib.caisson.structural.mkModule (
               { ... }:
               {
@@ -1787,10 +1810,19 @@ in
         };
       };
 
-      "test: registered structural modules are selected by default" = {
+      "test: the default default applies the entries named default" = {
         expr =
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
+          }).value.caisson.configInfo.configName;
+        expected = "from-the-default";
+      };
+
+      "test: a selection by name replaces the default default" = {
+        expr =
+          (registeringLib.caisson.structural.mkConfiguration {
+            configModule = { };
+            moduleImports = modules: [ modules.named ];
           }).value.caisson.configInfo.configName;
         expected = "from-the-registry";
       };

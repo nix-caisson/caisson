@@ -18,7 +18,7 @@ For commands and test conventions, see [testing.md](./testing.md).
 ## Overview
 
 All checks are produced by the **checks partition**
-(`configs/flake-parts/caisson/partitions/checks.nix`). This partition:
+(`configs/flake/caisson/partitions/checks.nix`). This partition:
 
 1. Pulls in development-time dependencies from `tests/dependencies` via
    `lib.caisson-core.partitionExtraInputs`
@@ -139,19 +139,20 @@ its `.inputs` is a superset of the dependencies flake's inputs.
 
 The unit test flake (`tests/unit/flake.nix`) composes the way a downstream
 consumer that cares about its core revision does: with its own `caisson-core`
-input, registering caisson's overlay files from the parent's source path.
+input, registering caisson's overlay and module files from the parent's
+source path with the directory readers.
 
 ```nix
-lib = inputs.caisson-core.lib.caisson-core.mkLib {
+core = inputs.caisson-core.lib.caisson-core;
+lib = core.mkLib {
   inherit inputs;
   defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
-  libOverlays = mkLibOverlay: {
-    flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
-  };
+  modules = core.mkModules (parent.outPath + "/modules");
+  libOverlays = core.mkLibOverlays (parent.outPath + "/lib-overlays");
 };
 
 lib.caisson.flake-parts.mkConfiguration {
-  configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/unit-tests;
+  configModule = lib.caisson.flake-parts.mkModule ./configs/flake/unit-tests;
 };
 ```
 
@@ -160,7 +161,9 @@ evaluating a flake input's value applies its outputs function, which would
 force caisson's own hidden core pin inside the nix-unit sandbox, where nothing
 can fetch. A source-only input carries the path and applies nothing. The
 overlay files register from that path because a flake cannot reference files
-outside its own source tree.
+outside its own source tree, and the modules register with them: an overlay
+registered from its file reads the registry of the composition that
+registered it (the `core` of its class, for one), so the two go together.
 
 The tests are not only testing library functions in isolation; the composition
 and `lib.caisson.flake-parts.mkConfiguration` path is the same one a downstream consumer exercises, so they
@@ -168,7 +171,7 @@ verify that the framework's composition machinery works end-to-end.
 
 ### nix-unit integration
 
-The test flake's config module (`tests/unit/configs/flake-parts/unit-tests/default.nix`)
+The test flake's config module (`tests/unit/configs/flake/unit-tests/default.nix`)
 imports the nix-unit flake-parts module:
 
 ```nix

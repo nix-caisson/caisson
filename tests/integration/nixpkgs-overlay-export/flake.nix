@@ -27,6 +27,6 @@
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-overlay-export;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-overlay-export;
     };
 }

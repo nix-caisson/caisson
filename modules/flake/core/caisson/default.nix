@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-{ mkModule, ... }:
 { ... }:
 {
   imports = [
-    (mkModule ./caisson)
+    ./exports.nix
+    ./systems.nix
   ];
 }

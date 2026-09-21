@@ -16,8 +16,8 @@ let
       type = "github";
       owner = "nix-caisson";
       repo = "caisson-core";
-      rev = "8ab6587ef82725233a00a9fe493aae59efa7a609";
-      narHash = "sha256-iGMp70NBaFwolzIj9kU8NQ42FGnWWm9B/lYYCgViKoM=";
+      rev = "03d280668003210ee218ed24662cd9c6d2239969";
+      narHash = "sha256-jChcLZ5nAdP+ISnTM8jmxnP2WRpZJRZqvx8aPqIan5M=";
     };
     nixpkgs-lib = {
       type = "github";
@@ -28,16 +28,16 @@ let
     };
   };
 
-  caisson-core = import (builtins.fetchTree pins.caisson-core);
+  core = import (builtins.fetchTree pins.caisson-core);
 
-  lib = caisson-core.mkLib {
+  lib = core.mkLib {
     inputs = {
       nixpkgs-lib = builtins.fetchTree pins.nixpkgs-lib;
     };
     systems = import ./systems.nix;
-    modules = import ./modules.nix;
-    configs = import ./configs.nix;
-    libOverlays = import ./libOverlays.nix;
+    modules = core.mkModules ./modules;
+    configs = core.mkModules ./configs;
+    libOverlays = core.mkLibOverlays ./lib-overlays;
   };
 
 in

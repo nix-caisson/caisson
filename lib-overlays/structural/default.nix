@@ -7,17 +7,30 @@
 # registry selectors and `caisson.exports`. A structural configuration
 # is the top of a repository whose point is what it exports, and
 # `default.nix` returns what `mkTopConfiguration` returns from it.
-{ entries, ... }:
+{
+  closure-lib,
+  contributeClasses,
+  entries,
+  mkLibOverlay,
+  ...
+}:
 
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
 
       prevNs = (prev.caisson or { }).structural or { };
+
+      selection = final.caisson.integrations;
 
       accepted = [
         "configModule"
@@ -29,7 +42,7 @@
       hints = {
         modules = "pass the configuration's module as `configModule`; registered structural modules are selected with `moduleImports`.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.structural.mkConfiguration";
         inherit accepted hints;
       };
@@ -41,7 +54,9 @@
 
           configModule,
 
-          moduleImports ? builtins.attrValues,
+          # Selection over the structural class of the registry; the
+          # default default is every entry named `default`.
+          moduleImports ? selection.defaultModuleImports,
 
           # The configuration's canonical name; the default for
           # caisson.configInfo.configName.
@@ -67,7 +82,17 @@
                 caisson-core.mkLib, which captures one.
               '';
 
-          importedModules = moduleImports (final.caisson-core.modules.structural or { });
+          registry = final.caisson-core.modules.structural or { };
+
+          # The framework module of the class: caisson's own core, read
+          # from the closure so it is there however this integration was
+          # registered, plus every `core` the composition registered.
+          frameworkModules = [
+            closure-lib.caisson-core.modules.structural.core
+          ]
+          ++ selection.coreModules registry;
+
+          importedModules = moduleImports registry;
 
           evaluated = final.evalModules {
             class = "structural";
@@ -77,12 +102,11 @@
             }
             // (if pkgSets != null then { inherit pkgSets; } else { })
             // specialArgs;
-            modules = [
-              ../../modules/core
-            ]
-            ++ importedModules
-            ++ [ configModule ]
-            ++ (if name != null then [ { caisson.configInfo.configName = final.mkDefault name; } ] else [ ]);
+            modules =
+              frameworkModules
+              ++ importedModules
+              ++ [ configModule ]
+              ++ (if name != null then [ { caisson.configInfo.configName = final.mkDefault name; } ] else [ ]);
           };
 
         in
@@ -106,7 +130,14 @@
         };
 
     in
-    {
+    # This integration owns the `structural` class.
+    contributeClasses prev {
+      structural = {
+        integration = "structural";
+        mkModule = final.caisson-core.mkModule "structural";
+      };
+    }
+    // {
 
       caisson = (prev.caisson or { }) // {
         structural = prevNs // {

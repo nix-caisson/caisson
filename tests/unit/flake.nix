@@ -43,19 +43,22 @@
       ...
     }:
     let
-      lib = inputs.caisson-core.lib.caisson-core.mkLib {
+      core = inputs.caisson-core.lib.caisson-core;
+      lib = core.mkLib {
         inherit inputs;
         defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
         # Registered from the parent's source path: a flake cannot
         # reference files outside its own tree, and reading the
-        # source forces none of the parent's outputs.
-        libOverlays = mkLibOverlay: {
-          structural = mkLibOverlay (parent.outPath + "/lib-overlays/structural");
-          flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
-        };
+        # source forces none of the parent's outputs. The overlays
+        # and the modules register together, since an overlay
+        # registered from its file reads the registry of the
+        # composition that registered it (the framework module of
+        # its class, `modules.<class>.core`, among others).
+        modules = core.mkModules (parent.outPath + "/modules");
+        libOverlays = core.mkLibOverlays (parent.outPath + "/lib-overlays");
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/unit-tests;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/unit-tests;
     };
 }

@@ -17,20 +17,31 @@
 # back from the hive, one evaluation for nixos-rebuild and colmena
 # apply. Projects can contribute hive modules through the registry
 # like any other class.
-{ entries, ... }:
+{
+  contributeClasses,
+  entries,
+  mkLibOverlay,
+  ...
+}:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
       mkHiveModule = final.caisson-core.mkModule "colmena";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = final.caisson.integrations;
+
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "colmena";
         context = "caisson.colmena";
-        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:
@@ -82,13 +93,13 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         deployment = "set `deployment.*` in the host's configModule; the node declares those options.";
       };
-      checkNodeArgs = import ../check-args.nix {
+      checkNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfiguration (the hive module argument)";
         accepted = nodeAccepted;
         hints = nodeHints;
         open = "mkNixosConfigurationWithEcosystemArgs";
       };
-      checkOpenNodeArgs = import ../check-args.nix {
+      checkOpenNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfigurationWithEcosystemArgs (the hive module argument)";
         accepted = nodeAccepted ++ [ "ecosystemArgs" ];
         hints = nodeHints;
@@ -175,12 +186,12 @@
         defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
         network = "hive metadata is the hive module's `meta`.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.colmena.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
@@ -219,18 +230,21 @@
         {
           ecosystemSrc ? null,
           configModule,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
           pkgSets ? null,
           ...
         }:
         let
           src = assertColmenaEcosystemSrc (resolveSrc ecosystemSrc);
-          selectedModules = moduleImports (final.caisson-core.modules.colmena or { });
+          registry = final.caisson-core.modules.colmena or { };
+          # The framework module of the class: every registered `core`, forced.
+          coreModules = selection.coreModules registry;
+          selectedModules = moduleImports registry;
           hive =
             (final.evalModules {
               class = "colmena";
-              modules = [ hiveOptions ] ++ selectedModules ++ [ configModule ];
+              modules = [ hiveOptions ] ++ coreModules ++ selectedModules ++ [ configModule ];
               specialArgs =
                 mkNodeConstructors src // (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
             }).config;
@@ -275,7 +289,14 @@
         in
         compose args // (args.ecosystemArgs or { });
     in
-    {
+    # This integration owns the `colmena` class.
+    contributeClasses prev {
+      colmena = {
+        integration = "colmena";
+        mkModule = mkHiveModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         colmena = ((prev.caisson or { }).colmena or { }) // {
           mkModule = mkHiveModule;

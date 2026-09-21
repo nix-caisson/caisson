@@ -5,6 +5,8 @@
 # cannot express different machines from the same arguments.
 { final }:
 let
+  selection = final.caisson.integrations;
+
   assertPkgSets =
     context: pkgSets:
     if pkgSets ? pkgs then pkgSets else throw "${context} requires `pkgSets.pkgs` to be defined.";
@@ -12,14 +14,14 @@ let
   # eval-config evaluations carry the nixpkgs module, so the package
   # set lands on `nixpkgs.pkgs`; the minimal evaluator has no such
   # module, so there it is the `pkgs` module argument instead.
-  mkFrameworkModule = pkgSets: {
-    _file = "caisson-nixos:framework";
+  mkPkgSetsModule = pkgSets: {
+    _file = "caisson-nixos:pkgSets";
     config = {
       nixpkgs.pkgs = pkgSets.pkgs;
     };
   };
-  mkMinimalFrameworkModule = pkgSets: {
-    _file = "caisson-nixos:framework-minimal";
+  mkMinimalPkgSetsModule = pkgSets: {
+    _file = "caisson-nixos:pkgSets-minimal";
     config = {
       _module.args.pkgs = final.mkDefault pkgSets.pkgs;
     };
@@ -32,22 +34,28 @@ in
 {
   pkgSets,
   configModule,
-  moduleImports ? builtins.attrValues,
+  moduleImports ? selection.defaultModuleImports,
   specialArgs ? { },
   ...
 }:
 let
   checkedPkgSets = assertPkgSets context pkgSets;
-  selectedModules = moduleImports (final.caisson-core.modules.nixos or { });
-  frameworkModule =
-    if minimal then mkMinimalFrameworkModule checkedPkgSets else mkFrameworkModule checkedPkgSets;
+  registry = final.caisson-core.modules.nixos or { };
+  # The framework module of the class: every registered `core`, forced.
+  coreModules = selection.coreModules registry;
+  selectedModules = moduleImports registry;
+  pkgSetsModule =
+    if minimal then mkMinimalPkgSetsModule checkedPkgSets else mkPkgSetsModule checkedPkgSets;
 in
 {
   inherit checkedPkgSets;
-  modules = selectedModules ++ [
-    configModule
-    frameworkModule
-  ];
+  modules =
+    coreModules
+    ++ selectedModules
+    ++ [
+      configModule
+      pkgSetsModule
+    ];
   # Framework defaults first; the caller's win on conflict, as is
   # normal in the Nix ecosystem.
   specialArgs = {
