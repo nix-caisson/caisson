@@ -3,15 +3,15 @@
 # What an integration is written from: the functions every integration
 # overlay shares, under `lib.caisson.integrations`. Each integration
 # imports this overlay by key, so composing any one of them composes
-# this, and reads the functions through `final`. When `mkIntegration`
-# generates integrations from declarations (design section 8), these
-# are the pieces it generates them from.
+# this, and reads the functions through `final`. `mkIntegration` and
+# `mkAltIntegration` generate an integration from its declaration
+# (design section 8) out of these pieces.
 #
 #   checkArgs            the closed signature of an entry point: every
 #                        integration takes exactly the caisson-shaped
 #                        arguments (configModule, moduleImports,
-#                        specialArgs, pkgSets, ecosystemSrc, and a
-#                        target's own few) and composes the evaluator's
+#                        specialArgs, pkgSets, ecosystemSrc, and the
+#                        few of one target) and composes the evaluator's
 #                        call from them. Nothing else is forwarded: an
 #                        evaluator argument handed in directly would be
 #                        silently overwritten, silently dropped, or
@@ -77,7 +77,7 @@
             if hints ? ${name} then
               "${context} does not accept `${name}`: ${hints.${name}}"
             else if open != null then
-              "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. The evaluator's own arguments are available through ${open}, in `ecosystemArgs`."
+              "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. The evaluator's arguments are available through ${open}, in `ecosystemArgs`."
             else
               "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. Evaluator arguments go in `ecosystemArgs`.";
         in
