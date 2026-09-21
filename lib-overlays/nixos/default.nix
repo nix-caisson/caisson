@@ -42,7 +42,7 @@
       hints = {
         modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
         pkgs = "pass the package set as `pkgSets.pkgs`.";
-        baseModules = "the base module list belongs to the variant: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, mkConfigurationMinimal without it.";
+        baseModules = "the base module list belongs to the entry point: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration without it.";
       };
       mkCheck =
         name: extra: open:
@@ -52,15 +52,21 @@
           inherit hints open;
         };
 
+      # The composition of the class: the module list, the special
+      # arguments and the resolved nixpkgs source, from the caisson
+      # arguments. Every entry point here builds on it, and so does an
+      # integration that evaluates the nixos class with another
+      # evaluator (nixos-minimal), through `lib.caisson.nixos.compose`.
       compose =
         {
-          minimal ? false,
+          context ? "lib.caisson.nixos.mkConfiguration",
+          # Whether the evaluation carries NixOS' nixpkgs module, so
+          # the package set lands on `nixpkgs.pkgs`; without it, the
+          # set is the `pkgs` module argument.
+          nixpkgsModule ? true,
         }:
         args:
-        composeNixos {
-          context = "lib.caisson.nixos.mkConfiguration";
-          inherit minimal;
-        } args
+        composeNixos { inherit context nixpkgsModule; } args
         // {
           src = resolveSrc (args.ecosystemSrc or null);
         };
@@ -116,34 +122,6 @@
           common = compose { } args;
         in
         evalConfig common (evalConfigArgs args common // (args.ecosystemArgs or { }));
-
-      # nixos/lib's evalModules: no NixOS base modules, so the config
-      # module declares any options it uses; the package set arrives as
-      # the `pkgs` module argument.
-      evalMinimalArgs = args: common: {
-        prefix = args.prefix or [ ];
-        modules = common.modules;
-        specialArgs = common.specialArgs;
-      };
-      evalMinimal = common: (import "${common.src}/nixos/lib" { }).evalModules;
-
-      mkConfigurationMinimal =
-        rawArgs:
-        let
-          args = mkCheck "mkConfigurationMinimal" [
-            "prefix"
-          ] "lib.caisson.nixos.mkConfigurationMinimalWithEcosystemArgs" rawArgs;
-          common = compose { minimal = true; } args;
-        in
-        evalMinimal common (evalMinimalArgs args common);
-
-      mkConfigurationMinimalWithEcosystemArgs =
-        rawArgs:
-        let
-          args = mkCheck "mkConfigurationMinimalWithEcosystemArgs" [ "prefix" "ecosystemArgs" ] null rawArgs;
-          common = compose { minimal = true; } args;
-        in
-        evalMinimal common (evalMinimalArgs args common // (args.ecosystemArgs or { }));
     in
     # This integration owns the `nixos` class.
     contributeClasses prev {
@@ -156,12 +134,11 @@
       caisson = (prev.caisson or { }) // {
         nixos = ((prev.caisson or { }).nixos or { }) // {
           inherit
+            compose
             mkModule
             mkConfiguration
             mkConfigurationFull
-            mkConfigurationMinimal
             mkConfigurationWithEcosystemArgs
-            mkConfigurationMinimalWithEcosystemArgs
             ;
         };
       };

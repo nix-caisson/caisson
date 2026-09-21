@@ -23,6 +23,7 @@
         tooling
         nixpkgs
         nixos
+        nixos-minimal
         home-manager
         colmena
         terranix
