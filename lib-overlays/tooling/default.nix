@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # The pkgs-dependent tooling: helpers that need a package set at use
-# time. The composition machinery this directory used to hold lives in
-# caisson-core (the caisson-core input) and reaches composed libraries
-# through mkLib's `caisson-core` namespace injection.
+# time. The composition machinery lives in caisson-core (the
+# caisson-core input) and reaches composed libraries as the
+# `caisson-core` namespace mkLib composes in.
 { entries, ... }:
 
 {

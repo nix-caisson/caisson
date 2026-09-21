@@ -11,10 +11,9 @@
 
     configInfo.configName = "caisson";
 
-    # Every registered overlay exports as-is: integrations carry no
-    # hidden framework dependency (their machinery is baked in at
-    # registration, and the registry comes from the consumer's
-    # mkLib).
+    # Every registered overlay exports as-is: its machinery is baked in
+    # at registration, and the registry comes from the mkLib call of
+    # the consumer.
     libOverlays.exported = libOverlays: {
       inherit (libOverlays)
         integrations

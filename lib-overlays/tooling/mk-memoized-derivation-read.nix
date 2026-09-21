@@ -43,9 +43,8 @@
 
 # Imported by the core lib overlay as `{ lib = final; }`, exposing
 # `lib.caisson.mkMemoizedDerivationRead` for every consumer (mirrors how
-# `eval-weight` is wired). Lives in core, not the `default` overlay, because
-# `mkLib` only re-applies its own injection downstream; a helper in `default`
-# would be invisible to consumers that don't import caisson's own overlay.
+# `eval-weight` is wired). Lives in the tooling overlay so every consumer
+# that composes it sees the helper.
 { lib }:
 
 # { pkgs, drv, subpath, memo, normalize ? id, canonicalize ? null }

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# The `caisson.*` part of the default flake module. The configuration
-# name and the lib export it used to declare are part of caisson's
-# core module now, applied to every evaluation; nothing is left here.
+# The `caisson.*` part of the default flake module. It declares
+# nothing: the configuration name and the lib export belong to the
+# core module of caisson, which applies to every evaluation.
 { ... }:
 { ... }:
 {
