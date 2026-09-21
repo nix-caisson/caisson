@@ -9,7 +9,9 @@
     let
       mkModule = final.caisson-core.mkModule "terranix";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = import ../../helpers/registry-selection.nix;
+
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "terranix";
         context = "caisson.terranix";
         resolve = final.caisson-core.resolve;
@@ -35,12 +37,12 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         system = "pass the package set as `pkgSets.pkgs`; terranix evaluates against it.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.terranix.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
@@ -57,7 +59,7 @@
         {
           ecosystemSrc ? null,
           configModule,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
           pkgSets ? null,
           ...
@@ -67,12 +69,15 @@
             explicit = ecosystemSrc;
             manifest = final.caisson-core.libManifest or { };
           });
-          selectedModules = moduleImports (final.caisson-core.modules.terranix or { });
+          registry = final.caisson-core.modules.terranix or { };
+          # The framework module of the class: every registered `core`, forced.
+          coreModules = selection.coreModules registry;
+          selectedModules = moduleImports registry;
         in
         {
           inherit checkedEcosystemSrc;
           ecosystemArgs = (if pkgSets != null && pkgSets ? pkgs then { pkgs = pkgSets.pkgs; } else { }) // {
-            modules = selectedModules ++ [ configModule ];
+            modules = coreModules ++ selectedModules ++ [ configModule ];
             extraArgs = {
               inputs = closure-inputs;
             }

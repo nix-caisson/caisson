@@ -19,7 +19,7 @@
 # evaluation runs on the same library everything else in the
 # composition does, never on a library flake-parts assembled for
 # itself.
-{ entries, ... }:
+{ closure-lib, entries, ... }:
 
 {
 
@@ -31,7 +31,9 @@
 
       prevNs = (prev.caisson or { }).flake-parts or { };
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = import ../../helpers/registry-selection.nix;
+
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "flake-parts";
         context = "caisson.flake-parts";
         resolve = final.caisson-core.resolve;
@@ -63,7 +65,7 @@
 
       # The option types of the core module, re-exported under this
       # namespace for the readers of that name.
-      types = (prevNs.types or { }) // import ../../modules/core/types.nix { lib = final; };
+      types = (prevNs.types or { }) // import ../../modules/generic/core/types.nix { lib = final; };
 
       # flake-parts' own mkFlake arguments this entry point composes are
       # refused with a pointer to the caisson argument; the rest forward.
@@ -81,12 +83,12 @@
         modules = "pass the configuration's module as `configModule`; registered flake-class modules are selected with `moduleImports`.";
         moduleLocation = "pass the flake's canonical name as `name`.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.flake-parts.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
@@ -105,7 +107,9 @@
           # declarations when absent.
           ecosystemSrc ? null,
 
-          moduleImports ? builtins.attrValues,
+          # Selection over the flake class of the registry; the default
+          # default is every entry named `default`.
+          moduleImports ? selection.defaultModuleImports,
 
           # The flake's canonical name. Exported modules are keyed by
           # flake-parts' moduleLocation, which defaults to self.outPath,
@@ -160,11 +164,22 @@
               }
               // ecosystemArgs;
 
-            # Selection over the flake class of the registry, the
-            # same source every adapter selects from, so modules
-            # arriving by any channel (local registration, overlay
-            # contribution, consumed project) are selectable here.
-            importedModules = moduleImports (final.caisson-core.modules.flake or { });
+            # The flake class of the registry, the same source every
+            # adapter selects from, so modules arriving by any channel
+            # (local registration, overlay contribution, consumed
+            # project) are selectable here.
+            registry = final.caisson-core.modules.flake or { };
+
+            # The framework module of the class: caisson's own core,
+            # read from the closure so it is there however this
+            # integration was registered, plus every `core` the
+            # composition registered.
+            frameworkModules = [
+              closure-lib.caisson-core.modules.flake.core
+            ]
+            ++ selection.coreModules registry;
+
+            importedModules = moduleImports registry;
 
             finalModule = (
               { lib, ... }:
@@ -172,8 +187,8 @@
                 imports = [
                   flakeParts.flakeModules.flakeModules
                   flakeParts.flakeModules.modules
-                  ../../modules/flake-parts/core
                 ]
+                ++ frameworkModules
                 ++ importedModules
                 ++ [ configModule ]
                 ++ (if name != null then [ { caisson.configInfo.configName = lib.mkDefault name; } ] else [ ]);

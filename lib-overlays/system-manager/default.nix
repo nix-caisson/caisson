@@ -9,7 +9,9 @@
     let
       mkModule = final.caisson-core.mkModule "systemManager";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = import ../../helpers/registry-selection.nix;
+
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "system-manager";
         context = "caisson.system-manager";
         resolve = final.caisson-core.resolve;
@@ -25,13 +27,16 @@
       mkCommonArgs =
         args@{
           configModule,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
           pkgSets ? null,
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson-core.modules.systemManager or { });
+          registry = final.caisson-core.modules.systemManager or { };
+          # The framework module of the class: every registered `core`, forced.
+          coreModules = selection.coreModules registry;
+          selectedModules = moduleImports registry;
           # system-manager instantiates its own nixpkgs from
           # `nixpkgs.hostPlatform`; a supplied package set seeds that
           # platform (an explicit hostPlatform wins) and rides along as
@@ -48,7 +53,7 @@
               [ ];
         in
         {
-          modules = selectedModules ++ pkgSetsModule ++ [ configModule ];
+          modules = coreModules ++ selectedModules ++ pkgSetsModule ++ [ configModule ];
           # Framework defaults first; caller's specialArgs wins on conflict.
           # This is intentional and normal in the Nix ecosystem.
           specialArgs = {
@@ -69,12 +74,12 @@
         modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
         extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.system-manager.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;

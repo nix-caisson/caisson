@@ -27,7 +27,9 @@
     let
       mkHiveModule = final.caisson-core.mkModule "colmena";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = import ../../helpers/registry-selection.nix;
+
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "colmena";
         context = "caisson.colmena";
         resolve = final.caisson-core.resolve;
@@ -82,13 +84,13 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         deployment = "set `deployment.*` in the host's configModule; the node declares those options.";
       };
-      checkNodeArgs = import ../check-args.nix {
+      checkNodeArgs = import ../../helpers/check-args.nix {
         context = "mkNixosConfiguration (the hive module argument)";
         accepted = nodeAccepted;
         hints = nodeHints;
         open = "mkNixosConfigurationWithEcosystemArgs";
       };
-      checkOpenNodeArgs = import ../check-args.nix {
+      checkOpenNodeArgs = import ../../helpers/check-args.nix {
         context = "mkNixosConfigurationWithEcosystemArgs (the hive module argument)";
         accepted = nodeAccepted ++ [ "ecosystemArgs" ];
         hints = nodeHints;
@@ -175,12 +177,12 @@
         defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
         network = "hive metadata is the hive module's `meta`.";
       };
-      checkArgs = import ../check-args.nix {
+      checkArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.colmena.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
@@ -219,18 +221,21 @@
         {
           ecosystemSrc ? null,
           configModule,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
           pkgSets ? null,
           ...
         }:
         let
           src = assertColmenaEcosystemSrc (resolveSrc ecosystemSrc);
-          selectedModules = moduleImports (final.caisson-core.modules.colmena or { });
+          registry = final.caisson-core.modules.colmena or { };
+          # The framework module of the class: every registered `core`, forced.
+          coreModules = selection.coreModules registry;
+          selectedModules = moduleImports registry;
           hive =
             (final.evalModules {
               class = "colmena";
-              modules = [ hiveOptions ] ++ selectedModules ++ [ configModule ];
+              modules = [ hiveOptions ] ++ coreModules ++ selectedModules ++ [ configModule ];
               specialArgs =
                 mkNodeConstructors src // (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
             }).config;

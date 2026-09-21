@@ -57,40 +57,34 @@
           `<project>/<name>`, and the usual selections pick from them per
           item. Registering caisson this way brings in its integrations
           (`lib.caisson`, the flake-parts one included) and its exported modules.
-        - `modules` is a function from the composed `lib`, used to register
-          this flake's own class-keyed modules.
+        - `modules` is a function from the composed `lib` returning the
+          class-keyed registration. `mkModules` derives it from the
+          conventional layout, `modules/<class>/<name>/default.nix`:
+          each entry directory becomes `modules.<class>.<name>`, built
+          with `caisson-core.mkModule <class>`. Everything passed to
+          mkModule takes the closure attrset ({ closure-inputs,
+          closure-lib, mkModule, ... }) as its first arg list; files
+          that don't need it take `{ ... }:`.
+        - `configs` is the same registration for `configs/<class>/<name>`,
+          the configurations a top evaluates.
         - `libOverlays` is a function from an input-closed `mkLibOverlay`
-          helper, used to register individual library overlays; registering
+          helper returning the registered library overlays; `mkLibOverlays`
+          derives it from `lib-overlays/<name>/default.nix`. Registering
           one by hand stays useful for cherry-picking or renaming a single
           overlay from elsewhere.
       */
-      lib = caisson.lib.caisson-core.mkLib {
+      core = caisson.lib.caisson-core;
+
+      lib = core.mkLib {
         inherit inputs;
 
         projects = {
           inherit caisson;
         };
 
-        modules = lib: {
-          # Demonstrate class-keyed module registration.
-          # This class is not imported by the flake-parts mkConfiguration in this example.
-          generic = {
-            noop = lib.caisson-core.mkModule "generic" ({ ... }: { });
-          };
-          flake = {
-            # Register this flake's own module. Everything passed to mkModule
-            # takes the closure attrset ({ closure-inputs, closure-lib,
-            # mkModule, ... }) as its first arg list; files that don't need it
-            # take `{ ... }:`.
-            default = lib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
-          };
-        };
-
-        libOverlays = mkLibOverlay: {
-          # Register a local library overlay. After mkLib completes, its
-          # attributes are available on the composed `lib` (e.g. lib.literate-flake).
-          default = mkLibOverlay ./lib-overlays/default;
-        };
+        modules = core.mkModules ./modules;
+        configs = core.mkModules ./configs;
+        libOverlays = core.mkLibOverlays ./lib-overlays;
       };
     in
     /*
@@ -101,19 +95,17 @@
       the fully composed library.
 
       - `configModule` is the flake's top-level configuration (systems,
-        caisson settings, per-system packages, etc.).
+        caisson settings, per-system packages, etc.), here the registered
+        configuration `configs/flake/literate-flake`.
       - `moduleImports` returns the list of registered flake-class modules
         to activate, like `libOverlayImports` for overlays; the consumed
-        project's modules select under their prefixed names
-        ("caisson/default" is caisson's default module, providing
-        configInfo and the export options).
+        project's modules select under their prefixed names. When it is
+        omitted, every registered entry named `default` applies: this
+        flake's own and "caisson/default", caisson's default module (the
+        nixpkgs integration's module layer). The `core` entries of the
+        class apply to every evaluation regardless.
     */
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/literate-flake;
-
-      moduleImports = modules: [
-        modules."caisson/default"
-        modules.default
-      ];
+      configModule = lib.caisson-core.configs.flake.literate-flake;
     };
 }

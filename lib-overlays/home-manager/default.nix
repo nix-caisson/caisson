@@ -10,7 +10,13 @@
       mkModule = final.caisson-core.mkModule "homeManager";
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      selection = import ../../helpers/registry-selection.nix;
+      registry = final.caisson-core.modules.homeManager or { };
+      # The framework module of the class: every registered `core`,
+      # forced into every home-manager evaluation.
+      coreModules = selection.coreModules registry;
+
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "home-manager";
         context = "caisson.home-manager";
         resolve = final.caisson-core.resolve;
@@ -151,7 +157,7 @@
           ecosystemSrc ? null,
           pkgSets,
           configModule,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
           osConfig ? null,
           check ? true,
@@ -161,7 +167,7 @@
         }:
         let
           checkedPkgSets = assertPkgSets pkgSets;
-          selectedModules = moduleImports (final.caisson-core.modules.homeManager or { });
+          selectedModules = moduleImports registry;
           hmSource = resolveOutPath (resolveSrc ecosystemSrc);
           resolvedSourceMeta =
             if sourceMeta != null then
@@ -180,11 +186,14 @@
             ;
           sourceMeta = resolvedSourceMeta;
           configuration = {
-            imports = selectedModules ++ [
-              configModule
-              (mkSourceMetaModule resolvedSourceMeta)
-              { programs.home-manager.path = final.mkDefault hmSource; }
-            ];
+            imports =
+              coreModules
+              ++ selectedModules
+              ++ [
+                configModule
+                (mkSourceMetaModule resolvedSourceMeta)
+                { programs.home-manager.path = final.mkDefault hmSource; }
+              ];
           };
           pkgs = checkedPkgSets.pkgs;
           # Framework defaults first; caller's specialArgs wins on conflict.
@@ -220,13 +229,13 @@
         "minimal"
         "sourceMeta"
       ];
-      checkArgs = import ../check-args.nix {
+      checkArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.home-manager.mkConfiguration";
         accepted = configurationArgs;
         inherit hints;
         open = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../check-args.nix {
+      checkOpenArgs = import ../../helpers/check-args.nix {
         context = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
         accepted = configurationArgs ++ [ "ecosystemArgs" ];
         inherit hints;
@@ -266,14 +275,14 @@
 
       mkStandaloneAdapter =
         args@{
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           ...
         }:
         let
-          selectedModules = moduleImports (final.caisson-core.modules.homeManager or { });
+          selectedModules = moduleImports registry;
         in
         {
-          homeModules = selectedModules;
+          homeModules = coreModules ++ selectedModules;
           buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
@@ -298,7 +307,7 @@
           # marker cannot vouch for coherence.
           baseSystem ? null,
           sourceMeta ? null,
-          moduleImports ? builtins.attrValues,
+          moduleImports ? selection.defaultModuleImports,
           sharedModules ? [ ],
           useGlobalPkgs ? true,
           useUserPackages ? true,
@@ -336,7 +345,7 @@
           }:
           let
             checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
-            sharedClassModules = moduleImports (final.caisson-core.modules.homeManager or { });
+            sharedClassModules = coreModules ++ moduleImports registry;
             hmSource = resolveOutPath (resolveSrc ecosystemSrc);
             resolvedSourceMeta =
               if sourceMeta != null then
@@ -358,7 +367,7 @@
               _username: userArgs:
               let
                 userModuleImports = userArgs.moduleImports or (_modules: [ ]);
-                userClassModules = userModuleImports (final.caisson-core.modules.homeManager or { });
+                userClassModules = userModuleImports registry;
                 configModule =
                   if userArgs ? configModule then
                     userArgs.configModule

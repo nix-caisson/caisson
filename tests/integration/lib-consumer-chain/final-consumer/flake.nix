@@ -28,6 +28,6 @@
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/final-consumer;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/final-consumer;
     };
 }

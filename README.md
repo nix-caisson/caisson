@@ -32,7 +32,9 @@ fit together instead of colliding.
 
 Use `caisson-core.mkLib` to compose your library, then
 `lib.caisson.flake-parts.mkConfiguration` to produce the flake outputs. By convention, your primary configuration
-lives in `configs/flake-parts/<flake-name>`.
+lives in `configs/flake/<flake-name>`, and the registrations are read
+from the directories: `modules/<class>/<name>`, `configs/<class>/<name>`
+and `lib-overlays/<name>`.
 
 ```nix
 {
@@ -52,40 +54,41 @@ lives in `configs/flake-parts/<flake-name>`.
       # Compose a library: the machinery lands under lib.caisson-core,
       # and caisson's flake-parts integration overlay contributes
       # lib.caisson (one namespace per integration target).
-      lib = caisson.lib.caisson-core.mkLib {
+      core = caisson.lib.caisson-core;
+
+      lib = core.mkLib {
         inherit inputs;
 
-        # Register class-keyed modules. This function receives the composed lib.
-        modules = lib: {
-          flake = {
-            # The flake-parts modules this flake defines: closed over your
-            # inputs, importable here, exportable to downstream consumers.
-            default = lib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
-            # other = lib.caisson.flake-parts.mkModule inputs.other-flake.flakeModules.default;
-          };
-        };
+        # Consume caisson as a project: its integrations and its
+        # exported modules join the registries under `caisson/<name>`.
+        projects = { inherit caisson; };
 
-        # The library overlays this flake registers. This function receives
-        # an input-closed mkLibOverlay helper; already-built overlays (like
-        # caisson's integrations) register directly.
-        libOverlays = mkLibOverlay: {
-          flake-parts = caisson.libOverlays.flake-parts;
-          default = mkLibOverlay ./lib-overlays/default;
-          # other = inputs.other-flake.libOverlays.default;
-        };
+        # The class-keyed modules this flake defines, read from
+        # modules/<class>/<name>/default.nix: closed over your inputs,
+        # importable here, exportable to downstream consumers. A flake
+        # with another layout writes the registration by hand
+        # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
+        modules = core.mkModules ./modules;
 
-        # Select which of the registered overlays to apply to this flake's lib.
-        libOverlayImports = overlays: builtins.attrValues { inherit (overlays) flake-parts default; };
+        # The configurations, read from configs/<class>/<name>/default.nix.
+        configs = core.mkModules ./configs;
+
+        # The library overlays this flake registers, read from
+        # lib-overlays/<name>/default.nix. An already-built overlay (another
+        # flake's export) registers by hand, directly.
+        libOverlays = core.mkLibOverlays ./lib-overlays;
 
       };
 
     in lib.caisson.flake-parts.mkConfiguration {
 
-      # Convention: your primary config lives in configs/flake-parts/<flake-name>
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/my-flake;
+      # Convention: your primary config lives in configs/flake/<flake-name>
+      configModule = lib.caisson-core.configs.flake.my-flake;
 
-      # Select which modules (yours or your dependencies') this flake composes.
-      moduleImports = modules: { inherit (modules) default; };
+      # Which registered flake modules apply. Omitted, every entry named
+      # `default` applies (this flake's `default` and `caisson/default`);
+      # the `core` entries apply regardless.
+      # moduleImports = modules: [ modules.default modules."caisson/default" ];
 
     };
 }

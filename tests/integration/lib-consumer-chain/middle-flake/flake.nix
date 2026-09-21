@@ -19,7 +19,7 @@
 
         modules = lib: {
           flake = {
-            default = lib.caisson.flake-parts.mkModule ./modules/flake-parts/default;
+            default = lib.caisson.flake-parts.mkModule ./modules/flake/default;
           };
         };
 
@@ -30,6 +30,6 @@
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/middle-flake;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/middle-flake;
     };
 }

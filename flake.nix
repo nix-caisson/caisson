@@ -27,12 +27,14 @@
     inputs@{ caisson-core, ... }:
     let
 
-      lib = caisson-core.lib.caisson-core.mkLib {
+      core = caisson-core.lib.caisson-core;
+
+      lib = core.mkLib {
         inherit inputs;
         systems = import ./systems.nix;
-        modules = import ./modules.nix;
-        configs = import ./configs.nix;
-        libOverlays = import ./libOverlays.nix;
+        modules = core.mkModules ./modules;
+        configs = core.mkModules ./configs;
+        libOverlays = core.mkLibOverlays ./lib-overlays;
       };
 
     in
@@ -41,8 +43,6 @@
       name = "caisson";
 
       configModule = lib.caisson-core.configs.flake.caisson;
-
-      moduleImports = modules: [ modules.default ];
 
     };
 

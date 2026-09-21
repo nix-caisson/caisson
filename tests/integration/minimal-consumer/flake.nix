@@ -19,23 +19,18 @@
   outputs =
     inputs@{ parent, ... }:
     let
+      # The flake-parts integration alone, registered by hand: its core
+      # module reaches the evaluation through the closure of the
+      # overlay, so nothing else is registered or selected.
       lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
 
         libOverlays = _mkLibOverlay: {
           flake-parts = parent.libOverlays.flake-parts;
         };
-
-        modules = lib: {
-          flake = {
-            caisson-default = inputs.parent.flakeModules.default;
-          };
-        };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/minimal-consumer;
-
-      moduleImports = modules: [ modules.caisson-default ];
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/minimal-consumer;
     };
 }

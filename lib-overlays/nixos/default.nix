@@ -9,7 +9,7 @@
     let
       mkModule = final.caisson-core.mkModule "nixos";
 
-      resolveEcosystemSrc = import ../resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
         name = "nixpkgs";
         context = "caisson.nixos";
         resolve = final.caisson-core.resolve;
@@ -37,7 +37,7 @@
       };
       mkCheck =
         name: extra: open:
-        import ../check-args.nix {
+        import ../../helpers/check-args.nix {
           context = "lib.caisson.nixos.${name}";
           accepted = commonAccepted ++ extra;
           inherit hints open;

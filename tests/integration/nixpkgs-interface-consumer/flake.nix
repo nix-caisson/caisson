@@ -27,13 +27,11 @@
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-interface-consumer;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-interface-consumer;
 
       # Interface only: the registry option without the package-set
-      # machinery.
-      moduleImports = modules: [
-        modules."caisson/default"
-        modules."caisson/nixpkgs-interface"
-      ];
+      # machinery, which caisson/default (the default default) would
+      # bring; caisson/core applies regardless.
+      moduleImports = modules: [ modules."caisson/nixpkgs-interface" ];
     };
 }
