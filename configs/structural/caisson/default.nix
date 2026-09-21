@@ -41,7 +41,7 @@
       export.enabled = true;
       # The native surface mirrors the composed library's framework
       # namespaces, so flake-level and composed-level addresses match.
-      exported = composedLib: { inherit (composedLib) caisson caisson-core; };
+      exported = lib: { inherit (lib) caisson caisson-core; };
     };
 
   };

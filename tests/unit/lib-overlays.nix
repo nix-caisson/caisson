@@ -1705,13 +1705,13 @@ in
     let
       registeringLib = caisson.mkLib {
         inputs = mockInputs;
-        modules = composedLib: {
+        modules = callbackLib: {
           flake = {
-            thing = composedLib.caisson.flake-parts.mkModule ({ ... }: { });
-            other = composedLib.caisson.flake-parts.mkModule ({ ... }: { });
+            thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
+            other = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
           };
           structural = {
-            named = composedLib.caisson.structural.mkModule (
+            named = callbackLib.caisson.structural.mkModule (
               { ... }:
               {
                 caisson.configInfo.configName = "from-the-registry";
