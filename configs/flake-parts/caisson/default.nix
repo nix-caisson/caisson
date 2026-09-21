@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: MIT
 #
-# The flake top's configuration: the structural configuration of
-# caisson evaluated beneath this flake top, its exports merged into
-# this top's exports (what a child configuration will be once
-# children exist), plus the checks partition only a flake evaluation
-# carries.
+# The flake top's configuration: the shared configuration of what
+# caisson exports, evaluated beneath this top with its exports merged
+# into this top's exports, plus the checks partition only a flake
+# evaluation carries.
 { closure-inputs, ... }:
 { lib, ... }:
 let
-  structural = lib.caisson.structural.mkConfiguration {
-    configModule = ../../structural/caisson;
+  impl = lib.caisson.structural.mkConfiguration {
+    configModule = lib.caisson-core.configs.structural.impl;
   };
 in
 {
@@ -25,6 +24,6 @@ in
 
   debug = false;
 
-  caisson.exports = structural.outputs.exports;
+  caisson.exports = impl.outputs.exports;
 
 }

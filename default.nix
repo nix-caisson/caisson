@@ -16,8 +16,8 @@ let
       type = "github";
       owner = "nix-caisson";
       repo = "caisson-core";
-      rev = "cf7317cb03067c1cc12735985c7124ec6ebce1d8";
-      narHash = "sha256-DAkrrGVfFtQqDn0CFt0oNrMKYhLxq4lYvLhfqMUUN+8=";
+      rev = "97e941f303908484e213cf932916e3d76dc5b5e6";
+      narHash = "sha256-iGMp70NBaFwolzIj9kU8NQ42FGnWWm9B/lYYCgViKoM=";
     };
     nixpkgs-lib = {
       type = "github";
@@ -36,10 +36,11 @@ let
     };
     systems = import ./systems.nix;
     modules = import ./modules.nix;
+    configs = import ./configs.nix;
     libOverlays = import ./libOverlays.nix;
   };
 
 in
 lib.caisson.structural.mkTopConfiguration {
-  configModule = ./configs/structural/caisson;
+  configModule = lib.caisson-core.configs.structural.caisson;
 }

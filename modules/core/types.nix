@@ -41,6 +41,8 @@ in
       )
       && builtins.isAttrs (v.modules or null)
       && builtins.all builtins.isAttrs (builtins.attrValues v.modules)
+      && builtins.isAttrs (v.configs or { })
+      && builtins.all builtins.isAttrs (builtins.attrValues (v.configs or { }))
       && builtins.isAttrs (v.libOverlays or null)
       && builtins.all isLibOverlay (builtins.attrValues v.libOverlays);
   };

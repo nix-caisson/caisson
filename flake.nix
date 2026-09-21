@@ -31,6 +31,7 @@
         inherit inputs;
         systems = import ./systems.nix;
         modules = import ./modules.nix;
+        configs = import ./configs.nix;
         libOverlays = import ./libOverlays.nix;
       };
 
@@ -39,7 +40,7 @@
 
       name = "caisson";
 
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/caisson;
+      configModule = lib.caisson-core.configs.flake.caisson;
 
       moduleImports = modules: [ modules.default ];
 
