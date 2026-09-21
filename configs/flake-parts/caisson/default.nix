@@ -3,12 +3,14 @@
 # The flake top's configuration: the shared configuration of what
 # caisson exports, evaluated beneath this top with its exports merged
 # into this top's exports, plus the checks partition only a flake
-# evaluation carries.
-{ closure-inputs, ... }:
-{ lib, ... }:
+# evaluation carries. Both the configuration and the evaluation come
+# from the closure, the composition this configuration was registered
+# in.
+{ closure-inputs, closure-lib, ... }:
+{ ... }:
 let
-  impl = lib.caisson.structural.mkConfiguration {
-    configModule = lib.caisson-core.configs.structural.impl;
+  impl = closure-lib.caisson.structural.mkConfiguration {
+    configModule = closure-lib.caisson-core.configs.structural.impl;
   };
 in
 {
