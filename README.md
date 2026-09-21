@@ -110,7 +110,7 @@ source by.
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `terranix` | `terranix` | Terranix and Terraform configurations |
-| `colmena` | `colmena` | Colmena deployment hives |
+| `colmena` | `colmena` | colmena configurations (class `caisson-colmena`), projected onto the hive colmena's binary reads; not compatible with colmena's hive modules |
 | `system-manager` | `system-manager` | system-manager configurations on foreign distros |
 | `structural` | none | a configuration that only exports: the top of a repository whose point is what it exports, such as caisson itself |
 
