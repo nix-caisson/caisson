@@ -2,9 +2,8 @@
 { ... }:
 {
   imports = [
-    ./manifest.nix
-    ./modules.nix
-    ./libOverlays.nix
+    ../../../core
+    ./exports.nix
     ./systems.nix
   ];
 }

@@ -50,6 +50,7 @@
         # reference files outside its own tree, and reading the
         # source forces none of the parent's outputs.
         libOverlays = mkLibOverlay: {
+          structural = mkLibOverlay (parent.outPath + "/lib-overlays/structural");
           flake-parts = mkLibOverlay (parent.outPath + "/lib-overlays/flake-parts");
         };
       };

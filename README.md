@@ -108,12 +108,14 @@ source by.
 | `terranix` | `terranix` | Terranix and Terraform configurations |
 | `colmena` | `colmena` | Colmena deployment hives |
 | `system-manager` | `system-manager` | system-manager configurations on foreign distros |
+| `structural` | none | a configuration that only exports: the top of a repository whose point is what it exports, such as caisson itself |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
 argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then
 the entry named exactly `<name>` in the `inputs` you passed to `mkLib`.
 caisson pins none of these ecosystems. caisson's flake inputs are
-caisson-core, nixpkgs-lib and flake-parts, used for its own evaluation.
+caisson-core, nixpkgs-lib and flake-parts, used when caisson itself is
+evaluated.
 
 ## Going deeper
 

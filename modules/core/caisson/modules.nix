@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 { config, lib, ... }:
 let
-  registeredModules = config.caisson.manifest.modules // {
-    flake = config.caisson.manifest.modules.flake or { };
-  };
+  registeredModules = config.caisson.manifest.modules;
 
   classConfigFor =
     class:
@@ -16,9 +14,8 @@ let
     class: classModules:
     let
       classConfig = classConfigFor class;
-      selectedModules = if classConfig.export.enabled then classConfig.exported classModules else { };
     in
-    if class == "flake" then { default = { }; } // selectedModules else selectedModules
+    if classConfig.export.enabled then classConfig.exported classModules else { }
   ) registeredModules;
 in
 {
@@ -35,7 +32,7 @@ in
               description = ''
                 Function that selects which registered modules to export for this
                 class. Receives the modules registered via `mkLib.modules.<class>`
-                and returns the subset to publish under `flake.modules.<class>`.
+                and returns the subset to publish.
               '';
             };
           };
@@ -50,8 +47,5 @@ in
     '';
   };
 
-  config = {
-    flake.modules = exportedClassModules;
-    flake.flakeModules = config.flake.modules.flake;
-  };
+  config.caisson.exports.modules = exportedClassModules;
 }

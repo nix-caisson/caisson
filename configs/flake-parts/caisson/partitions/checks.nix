@@ -158,7 +158,10 @@
                     # this is the number that must not creep. It includes
                     # one instantiation of flake-parts' library over the
                     # composed lib, since the raw scenario's flake-parts is
-                    # built over the plain nixpkgs lib and is not shared.
+                    # built over the plain nixpkgs lib and is not shared,
+                    # and the evaluation of the structural configuration
+                    # caisson's flake top holds beneath it, which reading
+                    # caisson's outputs pays.
                     {
                       name = "caisson-overhead";
                       minuend = "minimal-consumer";

@@ -25,9 +25,9 @@ without nixpkgs can depend on it directly.
 
 ## caisson
 
-The layer users reach for: the integrations (`flake-parts`,
-`nixpkgs`, `nixos`, `home-manager`, `colmena`, `terranix`,
-`system-manager`), each a library overlay contributing its
+The layer users reach for: the integrations (`structural`,
+`flake-parts`, `nixpkgs`, `nixos`, `home-manager`, `colmena`,
+`terranix`, `system-manager`), each a library overlay contributing its
 `lib.caisson` namespace, registering its own module class where it
 has one, and taking its ecosystem as an `ecosystemSrc` argument
 resolved from the declarations of the mkLib call that composes it
@@ -35,9 +35,9 @@ resolved from the declarations of the mkLib call that composes it
 with the composed library as its `nixpkgs-lib`, and carries the
 export machinery that projects a composition's manifest into flake
 outputs). The pkgs-dependent tooling (`eval-weight`,
-`mkMemoizedDerivationRead`) lives here too. caisson's own flake
-declares three inputs, caisson-core, nixpkgs-lib and flake-parts,
-for its own evaluation; a consumer's evaluation reads none of them,
+`mkMemoizedDerivationRead`) lives here too. The flake of caisson
+declares the inputs caisson-core, nixpkgs-lib and flake-parts,
+used when caisson itself is evaluated; a consumer's evaluation reads none of them,
 since every ecosystem comes from the consumer's declarations, and a
 consumer that composes with caisson-core directly registers
 caisson's exported overlays and modules. Hand-wired evaluations (the

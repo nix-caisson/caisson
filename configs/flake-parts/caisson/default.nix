@@ -1,11 +1,23 @@
 # SPDX-License-Identifier: MIT
-{ closure-inputs, ... }:
-{ inputs, config, ... }:
+#
+# The flake top's configuration: the shared configuration of what
+# caisson exports, evaluated beneath this top with its exports merged
+# into this top's exports, plus the checks partition only a flake
+# evaluation carries. Both the configuration and the evaluation come
+# from the closure, the composition this configuration was registered
+# in.
+{ closure-inputs, closure-lib, ... }:
+{ ... }:
+let
+  impl = closure-lib.caisson.structural.mkConfiguration {
+    configModule = closure-lib.caisson-core.configs.structural.impl;
+  };
+in
 {
 
   imports = [
-    # flake-parts' partitions module, from this flake's own
-    # flake-parts input (a module file; it binds no library).
+    # flake-parts' partitions module, from the flake-parts input of
+    # this flake (a module file; it binds no library).
     closure-inputs.flake-parts.flakeModules.partitions
     ./partitions
   ];
@@ -14,39 +26,6 @@
 
   debug = false;
 
-  caisson = {
-
-    # Every registered overlay exports as-is: integrations carry no
-    # hidden framework dependency (their machinery is baked in at
-    # registration, and the registry comes from the consumer's
-    # mkLib).
-    libOverlays.exported = libOverlays: {
-      inherit (libOverlays)
-        flake-parts
-        tooling
-        nixpkgs
-        nixos
-        home-manager
-        colmena
-        terranix
-        system-manager
-        ;
-    };
-    modules.flake.exported = modules: {
-      inherit (modules)
-        default
-        nixpkgs
-        nixpkgs-interface
-        ;
-    };
-
-    lib = {
-      export.enabled = true;
-      # The native surface mirrors the composed library's framework
-      # namespaces, so flake-level and composed-level addresses match.
-      exported = composedLib: { inherit (composedLib) caisson caisson-core; };
-    };
-
-  };
+  caisson.exports = impl.outputs.exports;
 
 }

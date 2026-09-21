@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: MIT
-{ ... }:
 { config, lib, ... }:
 let
   configName = config.caisson.configInfo.configName;
@@ -14,8 +13,8 @@ in
       type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
       description = ''
         Function that selects which parts of the composed library to
-        publish as the flake's `lib` output. Receives the composed
-        library; defaults to the flake's own namespace.
+        publish as the `lib` export. Receives the composed library;
+        defaults to the namespace `configName` names.
       '';
       default =
         composedLib:
@@ -30,6 +29,7 @@ in
   config = {
     caisson.lib.export.enabled = lib.mkDefault false;
 
-    flake.lib = if config.caisson.lib.export.enabled then config.caisson.lib.exported lib else { };
+    caisson.exports.lib =
+      if config.caisson.lib.export.enabled then config.caisson.lib.exported lib else { };
   };
 }
