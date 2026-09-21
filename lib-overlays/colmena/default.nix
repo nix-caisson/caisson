@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# The colmena integration. A hive is a set of NixOS configurations plus
-# deployment metadata, and colmena's binary reads it through a small
-# versioned attrset (the hive schema).
+# The colmena integration, declared: it owns the `colmena` class, and
+# what it evaluates is a hive. A hive is a set of NixOS configurations
+# plus deployment metadata, and colmena's binary reads it through a
+# small versioned attrset (the hive schema).
 #
 # mkConfiguration evaluates the hive: a module of class `colmena` with
 # `meta` (the metadata colmena's binary reads) and `nodes.<name>`,
@@ -35,8 +36,6 @@
   overlay =
     final: prev:
     let
-      mkHiveModule = final.caisson-core.mkModule "colmena";
-
       selection = final.caisson.integrations;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
@@ -58,8 +57,8 @@
           throw "lib.caisson.colmena requires `ecosystemSrc.lib.makeHive` and `ecosystemSrc.nixosModules` (a colmena flake).";
 
       # The hive schema this integration emits. Colmena's binary asserts
-      # the version; mkConfiguration asserts it against the ecosystem
-      # source's own makeHive, so a colmena revision that moves the
+      # the version; mkConfiguration asserts it against the makeHive of
+      # the ecosystem source, so a colmena revision that moves the
       # schema fails loudly at evaluation rather than at deploy time.
       schema = "v0.5";
       metaConfigKeys = [
@@ -172,31 +171,6 @@
           };
         };
 
-      accepted = [
-        "ecosystemSrc"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "pkgSets"
-      ];
-      hints = {
-        modules = "pass the hive module as `configModule`; registered colmena-class modules are selected with `moduleImports`.";
-        meta = "hive metadata is the hive module's `meta`.";
-        nodes = "the nodes are the hive module's `nodes`.";
-        defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
-        network = "hive metadata is the hive module's `meta`.";
-      };
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.colmena.mkConfiguration";
-        inherit accepted hints;
-        open = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
-        accepted = accepted ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
-
       checkNode =
         name: node:
         if builtins.isAttrs node && node ? config && node.config ? deployment then
@@ -226,6 +200,9 @@
             }. A node name is non-empty, does not start with `@` (a tag) and contains no `,` (a separator).
           '';
 
+      # colmena's binary is the evaluator of a hive: it reads the hive
+      # attrset, so the composed call is the hive itself, and the
+      # twin's `ecosystemArgs` sets or replaces its attributes.
       compose =
         {
           ecosystemSrc ? null,
@@ -251,60 +228,54 @@
           nodes = builtins.mapAttrs checkNode (checkNodeNames hive.nodes);
           upstreamSchema = (src.lib.makeHive { }).__schema;
         in
-        if upstreamSchema != schema then
-          throw "lib.caisson.colmena.mkConfiguration emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
-        else
-          rec {
-            __schema = schema;
-            inherit nodes;
-            toplevel = builtins.mapAttrs (_: node: node.config.system.build.toplevel) nodes;
-            deploymentConfig = builtins.mapAttrs (_: node: node.config.deployment) nodes;
-            deploymentConfigSelected =
-              names: final.filterAttrs (name: _: builtins.elem name names) deploymentConfig;
-            evalSelected = names: final.filterAttrs (name: _: builtins.elem name names) toplevel;
-            evalSelectedDrvPaths = names: builtins.mapAttrs (_: drv: drv.drvPath) (evalSelected names);
-            metaConfig = final.getAttrs metaConfigKeys hive.meta;
-            introspect =
-              f:
-              f {
-                lib = final;
-                pkgs =
-                  if pkgSets != null && pkgSets ? pkgs then
-                    pkgSets.pkgs
-                  else
-                    throw "lib.caisson.colmena: `colmena eval` needs a package set; pass `pkgSets.pkgs` to mkConfiguration.";
+        {
+          ecosystemArgs =
+            if upstreamSchema != schema then
+              throw "lib.caisson.colmena.mkConfiguration emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
+            else
+              rec {
+                __schema = schema;
                 inherit nodes;
+                toplevel = builtins.mapAttrs (_: node: node.config.system.build.toplevel) nodes;
+                deploymentConfig = builtins.mapAttrs (_: node: node.config.deployment) nodes;
+                deploymentConfigSelected =
+                  names: final.filterAttrs (name: _: builtins.elem name names) deploymentConfig;
+                evalSelected = names: final.filterAttrs (name: _: builtins.elem name names) toplevel;
+                evalSelectedDrvPaths = names: builtins.mapAttrs (_: drv: drv.drvPath) (evalSelected names);
+                metaConfig = final.getAttrs metaConfigKeys hive.meta;
+                introspect =
+                  f:
+                  f {
+                    lib = final;
+                    pkgs =
+                      if pkgSets != null && pkgSets ? pkgs then
+                        pkgSets.pkgs
+                      else
+                        throw "lib.caisson.colmena: `colmena eval` needs a package set; pass `pkgSets.pkgs` to mkConfiguration.";
+                    inherit nodes;
+                  };
               };
-          };
+        };
 
-      mkConfiguration = rawArgs: compose (checkArgs rawArgs);
+      evaluate = _composed: hive: hive;
 
-      # The same hive, then `ecosystemArgs` merged over it verbatim: the
-      # hive attrset is what colmena's binary reads, so any of its
-      # attributes can be set or replaced there.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = checkOpenArgs rawArgs;
-        in
-        compose args // (args.ecosystemArgs or { });
-    in
-    # This integration owns the `colmena` class.
-    contributeClasses prev {
-      colmena = {
-        integration = "colmena";
-        mkModule = mkHiveModule;
+      integration = selection.mkIntegration {
+        name = "colmena";
+        class = "colmena";
+        hints = {
+          modules = "pass the hive module as `configModule`; registered colmena-class modules are selected with `moduleImports`.";
+          meta = "hive metadata is the hive module's `meta`.";
+          nodes = "the nodes are the hive module's `nodes`.";
+          defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
+          network = "hive metadata is the hive module's `meta`.";
+        };
+        inherit compose evaluate;
       };
-    }
+    in
+    contributeClasses prev integration.classes
     // {
       caisson = (prev.caisson or { }) // {
-        colmena = ((prev.caisson or { }).colmena or { }) // {
-          mkModule = mkHiveModule;
-          inherit
-            mkConfiguration
-            mkConfigurationWithEcosystemArgs
-            ;
-        };
+        colmena = integration.namespace;
       };
     };
 
