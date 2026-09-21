@@ -16,8 +16,8 @@ let
       type = "github";
       owner = "nix-caisson";
       repo = "caisson-core";
-      rev = "03d280668003210ee218ed24662cd9c6d2239969";
-      narHash = "sha256-jChcLZ5nAdP+ISnTM8jmxnP2WRpZJRZqvx8aPqIan5M=";
+      rev = "c677e69f34a354c7617aaf315165afa3d8cdb137";
+      narHash = "sha256-IL8uY8ShiAPthlO9+CKNpbO1DO9DDaXyNXI5YjyoOkU=";
     };
     nixpkgs-lib = {
       type = "github";

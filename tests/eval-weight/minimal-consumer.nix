@@ -12,7 +12,7 @@
   system,
 }:
 let
-  callFlake = import (caisson-core + "/lib/kernel/call-flake.nix");
+  callFlake = (import caisson-core).callFlake;
 
   caissonCoreFlake = callFlake { src = caisson-core; };
   nixpkgsLibFlake = callFlake { src = nixpkgs-lib; };
