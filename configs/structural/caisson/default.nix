@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# What caisson exports, as a structural configuration: every
-# registered overlay and flake module, and the composed library's
-# framework namespaces. The flake top imports this same module into
-# its flake-parts evaluation, so both tops export the same things.
-{ ... }:
+# What caisson exports: every registered overlay and flake module, and
+# the composed library's framework namespaces. A plain module of the
+# core module's options, so the structural top takes it as its
+# configuration and the flake top's configuration imports it.
 { ... }:
 {
 

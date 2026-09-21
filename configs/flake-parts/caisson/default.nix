@@ -4,7 +4,7 @@
 # structural configuration both tops share, plus the checks partition
 # only a flake evaluation carries.
 { closure-inputs, ... }:
-{ lib, ... }:
+{ ... }:
 {
 
   imports = [
@@ -12,7 +12,8 @@
     # this flake (a module file; it binds no library).
     closure-inputs.flake-parts.flakeModules.partitions
     ./partitions
-    (lib.caisson.flake-parts.mkModule ../../structural/caisson)
+    # The export selectors, shared with the structural top.
+    ../../structural/caisson
   ];
 
   partitionedAttrs.checks = "checks";

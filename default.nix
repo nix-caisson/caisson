@@ -41,5 +41,5 @@ let
 
 in
 lib.caisson.structural.mkTopConfiguration {
-  configModule = lib.caisson.structural.mkModule ./configs/structural/caisson;
+  configModule = ./configs/structural/caisson;
 }
