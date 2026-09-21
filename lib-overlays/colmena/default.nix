@@ -17,7 +17,7 @@
 # back from the hive, one evaluation for nixos-rebuild and colmena
 # apply. Projects can contribute hive modules through the registry
 # like any other class.
-{ entries, ... }:
+{ contributeClasses, entries, ... }:
 {
 
   imports = [ entries.nixpkgs-lib ];
@@ -280,7 +280,14 @@
         in
         compose args // (args.ecosystemArgs or { });
     in
-    {
+    # This integration owns the `colmena` class.
+    contributeClasses prev {
+      colmena = {
+        integration = "colmena";
+        mkModule = mkHiveModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         colmena = ((prev.caisson or { }).colmena or { }) // {
           mkModule = mkHiveModule;

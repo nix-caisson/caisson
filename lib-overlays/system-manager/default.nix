@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: MIT
-{ closure-inputs, entries, ... }:
+{
+  closure-inputs,
+  contributeClasses,
+  entries,
+  ...
+}:
 {
 
   imports = [ entries.nixpkgs-lib ];
@@ -199,7 +204,14 @@
           composed.ecosystemArgs // (args.ecosystemArgs or { })
         );
     in
-    {
+    # This integration owns the `systemManager` class.
+    contributeClasses prev {
+      systemManager = {
+        integration = "system-manager";
+        inherit mkModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         system-manager = ((prev.caisson or { }).system-manager or { }) // {
           inherit

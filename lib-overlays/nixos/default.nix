@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-{ entries, ... }:
+{ contributeClasses, entries, ... }:
 {
 
   imports = [ entries.nixpkgs-lib ];
@@ -136,7 +136,14 @@
         in
         evalMinimal common (evalMinimalArgs args common // (args.ecosystemArgs or { }));
     in
-    {
+    # This integration owns the `nixos` class.
+    contributeClasses prev {
+      nixos = {
+        integration = "nixos";
+        inherit mkModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         nixos = ((prev.caisson or { }).nixos or { }) // {
           inherit

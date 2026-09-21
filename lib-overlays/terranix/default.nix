@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: MIT
-{ closure-inputs, entries, ... }:
+{
+  closure-inputs,
+  contributeClasses,
+  entries,
+  ...
+}:
 {
 
   imports = [ entries.nixpkgs-lib ];
@@ -112,7 +117,14 @@
           composed.ecosystemArgs // (args.ecosystemArgs or { })
         );
     in
-    {
+    # This integration owns the `terranix` class.
+    contributeClasses prev {
+      terranix = {
+        integration = "terranix";
+        inherit mkModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         terranix = ((prev.caisson or { }).terranix or { }) // {
           inherit

@@ -19,7 +19,12 @@
 # evaluation runs on the same library everything else in the
 # composition does, never on a library flake-parts assembled for
 # itself.
-{ closure-lib, entries, ... }:
+{
+  closure-lib,
+  contributeClasses,
+  entries,
+  ...
+}:
 
 {
 
@@ -200,7 +205,15 @@
         );
 
     in
-    {
+    # This integration owns the `flake` class: its declaration in the
+    # class index is what `mkModules` registers `modules/flake` through.
+    contributeClasses prev {
+      flake = {
+        integration = "flake-parts";
+        mkModule = final.caisson-core.mkModule "flake";
+      };
+    }
+    // {
 
       caisson = (prev.caisson or { }) // {
         flake-parts = prevNs // {

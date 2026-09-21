@@ -7,7 +7,12 @@
 # registry selectors and `caisson.exports`. A structural configuration
 # is the top of a repository whose point is what it exports, and
 # `default.nix` returns what `mkTopConfiguration` returns from it.
-{ closure-lib, entries, ... }:
+{
+  closure-lib,
+  contributeClasses,
+  entries,
+  ...
+}:
 
 {
 
@@ -119,7 +124,14 @@
         };
 
     in
-    {
+    # This integration owns the `structural` class.
+    contributeClasses prev {
+      structural = {
+        integration = "structural";
+        mkModule = final.caisson-core.mkModule "structural";
+      };
+    }
+    // {
 
       caisson = (prev.caisson or { }) // {
         structural = prevNs // {

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-{ entries, ... }:
+{ contributeClasses, entries, ... }:
 {
 
   imports = [ entries.nixpkgs-lib ];
@@ -527,7 +527,14 @@
             target fingerprint: ${targetFp}
           '';
     in
-    {
+    # This integration owns the `homeManager` class.
+    contributeClasses prev {
+      homeManager = {
+        integration = "home-manager";
+        inherit mkModule;
+      };
+    }
+    // {
       caisson = (prev.caisson or { }) // {
         home-manager = ((prev.caisson or { }).home-manager or { }) // {
           inherit
