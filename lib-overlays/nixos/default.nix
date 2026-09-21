@@ -1,4 +1,9 @@
 # SPDX-License-Identifier: MIT
+#
+# The nixos integration, declared: it owns the `nixos` class and
+# evaluates it with `nixos/lib/eval-config.nix` from a nixpkgs source
+# tree. `compose` (in compose.nix) is the composition of the class,
+# shared with any integration that evaluates the class another way.
 {
   contributeClasses,
   entries,
@@ -17,40 +22,12 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson-core.mkModule "nixos";
-
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "nixpkgs";
         context = "caisson.nixos";
       };
-      resolveSrc =
-        explicit:
-        resolveEcosystemSrc {
-          inherit explicit;
-          manifest = final.caisson-core.libManifest or { };
-        };
 
       composeNixos = import ./compose.nix { inherit final; };
-
-      commonAccepted = [
-        "ecosystemSrc"
-        "pkgSets"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-      ];
-      hints = {
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        baseModules = "the base module list belongs to the entry point: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration without it.";
-      };
-      mkCheck =
-        name: extra: open:
-        final.caisson.integrations.checkArgs {
-          context = "lib.caisson.nixos.${name}";
-          accepted = commonAccepted ++ extra;
-          inherit hints open;
-        };
 
       # The composition of the class: the module list, the special
       # arguments and the resolved nixpkgs source, from the caisson
@@ -68,79 +45,81 @@
         args:
         composeNixos { inherit context nixpkgsModule; } args
         // {
-          src = resolveSrc (args.ecosystemSrc or null);
+          src = resolveEcosystemSrc {
+            explicit = args.ecosystemSrc or null;
+            manifest = final.caisson-core.libManifest or { };
+          };
         };
 
       # eval-config evaluations. `system` defaults to the package set's
       # host platform.
-      evalConfigArgs = args: common: {
-        modules = common.modules;
-        specialArgs = common.specialArgs;
-        system =
-          args.system or (common.checkedPkgSets.pkgs.stdenv.hostPlatform.system
-            or (common.checkedPkgSets.pkgs.system or null)
-          );
-      };
-      evalConfig = common: import "${common.src}/nixos/lib/eval-config.nix";
-
-      mkConfiguration =
-        rawArgs:
+      composeEvalConfig =
+        args:
         let
-          args = mkCheck "mkConfiguration" [
-            "system"
-          ] "lib.caisson.nixos.mkConfigurationWithEcosystemArgs" rawArgs;
           common = compose { } args;
         in
-        evalConfig common (evalConfigArgs args common);
+        common
+        // {
+          ecosystemArgs = {
+            modules = common.modules;
+            specialArgs = common.specialArgs;
+            system =
+              args.system or (common.checkedPkgSets.pkgs.stdenv.hostPlatform.system
+                or (common.checkedPkgSets.pkgs.system or null)
+              );
+          };
+        };
+      evalConfig = composed: callArgs: import "${composed.src}/nixos/lib/eval-config.nix" callArgs;
 
       # eval-config with nixpkgs' module list passed explicitly as
       # `baseModules`.
       mkConfigurationFull =
         rawArgs:
         let
-          args = mkCheck "mkConfigurationFull" [
-            "system"
-          ] "lib.caisson.nixos.mkConfigurationWithEcosystemArgs" rawArgs;
-          common = compose { } args;
+          args = final.caisson.integrations.checkArgs {
+            context = "lib.caisson.nixos.mkConfigurationFull";
+            accepted = [
+              "ecosystemSrc"
+              "pkgSets"
+              "configModule"
+              "moduleImports"
+              "specialArgs"
+              "system"
+            ];
+            inherit hints;
+            open = "lib.caisson.nixos.mkConfigurationWithEcosystemArgs";
+          } rawArgs;
+          composed = composeEvalConfig args;
         in
-        evalConfig common (
-          evalConfigArgs args common
+        evalConfig composed (
+          composed.ecosystemArgs
           // {
-            baseModules = import "${common.src}/nixos/modules/module-list.nix";
+            baseModules = import "${composed.src}/nixos/modules/module-list.nix";
           }
         );
 
-      # The same composition as mkConfiguration, then `ecosystemArgs`
-      # merged over the eval-config call verbatim: everything
-      # eval-config takes (system, pkgs, baseModules, specialArgs,
-      # modules, modulesLocation, prefix, lib, extraModules) can be set
-      # or replaced there.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = mkCheck "mkConfigurationWithEcosystemArgs" [ "system" "ecosystemArgs" ] null rawArgs;
-          common = compose { } args;
-        in
-        evalConfig common (evalConfigArgs args common // (args.ecosystemArgs or { }));
-    in
-    # This integration owns the `nixos` class.
-    contributeClasses prev {
-      nixos = {
-        integration = "nixos";
-        inherit mkModule;
+      hints = {
+        pkgs = "pass the package set as `pkgSets.pkgs`.";
+        baseModules = "the base module list belongs to the entry point: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration without it.";
       };
-    }
+      integration = final.caisson.integrations.mkIntegration {
+        name = "nixos";
+        class = "nixos";
+        accepted = [ "system" ];
+        inherit hints;
+        compose = composeEvalConfig;
+        evaluate = evalConfig;
+        extra = {
+          inherit mkConfigurationFull;
+          # The two-stage composition an alt over this class reads.
+          inherit compose;
+        };
+      };
+    in
+    contributeClasses prev integration.classes
     // {
       caisson = (prev.caisson or { }) // {
-        nixos = ((prev.caisson or { }).nixos or { }) // {
-          inherit
-            compose
-            mkModule
-            mkConfiguration
-            mkConfigurationFull
-            mkConfigurationWithEcosystemArgs
-            ;
-        };
+        nixos = integration.namespace;
       };
     };
 

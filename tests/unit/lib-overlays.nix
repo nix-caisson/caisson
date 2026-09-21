@@ -1849,4 +1849,119 @@ in
         expected = false;
       };
     };
+
+  # The integration constructors: an owner declares a class and an
+  # evaluator; an alt declares the owner and another evaluator.
+  integrations =
+    let
+      declaringLib = caisson.mkLib {
+        inputs = mockInputs;
+        libOverlays = _mkLibOverlay: {
+          probe = mkLibOverlay (
+            { contributeClasses, ... }:
+            {
+              overlay =
+                final: prev:
+                let
+                  integration = final.caisson.integrations.mkIntegration {
+                    name = "probe";
+                    class = "probe";
+                    accepted = [ "tag" ];
+                    compose = args: {
+                      ecosystemArgs = {
+                        modules = (args.moduleImports or (_modules: [ ])) (final.caisson-core.modules.probe or { });
+                        tag = args.tag or "none";
+                      };
+                    };
+                    evaluate = _composed: callArgs: callArgs;
+                    extra = {
+                      marker = true;
+                    };
+                  };
+                in
+                contributeClasses prev integration.classes
+                // {
+                  caisson = (prev.caisson or { }) // {
+                    probe = integration.namespace;
+                  };
+                };
+            }
+          );
+          probe-alt = mkLibOverlay (
+            { ... }:
+            {
+              overlay = final: prev: {
+                caisson = (prev.caisson or { }) // {
+                  probe-alt = final.caisson.integrations.mkAltIntegration {
+                    name = "probe-alt";
+                    over = final.caisson.probe;
+                    compose = _args: {
+                      ecosystemArgs = {
+                        alt = true;
+                      };
+                    };
+                    evaluate = _composed: callArgs: callArgs;
+                  };
+                };
+              };
+            }
+          );
+        };
+      };
+    in
+    {
+      "test: an owner declares its class in the index and carries mkModule" = {
+        expr = {
+          integration = declaringLib.caisson-core.classes.probe.integration;
+          hasMkModule = builtins.isFunction declaringLib.caisson.probe.mkModule;
+          marker = declaringLib.caisson.probe.marker;
+        };
+        expected = {
+          integration = "probe";
+          hasMkModule = true;
+          marker = true;
+        };
+      };
+
+      "test: the generated entry points check the signature and merge ecosystemArgs last" = {
+        expr = {
+          plain =
+            (declaringLib.caisson.probe.mkConfiguration {
+              configModule = { };
+              tag = "t";
+            }).tag;
+          open =
+            (declaringLib.caisson.probe.mkConfigurationWithEcosystemArgs {
+              configModule = { };
+              ecosystemArgs.tag = "override";
+            }).tag;
+          refused =
+            !(builtins.tryEval (
+              builtins.deepSeq (declaringLib.caisson.probe.mkConfiguration {
+                configModule = { };
+                bogus = 1;
+              }) true
+            )).success;
+        };
+        expected = {
+          plain = "t";
+          open = "override";
+          refused = true;
+        };
+      };
+
+      "test: an alt carries entry points only" = {
+        expr = {
+          names = builtins.attrNames declaringLib.caisson.probe-alt;
+          alt = (declaringLib.caisson.probe-alt.mkConfiguration { configModule = { }; }).alt;
+        };
+        expected = {
+          names = [
+            "mkConfiguration"
+            "mkConfigurationWithEcosystemArgs"
+          ];
+          alt = true;
+        };
+      };
+    };
 }

@@ -122,11 +122,158 @@
         leaf: registry:
         builtins.map (name: registry.${name}) (builtins.filter (named leaf) (builtins.attrNames registry));
 
+      # The arguments every entry point takes; a declaration adds the
+      # few of its own.
+      commonAccepted = [
+        "ecosystemSrc"
+        "pkgSets"
+        "configModule"
+        "moduleImports"
+        "specialArgs"
+      ];
+      commonHints = {
+        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+      };
+
+      # The entry points a declaration generates: `mkConfiguration`,
+      # which checks the arguments against the closed signature,
+      # composes the evaluator's call and evaluates it, and the
+      # `WithEcosystemArgs` twin, which merges `ecosystemArgs` over the
+      # composed call verbatim, last. `compose` takes the checked
+      # arguments and returns an attrset holding `ecosystemArgs`, the
+      # evaluator's call as composed, beside whatever `evaluate` needs;
+      # `evaluate` takes that attrset and the call to make.
+      mkEntryPoints =
+        {
+          name,
+          accepted,
+          hints,
+          compose,
+          evaluate,
+        }:
+        let
+          context = "lib.caisson.${name}";
+          allAccepted = commonAccepted ++ accepted;
+          allHints = commonHints // hints;
+          check = checkArgs {
+            context = "${context}.mkConfiguration";
+            accepted = allAccepted;
+            hints = allHints;
+            open = "${context}.mkConfigurationWithEcosystemArgs";
+          };
+          checkOpen = checkArgs {
+            context = "${context}.mkConfigurationWithEcosystemArgs";
+            accepted = allAccepted ++ [ "ecosystemArgs" ];
+            hints = allHints;
+          };
+        in
+        {
+          mkConfiguration =
+            rawArgs:
+            let
+              composed = compose (check rawArgs);
+            in
+            evaluate composed composed.ecosystemArgs;
+          mkConfigurationWithEcosystemArgs =
+            rawArgs:
+            let
+              args = checkOpen rawArgs;
+              composed = compose args;
+            in
+            evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { }));
+        };
+
+      # An integration that owns a module class, declared. The result
+      # holds `namespace`, the value of `lib.caisson.<name>` (the entry
+      # points, the registration form `mkModule` bound to the class,
+      # and whatever `extra` adds beside them: variants, adapters, the
+      # composition an alt over the class reads), and `classes`, the
+      # declaration of the class for the index, so `mkModules`
+      # registers the class through this integration. The overlay
+      # file writes both under their keys, since an overlay's output
+      # attribute names must not depend on `final`:
+      #
+      #   overlay = final: prev:
+      #     let integration = final.caisson.integrations.mkIntegration { ... }; in
+      #     contributeClasses prev integration.classes
+      #     // { caisson = (prev.caisson or { }) // { nixos = integration.namespace; }; };
+      mkIntegration =
+        {
+          name,
+          class,
+          accepted ? [ ],
+          hints ? { },
+          compose,
+          evaluate,
+          extra ? { },
+        }:
+        let
+          mkModule = final.caisson-core.mkModule class;
+        in
+        {
+          namespace =
+            mkEntryPoints {
+              inherit
+                name
+                accepted
+                hints
+                compose
+                evaluate
+                ;
+            }
+            // {
+              inherit mkModule;
+            }
+            // extra;
+          classes = {
+            ${class} = {
+              integration = name;
+              inherit mkModule;
+            };
+          };
+        };
+
+      # An integration that evaluates a class another integration
+      # owns, declared: `over` is the owning integration, reached
+      # through the lib (`final.caisson.nixos`), and the class and its
+      # registration form belong to that integration; `compose` builds
+      # on the composition that integration publishes, so the two
+      # evaluators cannot express different configurations from the
+      # same arguments. The result is the value of `lib.caisson.<name>`:
+      # the entry points and `extra`, no `mkModule`, and no class
+      # declaration.
+      mkAltIntegration =
+        {
+          name,
+          over,
+          accepted ? [ ],
+          hints ? { },
+          compose,
+          evaluate,
+          extra ? { },
+        }:
+        assert builtins.isAttrs over && over ? mkModule;
+        mkEntryPoints {
+          inherit
+            name
+            accepted
+            hints
+            compose
+            evaluate
+            ;
+        }
+        // extra;
+
     in
     {
       caisson = (prev.caisson or { }) // {
         integrations = ((prev.caisson or { }).integrations or { }) // {
-          inherit checkArgs resolveEcosystemSrc;
+          inherit
+            checkArgs
+            resolveEcosystemSrc
+            mkIntegration
+            mkAltIntegration
+            ;
           coreModules = select "core";
           defaultModuleImports = select "default";
         };
