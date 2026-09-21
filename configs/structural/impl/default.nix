@@ -17,6 +17,7 @@
     # mkLib).
     libOverlays.exported = libOverlays: {
       inherit (libOverlays)
+        integrations
         structural
         flake-parts
         tooling

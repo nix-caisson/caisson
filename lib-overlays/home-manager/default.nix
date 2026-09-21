@@ -1,8 +1,18 @@
 # SPDX-License-Identifier: MIT
-{ contributeClasses, entries, ... }:
+{
+  contributeClasses,
+  entries,
+  mkLibOverlay,
+  ...
+}:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
@@ -10,16 +20,15 @@
       mkModule = final.caisson-core.mkModule "homeManager";
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
       registry = final.caisson-core.modules.homeManager or { };
       # The framework module of the class: every registered `core`,
       # forced into every home-manager evaluation.
       coreModules = selection.coreModules registry;
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "home-manager";
         context = "caisson.home-manager";
-        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:
@@ -229,13 +238,13 @@
         "minimal"
         "sourceMeta"
       ];
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.home-manager.mkConfiguration";
         accepted = configurationArgs;
         inherit hints;
         open = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../../helpers/check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
         accepted = configurationArgs ++ [ "ecosystemArgs" ];
         inherit hints;

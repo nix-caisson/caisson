@@ -3,23 +3,28 @@
   closure-inputs,
   contributeClasses,
   entries,
+  mkLibOverlay,
   ...
 }:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
       mkModule = final.caisson-core.mkModule "systemManager";
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "system-manager";
         context = "caisson.system-manager";
-        resolve = final.caisson-core.resolve;
       };
 
       assertSystemManagerEcosystemSrc =
@@ -79,12 +84,12 @@
         modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
         extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
       };
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.system-manager.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../../helpers/check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;

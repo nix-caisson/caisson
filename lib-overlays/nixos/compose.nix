@@ -5,7 +5,7 @@
 # cannot express different machines from the same arguments.
 { final }:
 let
-  selection = import ../../helpers/registry-selection.nix;
+  selection = final.caisson.integrations;
 
   assertPkgSets =
     context: pkgSets:

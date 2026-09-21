@@ -3,23 +3,28 @@
   closure-inputs,
   contributeClasses,
   entries,
+  mkLibOverlay,
   ...
 }:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
       mkModule = final.caisson-core.mkModule "terranix";
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "terranix";
         context = "caisson.terranix";
-        resolve = final.caisson-core.resolve;
       };
 
       assertTerranixEcosystemSrc =
@@ -42,12 +47,12 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         system = "pass the package set as `pkgSets.pkgs`; terranix evaluates against it.";
       };
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.terranix.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../../helpers/check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;

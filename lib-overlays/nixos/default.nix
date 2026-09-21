@@ -1,18 +1,27 @@
 # SPDX-License-Identifier: MIT
-{ contributeClasses, entries, ... }:
+{
+  contributeClasses,
+  entries,
+  mkLibOverlay,
+  ...
+}:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
       mkModule = final.caisson-core.mkModule "nixos";
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "nixpkgs";
         context = "caisson.nixos";
-        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:
@@ -37,7 +46,7 @@
       };
       mkCheck =
         name: extra: open:
-        import ../../helpers/check-args.nix {
+        final.caisson.integrations.checkArgs {
           context = "lib.caisson.nixos.${name}";
           accepted = commonAccepted ++ extra;
           inherit hints open;

@@ -17,22 +17,31 @@
 # back from the hive, one evaluation for nixos-rebuild and colmena
 # apply. Projects can contribute hive modules through the registry
 # like any other class.
-{ contributeClasses, entries, ... }:
+{
+  contributeClasses,
+  entries,
+  mkLibOverlay,
+  ...
+}:
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
     let
       mkHiveModule = final.caisson-core.mkModule "colmena";
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "colmena";
         context = "caisson.colmena";
-        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:
@@ -84,13 +93,13 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         deployment = "set `deployment.*` in the host's configModule; the node declares those options.";
       };
-      checkNodeArgs = import ../../helpers/check-args.nix {
+      checkNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfiguration (the hive module argument)";
         accepted = nodeAccepted;
         hints = nodeHints;
         open = "mkNixosConfigurationWithEcosystemArgs";
       };
-      checkOpenNodeArgs = import ../../helpers/check-args.nix {
+      checkOpenNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfigurationWithEcosystemArgs (the hive module argument)";
         accepted = nodeAccepted ++ [ "ecosystemArgs" ];
         hints = nodeHints;
@@ -177,12 +186,12 @@
         defaults = "there is no hive-wide module: every node is an evaluated NixOS configuration (the hive module's mkNixosConfiguration); select shared modules there.";
         network = "hive metadata is the hive module's `meta`.";
       };
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.colmena.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../../helpers/check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.colmena.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;

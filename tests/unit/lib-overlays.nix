@@ -1387,7 +1387,7 @@ in
       # moduleImports selects when omitted.
       expr =
         let
-          selection = import (inputs.parent.outPath + "/helpers/registry-selection.nix");
+          selection = lib.caisson.integrations;
           registry = {
             core = "c";
             default = "d";

@@ -11,12 +11,18 @@
   closure-lib,
   contributeClasses,
   entries,
+  mkLibOverlay,
   ...
 }:
 
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
@@ -24,7 +30,7 @@
 
       prevNs = (prev.caisson or { }).structural or { };
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
 
       accepted = [
         "configModule"
@@ -36,7 +42,7 @@
       hints = {
         modules = "pass the configuration's module as `configModule`; registered structural modules are selected with `moduleImports`.";
       };
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.structural.mkConfiguration";
         inherit accepted hints;
       };

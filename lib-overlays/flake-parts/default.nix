@@ -23,12 +23,18 @@
   closure-lib,
   contributeClasses,
   entries,
+  mkLibOverlay,
   ...
 }:
 
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  imports = [
+    entries.nixpkgs-lib
+    # What an integration is written from, imported by key so it is
+    # composed wherever this integration is.
+    ((mkLibOverlay ../integrations) // { key = "integrations"; })
+  ];
 
   overlay =
     final: prev:
@@ -36,12 +42,11 @@
 
       prevNs = (prev.caisson or { }).flake-parts or { };
 
-      selection = import ../../helpers/registry-selection.nix;
+      selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = import ../../helpers/resolve-ecosystem-src.nix {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "flake-parts";
         context = "caisson.flake-parts";
-        resolve = final.caisson-core.resolve;
       };
       resolveSrc =
         explicit:
@@ -88,12 +93,12 @@
         modules = "pass the configuration's module as `configModule`; registered flake-class modules are selected with `moduleImports`.";
         moduleLocation = "pass the flake's canonical name as `name`.";
       };
-      checkArgs = import ../../helpers/check-args.nix {
+      checkArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.flake-parts.mkConfiguration";
         inherit accepted hints;
         open = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
       };
-      checkOpenArgs = import ../../helpers/check-args.nix {
+      checkOpenArgs = final.caisson.integrations.checkArgs {
         context = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
         accepted = accepted ++ [ "ecosystemArgs" ];
         inherit hints;
