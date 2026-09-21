@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: MIT
+#
+# The system-manager integration, declared: it owns the `systemManager`
+# class and evaluates it with `makeSystemConfig` from the
+# system-manager flake.
 {
   closure-inputs,
   contributeClasses,
@@ -18,8 +22,6 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson-core.mkModule "systemManager";
-
       selection = final.caisson.integrations;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
@@ -35,7 +37,7 @@
           throw "lib.caisson.system-manager.mkConfiguration requires `ecosystemSrc.lib.makeSystemConfig`.";
 
       mkCommonArgs =
-        args@{
+        {
           configModule,
           moduleImports ? selection.defaultModuleImports,
           specialArgs ? { },
@@ -47,9 +49,9 @@
           # The framework module of the class: every registered `core`, forced.
           coreModules = selection.coreModules registry;
           selectedModules = moduleImports registry;
-          # system-manager instantiates its own nixpkgs from
+          # system-manager instantiates nixpkgs itself from
           # `nixpkgs.hostPlatform`; a supplied package set seeds that
-          # platform (an explicit hostPlatform wins) and rides along as
+          # platform (an explicit hostPlatform wins) and is passed as
           # the `pkgSets` module argument.
           pkgSetsModule =
             if pkgSets != null && pkgSets ? pkgs then
@@ -73,59 +75,38 @@
           // specialArgs;
         };
 
-      accepted = [
-        "ecosystemSrc"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "pkgSets"
-      ];
-      hints = {
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
-      };
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.system-manager.mkConfiguration";
-        inherit accepted hints;
-        open = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.system-manager.mkConfigurationWithEcosystemArgs";
-        accepted = accepted ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
       # makeSystemConfig's arguments, composed from the caisson arguments,
       # plus the compatibility bridge below.
       compose =
         args:
         let
-          checkedEcosystemSrc = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
+          src = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
             manifest = final.caisson-core.libManifest or { };
           });
           common = mkCommonArgs args;
 
-          # system-manager imports selected NixOS modules from its own
-          # nixpkgs input; current nixos-unstable restructured
-          # nixos/modules/config/nix.nix in two ways system-manager's
-          # module set (tip 48d4734) does not absorb. Both are bridged
+          # system-manager imports selected NixOS modules from the
+          # nixpkgs input pinned in its flake; current nixos-unstable
+          # restructured nixos/modules/config/nix.nix in two ways
+          # system-manager's module set (tip 48d4734) does not absorb. Both are bridged
           # here, where every system-manager eval composes.
           # Delete the bridge when upstream absorbs the restructure: each
           # half fails loudly (duplicate declaration / unused disable)
           # when its reason disappears.
-          smNixpkgs = checkedEcosystemSrc.inputs.nixpkgs;
+          smNixpkgs = src.inputs.nixpkgs;
           nixosNixModuleText = builtins.readFile "${smNixpkgs}/nixos/modules/config/nix.nix";
 
           # (1) That module now defines `services.displayManager.hiddenUsers`
           # (hiding nixbld users from display managers), an option nothing
           # in a system-manager eval declares, which is fatal structurally,
           # before any mkIf can discharge it. Declare the sink, following
-          # system-manager's own ignored-options pattern: no display
+          # system-manager's ignored-options pattern: no display
           # manager exists in a system-manager config. The sink retires
-          # itself when system-manager's ignored-options file (the likely
-          # fix site) mentions the option; a fix landing anywhere else
-          # surfaces as a duplicate declaration at that pin's gate.
-          smIgnoredOptionsText = builtins.readFile "${checkedEcosystemSrc}/nix/modules/upstream/nixpkgs/default.nix";
+          # itself when the ignored-options file of system-manager (the
+          # likely fix site) mentions the option; a fix landing anywhere
+          # else surfaces as a duplicate declaration at that pin's gate.
+          smIgnoredOptionsText = builtins.readFile "${src}/nix/modules/upstream/nixpkgs/default.nix";
           smDeclaresDisplayManager = final.hasInfix "displayManager" smIgnoredOptionsText;
           displayManagerSinkModule = {
             _file = "caisson-system-manager:nixpkgs-compat-sink";
@@ -156,7 +137,7 @@
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
           nixStubReplacementModule = {
             _file = "caisson-system-manager:nixpkgs-compat-nix-stub";
-            disabledModules = [ "${checkedEcosystemSrc}/nix/modules/upstream/nixpkgs/nix.nix" ];
+            disabledModules = [ "${src}/nix/modules/upstream/nixpkgs/nix.nix" ];
             imports = [
               (
                 { config, lib, ... }:
@@ -181,50 +162,31 @@
             ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
         in
         {
-          inherit checkedEcosystemSrc;
+          inherit src;
           ecosystemArgs = {
             inherit (common) specialArgs;
             modules = common.modules ++ compatModules;
           };
         };
 
-      mkConfiguration =
-        rawArgs:
-        let
-          composed = compose (checkArgs rawArgs);
-        in
-        composed.checkedEcosystemSrc.lib.makeSystemConfig composed.ecosystemArgs;
+      # Everything makeSystemConfig takes (modules, overlays,
+      # specialArgs, allowUnsupportedNixpkgs) can be set or replaced
+      # through the twin's `ecosystemArgs`.
+      evaluate = composed: callArgs: composed.src.lib.makeSystemConfig callArgs;
 
-      # The same composition, then `ecosystemArgs` merged over the
-      # evaluator call verbatim: everything makeSystemConfig takes
-      # (modules, overlays, specialArgs, allowUnsupportedNixpkgs) can be
-      # set or replaced there.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = checkOpenArgs rawArgs;
-          composed = compose args;
-        in
-        composed.checkedEcosystemSrc.lib.makeSystemConfig (
-          composed.ecosystemArgs // (args.ecosystemArgs or { })
-        );
-    in
-    # This integration owns the `systemManager` class.
-    contributeClasses prev {
-      systemManager = {
-        integration = "system-manager";
-        inherit mkModule;
+      integration = selection.mkIntegration {
+        name = "system-manager";
+        class = "systemManager";
+        hints = {
+          extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+        };
+        inherit compose evaluate;
       };
-    }
+    in
+    contributeClasses prev integration.classes
     // {
       caisson = (prev.caisson or { }) // {
-        system-manager = ((prev.caisson or { }).system-manager or { }) // {
-          inherit
-            mkConfiguration
-            mkConfigurationWithEcosystemArgs
-            mkModule
-            ;
-        };
+        system-manager = integration.namespace;
       };
     };
 
