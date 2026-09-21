@@ -158,8 +158,8 @@ lib.caisson.flake-parts.mkConfiguration {
 
 The `parent` input is caisson's source tree, declared `flake = false`:
 evaluating a flake input's value applies its outputs function, which would
-force caisson's own hidden core pin inside the nix-unit sandbox, where nothing
-can fetch. A source-only input carries the path and applies nothing. The
+force the `caisson-core` input of caisson inside the nix-unit sandbox, where
+nothing can fetch. A source-only input carries the path and applies nothing. The
 overlay files register from that path because a flake cannot reference files
 outside its own source tree, and the modules register with them: an overlay
 registered from its file reads the registry of the composition that

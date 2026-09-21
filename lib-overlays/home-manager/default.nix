@@ -53,9 +53,9 @@
         else
           toString value;
 
-      # Provenance derives from what actually composes: the ecosystem
-      # source handed to the entry point and the nixpkgs the package set
-      # was instantiated from.  Nothing falls back to pinned inputs.
+      # Provenance derives from what composes: the ecosystem source
+      # handed to the entry point and the nixpkgs the package set was
+      # instantiated from.
       mkSourceMeta =
         {
           profileName,
@@ -294,8 +294,9 @@
         };
 
       # The adapter keeps `...` (its extras are NixOS-module options,
-      # not evaluator arguments); only the old special-arguments name is
-      # refused.
+      # not evaluator arguments); only home-manager's own
+      # `extraSpecialArgs` spelling is refused, with a pointer to
+      # `specialArgs`.
       mkNixosAdapter =
         rawArgs:
         if rawArgs ? extraSpecialArgs then

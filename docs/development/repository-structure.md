@@ -43,10 +43,7 @@ since every ecosystem comes from the consumer's declarations, and a
 consumer that composes with caisson-core directly registers
 caisson's exported overlays and modules. Hand-wired evaluations (the
 sandboxed test harnesses, which receive every tree as an argument)
-inject the same names beside
-`self`, and an injected value wins over the pin. caisson also
-exports its library contributions, integrations included, as keyed
-entries via `lib.composition.entriesFor`.
+inject the same names beside `self`.
 
 ## caisson-compat
 

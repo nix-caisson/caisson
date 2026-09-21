@@ -46,7 +46,8 @@ let
       );
 
   # The names the test bodies use: the caisson namespace, with the
-  # machinery reachable the way the pre-split surface exposed it.
+  # machinery reachable at its top level as well as under
+  # `caisson-core`.
   caisson = lib.caisson // {
     inherit (lib.caisson-core) mkLibOverlay mkModule importApply;
     mkLib = testMkLib;

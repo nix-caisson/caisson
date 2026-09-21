@@ -25,8 +25,8 @@
       ...
     }:
     let
-      # Create a composed 'lib' using the framework's mkLib
-      # Note: parent.lib IS lib.caisson because of how it is exported
+      # Compose a library with mkLib. parent.lib mirrors the framework
+      # namespaces of the composed library (`caisson`, `caisson-core`).
       lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
         libOverlays = _mkLibOverlay: {
