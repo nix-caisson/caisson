@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
-# The composition the nixos integration's entry points share: one
-# definition of the module list and special arguments, so the variants
-# cannot express different machines from the same arguments.
+# The composition the nixos integration's entry points share, and the
+# nixos-minimal integration reads through `lib.caisson.nixos.compose`:
+# one definition of the module list and special arguments, so the
+# evaluators of the class cannot express different machines from the
+# same arguments.
 { final }:
 let
   selection = final.caisson.integrations;
@@ -12,16 +14,16 @@ let
     if pkgSets ? pkgs then pkgSets else throw "${context} requires `pkgSets.pkgs` to be defined.";
 
   # eval-config evaluations carry the nixpkgs module, so the package
-  # set lands on `nixpkgs.pkgs`; the minimal evaluator has no such
-  # module, so there it is the `pkgs` module argument instead.
+  # set lands on `nixpkgs.pkgs`; an evaluation without that module
+  # takes it as the `pkgs` module argument instead.
   mkPkgSetsModule = pkgSets: {
     _file = "caisson-nixos:pkgSets";
     config = {
       nixpkgs.pkgs = pkgSets.pkgs;
     };
   };
-  mkMinimalPkgSetsModule = pkgSets: {
-    _file = "caisson-nixos:pkgSets-minimal";
+  mkBarePkgSetsModule = pkgSets: {
+    _file = "caisson-nixos:pkgSets-bare";
     config = {
       _module.args.pkgs = final.mkDefault pkgSets.pkgs;
     };
@@ -29,7 +31,8 @@ let
 in
 {
   context,
-  minimal ? false,
+  # Whether the evaluation carries NixOS' nixpkgs module.
+  nixpkgsModule ? true,
 }:
 {
   pkgSets,
@@ -45,7 +48,7 @@ let
   coreModules = selection.coreModules registry;
   selectedModules = moduleImports registry;
   pkgSetsModule =
-    if minimal then mkMinimalPkgSetsModule checkedPkgSets else mkPkgSetsModule checkedPkgSets;
+    if nixpkgsModule then mkPkgSetsModule checkedPkgSets else mkBarePkgSetsModule checkedPkgSets;
 in
 {
   inherit checkedPkgSets;

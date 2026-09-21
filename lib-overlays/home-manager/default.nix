@@ -280,8 +280,6 @@
         in
         evaluator (ecosystemArgsOf common // (args.ecosystemArgs or { }));
 
-      mkConfigurationMinimal = args: mkConfiguration (args // { minimal = true; });
-
       mkStandaloneAdapter =
         args@{
           moduleImports ? selection.defaultModuleImports,
@@ -549,7 +547,6 @@
           inherit
             assertSourceCoherence
             mkConfiguration
-            mkConfigurationMinimal
             mkConfigurationWithEcosystemArgs
             mkModule
             mkNixosAdapter

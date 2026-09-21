@@ -107,6 +107,7 @@ source by.
 | `flake-parts` | `flake-parts` | flake outputs |
 | `nixpkgs` | `nixpkgs` | package sets and overlays |
 | `nixos` | `nixpkgs` | NixOS configurations |
+| `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `terranix` | `terranix` | Terranix and Terraform configurations |
 | `colmena` | `colmena` | Colmena deployment hives |
