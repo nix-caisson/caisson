@@ -27,9 +27,11 @@
     inputs@{ caisson-core, ... }:
     let
 
-      lib = import ./root.nix {
-        caisson-core = caisson-core.lib.caisson-core;
+      lib = caisson-core.lib.caisson-core.mkLib {
         inherit inputs;
+        systems = import ./systems.nix;
+        modules = import ./modules.nix;
+        libOverlays = import ./libOverlays.nix;
       };
 
     in
