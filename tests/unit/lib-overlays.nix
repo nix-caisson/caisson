@@ -1848,6 +1848,26 @@ in
           )).success;
         expected = false;
       };
+
+      "test: ecosystemSrc is refused, the integration wrapping no ecosystem" = {
+        expr =
+          (builtins.tryEval (
+            builtins.deepSeq (registeringLib.caisson.structural.mkConfiguration {
+              configModule = { };
+              ecosystemSrc = ./.;
+            }) true
+          )).success;
+        expected = false;
+      };
+
+      "test: the twin evaluates the same call with nothing merged" = {
+        expr =
+          (registeringLib.caisson.structural.mkConfigurationWithEcosystemArgs {
+            configModule = { };
+            ecosystemArgs = { };
+          }).value.caisson.configInfo.configName;
+        expected = "from-the-default";
+      };
     };
 
   # The integration constructors: an owner declares a class and an
