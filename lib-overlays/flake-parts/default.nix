@@ -1,24 +1,22 @@
 # SPDX-License-Identifier: MIT
 #
-# The flake-parts integration: projecting a composition into flake
-# outputs. A peer of the other integrations, it carries mkConfiguration, the
-# `flake` module class (mkModule), the option types (option
-# types are this integration's medium), the export machinery (the
-# core flake-parts module reads the composition's manifest at
-# `caisson-core.libManifest`, projects the `libOverlays` and
-# `modules` flake outputs from it, and defaults flake-parts' `systems`
-# from the `systems` the composition declared), and the `flake-parts`
-# library mirror.
+# The flake-parts integration, declared: projecting a composition into
+# flake outputs. It owns the `flake` class and evaluates it with
+# flake-parts' `mkFlake`. Beside the entry points it carries the option
+# types (option types are this integration's medium), the export
+# machinery (the core flake-parts module reads the composition's
+# manifest at `caisson-core.libManifest`, projects the `libOverlays`
+# and `modules` flake outputs from it, and defaults flake-parts'
+# `systems` from the `systems` the composition declared), and the
+# `flake-parts` library mirror.
 #
 # flake-parts itself comes from the composition, resolved like every
 # ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
 # in the mkLib call, the entry named `flake-parts` in the inputs passed
-# to mkLib),
-# and is taken as a source: its flake.nix is called with the composed
-# library standing in for its `nixpkgs-lib` input, so the module
-# evaluation runs on the same library everything else in the
-# composition does, never on a library flake-parts assembled for
-# itself.
+# to mkLib), and is taken as a source: its flake.nix is called with the
+# composed library standing in for its `nixpkgs-lib` input, so the
+# module evaluation runs on the same library everything else in the
+# composition does, and on no library flake-parts assembled for itself.
 {
   closure-lib,
   contributeClasses,
@@ -39,8 +37,6 @@
   overlay =
     final: prev:
     let
-
-      prevNs = (prev.caisson or { }).flake-parts or { };
 
       selection = final.caisson.integrations;
 
@@ -75,41 +71,24 @@
 
       # The option types of the core module, re-exported under this
       # namespace for the readers of that name.
-      types = (prevNs.types or { }) // import ../../modules/generic/core/types.nix { lib = final; };
+      types = import ../../modules/generic/core/types.nix { lib = final; };
 
-      # flake-parts' own mkFlake arguments this entry point composes are
-      # refused with a pointer to the caisson argument; the rest forward.
-      accepted = [
-        "configModule"
-        "ecosystemSrc"
-        "moduleImports"
-        "name"
-        "specialArgs"
-        "pkgSets"
-      ];
-      hints = {
-        inputs = "the flake's inputs come from the composition's manifest; pass them to caisson-core.mkLib.";
-        self = "the flake's own outputs come from the composition's manifest; pass inputs (self included) to caisson-core.mkLib.";
-        modules = "pass the configuration's module as `configModule`; registered flake-class modules are selected with `moduleImports`.";
-        moduleLocation = "pass the flake's canonical name as `name`.";
-      };
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.flake-parts.mkConfiguration";
-        inherit accepted hints;
-        open = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.flake-parts.mkConfigurationWithEcosystemArgs";
-        accepted = accepted ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
-      mkConfiguration = rawArgs: mkConfigurationChecked (checkArgs rawArgs);
-      # The same composition, then `ecosystemArgs` merged over the
-      # flake-parts mkFlake call verbatim: everything it takes (inputs,
-      # specialArgs, self, moduleLocation) can be set or replaced there.
-      mkConfigurationWithEcosystemArgs = rawArgs: mkConfigurationChecked (checkOpenArgs rawArgs);
-      mkConfigurationChecked =
-        args@{
+      manifest =
+        if (final.caisson-core.libManifest or null) != null then
+          final.caisson-core.libManifest
+        else
+          throw ''
+            caisson.flake-parts.mkConfiguration projects a composition's manifest into flake
+            outputs, but this composed library carries no manifest at
+            `caisson-core.libManifest`. Compose the library with
+            caisson-core.mkLib, which captures one.
+          '';
+
+      # The `mkFlake` call: the manifest's inputs, the special
+      # arguments and the module location when the flake is named,
+      # beside the flake-parts it runs on and the module it evaluates.
+      compose =
+        {
 
           configModule,
 
@@ -144,87 +123,79 @@
 
           specialArgs ? { },
 
-          ecosystemArgs ? { },
+          ...
         }:
-        (
-          let
+        let
 
-            flakeParts = if ecosystemSrc == null then flakePartsDefault else flakePartsFor ecosystemSrc;
+          flakeParts = if ecosystemSrc == null then flakePartsDefault else flakePartsFor ecosystemSrc;
 
-            manifest =
-              if (final.caisson-core.libManifest or null) != null then
-                final.caisson-core.libManifest
-              else
-                throw ''
-                  caisson.flake-parts.mkConfiguration projects a composition's manifest into flake
-                  outputs, but this composed library carries no manifest at
-                  `caisson-core.libManifest`. Compose the library with
-                  caisson-core.mkLib, which captures one.
-                '';
+          # The flake class of the registry, the same source every
+          # adapter selects from, so modules arriving by any channel
+          # (local registration, overlay contribution, consumed
+          # project) are selectable here.
+          registry = final.caisson-core.modules.flake or { };
 
-            finalArgs =
-              (if name != null then { moduleLocation = name; } else { })
-              // {
-                inputs = manifest.inputs;
-                specialArgs = {
-                  lib = final;
-                }
-                // (if pkgSets != null then { inherit pkgSets; } else { })
-                // specialArgs;
-              }
-              // ecosystemArgs;
+          # The framework module of the class: the core of caisson
+          # itself, read from the closure so it is there however this
+          # integration was registered, plus every `core` the
+          # composition registered.
+          frameworkModules = [
+            closure-lib.caisson-core.modules.flake.core
+          ]
+          ++ selection.coreModules registry;
 
-            # The flake class of the registry, the same source every
-            # adapter selects from, so modules arriving by any channel
-            # (local registration, overlay contribution, consumed
-            # project) are selectable here.
-            registry = final.caisson-core.modules.flake or { };
+          importedModules = moduleImports registry;
 
-            # The framework module of the class: caisson's own core,
-            # read from the closure so it is there however this
-            # integration was registered, plus every `core` the
-            # composition registered.
-            frameworkModules = [
-              closure-lib.caisson-core.modules.flake.core
-            ]
-            ++ selection.coreModules registry;
+        in
+        {
+          inherit flakeParts;
+          ecosystemArgs = (if name != null then { moduleLocation = name; } else { }) // {
+            inputs = manifest.inputs;
+            specialArgs = {
+              lib = final;
+            }
+            // (if pkgSets != null then { inherit pkgSets; } else { })
+            // specialArgs;
+          };
+          module =
+            { lib, ... }:
+            {
+              imports = [
+                flakeParts.flakeModules.flakeModules
+                flakeParts.flakeModules.modules
+              ]
+              ++ frameworkModules
+              ++ importedModules
+              ++ [ configModule ]
+              ++ (if name != null then [ { caisson.configInfo.configName = lib.mkDefault name; } ] else [ ]);
+            };
+        };
 
-            importedModules = moduleImports registry;
+      evaluate = composed: callArgs: composed.flakeParts.lib.mkFlake callArgs composed.module;
 
-            finalModule = (
-              { lib, ... }:
-              {
-                imports = [
-                  flakeParts.flakeModules.flakeModules
-                  flakeParts.flakeModules.modules
-                ]
-                ++ frameworkModules
-                ++ importedModules
-                ++ [ configModule ]
-                ++ (if name != null then [ { caisson.configInfo.configName = lib.mkDefault name; } ] else [ ]);
-              }
-            );
-
-          in
-          flakeParts.lib.mkFlake finalArgs finalModule
-        );
+      integration = selection.mkIntegration {
+        name = "flake-parts";
+        class = "flake";
+        accepted = [ "name" ];
+        # flake-parts' mkFlake arguments this entry point composes are
+        # refused with a pointer to the caisson argument.
+        hints = {
+          inputs = "the flake's inputs come from the composition's manifest; pass them to caisson-core.mkLib.";
+          self = "the flake's outputs come from the composition's manifest; pass inputs (self included) to caisson-core.mkLib.";
+          moduleLocation = "pass the flake's canonical name as `name`.";
+        };
+        inherit compose evaluate;
+        extra = {
+          inherit types;
+        };
+      };
 
     in
-    # This integration owns the `flake` class: its declaration in the
-    # class index is what `mkModules` registers `modules/flake` through.
-    contributeClasses prev {
-      flake = {
-        integration = "flake-parts";
-        mkModule = final.caisson-core.mkModule "flake";
-      };
-    }
+    contributeClasses prev integration.classes
     // {
 
       caisson = (prev.caisson or { }) // {
-        flake-parts = prevNs // {
-          inherit mkConfiguration mkConfigurationWithEcosystemArgs types;
-          mkModule = final.caisson-core.mkModule "flake";
-        };
+        flake-parts = integration.namespace;
       };
 
       # The flake-parts library mirrored into the composed library,
