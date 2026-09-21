@@ -1,4 +1,11 @@
 # SPDX-License-Identifier: MIT
+#
+# The home-manager integration, declared: it owns the `homeManager`
+# class and evaluates it with home-manager's standalone evaluator,
+# `modules/default.nix` of the home-manager source. Beside the entry
+# points it carries the adapters that place a home-manager
+# configuration inside a NixOS one, and the source metadata the
+# activation coherence check compares.
 {
   contributeClasses,
   entries,
@@ -17,7 +24,7 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson-core.mkModule "homeManager";
+      mkModule = final.caisson.home-manager.mkModule;
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
       selection = final.caisson.integrations;
@@ -162,7 +169,7 @@
         );
 
       mkCommonArgs =
-        args@{
+        {
           ecosystemSrc ? null,
           pkgSets,
           configModule,
@@ -217,68 +224,31 @@
           evaluatorPath = "${hmSource}/modules";
         };
 
-      # home-manager's evaluator takes exactly the arguments mkCommonArgs
-      # composes, so there is nothing to forward: the evaluator's own
-      # names are refused with a pointer to the caisson argument, and any
-      # other name is refused as unknown.
-      hints = {
-        configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
-      };
-      configurationArgs = [
-        "ecosystemSrc"
-        "pkgSets"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "osConfig"
-        "check"
-        "minimal"
-        "sourceMeta"
-      ];
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.home-manager.mkConfiguration";
-        accepted = configurationArgs;
-        inherit hints;
-        open = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
-        accepted = configurationArgs ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
-      ecosystemArgsOf = common: {
-        inherit (common)
-          check
-          configuration
-          extraSpecialArgs
-          minimal
-          pkgs
-          ;
-      };
-
-      mkConfiguration =
-        rawArgs:
+      # The evaluator's call, from the composition above: everything
+      # home-manager's evaluator takes (configuration, pkgs, lib,
+      # minimal, check, extraSpecialArgs) can be set or replaced
+      # through the twin's `ecosystemArgs`.
+      compose =
+        args:
         let
-          common = mkCommonArgs (checkArgs rawArgs);
-          evaluator = import common.evaluatorPath;
-        in
-        evaluator (ecosystemArgsOf common);
-
-      # The same composition, then `ecosystemArgs` merged over the
-      # evaluator call verbatim: everything home-manager's evaluator
-      # takes (configuration, pkgs, lib, minimal, check,
-      # extraSpecialArgs) can be set or replaced there.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = checkOpenArgs rawArgs;
           common = mkCommonArgs args;
-          evaluator = import common.evaluatorPath;
         in
-        evaluator (ecosystemArgsOf common // (args.ecosystemArgs or { }));
+        common
+        // {
+          ecosystemArgs = {
+            inherit (common)
+              check
+              configuration
+              extraSpecialArgs
+              minimal
+              pkgs
+              ;
+          };
+        };
+
+      evaluate = composed: callArgs: (import composed.evaluatorPath) callArgs;
+
+      mkConfiguration = final.caisson.home-manager.mkConfiguration;
 
       mkStandaloneAdapter =
         args@{
@@ -294,9 +264,8 @@
         };
 
       # The adapter keeps `...` (its extras are NixOS-module options,
-      # not evaluator arguments); only home-manager's own
-      # `extraSpecialArgs` spelling is refused, with a pointer to
-      # `specialArgs`.
+      # not evaluator arguments); only the `extraSpecialArgs` spelling
+      # of home-manager is refused, with a pointer to `specialArgs`.
       mkNixosAdapter =
         rawArgs:
         if rawArgs ? extraSpecialArgs then
@@ -321,7 +290,7 @@
           useUserPackages ? true,
           # How the NixOS generation triggers home-manager activation:
           #
-          # "upstream": home-manager's own nixos module delivery (system
+          # "upstream": home-manager's nixos module delivery (system
           # units at boot).  Fine when the OS declares the users and their
           # homes are available at boot.
           #
@@ -444,7 +413,7 @@
                       SyslogIdentifier = "hm-activate-${username}";
                       # A login shell, as upstream's system units use: the
                       # standalone activation script expects the user's normal
-                      # environment (nix on PATH for its own profile update).
+                      # environment (nix on PATH to update its profile).
                       ExecStart = pkgs.writeScript "hm-user-activate-${username}" ''
                         #! ${pkgs.runtimeShell} -el
                         exec ${userActivations.${username}}/activate
@@ -534,27 +503,39 @@
             host fingerprint: ${hostFp}
             target fingerprint: ${targetFp}
           '';
-    in
-    # This integration owns the `homeManager` class.
-    contributeClasses prev {
-      homeManager = {
-        integration = "home-manager";
-        inherit mkModule;
-      };
-    }
-    // {
-      caisson = (prev.caisson or { }) // {
-        home-manager = ((prev.caisson or { }).home-manager or { }) // {
+      # home-manager's evaluator takes exactly the arguments the
+      # composition builds, so there is nothing to forward: the
+      # evaluator's names are refused with a pointer to the caisson
+      # argument, and any other name is refused as unknown.
+      integration = selection.mkIntegration {
+        name = "home-manager";
+        class = "homeManager";
+        accepted = [
+          "osConfig"
+          "check"
+          "minimal"
+          "sourceMeta"
+        ];
+        hints = {
+          configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+          pkgs = "pass the package set as `pkgSets.pkgs`.";
+          extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+        };
+        inherit compose evaluate;
+        extra = {
           inherit
             assertSourceCoherence
-            mkConfiguration
-            mkConfigurationWithEcosystemArgs
-            mkModule
             mkNixosAdapter
             mkSourceMeta
             mkStandaloneAdapter
             ;
         };
+      };
+    in
+    contributeClasses prev integration.classes
+    // {
+      caisson = (prev.caisson or { }) // {
+        home-manager = integration.namespace;
       };
     };
 
