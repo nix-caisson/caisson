@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The system-manager integration, declared: it owns the `systemManager`
+# The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
 # system-manager flake.
 {
@@ -66,8 +66,8 @@
         in
         {
           modules = coreModules ++ selectedModules ++ pkgSetsModule ++ [ configModule ];
-          # Framework defaults first; caller's specialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem.
+          # Framework defaults first; the values the caller passed win
+          # on conflict.
           specialArgs = {
             inputs = closure-inputs;
           }

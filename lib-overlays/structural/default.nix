@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The structural integration, declared: the empty integration, wrapping
+# The structural integration: the empty integration, wrapping
 # no ecosystem. Its class, `structural`, is one caisson defines itself,
 # since no ecosystem owns a plain tree of configurations, and it
 # carries nothing but caisson's core module: the manifest, the

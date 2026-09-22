@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The home-manager integration, declared: it owns the `homeManager`
+# The home-manager integration: it owns the `homeManager`
 # class and evaluates it with home-manager's standalone evaluator,
 # `modules/default.nix` of the home-manager source. Beside the entry
 # points it carries the adapters that place a home-manager
@@ -212,9 +212,9 @@
               ];
           };
           pkgs = checkedPkgSets.pkgs;
-          # Framework defaults first; caller's specialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem. home-manager
-          # calls these extraSpecialArgs; the caisson surface uses one name.
+          # Framework defaults first; the values the caller passed win on
+          # conflict. home-manager names these extraSpecialArgs; the
+          # caisson name is specialArgs.
           extraSpecialArgs = {
             pkgSets = checkedPkgSets;
             inherit osConfig;
@@ -263,9 +263,10 @@
           buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
-      # The adapter keeps `...` (its extras are NixOS-module options,
-      # not evaluator arguments); only the `extraSpecialArgs` spelling
-      # of home-manager is refused, with a pointer to `specialArgs`.
+      # The adapter's signature is open, its extras being NixOS-module
+      # options rather than evaluator arguments; home-manager's
+      # `extraSpecialArgs` spelling is refused with a pointer to
+      # `specialArgs`.
       mkNixosAdapter =
         rawArgs:
         if rawArgs ? extraSpecialArgs then
@@ -299,8 +300,8 @@
           # manager starts.  It leaves `users.users` untouched, so it is safe for
           # systemd-homed hosts, where a NixOS-created passwd entry would
           # conflict with the homed user record and the home directory is
-          # only mounted at login anyway.  Currently limited to exactly one
-          # hosted user (one shared unit cannot carry per-user ExecStarts).
+          # only mounted at login anyway.  Limited to one user: a single
+          # shared unit cannot carry per-user ExecStarts.
           activationMode ? "upstream",
           specialArgs ? { },
           ...
@@ -311,7 +312,7 @@
         ]) "mkNixosAdapter: activationMode must be \"upstream\" or \"user-service\".";
         assert final.assertMsg (
           activationMode != "user-service" || builtins.length (builtins.attrNames users) == 1
-        ) "mkNixosAdapter: activationMode \"user-service\" currently supports exactly one hosted user.";
+        ) "mkNixosAdapter: activationMode \"user-service\" supports exactly one user.";
         mkNixosModule (
           { ... }:
           {
@@ -435,15 +436,16 @@
                   useGlobalPkgs
                   useUserPackages
                   ;
-                # Framework defaults first; caller's specialArgs wins on conflict.
-                # This is intentional and normal in the Nix ecosystem.
+                # Framework defaults first; the values the caller passed
+                # win on conflict.
                 extraSpecialArgs = {
                   pkgSets = checkedPkgSets;
                   sourceMeta = resolvedSourceMeta;
                 }
                 // specialArgs;
-                # The extra entries mirror mkCommonArgs/standalone defaults so a
-                # hosted user generation evaluates to the same derivation as the
+                # The extra entries match the standalone defaults of
+                # mkCommonArgs, so a user generation inside the NixOS
+                # configuration evaluates to the same derivation as the
                 # standalone profile built from the same source.
                 sharedModules =
                   sharedModules
@@ -464,7 +466,7 @@
                           # standalone default is pkgs.glibcLocales.
                           { i18n.glibcLocales = lib.mkDefault pkgs.glibcLocales; }
                           # Upstream skips the home-manager CLI for submodule
-                          # (hosted) evaluations, but the standalone CLI must
+                          # evaluations, but the standalone CLI must
                           # survive a nixos-rebuild "revert" or the user cannot
                           # layer standalone switches afterwards.
                           (lib.mkIf (config.programs.home-manager.enable && config.submoduleSupport.enable) {
@@ -503,10 +505,6 @@
             host fingerprint: ${hostFp}
             target fingerprint: ${targetFp}
           '';
-      # home-manager's evaluator takes exactly the arguments the
-      # composition builds, so there is nothing to forward: the
-      # evaluator's names are refused with a pointer to the caisson
-      # argument, and any other name is refused as unknown.
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The flake-parts integration, declared: projecting a composition into
+# The flake-parts integration: projecting a composition into
 # flake outputs. It owns the `flake` class and evaluates it with
 # flake-parts' `mkFlake`. Beside the entry points it carries the option
 # types (option types are this integration's medium), the export

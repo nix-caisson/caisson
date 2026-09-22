@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The terranix integration, declared: it owns the `terranix` class and
+# The terranix integration: it owns the `terranix` class and
 # evaluates it with `terranixConfiguration` from the terranix flake.
 {
   closure-inputs,
@@ -39,8 +39,7 @@
       # arguments: pkgSets.pkgs is `pkgs`, the selected class modules
       # and the config module are `modules`, and specialArgs becomes
       # terranix's `extraArgs` (framework defaults first; the values the
-      # caller passed win on conflict, as is normal in the Nix
-      # ecosystem).
+      # caller passed win on conflict).
       compose =
         {
           ecosystemSrc ? null,

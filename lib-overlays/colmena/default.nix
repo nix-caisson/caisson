@@ -1,16 +1,14 @@
 # SPDX-License-Identifier: MIT
 #
-# The colmena integration, declared: it owns the `caisson-colmena`
-# class, a class caisson defines itself, since colmena's hive format
-# is not a module class (and so the bare name `colmena` is not
-# caisson's to claim). A colmena configuration is a module of that class with
+# The colmena integration: it owns the `caisson-colmena` class,
+# prefixed because caisson defines it, colmena's hive format being no
+# module class. A colmena configuration is a module of that class with
 # `meta` (the metadata colmena's binary reads) and `nodes.<name>`, and
 # the integration is not compatible with colmena's hive modules
 # (`makeHive`, `defaults`, `meta.nixpkgs`). Its evaluator is the module
 # system of the composed library, and the evaluator step projects the
 # evaluated configuration onto the hive: the small versioned attrset
-# (the hive schema) that colmena's binary reads, the one place the
-# word hive applies.
+# (the hive schema) that colmena's binary reads.
 #
 # The configuration module receives `mkNixosConfiguration` as a module
 # argument, closed over the configuration's colmena source:
