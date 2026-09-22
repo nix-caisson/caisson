@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: MIT
+#
+# The terranix integration: it owns the `terranix` class and
+# evaluates it with `terranixConfiguration` from the terranix flake.
 {
   closure-inputs,
   contributeClasses,
@@ -18,8 +21,6 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson-core.mkModule "terranix";
-
       selection = final.caisson.integrations;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
@@ -32,39 +33,13 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? terranixConfiguration then
           ecosystemSrc
         else
-          throw "lib.caisson.terranix.mkConfiguration requires `ecosystemSrc.lib.terranixConfiguration`.";
-
-      accepted = [
-        "ecosystemSrc"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "pkgSets"
-      ];
-      hints = {
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        extraArgs = "pass extra module arguments as `specialArgs`.";
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        system = "pass the package set as `pkgSets.pkgs`; terranix evaluates against it.";
-      };
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.terranix.mkConfiguration";
-        inherit accepted hints;
-        open = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.terranix.mkConfigurationWithEcosystemArgs";
-        accepted = accepted ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
+          throw "lib.caisson.terranix requires `ecosystemSrc.lib.terranixConfiguration`.";
 
       # terranixConfiguration's arguments, composed from the caisson
-      # arguments: pkgSets.pkgs is `pkgs` (terranix evaluates against
-      # a package set, so mkConfiguration requires one), the selected
-      # class modules and the config module are `modules`, and
-      # specialArgs becomes terranix's `extraArgs` (framework defaults
-      # first; the caller's win on conflict, as is normal in the Nix
-      # ecosystem).
+      # arguments: pkgSets.pkgs is `pkgs`, the selected class modules
+      # and the config module are `modules`, and specialArgs becomes
+      # terranix's `extraArgs` (framework defaults first; the values the
+      # caller passed win on conflict).
       compose =
         {
           ecosystemSrc ? null,
@@ -75,7 +50,7 @@
           ...
         }:
         let
-          checkedEcosystemSrc = assertTerranixEcosystemSrc (resolveEcosystemSrc {
+          src = assertTerranixEcosystemSrc (resolveEcosystemSrc {
             explicit = ecosystemSrc;
             manifest = final.caisson-core.libManifest or { };
           });
@@ -85,7 +60,7 @@
           selectedModules = moduleImports registry;
         in
         {
-          inherit checkedEcosystemSrc;
+          inherit src;
           ecosystemArgs = (if pkgSets != null && pkgSets ? pkgs then { pkgs = pkgSets.pkgs; } else { }) // {
             modules = coreModules ++ selectedModules ++ [ configModule ];
             extraArgs = {
@@ -96,48 +71,31 @@
           };
         };
 
-      mkConfiguration =
-        rawArgs:
-        let
-          args = checkArgs rawArgs;
-          composed = compose args;
-        in
-        if !(args ? pkgSets && args.pkgSets ? pkgs) then
-          throw "lib.caisson.terranix.mkConfiguration requires `pkgSets.pkgs` to be defined."
+      # terranix evaluates against a package set, `pkgs` or one it
+      # instantiates for `system`. The composed call carries `pkgs` from
+      # `pkgSets.pkgs`; the twin may supply either in `ecosystemArgs`.
+      evaluate =
+        composed: callArgs:
+        if !(callArgs ? pkgs || callArgs ? system) then
+          throw "lib.caisson.terranix: terranixConfiguration needs a package set; pass `pkgSets.pkgs`, or `pkgs` or `system` in `ecosystemArgs`."
         else
-          composed.checkedEcosystemSrc.lib.terranixConfiguration composed.ecosystemArgs;
+          composed.src.lib.terranixConfiguration callArgs;
 
-      # The same composition, then `ecosystemArgs` merged over the
-      # evaluator call verbatim: everything terranixConfiguration takes
-      # (system, pkgs, modules, extraArgs, strip_nulls) can be set or
-      # replaced there; pkgSets is optional here since `system` or
-      # `pkgs` may come that way.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = checkOpenArgs rawArgs;
-          composed = compose args;
-        in
-        composed.checkedEcosystemSrc.lib.terranixConfiguration (
-          composed.ecosystemArgs // (args.ecosystemArgs or { })
-        );
-    in
-    # This integration owns the `terranix` class.
-    contributeClasses prev {
-      terranix = {
-        integration = "terranix";
-        inherit mkModule;
+      integration = selection.mkIntegration {
+        name = "terranix";
+        class = "terranix";
+        hints = {
+          extraArgs = "pass extra module arguments as `specialArgs`.";
+          pkgs = "pass the package set as `pkgSets.pkgs`.";
+          system = "pass the package set as `pkgSets.pkgs`; terranix evaluates against it.";
+        };
+        inherit compose evaluate;
       };
-    }
+    in
+    contributeClasses prev integration.classes
     // {
       caisson = (prev.caisson or { }) // {
-        terranix = ((prev.caisson or { }).terranix or { }) // {
-          inherit
-            mkConfiguration
-            mkConfigurationWithEcosystemArgs
-            mkModule
-            ;
-        };
+        terranix = integration.namespace;
       };
     };
 

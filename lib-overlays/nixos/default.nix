@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The nixos integration, declared: it owns the `nixos` class and
+# The nixos integration: it owns the `nixos` class and
 # evaluates it with `nixos/lib/eval-config.nix` from a nixpkgs source
 # tree. `compose` (in compose.nix) is the composition of the class,
 # shared with any integration that evaluates the class another way.

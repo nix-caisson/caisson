@@ -1,4 +1,11 @@
 # SPDX-License-Identifier: MIT
+#
+# The home-manager integration: it owns the `homeManager`
+# class and evaluates it with home-manager's standalone evaluator,
+# `modules/default.nix` of the home-manager source. Beside the entry
+# points it carries the adapters that place a home-manager
+# configuration inside a NixOS one, and the source metadata the
+# activation coherence check compares.
 {
   contributeClasses,
   entries,
@@ -17,7 +24,7 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson-core.mkModule "homeManager";
+      mkModule = final.caisson.home-manager.mkModule;
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
       selection = final.caisson.integrations;
@@ -162,7 +169,7 @@
         );
 
       mkCommonArgs =
-        args@{
+        {
           ecosystemSrc ? null,
           pkgSets,
           configModule,
@@ -205,9 +212,9 @@
               ];
           };
           pkgs = checkedPkgSets.pkgs;
-          # Framework defaults first; caller's specialArgs wins on conflict.
-          # This is intentional and normal in the Nix ecosystem. home-manager
-          # calls these extraSpecialArgs; the caisson surface uses one name.
+          # Framework defaults first; the values the caller passed win on
+          # conflict. home-manager names these extraSpecialArgs; the
+          # caisson name is specialArgs.
           extraSpecialArgs = {
             pkgSets = checkedPkgSets;
             inherit osConfig;
@@ -217,68 +224,31 @@
           evaluatorPath = "${hmSource}/modules";
         };
 
-      # home-manager's evaluator takes exactly the arguments mkCommonArgs
-      # composes, so there is nothing to forward: the evaluator's own
-      # names are refused with a pointer to the caisson argument, and any
-      # other name is refused as unknown.
-      hints = {
-        configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
-      };
-      configurationArgs = [
-        "ecosystemSrc"
-        "pkgSets"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "osConfig"
-        "check"
-        "minimal"
-        "sourceMeta"
-      ];
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.home-manager.mkConfiguration";
-        accepted = configurationArgs;
-        inherit hints;
-        open = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
-      };
-      checkOpenArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.home-manager.mkConfigurationWithEcosystemArgs";
-        accepted = configurationArgs ++ [ "ecosystemArgs" ];
-        inherit hints;
-      };
-      ecosystemArgsOf = common: {
-        inherit (common)
-          check
-          configuration
-          extraSpecialArgs
-          minimal
-          pkgs
-          ;
-      };
-
-      mkConfiguration =
-        rawArgs:
+      # The evaluator's call, from the composition above: everything
+      # home-manager's evaluator takes (configuration, pkgs, lib,
+      # minimal, check, extraSpecialArgs) can be set or replaced
+      # through the twin's `ecosystemArgs`.
+      compose =
+        args:
         let
-          common = mkCommonArgs (checkArgs rawArgs);
-          evaluator = import common.evaluatorPath;
-        in
-        evaluator (ecosystemArgsOf common);
-
-      # The same composition, then `ecosystemArgs` merged over the
-      # evaluator call verbatim: everything home-manager's evaluator
-      # takes (configuration, pkgs, lib, minimal, check,
-      # extraSpecialArgs) can be set or replaced there.
-      mkConfigurationWithEcosystemArgs =
-        rawArgs:
-        let
-          args = checkOpenArgs rawArgs;
           common = mkCommonArgs args;
-          evaluator = import common.evaluatorPath;
         in
-        evaluator (ecosystemArgsOf common // (args.ecosystemArgs or { }));
+        common
+        // {
+          ecosystemArgs = {
+            inherit (common)
+              check
+              configuration
+              extraSpecialArgs
+              minimal
+              pkgs
+              ;
+          };
+        };
+
+      evaluate = composed: callArgs: (import composed.evaluatorPath) callArgs;
+
+      mkConfiguration = final.caisson.home-manager.mkConfiguration;
 
       mkStandaloneAdapter =
         args@{
@@ -293,9 +263,9 @@
           buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
-      # The adapter keeps `...` (its extras are NixOS-module options,
-      # not evaluator arguments); only home-manager's own
-      # `extraSpecialArgs` spelling is refused, with a pointer to
+      # The adapter's signature is open, its extras being NixOS-module
+      # options rather than evaluator arguments; home-manager's
+      # `extraSpecialArgs` spelling is refused with a pointer to
       # `specialArgs`.
       mkNixosAdapter =
         rawArgs:
@@ -321,7 +291,7 @@
           useUserPackages ? true,
           # How the NixOS generation triggers home-manager activation:
           #
-          # "upstream": home-manager's own nixos module delivery (system
+          # "upstream": home-manager's nixos module delivery (system
           # units at boot).  Fine when the OS declares the users and their
           # homes are available at boot.
           #
@@ -330,8 +300,8 @@
           # manager starts.  It leaves `users.users` untouched, so it is safe for
           # systemd-homed hosts, where a NixOS-created passwd entry would
           # conflict with the homed user record and the home directory is
-          # only mounted at login anyway.  Currently limited to exactly one
-          # hosted user (one shared unit cannot carry per-user ExecStarts).
+          # only mounted at login anyway.  Limited to one user: a single
+          # shared unit cannot carry per-user ExecStarts.
           activationMode ? "upstream",
           specialArgs ? { },
           ...
@@ -342,7 +312,7 @@
         ]) "mkNixosAdapter: activationMode must be \"upstream\" or \"user-service\".";
         assert final.assertMsg (
           activationMode != "user-service" || builtins.length (builtins.attrNames users) == 1
-        ) "mkNixosAdapter: activationMode \"user-service\" currently supports exactly one hosted user.";
+        ) "mkNixosAdapter: activationMode \"user-service\" supports exactly one user.";
         mkNixosModule (
           { ... }:
           {
@@ -444,7 +414,7 @@
                       SyslogIdentifier = "hm-activate-${username}";
                       # A login shell, as upstream's system units use: the
                       # standalone activation script expects the user's normal
-                      # environment (nix on PATH for its own profile update).
+                      # environment (nix on PATH to update its profile).
                       ExecStart = pkgs.writeScript "hm-user-activate-${username}" ''
                         #! ${pkgs.runtimeShell} -el
                         exec ${userActivations.${username}}/activate
@@ -466,15 +436,16 @@
                   useGlobalPkgs
                   useUserPackages
                   ;
-                # Framework defaults first; caller's specialArgs wins on conflict.
-                # This is intentional and normal in the Nix ecosystem.
+                # Framework defaults first; the values the caller passed
+                # win on conflict.
                 extraSpecialArgs = {
                   pkgSets = checkedPkgSets;
                   sourceMeta = resolvedSourceMeta;
                 }
                 // specialArgs;
-                # The extra entries mirror mkCommonArgs/standalone defaults so a
-                # hosted user generation evaluates to the same derivation as the
+                # The extra entries match the standalone defaults of
+                # mkCommonArgs, so a user generation inside the NixOS
+                # configuration evaluates to the same derivation as the
                 # standalone profile built from the same source.
                 sharedModules =
                   sharedModules
@@ -495,7 +466,7 @@
                           # standalone default is pkgs.glibcLocales.
                           { i18n.glibcLocales = lib.mkDefault pkgs.glibcLocales; }
                           # Upstream skips the home-manager CLI for submodule
-                          # (hosted) evaluations, but the standalone CLI must
+                          # evaluations, but the standalone CLI must
                           # survive a nixos-rebuild "revert" or the user cannot
                           # layer standalone switches afterwards.
                           (lib.mkIf (config.programs.home-manager.enable && config.submoduleSupport.enable) {
@@ -534,27 +505,35 @@
             host fingerprint: ${hostFp}
             target fingerprint: ${targetFp}
           '';
-    in
-    # This integration owns the `homeManager` class.
-    contributeClasses prev {
-      homeManager = {
-        integration = "home-manager";
-        inherit mkModule;
-      };
-    }
-    // {
-      caisson = (prev.caisson or { }) // {
-        home-manager = ((prev.caisson or { }).home-manager or { }) // {
+      integration = selection.mkIntegration {
+        name = "home-manager";
+        class = "homeManager";
+        accepted = [
+          "osConfig"
+          "check"
+          "minimal"
+          "sourceMeta"
+        ];
+        hints = {
+          configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
+          pkgs = "pass the package set as `pkgSets.pkgs`.";
+          extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+        };
+        inherit compose evaluate;
+        extra = {
           inherit
             assertSourceCoherence
-            mkConfiguration
-            mkConfigurationWithEcosystemArgs
-            mkModule
             mkNixosAdapter
             mkSourceMeta
             mkStandaloneAdapter
             ;
         };
+      };
+    in
+    contributeClasses prev integration.classes
+    // {
+      caisson = (prev.caisson or { }) // {
+        home-manager = integration.namespace;
       };
     };
 

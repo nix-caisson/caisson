@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: MIT
 #
-# The structural integration: the empty integration, wrapping no
-# ecosystem. Its class, `structural`, is one caisson defines itself,
+# The structural integration: the empty integration, wrapping
+# no ecosystem. Its class, `structural`, is one caisson defines itself,
 # since no ecosystem owns a plain tree of configurations, and it
 # carries nothing but caisson's core module: the manifest, the
-# registry selectors and `caisson.exports`. A structural configuration
-# is the top of a repository whose point is what it exports, and
-# `default.nix` returns what `mkTopConfiguration` returns from it.
+# registry selectors and `caisson.exports`. Its evaluator is the module
+# system of the composed library, `evalModules`. A structural
+# configuration is the top of a repository whose point is what it
+# exports, and `default.nix` returns what `mkTopConfiguration` returns
+# from it.
 {
   closure-lib,
   contributeClasses,
@@ -28,29 +30,24 @@
     final: prev:
     let
 
-      prevNs = (prev.caisson or { }).structural or { };
-
       selection = final.caisson.integrations;
 
-      accepted = [
-        "configModule"
-        "moduleImports"
-        "name"
-        "specialArgs"
-        "pkgSets"
-      ];
-      hints = {
-        modules = "pass the configuration's module as `configModule`; registered structural modules are selected with `moduleImports`.";
-      };
-      checkArgs = final.caisson.integrations.checkArgs {
-        context = "lib.caisson.structural.mkConfiguration";
-        inherit accepted hints;
-      };
+      manifest =
+        if (final.caisson-core.libManifest or null) != null then
+          final.caisson-core.libManifest
+        else
+          throw ''
+            caisson.structural.mkConfiguration evaluates over a composition's manifest,
+            but this composed library carries no manifest at
+            `caisson-core.libManifest`. Compose the library with
+            caisson-core.mkLib, which captures one.
+          '';
 
-      mkConfiguration = rawArgs: mkConfigurationChecked (checkArgs rawArgs);
-
-      mkConfigurationChecked =
-        {
+      # The `evalModules` call: the framework modules of the class, the
+      # selection, the configuration's module, and the name when the
+      # configuration has one, over the manifest's inputs.
+      compose =
+        args@{
 
           configModule,
 
@@ -68,47 +65,46 @@
 
           specialArgs ? { },
 
+          ...
         }:
-        let
+        # The closed signature admits `ecosystemSrc` for every
+        # integration; this one has no ecosystem to resolve it against.
+        if args ? ecosystemSrc then
+          throw "lib.caisson.structural takes no `ecosystemSrc`: the structural integration wraps no ecosystem."
+        else
+          let
+            registry = final.caisson-core.modules.structural or { };
 
-          manifest =
-            if (final.caisson-core.libManifest or null) != null then
-              final.caisson-core.libManifest
-            else
-              throw ''
-                caisson.structural.mkConfiguration evaluates over a composition's manifest,
-                but this composed library carries no manifest at
-                `caisson-core.libManifest`. Compose the library with
-                caisson-core.mkLib, which captures one.
-              '';
-
-          registry = final.caisson-core.modules.structural or { };
-
-          # The framework module of the class: caisson's own core, read
-          # from the closure so it is there however this integration was
-          # registered, plus every `core` the composition registered.
-          frameworkModules = [
-            closure-lib.caisson-core.modules.structural.core
-          ]
-          ++ selection.coreModules registry;
-
-          importedModules = moduleImports registry;
-
-          evaluated = final.evalModules {
-            class = "structural";
-            specialArgs = {
-              lib = final;
-              inputs = manifest.inputs;
-            }
-            // (if pkgSets != null then { inherit pkgSets; } else { })
-            // specialArgs;
-            modules =
-              frameworkModules
-              ++ importedModules
-              ++ [ configModule ]
-              ++ (if name != null then [ { caisson.configInfo.configName = final.mkDefault name; } ] else [ ]);
+            # The framework module of the class: the core of caisson
+            # itself, read from the closure so it is there however this
+            # integration was registered, plus every `core` the
+            # composition registered.
+            frameworkModules = [
+              closure-lib.caisson-core.modules.structural.core
+            ]
+            ++ selection.coreModules registry;
+          in
+          {
+            ecosystemArgs = {
+              class = "structural";
+              specialArgs = {
+                lib = final;
+                inputs = manifest.inputs;
+              }
+              // (if pkgSets != null then { inherit pkgSets; } else { })
+              // specialArgs;
+              modules =
+                frameworkModules
+                ++ moduleImports registry
+                ++ [ configModule ]
+                ++ (if name != null then [ { caisson.configInfo.configName = final.mkDefault name; } ] else [ ]);
+            };
           };
 
+      evaluate =
+        _composed: callArgs:
+        let
+          evaluated = final.evalModules callArgs;
         in
         {
           value = evaluated.config;
@@ -122,30 +118,29 @@
       mkTopConfiguration =
         rawArgs:
         let
-          configuration = mkConfiguration rawArgs;
+          configuration = final.caisson.structural.mkConfiguration rawArgs;
         in
         configuration.outputs.exports
         // {
           caisson.manifest = configuration.value.caisson.manifest;
         };
 
-    in
-    # This integration owns the `structural` class.
-    contributeClasses prev {
-      structural = {
-        integration = "structural";
-        mkModule = final.caisson-core.mkModule "structural";
-      };
-    }
-    // {
-
-      caisson = (prev.caisson or { }) // {
-        structural = prevNs // {
-          inherit mkConfiguration mkTopConfiguration;
-          mkModule = final.caisson-core.mkModule "structural";
+      integration = selection.mkIntegration {
+        name = "structural";
+        class = "structural";
+        accepted = [ "name" ];
+        inherit compose evaluate;
+        extra = {
+          inherit mkTopConfiguration;
         };
       };
 
+    in
+    contributeClasses prev integration.classes
+    // {
+      caisson = (prev.caisson or { }) // {
+        structural = integration.namespace;
+      };
     };
 
 }
