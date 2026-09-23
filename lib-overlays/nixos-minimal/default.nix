@@ -3,8 +3,9 @@
 # The nixos-minimal integration, declared as an alt over the nixos
 # integration: the minimal NixOS evaluator, `evalModules` from
 # nixos/lib with no NixOS base modules, over the `nixos` class that
-# integration owns. It carries constructors only: the class, its
-# registration form and its composition belong to `lib.caisson.nixos`.
+# integration owns and over the composed library. It carries
+# constructors only: the class, its registration form and its
+# composition belong to `lib.caisson.nixos`.
 # With no base modules, the config module declares every option it
 # uses, and the package set arrives as the `pkgs` module argument
 # rather than through `nixpkgs.pkgs`.
@@ -49,9 +50,22 @@
                 prefix = args.prefix or [ ];
                 modules = common.modules;
                 specialArgs = common.specialArgs;
+                # `nixos/lib/default.nix` of the nixpkgs source takes
+                # `lib` and defaults it to `import ../../lib`, the
+                # library of the tree it lives in. It is the argument
+                # of that file rather than of `evalModules`, so
+                # `evaluate` reads it out of the call and hands it to
+                # the import; the twin replaces it like any other
+                # evaluator argument.
+                lib = common.lib;
               };
             };
-          evaluate = composed: callArgs: (import "${composed.src}/nixos/lib" { }).evalModules callArgs;
+          evaluate =
+            composed: callArgs:
+            (import "${composed.src}/nixos/lib" {
+              inherit (callArgs) lib;
+            }).evalModules
+              (builtins.removeAttrs callArgs [ "lib" ]);
         };
       };
     };
