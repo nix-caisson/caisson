@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT
 #
-# A stand-in for `modules/default.nix` of the home-manager source: the
-# standalone evaluator, with that file's signature
-# (`{ configuration, pkgs, lib ? pkgs.lib, minimal ? false, check ? true,
-# extraSpecialArgs ? { } }`) and the steps the integration composes
-# for. It forwards `minimal` to the module list, evaluates the class
-# and publishes the names the real file adds beside the configuration.
+# A stand-in for home-manager's standalone evaluator, with its
+# signature and its treatment of `lib`: the library it is given,
+# extended with an `hm` namespace, is what the module system runs on
+# (home-manager does this in modules/lib/stdlib-extended.nix). The
+# result reports what the evaluation saw, so a test can read the
+# library the module system used.
 {
   configuration,
   pkgs,
@@ -15,27 +15,29 @@
   extraSpecialArgs ? { },
 }:
 let
-  hmModules = import ./modules.nix {
-    inherit
-      check
-      pkgs
-      minimal
-      lib
-      ;
-  };
-
-  rawModule = lib.evalModules {
-    modules = [ configuration ] ++ hmModules;
-    class = "homeManager";
-    specialArgs = {
-      modulesPath = toString ./.;
+  extendedLib = lib.extend (
+    _self: _super: {
+      hm.marker = "from-the-evaluator";
     }
-    // extraSpecialArgs;
+  );
+  evaluated = extendedLib.evalModules {
+    modules = [
+      configuration
+      {
+        options.seenLib = extendedLib.mkOption { type = extendedLib.types.attrs; };
+        config._module.check = check;
+      }
+    ];
+    class = "homeManager";
+    specialArgs = extraSpecialArgs;
   };
 in
-rawModule
-// {
-  inherit (rawModule.config.home) activationPackage;
-  newsDisplay = rawModule.config.news.display;
-  newsEntries = rawModule.config.news.entries;
+{
+  inherit
+    check
+    minimal
+    pkgs
+    ;
+  libArgument = lib;
+  inherit (evaluated) config;
 }
