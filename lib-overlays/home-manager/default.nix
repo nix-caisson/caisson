@@ -212,6 +212,13 @@
               ];
           };
           pkgs = checkedPkgSets.pkgs;
+          # The composed library is what the evaluation runs on:
+          # home-manager's evaluator extends the library it is given
+          # with its `hm` namespace (modules/lib/stdlib-extended.nix)
+          # and hands the result to the module system, so the modules
+          # see caisson's library plus `lib.hm`, and no library
+          # home-manager assembled for itself.
+          lib = final;
           # Framework defaults first; the values the caller passed win on
           # conflict. home-manager names these extraSpecialArgs; the
           # caisson name is specialArgs.
@@ -240,6 +247,7 @@
               check
               configuration
               extraSpecialArgs
+              lib
               minimal
               pkgs
               ;
@@ -437,7 +445,16 @@
                   useUserPackages
                   ;
                 # Framework defaults first; the values the caller passed
-                # win on conflict.
+                # win on conflict. The library of an embedded user
+                # generation is the library of the NixOS evaluation
+                # around it, which home-manager's NixOS module extends
+                # with its `hm` namespace and installs as the
+                # submodule's `lib` special argument
+                # (nixos/common.nix). `extraSpecialArgs` merges over
+                # that installation, so a `lib` here would replace the
+                # extended library and take `lib.hm` with it; the
+                # library reaches this path through the NixOS
+                # evaluation instead.
                 extraSpecialArgs = {
                   pkgSets = checkedPkgSets;
                   sourceMeta = resolvedSourceMeta;
