@@ -3,14 +3,17 @@
 # A stand-in for `modules/modules.nix` of the home-manager source: the
 # module list the evaluation imports, with that file's signature
 # (`{ pkgs, lib, check ? true, useNixpkgsModule ? true, minimal ? false }`)
-# and its `pkgsModule`, the module that wires `_module.args.pkgs` and
-# `_module.check` into every home-manager evaluation.
+# and its `pkgsModule`, the module that wires `_module.args.pkgs`,
+# `_module.check` and `lib = lib.hm` into every home-manager
+# evaluation.
 #
 # The real file lists home-manager's whole module tree when `minimal`
 # is false and the necessary modules alone when it is true. This one
-# lists the options a test configuration sets, plus one module that
-# stands for the tree the real file drops: it declares the option a
-# minimal configuration has to import for itself.
+# lists the options a test configuration sets, the
+# `home.activationPackage`, `news` and `assertions` names the
+# evaluation reads, and one module that stands for the tree the real
+# file drops: it declares the option a minimal configuration has to
+# import for itself.
 {
   pkgs,
   lib,
@@ -25,6 +28,9 @@ let
       config = {
         _module.args.pkgs = lib.mkDefault pkgs;
         _module.check = check;
+        # The real file sets this to `lib.hm`: inside a home-manager
+        # module, `lib` the option is the home-manager library.
+        lib = lib.hm;
       };
     };
 
@@ -56,6 +62,17 @@ let
         programs.home-manager.path = lib.mkOption {
           type = lib.types.str;
           default = "";
+        };
+        # The `lib` option of a home-manager module.
+        lib = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+        };
+        # What a test configuration records about the library the
+        # module system handed it.
+        seenLib = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
         };
         # The arguments the evaluation composed, recorded so a test
         # can read them.
