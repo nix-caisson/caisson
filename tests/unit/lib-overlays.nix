@@ -1714,6 +1714,86 @@ in
       };
     };
 
+  # The home-manager integration: the composed library is the library
+  # the evaluation runs on, handed to the evaluator as `lib`. The
+  # ecosystem source is a stand-in tree whose `modules` evaluator has
+  # home-manager's signature and its treatment of `lib` (extend the
+  # given library with an `hm` namespace, evaluate the modules on the
+  # result), so the tests read both what the evaluator was called with
+  # and what reached the module system.
+  homeManagerLib =
+    let
+      hmStub = ./home-manager-stub;
+      myLib = caisson.mkLib {
+        inputs = mockInputs;
+        defaultEcosystemSrc.home-manager = hmStub;
+        libOverlays = _mkLibOverlay: {
+          home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+          # The marker this composition carries and nothing else does:
+          # reading it inside the evaluation shows which library got
+          # there.
+          marker = mkLibOverlay (
+            { ... }:
+            {
+              overlay = _final: _prev: {
+                caissonMarker = "from-the-composition";
+              };
+            }
+          );
+        };
+      };
+      # A configuration module that records the library the module
+      # system handed it.
+      probeModule =
+        { lib, ... }:
+        {
+          seenLib = {
+            marker = lib.caissonMarker or null;
+            hm = lib.hm.marker or null;
+          };
+        };
+      configuration = myLib.caisson.home-manager.mkConfiguration {
+        configModule = probeModule;
+        pkgSets.pkgs = { };
+        check = false;
+      };
+    in
+    {
+      "test: the evaluation runs on the composed library" = {
+        expr = configuration.libArgument.caissonMarker or null;
+        expected = "from-the-composition";
+      };
+
+      # home-manager's `hm` namespace comes from extending the library
+      # it is given (modules/lib/stdlib-extended.nix), so passing the
+      # composed library keeps it: the modules see `lib.hm`.
+      #
+      # `extend` on the composed library re-ties nixpkgs' fixpoint,
+      # which nixpkgs' lib/default.nix bootstraps with a makeExtensible
+      # exposing `extend` alone, so what the module system receives
+      # carries nixpkgs' functions and `hm`. The composition's own
+      # attributes reach the modules through `specialArgs`, which
+      # `extraSpecialArgs` carries.
+      "test: the modules see hm over the library the evaluator extends" = {
+        expr = configuration.config.seenLib;
+        expected = {
+          marker = null;
+          hm = "from-the-evaluator";
+        };
+      };
+
+      "test: the twin replaces the library like any evaluator argument" = {
+        expr =
+          (myLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+            configModule = probeModule;
+            pkgSets.pkgs = { };
+            check = false;
+            ecosystemArgs.lib = myLib.extend (_final: _prev: { caissonMarker = "from-ecosystemArgs"; });
+          }).libArgument.caissonMarker or null;
+        expected = "from-ecosystemArgs";
+      };
+    };
+
   # The structural integration: the empty integration, evaluating
   # caisson's core module over a composition and returning what the
   # selectors chose.
