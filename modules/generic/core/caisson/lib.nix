@@ -19,7 +19,7 @@ in
       default =
         composedLib:
         assert lib.assertMsg (configName != null)
-          "caisson.lib.export.enabled is true but caisson.configInfo.configName is not set. Set configName or disable lib export.";
+          "caisson.lib.export.enabled is true but this configuration has no name. Declare `namespace` in the mkLib call, set caisson.configInfo.configName, or disable lib export.";
         composedLib.${configName};
       defaultText = "composedLib: composedLib.\${configName}";
     };

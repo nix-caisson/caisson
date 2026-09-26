@@ -1754,6 +1754,13 @@ in
           );
         };
       };
+      # The same composition with a namespace declared, so the name a
+      # parentless configuration takes is observable beside the
+      # composition that declares none.
+      namespacedLib = caisson.mkLib {
+        inputs = mockInputs;
+        namespace = "named-composition";
+      };
       selectors =
         { ... }:
         {
@@ -1828,14 +1835,148 @@ in
         expected = "from-the-registry";
       };
 
-      "test: the name argument defaults the configuration name" = {
+      # A parentless configuration takes the one name it holds: the
+      # namespace the composition declares on mkLib.
+      "test: the declared namespace names a parentless configuration" = {
+        expr =
+          (namespacedLib.caisson.structural.mkConfiguration {
+            configModule = { };
+            moduleImports = _modules: [ ];
+          }).value.caisson.configInfo.configName;
+        expected = "named-composition";
+      };
+
+      # Declaring none is a state the tree supports: the name is absent
+      # rather than an error, and absent is not `default`.
+      "test: a composition declaring no namespace leaves the name absent" = {
         expr =
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
             moduleImports = _modules: [ ];
-            name = "named-top";
           }).value.caisson.configInfo.configName;
-        expected = "named-top";
+        expected = null;
+      };
+
+      # The configuration's module still wins: the manifest supplies a
+      # default, not a definition.
+      "test: the configuration's module overrides the declared namespace" = {
+        expr =
+          (namespacedLib.caisson.structural.mkConfiguration {
+            configModule = {
+              caisson.configInfo.configName = "set-by-the-module";
+            };
+            moduleImports = _modules: [ ];
+          }).value.caisson.configInfo.configName;
+        expected = "set-by-the-module";
+      };
+
+      # No entry point takes a `name`, and the refusal says where a name
+      # does come from: the namespace declared on mkLib.
+      "test: a name argument is refused, pointing at the mkLib declaration" = {
+        expr =
+          let
+            attempt = builtins.tryEval (
+              builtins.deepSeq (namespacedLib.caisson.structural.mkConfiguration {
+                configModule = { };
+                moduleImports = _modules: [ ];
+                name = "named-top";
+              }) true
+            );
+            # A `name` that reached the evaluation would name the
+            # configuration, so the absence of that name is what proves
+            # the argument was refused rather than quietly dropped.
+            named = builtins.tryEval (
+              (namespacedLib.caisson.structural.mkConfiguration {
+                configModule = { };
+                moduleImports = _modules: [ ];
+                name = "named-top";
+              }).value.caisson.configInfo.configName
+            );
+          in
+          {
+            refused = !attempt.success;
+            neverNamesTheConfiguration = named.success -> named.value != "named-top";
+          };
+        expected = {
+          refused = true;
+          neverNamesTheConfiguration = true;
+        };
+      };
+
+      # flake-parts keys an exported module by moduleLocation, which
+      # defaults to self.outPath, a rev-sensitive identity. The
+      # composition's namespace is rev-independent, so two revisions of
+      # one flake key their modules identically and deduplicate rather
+      # than colliding on an already-declared option.
+      "test: moduleLocation is the declared namespace, not a store path" = {
+        expr =
+          let
+            mkOutputs =
+              tag:
+              (caisson.mkLib {
+                inputs = mockInputs;
+                namespace = "rev-independent";
+                modules = callbackLib: {
+                  flake = {
+                    thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
+                  };
+                };
+              }).caisson.flake-parts.mkConfiguration
+                {
+                  configModule = {
+                    systems = [ "x86_64-linux" ];
+                    caisson.modules.flake.exported = modules: { inherit (modules) thing; };
+                    flake.revTag = tag;
+                  };
+                  moduleImports = _modules: [ ];
+                };
+            # flake-parts publishes an exported module as a function, so
+            # the stamped identity is read by applying it.
+            stamp = outputs: (outputs.modules.flake.thing { })._file;
+            first = mkOutputs "one";
+            second = mkOutputs "two";
+          in
+          {
+            file = builtins.toString (stamp first);
+            # Two evaluations that differ only in a rev-like fact stamp
+            # their exported module the same, which is what lets a
+            # consumer composing both deduplicate.
+            sameAcrossRevs = builtins.toString (stamp first) == builtins.toString (stamp second);
+          };
+        expected = {
+          file = "rev-independent#modules.flake.thing";
+          sameAcrossRevs = true;
+        };
+      };
+
+      # With no namespace declared, moduleLocation is not set and
+      # flake-parts falls back to its own default, derived from `self`.
+      # These compositions supply no `self`, so that fallback is
+      # observable as flake-parts' own complaint rather than as a
+      # namespace-shaped identity.
+      "test: a composition declaring no namespace leaves moduleLocation to flake-parts" = {
+        expr =
+          let
+            outputs =
+              (caisson.mkLib {
+                inputs = mockInputs;
+                modules = callbackLib: {
+                  flake = {
+                    thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
+                  };
+                };
+              }).caisson.flake-parts.mkConfiguration
+                {
+                  configModule = {
+                    systems = [ "x86_64-linux" ];
+                    caisson.modules.flake.exported = modules: { inherit (modules) thing; };
+                  };
+                  moduleImports = _modules: [ ];
+                };
+            stamped = outputs.modules.flake.thing { };
+          in
+          (builtins.tryEval (builtins.deepSeq stamped._file true)).success;
+        expected = false;
       };
 
       "test: an evaluator argument is refused with a hint" = {

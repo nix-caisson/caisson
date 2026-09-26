@@ -16,8 +16,8 @@ let
       type = "github";
       owner = "nix-caisson";
       repo = "caisson-core";
-      rev = "c677e69f34a354c7617aaf315165afa3d8cdb137";
-      narHash = "sha256-IL8uY8ShiAPthlO9+CKNpbO1DO9DDaXyNXI5YjyoOkU=";
+      rev = "d40cfeb7a6cfbce40651f632f1a1760b5a7c8dbd";
+      narHash = "sha256-009HyksTcB8ysvnmYDCikLU936WD0HEUZL2ttKojoKE=";
     };
     nixpkgs-lib = {
       type = "github";
@@ -34,6 +34,7 @@ let
     inputs = {
       nixpkgs-lib = builtins.fetchTree pins.nixpkgs-lib;
     };
+    namespace = "caisson";
     systems = import ./systems.nix;
     modules = core.mkModules ./modules;
     configs = core.mkModules ./configs;
