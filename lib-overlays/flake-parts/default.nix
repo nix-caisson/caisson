@@ -100,20 +100,6 @@
           # default is every entry named `default`.
           moduleImports ? selection.defaultModuleImports,
 
-          # The flake's canonical name. Exported modules are keyed by
-          # flake-parts' moduleLocation, which defaults to self.outPath,
-          # a rev-sensitive identity, so consumers composing this flake's
-          # modules from two different revs (e.g. directly and via a sibling
-          # whose lock is one bump behind) collect two copies of the same
-          # option declarations and fail with "option ... is already
-          # declared". Passing the name here makes module identity
-          # rev-independent so such copies deduplicate. Also provides the
-          # default for caisson.configInfo.configName, keeping the name
-          # single-sourced. It must be an argument rather than (only) module
-          # config because moduleLocation is consumed before the module eval
-          # exists.
-          name ? null,
-
           # Package sets for the flake evaluation itself, handed to the
           # flake-class modules as the `pkgSets` special argument. Per
           # system package sets are the nixpkgs integration's business
@@ -146,9 +132,24 @@
 
           importedModules = moduleImports registry;
 
+          # The name this configuration holds: the namespace the
+          # composition declares on mkLib, since a flake evaluation has
+          # no parent to declare it under an attribute.
+          name = manifest.namespace or null;
+
         in
         {
           inherit flakeParts;
+          # Exported modules are keyed by flake-parts' moduleLocation,
+          # which defaults to self.outPath, a rev-sensitive identity, so
+          # consumers composing this flake's modules from two different
+          # revs (e.g. directly and via a sibling whose lock is one bump
+          # behind) collect two copies of the same option declarations
+          # and fail with "option ... is already declared". The
+          # composition's namespace is rev-independent, so such copies
+          # deduplicate. It comes from the manifest rather than the
+          # module evaluation because moduleLocation is consumed before
+          # that evaluation exists.
           ecosystemArgs = (if name != null then { moduleLocation = name; } else { }) // {
             inputs = manifest.inputs;
             specialArgs = {
@@ -157,18 +158,15 @@
             // (if pkgSets != null then { inherit pkgSets; } else { })
             // specialArgs;
           };
-          module =
-            { lib, ... }:
-            {
-              imports = [
-                flakeParts.flakeModules.flakeModules
-                flakeParts.flakeModules.modules
-              ]
-              ++ frameworkModules
-              ++ importedModules
-              ++ [ configModule ]
-              ++ (if name != null then [ { caisson.configInfo.configName = lib.mkDefault name; } ] else [ ]);
-            };
+          module = {
+            imports = [
+              flakeParts.flakeModules.flakeModules
+              flakeParts.flakeModules.modules
+            ]
+            ++ frameworkModules
+            ++ importedModules
+            ++ [ configModule ];
+          };
         };
 
       evaluate = composed: callArgs: composed.flakeParts.lib.mkFlake callArgs composed.module;
@@ -176,13 +174,13 @@
       integration = selection.mkIntegration {
         name = "flake-parts";
         class = "flake";
-        accepted = [ "name" ];
         # flake-parts' mkFlake arguments this entry point composes are
         # refused with a pointer to the caisson argument.
         hints = {
           inputs = "the flake's inputs come from the composition's manifest; pass them to caisson-core.mkLib.";
           self = "the flake's outputs come from the composition's manifest; pass inputs (self included) to caisson-core.mkLib.";
-          moduleLocation = "pass the flake's canonical name as `name`.";
+          moduleLocation = "the flake's name is the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
+          name = "a configuration's name is the attribute its parent declares it under, or, with no parent, the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
         };
         inherit compose evaluate;
         extra = {

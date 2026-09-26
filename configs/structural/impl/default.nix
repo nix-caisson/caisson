@@ -9,8 +9,6 @@
 
   caisson = {
 
-    configInfo.configName = "caisson";
-
     # Every registered overlay exports as-is: its machinery is baked in
     # at registration, and the registry comes from the mkLib call of
     # the consumer.

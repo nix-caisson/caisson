@@ -31,6 +31,7 @@
 
       lib = core.mkLib {
         inherit inputs;
+        namespace = "caisson";
         systems = import ./systems.nix;
         modules = core.mkModules ./modules;
         configs = core.mkModules ./configs;
@@ -39,8 +40,6 @@
 
     in
     lib.caisson.flake-parts.mkConfiguration {
-
-      name = "caisson";
 
       configModule = lib.caisson-core.configs.flake.caisson;
 

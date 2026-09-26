@@ -59,6 +59,11 @@ and `lib-overlays/<name>`.
       lib = core.mkLib {
         inherit inputs;
 
+        # The namespace this flake contributes to the composed library,
+        # and so the name of the configuration below, which no parent
+        # declares.
+        namespace = "my-flake";
+
         # Consume caisson as a project: its integrations and its
         # exported modules join the registries under `caisson/<name>`.
         projects = { inherit caisson; };

@@ -44,8 +44,9 @@
           '';
 
       # The `evalModules` call: the framework modules of the class, the
-      # selection, the configuration's module, and the name when the
-      # configuration has one, over the manifest's inputs.
+      # selection and the configuration's module, over the manifest's
+      # inputs. The configuration's name comes from the manifest,
+      # through the core module.
       compose =
         args@{
 
@@ -54,10 +55,6 @@
           # Selection over the structural class of the registry; the
           # default default is every entry named `default`.
           moduleImports ? selection.defaultModuleImports,
-
-          # The configuration's canonical name; the default for
-          # caisson.configInfo.configName.
-          name ? null,
 
           # Package sets handed to the modules as the `pkgSets` special
           # argument, the slot every integration carries.
@@ -93,11 +90,7 @@
               }
               // (if pkgSets != null then { inherit pkgSets; } else { })
               // specialArgs;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ [ configModule ]
-                ++ (if name != null then [ { caisson.configInfo.configName = final.mkDefault name; } ] else [ ]);
+              modules = frameworkModules ++ moduleImports registry ++ [ configModule ];
             };
           };
 
@@ -128,7 +121,9 @@
       integration = selection.mkIntegration {
         name = "structural";
         class = "structural";
-        accepted = [ "name" ];
+        hints = {
+          name = "a configuration's name is the attribute its parent declares it under, or, with no parent, the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
+        };
         inherit compose evaluate;
         extra = {
           inherit mkTopConfiguration;

@@ -34,6 +34,7 @@ let
     inputs = {
       nixpkgs-lib = builtins.fetchTree pins.nixpkgs-lib;
     };
+    namespace = "caisson";
     systems = import ./systems.nix;
     modules = core.mkModules ./modules;
     configs = core.mkModules ./configs;
