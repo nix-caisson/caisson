@@ -1,8 +1,5 @@
 # SPDX-License-Identifier: MIT
 { config, lib, ... }:
-let
-  configName = config.caisson.configInfo.configName;
-in
 {
 
   options.caisson.lib = {
@@ -14,14 +11,18 @@ in
       description = ''
         Function that selects which parts of the composed library to
         publish as the `lib` export. Receives the composed library;
-        defaults to the namespace `configName` names.
+        defaults to the namespace that library's composition declares
+        (`namespace` on mkLib, carried in the manifest).
       '';
       default =
         composedLib:
-        assert lib.assertMsg (configName != null)
-          "caisson.lib.export.enabled is true but this configuration has no name. Declare `namespace` in the mkLib call, set caisson.configInfo.configName, or disable lib export.";
-        composedLib.${configName};
-      defaultText = "composedLib: composedLib.\${configName}";
+        let
+          namespace = composedLib.caisson-core.libManifest.namespace or null;
+        in
+        assert lib.assertMsg (namespace != null)
+          "caisson.lib.export.enabled is true but this composition declares no namespace, so there is no library namespace to publish. Declare `namespace` in the mkLib call, select the parts to publish with caisson.lib.exported, or disable lib export.";
+        composedLib.${namespace};
+      defaultText = "composedLib: composedLib.\${the namespace the composition declares}";
     };
 
   };

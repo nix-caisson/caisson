@@ -76,33 +76,63 @@ let
 
 in
 {
-  libExport = {
-    "test: assertion fires when configName is null" = {
-      expr = builtins.tryEval (
-        assert lib.assertMsg (
-          null != null
-        ) "caisson.lib.export.enabled requires caisson.configInfo.configName to be set.";
-        "unreachable"
-      );
-      expected = {
-        success = false;
-        value = false;
-      };
-    };
+  # The default selector for `caisson.lib.exported`: a function of the
+  # composed library that looks up the namespace that library's
+  # composition declares. These tests apply it to libraries directly, so
+  # what they observe is the lookup and nothing around it.
+  libExport =
+    let
+      selectorOf =
+        composed:
+        (composed.caisson.structural.mkConfiguration {
+          configModule = { };
+          moduleImports = _modules: [ ];
+        }).value.caisson.lib.exported;
 
-    "test: assertion passes when configName is set" = {
-      expr = builtins.tryEval (
-        assert lib.assertMsg (
-          "caisson" != null
-        ) "caisson.lib.export.enabled requires caisson.configInfo.configName to be set.";
-        "ok"
-      );
-      expected = {
-        success = true;
-        value = "ok";
+      # A composition declaring a namespace and contributing it.
+      namedLib = caisson.mkLib {
+        inputs = mockInputs;
+        namespace = "the-namespace";
+        libOverlays = _mkLibOverlay: {
+          the-namespace = mkLibOverlay (
+            { ... }:
+            {
+              overlay = _final: prev: {
+                the-namespace = (prev.the-namespace or { }) // {
+                  marker = "selected";
+                };
+              };
+            }
+          );
+        };
+      };
+
+      # The same composition with no namespace declared.
+      unnamedLib = caisson.mkLib { inputs = mockInputs; };
+    in
+    {
+      "test: the selector reads the namespace off the library it is handed" = {
+        expr = (selectorOf namedLib) namedLib;
+        expected = {
+          marker = "selected";
+        };
+      };
+
+      # The selector reads the library passed to it, not the one the
+      # configuration it came from was evaluated over: handing it another
+      # composition's library selects that composition's namespace.
+      "test: the selector follows the library, not the configuration it came from" = {
+        expr = (selectorOf unnamedLib) namedLib;
+        expected = {
+          marker = "selected";
+        };
+      };
+
+      "test: the selector refuses a library whose composition declares no namespace" = {
+        expr = (builtins.tryEval (builtins.deepSeq ((selectorOf namedLib) unnamedLib) true)).success;
+        expected = false;
       };
     };
-  };
 
   importApply = {
     "test: applies static args to a function" = {
@@ -1727,18 +1757,31 @@ in
             other = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
           };
           structural = {
+            # Each entry stamps `whichEntry` with a marker, so which
+            # entry a selection applied is observable in the evaluated
+            # configuration.
             default = callbackLib.caisson.structural.mkModule (
               { ... }:
+              { lib, ... }:
               {
-                caisson.configInfo.configName = "from-the-default";
+                options.whichEntry = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                };
+                config.whichEntry = "from-the-default";
               }
             );
             # Applied only when selected by name: with the default default
             # in force it would conflict with the definition above.
             named = callbackLib.caisson.structural.mkModule (
               { ... }:
+              { lib, ... }:
               {
-                caisson.configInfo.configName = "from-the-registry";
+                options.whichEntry = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                };
+                config.whichEntry = "from-the-registry";
               }
             );
           };
@@ -1754,12 +1797,24 @@ in
           );
         };
       };
-      # The same composition with a namespace declared, so the name a
-      # parentless configuration takes is observable beside the
-      # composition that declares none.
+      # The same composition with a namespace declared, contributing
+      # that namespace to the composed library, so what the lib export
+      # selects is observable beside the composition that declares none.
       namespacedLib = caisson.mkLib {
         inputs = mockInputs;
         namespace = "named-composition";
+        libOverlays = _mkLibOverlay: {
+          named-composition = mkLibOverlay (
+            { ... }:
+            {
+              overlay = _final: prev: {
+                named-composition = (prev.named-composition or { }) // {
+                  marker = "from-the-namespace-overlay";
+                };
+              };
+            }
+          );
+        };
       };
       selectors =
         { ... }:
@@ -1822,7 +1877,7 @@ in
         expr =
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
-          }).value.caisson.configInfo.configName;
+          }).value.whichEntry;
         expected = "from-the-default";
       };
 
@@ -1831,43 +1886,53 @@ in
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
             moduleImports = modules: [ modules.named ];
-          }).value.caisson.configInfo.configName;
+          }).value.whichEntry;
         expected = "from-the-registry";
       };
 
-      # A parentless configuration takes the one name it holds: the
-      # namespace the composition declares on mkLib.
-      "test: the declared namespace names a parentless configuration" = {
+      # The lib export reader: the namespace it selects comes from the
+      # composed library it is handed, so declaring one on mkLib is the
+      # whole of what decides which namespace gets published.
+      "test: the lib export selects the namespace the composition declares" = {
         expr =
           (namespacedLib.caisson.structural.mkConfiguration {
-            configModule = { };
+            configModule = {
+              caisson.lib.export.enabled = true;
+            };
             moduleImports = _modules: [ ];
-          }).value.caisson.configInfo.configName;
-        expected = "named-composition";
+          }).value.caisson.exports.lib;
+        expected = {
+          marker = "from-the-namespace-overlay";
+        };
       };
 
-      # Declaring none is a state the tree supports: the name is absent
-      # rather than an error, and absent is not `default`.
-      "test: a composition declaring no namespace leaves the name absent" = {
+      # Declaring none is a state the tree supports, up to the point
+      # something asks for a name. The lib export is such a reader, and
+      # what it produces is the message, not a missing attribute.
+      "test: the lib export refuses a composition that declares no namespace" = {
+        expr =
+          (builtins.tryEval (
+            builtins.deepSeq
+              (registeringLib.caisson.structural.mkConfiguration {
+                configModule = {
+                  caisson.lib.export.enabled = true;
+                };
+                moduleImports = _modules: [ ];
+              }).value.caisson.exports.lib
+              true
+          )).success;
+        expected = false;
+      };
+
+      # Nothing asking for a name is the ordinary case for a composition
+      # that declares none: the evaluation goes through.
+      "test: a composition declaring no namespace evaluates without one" = {
         expr =
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
             moduleImports = _modules: [ ];
-          }).value.caisson.configInfo.configName;
-        expected = null;
-      };
-
-      # The configuration's module still wins: the manifest supplies a
-      # default, not a definition.
-      "test: the configuration's module overrides the declared namespace" = {
-        expr =
-          (namespacedLib.caisson.structural.mkConfiguration {
-            configModule = {
-              caisson.configInfo.configName = "set-by-the-module";
-            };
-            moduleImports = _modules: [ ];
-          }).value.caisson.configInfo.configName;
-        expected = "set-by-the-module";
+          }).value.caisson.exports.lib;
+        expected = { };
       };
 
       # No entry point takes a `name`, and the refusal says where a name
@@ -1883,19 +1948,23 @@ in
               }) true
             );
             # A `name` that reached the evaluation would name the
-            # configuration, so the absence of that name is what proves
-            # the argument was refused rather than quietly dropped.
+            # configuration, so the lib export still selecting the
+            # declared namespace is what proves the argument was refused
+            # rather than quietly taking effect.
             named = builtins.tryEval (
               (namespacedLib.caisson.structural.mkConfiguration {
-                configModule = { };
+                configModule = {
+                  caisson.lib.export.enabled = true;
+                };
                 moduleImports = _modules: [ ];
                 name = "named-top";
-              }).value.caisson.configInfo.configName
+              }).value.caisson.exports.lib
             );
           in
           {
             refused = !attempt.success;
-            neverNamesTheConfiguration = named.success -> named.value != "named-top";
+            neverNamesTheConfiguration =
+              named.success -> named.value == { marker = "from-the-namespace-overlay"; };
           };
         expected = {
           refused = true;
@@ -2006,7 +2075,7 @@ in
           (registeringLib.caisson.structural.mkConfigurationWithEcosystemArgs {
             configModule = { };
             ecosystemArgs = { };
-          }).value.caisson.configInfo.configName;
+          }).value.whichEntry;
         expected = "from-the-default";
       };
     };

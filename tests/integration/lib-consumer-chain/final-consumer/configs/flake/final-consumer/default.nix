@@ -14,8 +14,6 @@
 
   systems = [ "x86_64-linux" ];
 
-  caisson.configInfo.configName = "final-consumer";
-
   perSystem =
     { pkgs, ... }:
     {
