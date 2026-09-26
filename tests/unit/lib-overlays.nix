@@ -1984,4 +1984,184 @@ in
         };
       };
     };
+
+  # The two evaluators of the `homeManager` class: home-manager
+  # imports its whole module tree or the necessary modules alone, and
+  # that is a choice between evaluations, so each way is an entry
+  # point. `lib.caisson.home-manager` owns the class and evaluates it
+  # with the whole tree; `lib.caisson.home-manager-minimal` is an alt
+  # over it, evaluating the same class with the necessary modules.
+  # Both run over the composition the owner publishes, so the two
+  # cannot express different profiles from the same arguments.
+  #
+  # The ecosystem source is a stand-in tree with the two files the
+  # integrations read, `modules/default.nix` (the evaluator) and
+  # `modules/modules.nix` (the module list), each with the signature
+  # of the file it stands in for, and `modules/programs.nix` standing
+  # for the tree the minimal list drops.
+  homeManagerMinimal =
+    let
+      hmStub = ./home-manager-stub;
+      myLib = caisson.mkLib {
+        inputs = mockInputs;
+        defaultEcosystemSrc.home-manager = hmStub;
+        libOverlays = _mkLibOverlay: {
+          home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+          home-manager-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager-minimal");
+        };
+      };
+      # The arguments both entry points take, so the module list is
+      # the sole difference between the two evaluations. The package
+      # set carries a `lib`, the default of the `lib` argument of
+      # home-manager's standalone evaluator.
+      commonArgs = {
+        configModule = { };
+        pkgSets.pkgs = {
+          inherit lib;
+        };
+        check = false;
+      };
+      whole = myLib.caisson.home-manager.mkConfiguration commonArgs;
+      necessary = myLib.caisson.home-manager-minimal.mkConfiguration commonArgs;
+    in
+    {
+      # The alt exists and evaluates the class the other way. The
+      # module list home-manager imports is what `minimal` selects, so
+      # that is where the two entry points part.
+      "test: the alt evaluates the class with the necessary modules alone" = {
+        expr = {
+          owner = {
+            inherit (whole.config.stub) minimal moduleList;
+          };
+          alt = {
+            inherit (necessary.config.stub) minimal moduleList;
+          };
+        };
+        expected = {
+          owner = {
+            minimal = false;
+            moduleList = "whole-tree";
+          };
+          alt = {
+            minimal = true;
+            moduleList = "necessary";
+          };
+        };
+      };
+
+      # What the difference costs the configuration: an option the
+      # dropped tree declares is there under the owner and absent
+      # under the alt, which is what makes the two different
+      # evaluations rather than one evaluation tuned.
+      "test: an option of the dropped tree is absent from the alt" = {
+        expr = {
+          owner = whole.options ? programs && whole.options.programs ? stub;
+          alt = necessary.options.programs ? stub;
+        };
+        expected = {
+          owner = true;
+          alt = false;
+        };
+      };
+
+      # A minimal configuration imports what it uses from
+      # `modulesPath`, the special argument the evaluation supplies.
+      "test: the alt supplies modulesPath so a configuration imports for itself" = {
+        expr =
+          (myLib.caisson.home-manager-minimal.mkConfiguration (
+            commonArgs
+            // {
+              configModule =
+                { modulesPath, ... }:
+                {
+                  imports = [ "${modulesPath}/programs.nix" ];
+                  programs.stub.enable = true;
+                };
+            }
+          )).config.programs.stub.enable;
+        expected = true;
+      };
+
+      # The alt carries constructors only: the class, its registration
+      # form and its composition belong to the integration that owns
+      # the class.
+      "test: the alt carries entry points only" = {
+        expr = builtins.attrNames myLib.caisson.home-manager-minimal;
+        expected = [
+          "mkConfiguration"
+          "mkConfigurationWithEcosystemArgs"
+        ];
+      };
+
+      # The class is declared once, by the integration that owns it.
+      "test: the alt declares no class of its own" = {
+        expr = myLib.caisson-core.classes.homeManager.integration;
+        expected = "home-manager";
+      };
+
+      # `minimal` is not an argument of either entry point: it names
+      # the evaluation, so the message points at the entry point that
+      # evaluates that way.
+      "test: the owner refuses minimal and points at the alt" = {
+        expr = builtins.deepSeq (myLib.caisson.home-manager.mkConfiguration (
+          commonArgs // { minimal = true; }
+        )) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.home-manager\\.mkConfiguration does not accept `minimal`:.*lib\\.caisson\\.home-manager-minimal\\.mkConfiguration with the necessary modules alone\\.";
+        };
+      };
+
+      "test: the alt refuses minimal and points back at the owner" = {
+        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration (
+          commonArgs // { minimal = false; }
+        )) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration does not accept `minimal`:.*lib\\.caisson\\.home-manager\\.mkConfiguration evaluates with home-manager's whole module tree\\.";
+        };
+      };
+
+      # The twin of the alt reaches the evaluator's full surface, so
+      # the module list can still be replaced outright.
+      "test: the twin of the alt merges ecosystemArgs last" = {
+        expr =
+          (myLib.caisson.home-manager-minimal.mkConfigurationWithEcosystemArgs (
+            commonArgs // { ecosystemArgs.minimal = false; }
+          )).config.stub.moduleList;
+        expected = "whole-tree";
+      };
+
+      # One composition serves both entry points, so an argument of
+      # the class reaches the alt unchanged.
+      "test: the alt composes through the integration that owns the class" = {
+        expr =
+          (myLib.caisson.home-manager-minimal.mkConfiguration (
+            commonArgs
+            // {
+              specialArgs.marker = "from-specialArgs";
+              configModule =
+                { marker, ... }:
+                {
+                  news.display = marker;
+                };
+            }
+          )).config.news.display;
+        expected = "from-specialArgs";
+      };
+
+      # The composition checks the package set against the entry
+      # point that called it, so the narrower mistake is reported
+      # under the name the caller used.
+      "test: a pkgSets without pkgs is reported against the alt" = {
+        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration {
+          configModule = { };
+          pkgSets = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration requires `pkgSets\\.pkgs` to be defined\\.";
+        };
+      };
+    };
 }

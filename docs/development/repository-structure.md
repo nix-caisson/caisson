@@ -27,10 +27,12 @@ without nixpkgs can depend on it directly.
 
 The layer users reach for: the integrations (`structural`,
 `flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
-`colmena`, `terranix`, `system-manager`), each a library overlay
+`home-manager-minimal`, `colmena`, `terranix`, `system-manager`), each
+a library overlay
 contributing its `lib.caisson` namespace, registering its own module
-class where it has one (`nixos-minimal` evaluates the class `nixos`
-owns and carries constructors only), and taking its ecosystem as an `ecosystemSrc` argument
+class where it has one (`nixos-minimal` and `home-manager-minimal`
+each evaluate a class another integration
+owns and carry constructors only), and taking its ecosystem as an `ecosystemSrc` argument
 resolved from the declarations of the mkLib call that composes it
 (including flake-parts: the integration calls the consumer's flake-parts source
 with the composed library as its `nixpkgs-lib`, and carries the

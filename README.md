@@ -109,6 +109,7 @@ source by.
 | `nixos` | `nixpkgs` | NixOS configurations |
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
+| `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
 | `terranix` | `terranix` | Terranix and Terraform configurations |
 | `colmena` | `colmena` | colmena configurations (class `caisson-colmena`), projected onto the hive colmena's binary reads; not compatible with colmena's hive modules |
 | `system-manager` | `system-manager` | system-manager configurations on foreign distros |
