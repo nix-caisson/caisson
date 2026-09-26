@@ -86,7 +86,7 @@
               "specialArgs"
               "system"
             ];
-            inherit hints;
+            inherit hints required;
             open = "lib.caisson.nixos.mkConfigurationWithEcosystemArgs";
           } rawArgs;
           composed = composeEvalConfig args;
@@ -102,11 +102,18 @@
         pkgs = "pass the package set as `pkgSets.pkgs`.";
         baseModules = "the base module list belongs to the entry point: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration without it.";
       };
+      # What the shared composition destructures without a default,
+      # for every entry point over it. `assertPkgSets` there reports
+      # the narrower mistake, a `pkgSets` that carries no `pkgs`.
+      required = [
+        "pkgSets"
+        "configModule"
+      ];
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
         class = "nixos";
         accepted = [ "system" ];
-        inherit hints;
+        inherit hints required;
         compose = composeEvalConfig;
         evaluate = evalConfig;
         extra = {

@@ -129,6 +129,8 @@
         name = "structural";
         class = "structural";
         accepted = [ "name" ];
+        # What `compose` destructures without a default.
+        required = [ "configModule" ];
         inherit compose evaluate;
         extra = {
           inherit mkTopConfiguration;

@@ -514,6 +514,14 @@
           "minimal"
           "sourceMeta"
         ];
+        # What `mkCommonArgs` destructures without a default. The
+        # package set is checked twice, for two different mistakes:
+        # the signature reports `pkgSets` absent, `assertPkgSets`
+        # reports a `pkgSets` that carries no `pkgs`.
+        required = [
+          "pkgSets"
+          "configModule"
+        ];
         hints = {
           configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
           pkgs = "pass the package set as `pkgSets.pkgs`.";

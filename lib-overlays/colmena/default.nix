@@ -90,6 +90,14 @@
         "specialArgs"
         "system"
       ];
+      # A node is a NixOS configuration; the constructors forward to
+      # lib.caisson.nixos, whose composition destructures both without
+      # a default. Declaring them here names the module argument the
+      # configuration actually called.
+      nodeRequired = [
+        "pkgSets"
+        "configModule"
+      ];
       nodeHints = {
         modules = "pass the host's module as `configModule`; registered nixos-class modules are selected with `moduleImports`.";
         pkgs = "pass the package set as `pkgSets.pkgs`.";
@@ -98,12 +106,14 @@
       checkNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfiguration (the module argument of a colmena configuration)";
         accepted = nodeAccepted;
+        required = nodeRequired;
         hints = nodeHints;
         open = "mkNixosConfigurationWithEcosystemArgs";
       };
       checkOpenNodeArgs = final.caisson.integrations.checkArgs {
         context = "mkNixosConfigurationWithEcosystemArgs (the module argument of a colmena configuration)";
         accepted = nodeAccepted ++ [ "ecosystemArgs" ];
+        required = nodeRequired;
         hints = nodeHints;
       };
 
@@ -272,6 +282,9 @@
       integration = selection.mkIntegration {
         name = "colmena";
         class = "caisson-colmena";
+        # `pkgSets` defaults to null here: a colmena configuration
+        # needs one only for `colmena eval`, which reports the miss.
+        required = [ "configModule" ];
         # The keys of colmena's hive format, refused with a pointer to
         # the option of the colmena configuration that holds the fact.
         hints = {

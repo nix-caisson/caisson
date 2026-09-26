@@ -84,6 +84,10 @@
       integration = selection.mkIntegration {
         name = "terranix";
         class = "terranix";
+        # `pkgSets` defaults to null here: the evaluator step accepts a
+        # package set from `ecosystemArgs` instead, and reports the
+        # miss when neither arrives.
+        required = [ "configModule" ];
         hints = {
           extraArgs = "pass extra module arguments as `specialArgs`.";
           pkgs = "pass the package set as `pkgSets.pkgs`.";

@@ -31,6 +31,12 @@
           name = "nixos-minimal";
           inherit over;
           accepted = [ "prefix" ];
+          # The composition of the nixos class destructures both
+          # without a default, so the alt requires what the owner does.
+          required = [
+            "pkgSets"
+            "configModule"
+          ];
           hints = {
             pkgs = "pass the package set as `pkgSets.pkgs`.";
             baseModules = "the minimal evaluator takes no base modules; lib.caisson.nixos.mkConfiguration evaluates with NixOS' module list.";

@@ -177,6 +177,10 @@
       integration = selection.mkIntegration {
         name = "system-manager";
         class = "systemManager";
+        # What `mkCommonArgs` destructures without a default;
+        # system-manager instantiates nixpkgs itself, so `pkgSets`
+        # defaults to null.
+        required = [ "configModule" ];
         hints = {
           extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
         };

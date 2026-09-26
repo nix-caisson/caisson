@@ -20,7 +20,11 @@
 #                        each entry point is the way to the evaluator's
 #                        full surface: the same arguments plus
 #                        `ecosystemArgs`, merged over the composed call
-#                        verbatim, last.
+#                        verbatim, last. A declaration also names the
+#                        arguments the entry point must be given, so a
+#                        missing one is reported here, by the entry
+#                        point's name, rather than as a Nix function
+#                        argument error inside the composition.
 #   resolveEcosystemSrc  the layered ecosystem-source resolution:
 #                        caisson-core's `resolve` (the explicit
 #                        argument, then the composition's declared
@@ -63,6 +67,8 @@
           context,
           # the argument names it takes
           accepted,
+          # the argument names it must be given; the rest are optional
+          required ? [ ],
           # per-name pointers for the common mistakes (an evaluator
           # name where a caisson name exists)
           hints ? { },
@@ -71,17 +77,27 @@
         }:
         args:
         let
+          takes = "it takes ${builtins.concatStringsSep ", " accepted}";
           unknown = builtins.filter (name: !(builtins.elem name accepted)) (builtins.attrNames args);
           name = builtins.head unknown;
-          message =
+          unknownMessage =
             if hints ? ${name} then
               "${context} does not accept `${name}`: ${hints.${name}}"
             else if open != null then
-              "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. The evaluator's arguments are available through ${open}, in `ecosystemArgs`."
+              "${context} does not accept `${name}`; ${takes}. The evaluator's arguments are available through ${open}, in `ecosystemArgs`."
             else
-              "${context} does not accept `${name}`; it takes ${builtins.concatStringsSep ", " accepted}. Evaluator arguments go in `ecosystemArgs`.";
+              "${context} does not accept `${name}`; ${takes}. Evaluator arguments go in `ecosystemArgs`.";
+          missing = builtins.filter (name: !(args ? ${name})) required;
+          missingMessage = "${context} requires ${
+            builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") missing)
+          }; ${takes}.";
         in
-        if unknown == [ ] then args else throw message;
+        if unknown != [ ] then
+          throw unknownMessage
+        else if missing != [ ] then
+          throw missingMessage
+        else
+          args;
 
       resolveEcosystemSrc =
         {
@@ -147,6 +163,7 @@
         {
           name,
           accepted,
+          required,
           hints,
           compose,
           evaluate,
@@ -158,12 +175,17 @@
           check = checkArgs {
             context = "${context}.mkConfiguration";
             accepted = allAccepted;
+            inherit required;
             hints = allHints;
             open = "${context}.mkConfigurationWithEcosystemArgs";
           };
+          # The twin takes the same arguments and requires the same
+          # ones; `ecosystemArgs` is merged over the composed call, and
+          # composing it still needs what the composition destructures.
           checkOpen = checkArgs {
             context = "${context}.mkConfigurationWithEcosystemArgs";
             accepted = allAccepted ++ [ "ecosystemArgs" ];
+            inherit required;
             hints = allHints;
           };
         in
@@ -202,6 +224,7 @@
           name,
           class,
           accepted ? [ ],
+          required ? [ ],
           hints ? { },
           compose,
           evaluate,
@@ -216,6 +239,7 @@
               inherit
                 name
                 accepted
+                required
                 hints
                 compose
                 evaluate
@@ -247,6 +271,7 @@
           name,
           over,
           accepted ? [ ],
+          required ? [ ],
           hints ? { },
           compose,
           evaluate,
@@ -257,6 +282,7 @@
           inherit
             name
             accepted
+            required
             hints
             compose
             evaluate
