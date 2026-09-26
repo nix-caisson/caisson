@@ -2,8 +2,9 @@
 #
 # The nixos integration: it owns the `nixos` class and
 # evaluates it with `nixos/lib/eval-config.nix` from a nixpkgs source
-# tree. `compose` (in compose.nix) is the composition of the class,
-# shared with any integration that evaluates the class another way.
+# tree, over the composed library. `compose` (in compose.nix) is the
+# composition of the class, shared with any integration that evaluates
+# the class another way.
 {
   contributeClasses,
   entries,
@@ -63,6 +64,13 @@
           ecosystemArgs = {
             modules = common.modules;
             specialArgs = common.specialArgs;
+            # `nixos/lib/eval-config.nix` of the nixpkgs source
+            # defaults `lib` to `import ../../lib`, the library of the
+            # tree it lives in. Naming it makes the composed library
+            # what the evaluation runs on: its `evalModules`, its
+            # merging and its type checking, and the library the
+            # result publishes as `.lib`.
+            lib = common.lib;
             system =
               args.system or (common.checkedPkgSets.pkgs.stdenv.hostPlatform.system
                 or (common.checkedPkgSets.pkgs.system or null)

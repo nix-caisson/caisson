@@ -2,9 +2,9 @@
 #
 # The composition the nixos integration's entry points share, and the
 # nixos-minimal integration reads through `lib.caisson.nixos.compose`:
-# one definition of the module list and special arguments, so the
-# evaluators of the class cannot express different machines from the
-# same arguments.
+# one definition of the library, the module list and the special
+# arguments, so the evaluators of the class cannot express different
+# machines from the same arguments.
 { final }:
 let
   selection = final.caisson.integrations;
@@ -52,6 +52,9 @@ let
 in
 {
   inherit checkedPkgSets;
+  # The composed library is what a NixOS evaluation of this class runs
+  # on, whichever evaluator of the class performs it.
+  lib = final;
   modules =
     coreModules
     ++ selectedModules
@@ -63,6 +66,13 @@ in
   # normal in the Nix ecosystem.
   specialArgs = {
     pkgSets = checkedPkgSets;
+    # The `lib` argument every module receives. `evalModules` builds
+    # that argument from the `lib` its own `lib/modules.nix` closed
+    # over, which is the fixpoint the `nixpkgs-lib` entry read rather
+    # than the one this composition built, and `// specialArgs` in that
+    # file is where a caller says otherwise. Naming it here is what
+    # puts the composed library in front of the modules.
+    lib = final;
   }
   // specialArgs;
 }

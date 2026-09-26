@@ -1714,6 +1714,180 @@ in
       };
     };
 
+  # The nixos and nixos-minimal integrations: the composed library is
+  # the library a NixOS evaluation runs on, threaded into the
+  # evaluator of each. The ecosystem source is a stand-in nixpkgs tree
+  # carrying the three files the integrations read,
+  # `nixos/lib/eval-config.nix`, `nixos/lib/default.nix` and
+  # `nixos/modules/module-list.nix`, each with the signature of the
+  # file it stands in for and its treatment of `lib`, including the
+  # `import ../../lib` default that reaches the library of the tree.
+  # That `lib` directory throws, so an evaluation handed no library
+  # fails where it reaches for one.
+  nixosLib =
+    let
+      nixosStub = ./nixos-stub;
+      mkComposition =
+        extraOverlays:
+        caisson.mkLib {
+          inputs = mockInputs;
+          defaultEcosystemSrc.nixpkgs = nixosStub;
+          libOverlays =
+            _mkLibOverlay:
+            {
+              nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
+              # The marker this composition carries and nothing else
+              # does: reading it inside the evaluation shows which
+              # library got there.
+              marker = mkLibOverlay (
+                { ... }:
+                {
+                  overlay = _final: _prev: {
+                    caissonMarker = "from-the-composition";
+                  };
+                }
+              );
+            }
+            // extraOverlays;
+        };
+      myLib = mkComposition { };
+      # A configuration module that records what the library the
+      # module system handed it carries. It declares the option it
+      # sets, the way a NixOS configuration module declares anything
+      # the base modules do not, so it reads the same under the
+      # minimal evaluator, which takes no base modules.
+      probeModule =
+        { lib, ... }:
+        {
+          options.seenLib = lib.mkOption {
+            type = lib.types.attrs;
+            default = { };
+          };
+          config.seenLib = {
+            # An attribute this composition contributed and nixpkgs
+            # does not have: present only if the library the modules
+            # run on is the composed one.
+            marker = lib.caissonMarker or null;
+            # A nixpkgs function, so the composed library is still
+            # nixpkgs' library and not a bare marker.
+            nixpkgs = lib.isFunction lib.id;
+          };
+        };
+      configuration = myLib.caisson.nixos.mkConfiguration {
+        configModule = probeModule;
+        pkgSets.pkgs = { };
+      };
+      minimalConfiguration = myLib.caisson.nixos-minimal.mkConfiguration {
+        configModule = probeModule;
+        pkgSets.pkgs = { };
+      };
+    in
+    {
+      # The proof that the composition reaches the modules of a NixOS
+      # evaluation: a module inside the evaluation sees the
+      # composition's marker and a nixpkgs function at once, on one
+      # library. `evalModules` builds the `lib` module argument from
+      # the library its own `lib/modules.nix` closed over, which is
+      # the fixpoint the `nixpkgs-lib` entry read rather than the one
+      # this composition built, so the marker arrives only because the
+      # composition names `lib` among the special arguments.
+      "test: the modules of a nixos evaluation see the composed library" = {
+        expr = configuration.config.seenLib;
+        expected = {
+          marker = "from-the-composition";
+          nixpkgs = true;
+        };
+      };
+
+      # The evaluator's `lib` argument, which `eval-config.nix`
+      # publishes back as `lib` on the result: the module system, the
+      # merging and the type checking of the evaluation all run on it.
+      "test: eval-config runs on the composed library" = {
+        expr = configuration.libArgument.caissonMarker or null;
+        expected = "from-the-composition";
+      };
+
+      # The same library reaches the minimal evaluator, which takes it
+      # as the argument of `nixos/lib/default.nix` rather than of
+      # `evalModules`.
+      "test: the minimal evaluator runs on the composed library" = {
+        expr = {
+          argument = minimalConfiguration.libArgument.caissonMarker or null;
+          modules = minimalConfiguration.config.seenLib;
+        };
+        expected = {
+          argument = "from-the-composition";
+          modules = {
+            marker = "from-the-composition";
+            nixpkgs = true;
+          };
+        };
+      };
+
+      # The minimal evaluator takes no base modules, so the option the
+      # module list of the tree declares is absent from that
+      # evaluation, while mkConfigurationFull passes the list
+      # explicitly.
+      "test: only the full entry point carries the base module list" = {
+        expr = {
+          minimal = minimalConfiguration.config.stub.fromBaseModules or null;
+          full =
+            (myLib.caisson.nixos.mkConfigurationFull {
+              configModule = probeModule;
+              pkgSets.pkgs = { };
+            }).config.stub.fromBaseModules;
+        };
+        expected = {
+          minimal = null;
+          full = true;
+        };
+      };
+
+      # The twin replaces the library like any evaluator argument, on
+      # both entry points: `eval-config.nix` takes `lib` directly, and
+      # the minimal evaluator takes it through the import of
+      # `nixos/lib`.
+      "test: the twin replaces the library of a nixos evaluation" = {
+        expr =
+          (myLib.caisson.nixos.mkConfigurationWithEcosystemArgs {
+            configModule = probeModule;
+            pkgSets.pkgs = { };
+            ecosystemArgs.lib = myLib // {
+              caissonMarker = "from-ecosystemArgs";
+            };
+          }).libArgument.caissonMarker or null;
+        expected = "from-ecosystemArgs";
+      };
+
+      "test: the twin replaces the library of a minimal evaluation" = {
+        expr =
+          (myLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+            configModule = probeModule;
+            pkgSets.pkgs = { };
+            ecosystemArgs.lib = myLib // {
+              caissonMarker = "from-ecosystemArgs";
+            };
+          }).libArgument.caissonMarker or null;
+        expected = "from-ecosystemArgs";
+      };
+
+      # A `lib` the caller passes in `specialArgs` takes precedence
+      # over the one the composition sets, the way every other special
+      # argument does.
+      "test: the caller's specialArgs lib takes precedence" = {
+        expr =
+          (myLib.caisson.nixos.mkConfiguration {
+            configModule = probeModule;
+            pkgSets.pkgs = { };
+            specialArgs.lib = myLib // {
+              caissonMarker = "from-specialArgs";
+            };
+          }).config.seenLib.marker;
+        expected = "from-specialArgs";
+      };
+    };
+
   # The structural integration: the empty integration, evaluating
   # caisson's core module over a composition and returning what the
   # selectors chose.
