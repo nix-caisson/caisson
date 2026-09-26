@@ -22,6 +22,7 @@
         nixos
         nixos-minimal
         home-manager
+        home-manager-minimal
         colmena
         terranix
         system-manager
