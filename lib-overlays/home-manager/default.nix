@@ -44,12 +44,10 @@
           manifest = final.caisson-core.libManifest or { };
         };
 
-      assertPkgSets =
-        pkgSets:
-        if pkgSets ? pkgs then
-          pkgSets
-        else
-          throw "lib.caisson.home-manager.mkConfiguration requires `pkgSets.pkgs` to be defined.";
+      assertPkgSets = assertPkgSetsFor "lib.caisson.home-manager.mkConfiguration";
+      assertPkgSetsFor =
+        context: pkgSets:
+        if pkgSets ? pkgs then pkgSets else throw "${context} requires `pkgSets.pkgs` to be defined.";
 
       resolveOutPath =
         value:
@@ -168,7 +166,19 @@
           }
         );
 
+      # The composition of the class, shared by every evaluator over
+      # it: one definition of the module list, the package set and the
+      # special arguments, so the evaluators cannot express different
+      # profiles from the same arguments. `minimal` selects
+      # home-manager's module list, and belongs to the entry point
+      # rather than to the caller: the full list is
+      # `lib.caisson.home-manager`, the necessary modules alone are
+      # `lib.caisson.home-manager-minimal`.
       mkCommonArgs =
+        {
+          context,
+          minimal,
+        }:
         {
           ecosystemSrc ? null,
           pkgSets,
@@ -177,12 +187,11 @@
           specialArgs ? { },
           osConfig ? null,
           check ? true,
-          minimal ? false,
           sourceMeta ? null,
           ...
         }:
         let
-          checkedPkgSets = assertPkgSets pkgSets;
+          checkedPkgSets = assertPkgSetsFor context pkgSets;
           selectedModules = moduleImports registry;
           hmSource = resolveOutPath (resolveSrc ecosystemSrc);
           resolvedSourceMeta =
@@ -227,11 +236,19 @@
       # The evaluator's call, from the composition above: everything
       # home-manager's evaluator takes (configuration, pkgs, lib,
       # minimal, check, extraSpecialArgs) can be set or replaced
-      # through the twin's `ecosystemArgs`.
+      # through the twin's `ecosystemArgs`. An integration that
+      # evaluates the class the other way reads this through
+      # `lib.caisson.home-manager.compose`.
       compose =
+        {
+          context ? "lib.caisson.home-manager.mkConfiguration",
+          # Whether the evaluation imports home-manager's necessary
+          # modules alone instead of its whole module tree.
+          minimal ? false,
+        }:
         args:
         let
-          common = mkCommonArgs args;
+          common = mkCommonArgs { inherit context minimal; } args;
         in
         common
         // {
@@ -511,15 +528,16 @@
         accepted = [
           "osConfig"
           "check"
-          "minimal"
           "sourceMeta"
         ];
         hints = {
           configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
           pkgs = "pass the package set as `pkgSets.pkgs`.";
           extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
+          minimal = "the module list belongs to the entry point: mkConfiguration evaluates with home-manager's whole module tree, lib.caisson.home-manager-minimal.mkConfiguration with the necessary modules alone.";
         };
-        inherit compose evaluate;
+        compose = compose { };
+        inherit evaluate;
         extra = {
           inherit
             assertSourceCoherence
@@ -527,6 +545,12 @@
             mkSourceMeta
             mkStandaloneAdapter
             ;
+          # The two-stage composition an alt over this class reads,
+          # and the evaluation it composes for: both module lists come
+          # out of the same home-manager source and run through the
+          # same evaluation, so the entry points differ in the module
+          # list alone.
+          inherit compose evaluate;
         };
       };
     in
