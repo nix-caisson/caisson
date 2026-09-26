@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT
 #
-# The home-manager integration: it owns the `homeManager`
-# class and evaluates it with home-manager's standalone evaluator,
-# `modules/default.nix` of the home-manager source. Beside the entry
-# points it carries the adapters that place a home-manager
-# configuration inside a NixOS one, and the source metadata the
-# activation coherence check compares.
+# The home-manager integration: it owns the `homeManager` class,
+# contributes home-manager's library to the composition as `lib.hm`,
+# and evaluates the class over the composed library with
+# home-manager's module list. Beside the entry points it carries the
+# adapters that place a home-manager configuration inside a NixOS one,
+# and the source metadata the activation coherence check compares.
 {
   contributeClasses,
   entries,
@@ -59,6 +59,46 @@
           value.outPath
         else
           toString value;
+
+      # home-manager's library, instantiated over this composition:
+      # `modules/lib/default.nix` of the home-manager source applied to
+      # the composed library. Its functions call each other through
+      # `lib.hm`, so they resolve through caisson's fixpoint, and every
+      # nixpkgs name they read is a name this composition contributed.
+      mkHmLibFor =
+        explicit: import "${resolveOutPath (resolveSrc explicit)}/modules/lib" { lib = final; };
+      # The composition's declared home-manager, shared by every
+      # evaluation that passes no `ecosystemSrc`; forced only when read.
+      hmLibDefault = mkHmLibFor null;
+
+      # The library an evaluation runs on: the composed library,
+      # carrying the `hm` entry this integration contributes. The
+      # entry is built from the home-manager the composition declares,
+      # so an evaluation whose `ecosystemSrc` names a different tree
+      # would take its modules from one home-manager and `lib.hm` from
+      # another. That is refused, and the message names the
+      # declaration that composes an `hm` for the other tree.
+      libFor =
+        explicit:
+        let
+          declared = resolveOutPath (resolveSrc null);
+          named = resolveOutPath (resolveSrc explicit);
+        in
+        if explicit == null || named == declared then
+          final
+        else
+          throw ''
+            caisson.home-manager: this evaluation names
+              ${named}
+            as its home-manager, and the composed library carries `lib.hm`
+            from the home-manager this composition declares,
+              ${declared}.
+            A home-manager evaluation runs on one library, so the two must be
+            the same tree. Declare the other tree as
+            `defaultEcosystemSrc.home-manager` in a mkLib call and evaluate
+            under the library that composes, or drop the `ecosystemSrc`
+            argument.
+          '';
 
       # Provenance derives from what composes: the ecosystem source
       # handed to the entry point and the nixpkgs the package set was
@@ -212,6 +252,11 @@
               ];
           };
           pkgs = checkedPkgSets.pkgs;
+          # The composed library is what the evaluation runs on, and
+          # it carries `lib.hm` as an entry of this integration, so
+          # the modules see one library, the composed one, with the
+          # home-manager namespace under the name home-manager reads.
+          lib = libFor ecosystemSrc;
           # Framework defaults first; the values the caller passed win on
           # conflict. home-manager names these extraSpecialArgs; the
           # caisson name is specialArgs.
@@ -221,11 +266,14 @@
             sourceMeta = resolvedSourceMeta;
           }
           // specialArgs;
-          evaluatorPath = "${hmSource}/modules";
+          # The module tree the evaluation reads: home-manager's
+          # module list, its module files and the `modulesPath` special
+          # argument its news entries interpolate.
+          modulesPath = "${hmSource}/modules";
         };
 
       # The evaluator's call, from the composition above: everything
-      # home-manager's evaluator takes (configuration, pkgs, lib,
+      # the evaluation takes (configuration, pkgs, lib, modulesPath,
       # minimal, check, extraSpecialArgs) can be set or replaced
       # through the twin's `ecosystemArgs`.
       compose =
@@ -240,13 +288,117 @@
               check
               configuration
               extraSpecialArgs
+              lib
               minimal
+              modulesPath
               pkgs
               ;
           };
         };
 
-      evaluate = composed: callArgs: (import composed.evaluatorPath) callArgs;
+      # The evaluation, from the composed library. `modules/default.nix`
+      # of the home-manager source is the standalone entry point, and
+      # its one lib-construction step, `import ./lib/stdlib-extended.nix
+      # lib`, rebuilds nixpkgs' fixpoint through `extend` and drops
+      # every attribute the composition contributed: the modules would
+      # run on a library reassembled inside the evaluator. Everything
+      # else that entry point does is reproduced here line for line
+      # against the same source tree, with the composed library
+      # standing where it built one.
+      #
+      # The module list, the module files, the class name and
+      # `modulesPath` all come from the tree `modulesPath` names, so
+      # home-manager decides what is evaluated, and the library the
+      # evaluation runs on is the sole difference from the upstream
+      # entry point.
+      evaluate =
+        _composed:
+        {
+          configuration,
+          pkgs,
+          lib,
+          modulesPath,
+          minimal ? false,
+          check ? true,
+          extraSpecialArgs ? { },
+        }:
+        let
+          collectFailed = cfg: map (x: x.message) (lib.filter (x: !x.assertion) cfg.assertions);
+
+          showWarnings =
+            res:
+            let
+              f = w: x: builtins.trace "\x1b[1;31mwarning: ${w}\x1b[0m" x;
+            in
+            lib.foldr f res res.config.warnings;
+
+          hmModules = import "${modulesPath}/modules.nix" {
+            inherit
+              check
+              pkgs
+              minimal
+              lib
+              ;
+          };
+
+          rawModule = lib.evalModules {
+            modules = [ configuration ] ++ hmModules;
+            class = "homeManager";
+            specialArgs = {
+              inherit modulesPath;
+              # The `lib` argument every module receives.
+              # `evalModules` builds that argument from the `lib` its
+              # own `lib/modules.nix` closed over, which is the
+              # fixpoint the `nixpkgs-lib` entry read rather than the
+              # one this composition built, and `// specialArgs` in
+              # that file is where a caller says otherwise. Naming it
+              # here is what puts the composed library, `lib.hm` among
+              # its attributes, in front of the modules.
+              inherit lib;
+            }
+            // extraSpecialArgs;
+          };
+
+          moduleChecks =
+            raw:
+            showWarnings (
+              let
+                failed = collectFailed raw.config;
+                failedStr = lib.concatStringsSep "\n" (map (x: "- ${x}") failed);
+              in
+              if failed == [ ] then
+                raw
+              else
+                throw ''
+
+                  Failed assertions:
+                  ${failedStr}''
+            );
+
+          withExtraAttrs =
+            rawModule':
+            let
+              module = moduleChecks rawModule';
+            in
+            module
+            // {
+              inherit (module.config.home) activationPackage;
+
+              # home-manager keeps this name beside activationPackage
+              # for the configurations that read it.
+              activation-script = module.config.home.activationPackage;
+
+              newsDisplay = rawModule'.config.news.display;
+              newsEntries = lib.sort (a: b: a.time > b.time) (
+                lib.filter (a: a.condition) rawModule'.config.news.entries
+              );
+
+              inherit (module._module.args) pkgs;
+
+              extendModules = args: withExtraAttrs (rawModule'.extendModules args);
+            };
+        in
+        withExtraAttrs rawModule;
 
       mkConfiguration = final.caisson.home-manager.mkConfiguration;
 
@@ -437,7 +589,20 @@
                   useUserPackages
                   ;
                 # Framework defaults first; the values the caller passed
-                # win on conflict.
+                # win on conflict. The library of an embedded user
+                # generation is the library of the NixOS evaluation
+                # around it, which home-manager's NixOS module extends
+                # with its `hm` namespace and installs as the
+                # submodule's `lib` special argument
+                # (nixos/common.nix). `extraSpecialArgs` merges over
+                # that installation, so a `lib` here would replace the
+                # extended library and take `lib.hm` with it; the
+                # library reaches this path through the NixOS
+                # evaluation instead. That extension is the same
+                # rebuild of nixpkgs' fixpoint the standalone path
+                # composes `lib.hm` to avoid, and it is the nixos
+                # integration that delivers the composed library to a
+                # NixOS evaluation.
                 extraSpecialArgs = {
                   pkgSets = checkedPkgSets;
                   sourceMeta = resolvedSourceMeta;
@@ -535,6 +700,23 @@
       caisson = (prev.caisson or { }) // {
         home-manager = integration.namespace;
       };
+
+      # home-manager's library under the name home-manager's modules
+      # read, from the composition's declared home-manager; forced
+      # only when read. This entry is where `lib.hm` comes from, so a
+      # home-manager evaluation runs on one composed library that
+      # already carries it.
+      hm = (prev.hm or { }) // hmLibDefault;
+
+      # The home-manager maintainers merged into the nixpkgs
+      # maintainer list, which is what the `meta.maintainers` type
+      # check of nixpkgs reads (modules/lib/stdlib-extended.nix of the
+      # home-manager source does the same). nixpkgs reads its list
+      # from a file beside the `lib` directory, so this name forces
+      # that file, and a composition whose `nixpkgs-lib` part is the
+      # lib directory alone (the nixpkgs.lib mirror) has no list to
+      # read: forced only when a reader asks for the merged list.
+      maintainers = (prev.maintainers or { }) // hmLibDefault.maintainers;
     };
 
 }

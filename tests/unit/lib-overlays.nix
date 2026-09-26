@@ -1714,6 +1714,225 @@ in
       };
     };
 
+  # The home-manager integration as a library integration: `lib.hm` is
+  # an entry of the integration, composed over the library the
+  # composition builds, and a home-manager evaluation runs on that one
+  # library. The ecosystem source is a stand-in tree with the two
+  # files the integration reads, `modules/lib` (the function composed
+  # as the `hm` entry) and `modules/modules.nix` (the module list),
+  # each with the signature of the file it stands in for.
+  homeManagerLib =
+    let
+      hmStub = ./home-manager-stub;
+      mkComposition =
+        extraOverlays:
+        caisson.mkLib {
+          inputs = mockInputs;
+          defaultEcosystemSrc.home-manager = hmStub;
+          libOverlays =
+            _mkLibOverlay:
+            {
+              home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+              # The marker this composition carries and nothing else
+              # does: reading it inside the evaluation shows which
+              # library got there.
+              marker = mkLibOverlay (
+                { ... }:
+                {
+                  overlay = _final: _prev: {
+                    caissonMarker = "from-the-composition";
+                  };
+                }
+              );
+            }
+            // extraOverlays;
+        };
+      myLib = mkComposition { };
+      # A configuration module that records what the library the
+      # module system handed it carries.
+      probeModule =
+        { lib, ... }:
+        {
+          seenLib = {
+            # An attribute this composition contributed and nixpkgs
+            # does not have: present only if the library the modules
+            # run on is the composed one.
+            marker = lib.caissonMarker or null;
+            # The name home-manager's modules read.
+            hm = lib.hm.reachesLib or null;
+            # A function of `hm` calling back through `lib.hm`: the
+            # self-reference resolves through the composed fixpoint.
+            viaFixpoint = (lib.hm.dag.entryAnywhere "x").viaFixpoint or null;
+            # The home-manager maintainers under the name they are
+            # read by. The merged `lib.maintainers` forces nixpkgs'
+            # list, which lives beside the `lib` directory and so is
+            # absent from the nixpkgs.lib mirror these tests compose
+            # on; the home-manager half is read through `hm`.
+            maintainer = lib.hm.maintainers ? home-manager-stub-maintainer;
+            # A nixpkgs function, so the composed library is still
+            # nixpkgs' library and not a bare `hm`.
+            nixpkgs = lib.isFunction lib.id;
+          };
+        };
+      configuration = myLib.caisson.home-manager.mkConfiguration {
+        configModule = probeModule;
+        pkgSets.pkgs = { };
+        check = false;
+      };
+    in
+    {
+      # The proof that the composition reaches the modules: a module
+      # inside the evaluation sees the composition's marker and
+      # `lib.hm` at once, on one library. Composing `hm` with
+      # `lib.extend` inside the evaluator cannot produce this: nixpkgs'
+      # `lib/default.nix` builds its fixpoint with a bootstrap
+      # `makeExtensible` that keeps no `__unfix__`, so `extend`
+      # re-derives nixpkgs' fixpoint and `marker` comes back null while
+      # `hm` is set.
+      "test: the modules see the composition and lib.hm on one library" = {
+        expr = configuration.config.seenLib;
+        expected = {
+          marker = "from-the-composition";
+          hm = "from-the-composition";
+          viaFixpoint = "from-the-composition";
+          maintainer = true;
+          nixpkgs = true;
+        };
+      };
+
+      # `hm` is an entry of the composed library, so it is there
+      # before any evaluation and every reader of the library sees it.
+      "test: lib.hm is an attribute of the composed library" = {
+        expr = myLib.hm.reachesLib;
+        expected = "from-the-composition";
+      };
+
+      # The entry merges the home-manager maintainers into the
+      # nixpkgs maintainer list, the name the `meta.maintainers` type
+      # check of nixpkgs reads. The nixpkgs.lib mirror these tests
+      # compose on carries no list, so a composition that reads the
+      # merged name supplies one: the home-manager entry imports it,
+      # which puts it in `prev` where the merge reads it.
+      "test: lib.maintainers carries both lists" = {
+        expr =
+          let
+            nixpkgsMaintainers = {
+              key = "a-nixpkgs-maintainer-list";
+              overlay = _final: _prev: {
+                maintainers.a-nixpkgs-maintainer = { };
+              };
+            };
+            composed = caisson.mkLib {
+              inputs = mockInputs;
+              defaultEcosystemSrc.home-manager = hmStub;
+              libOverlays = _mkLibOverlay: {
+                home-manager = {
+                  imports = [
+                    nixpkgsMaintainers
+                    (mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager"))
+                  ];
+                  overlay = _final: _prev: { };
+                };
+              };
+            };
+          in
+          builtins.attrNames composed.maintainers;
+        expected = [
+          "a-nixpkgs-maintainer"
+          "home-manager-stub-maintainer"
+        ];
+      };
+
+      # An entry is replaceable by key. The integration's entry is
+      # keyed `home-manager`, so a same-key entry takes its place.
+      "test: the hm entry is replaceable by its key" = {
+        expr =
+          (mkComposition {
+            home-manager = {
+              key = "home-manager";
+              overlay = _final: _prev: {
+                hm = {
+                  reachesLib = "from-a-replacement-entry";
+                };
+              };
+            };
+          }).hm.reachesLib;
+        expected = "from-a-replacement-entry";
+      };
+
+      # The evaluation composes home-manager's module list from the
+      # declared source and hands it `modulesPath`, the special
+      # argument home-manager's news entries interpolate.
+      "test: the evaluation reads the module list of the declared source" = {
+        expr = {
+          inherit (configuration.config.stub) minimal useNixpkgsModule;
+          # The tail of the path, the head being the store copy of the
+          # tree the test flake declared.
+          modulesPath = lib.hasSuffix "/home-manager-stub/modules" configuration.config.stub.modulesPath;
+        };
+        expected = {
+          modulesPath = true;
+          minimal = false;
+          useNixpkgsModule = true;
+        };
+      };
+
+      # What the evaluation publishes beside the configuration, the
+      # names `modules/default.nix` of the home-manager source adds.
+      "test: the evaluation publishes the activation package and the news" = {
+        expr = {
+          inherit (configuration)
+            activationPackage
+            activation-script
+            newsDisplay
+            newsEntries
+            ;
+          extendModules = builtins.isFunction configuration.extendModules;
+        };
+        expected = {
+          activationPackage = "activation-package";
+          activation-script = "activation-package";
+          newsDisplay = "silent";
+          newsEntries = [ ];
+          extendModules = true;
+        };
+      };
+
+      # The evaluation collects the failed assertions of the
+      # configuration and throws with their messages.
+      "test: a failed assertion stops the evaluation" = {
+        expr =
+          (builtins.tryEval
+            (myLib.caisson.home-manager.mkConfiguration {
+              configModule = {
+                assertions = [
+                  {
+                    assertion = false;
+                    message = "the stub assertion";
+                  }
+                ];
+              };
+              pkgSets.pkgs = { };
+              check = false;
+            }).activationPackage
+          ).success;
+        expected = false;
+      };
+
+      "test: the twin replaces the library like any evaluator argument" = {
+        expr =
+          (myLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+            configModule = probeModule;
+            pkgSets.pkgs = { };
+            check = false;
+            ecosystemArgs.lib = myLib // {
+              caissonMarker = "from-ecosystemArgs";
+            };
+          }).config.seenLib.marker;
+        expected = "from-ecosystemArgs";
+      };
+    };
+
   # The structural integration: the empty integration, evaluating
   # caisson's core module over a composition and returning what the
   # selectors chose.
