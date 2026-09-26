@@ -177,6 +177,8 @@
         name = "flake-parts";
         class = "flake";
         accepted = [ "name" ];
+        # What `compose` destructures without a default.
+        required = [ "configModule" ];
         # flake-parts' mkFlake arguments this entry point composes are
         # refused with a pointer to the caisson argument.
         hints = {

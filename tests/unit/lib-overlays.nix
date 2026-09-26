@@ -1926,6 +1926,65 @@ in
               };
             }
           );
+          # An owner whose composition destructures two arguments
+          # without a default, declared, and an alt over it that
+          # requires the same.
+          probe-strict = mkLibOverlay (
+            { contributeClasses, ... }:
+            {
+              overlay =
+                final: prev:
+                let
+                  integration = final.caisson.integrations.mkIntegration {
+                    name = "probe-strict";
+                    class = "probeStrict";
+                    accepted = [ "tag" ];
+                    required = [
+                      "pkgSets"
+                      "configModule"
+                    ];
+                    compose =
+                      {
+                        pkgSets,
+                        configModule,
+                        ...
+                      }:
+                      {
+                        ecosystemArgs = {
+                          inherit pkgSets configModule;
+                        };
+                      };
+                    evaluate = _composed: callArgs: callArgs;
+                  };
+                in
+                contributeClasses prev integration.classes
+                // {
+                  caisson = (prev.caisson or { }) // {
+                    probe-strict = integration.namespace;
+                  };
+                };
+            }
+          );
+          probe-strict-alt = mkLibOverlay (
+            { ... }:
+            {
+              overlay = final: prev: {
+                caisson = (prev.caisson or { }) // {
+                  probe-strict-alt = final.caisson.integrations.mkAltIntegration {
+                    name = "probe-strict-alt";
+                    over = final.caisson.probe-strict;
+                    required = [ "configModule" ];
+                    compose = args: {
+                      ecosystemArgs = {
+                        inherit (args) configModule;
+                      };
+                    };
+                    evaluate = _composed: callArgs: callArgs;
+                  };
+                };
+              };
+            }
+          );
         };
       };
     in
@@ -1982,6 +2041,70 @@ in
           ];
           alt = true;
         };
+      };
+
+      # A declaration names the arguments its composition destructures
+      # without a default, so the entry point reports a missing one
+      # itself instead of letting the Nix function-argument error
+      # surface from inside the composition.
+      "test: a missing required argument names the entry point and the argument" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration { }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration requires `pkgSets`, `configModule`; it takes .*configModule.*";
+        };
+      };
+
+      "test: a required argument missing beside the others is reported alone" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration {
+          configModule = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration requires `pkgSets`;.*";
+        };
+      };
+
+      "test: the twin requires the same arguments" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfigurationWithEcosystemArgs {
+          ecosystemArgs = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-strict\\.mkConfigurationWithEcosystemArgs requires `pkgSets`, `configModule`;.*";
+        };
+      };
+
+      "test: an alt declares what its composition destructures" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-strict-alt.mkConfiguration {
+          pkgSets = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-strict-alt\\.mkConfiguration requires `configModule`;.*";
+        };
+      };
+
+      "test: an unknown argument is still reported before a missing one" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration { bogus = 1; }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration does not accept `bogus`; it takes .*";
+        };
+      };
+
+      "test: an integration declaring nothing required takes no arguments at all" = {
+        expr = (declaringLib.caisson.probe.mkConfiguration { }).tag;
+        expected = "none";
+      };
+
+      "test: the arguments a required declaration names are accepted" = {
+        expr =
+          (declaringLib.caisson.probe-strict.mkConfiguration {
+            pkgSets = { };
+            configModule = { };
+          }).configModule;
+        expected = { };
       };
     };
 }
