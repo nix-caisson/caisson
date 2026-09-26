@@ -121,6 +121,8 @@
       integration = selection.mkIntegration {
         name = "structural";
         class = "structural";
+        # What `compose` destructures without a default.
+        required = [ "configModule" ];
         hints = {
           name = "a configuration's name is the attribute its parent declares it under, or, with no parent, the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
         };
