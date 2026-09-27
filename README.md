@@ -63,7 +63,9 @@ and `lib-overlays/<name>`.
       core = caisson.lib.caisson-core;
 
       lib = core.mkLib {
-        inherit inputs;
+        # The flake pin reader: your inputs as the pinned sources the
+        # composition closes over, and the root from `self`.
+        inherit (core.pins.flake inputs) sources root;
 
         # The namespace this flake contributes to the composed library,
         # and so the name of the configuration below, which no parent
@@ -75,7 +77,7 @@ and `lib-overlays/<name>`.
         projects = { inherit caisson; };
 
         # The class-keyed modules this flake defines, read from
-        # modules/<class>/<name>/default.nix: closed over your inputs,
+        # modules/<class>/<name>/default.nix: closed over your pinned sources,
         # importable here, exportable to downstream consumers. A flake
         # with another layout writes the registration by hand
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).

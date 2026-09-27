@@ -15,7 +15,7 @@
     inputs@{ parent, ... }:
     let
       lib = parent.lib.caisson-core.mkLib {
-        inherit inputs;
+        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
 
         # The name this flake holds, deliberately not the directory
         # name: the final consumer registers this composition's exported

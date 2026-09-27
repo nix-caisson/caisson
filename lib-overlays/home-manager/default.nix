@@ -60,7 +60,7 @@
 
       # The home-manager this composition declares:
       # `defaultEcosystemSrc.home-manager` of the mkLib call, else the
-      # input of that name; null when it declares none. The layered
+      # pinned source of that name; null when it declares none. The layered
       # lookup of the integrations entry, read without its miss
       # message: a composition may leave the tree to the
       # `ecosystemSrc` of each evaluation.
@@ -72,7 +72,7 @@
           final.caisson-core.resolve {
             name = "home-manager";
             defaults = manifest.defaultEcosystemSrc or { };
-            inputs = manifest.inputs or { };
+            sources = manifest.sources or { };
           }
         );
 
@@ -93,8 +93,8 @@
         else
           throw ''
             lib.hm: this composition declares no home-manager. Declare one as
-            `defaultEcosystemSrc.home-manager` in the mkLib call, or name the
-            source `home-manager` in the inputs passed to mkLib; an evaluation
+            `defaultEcosystemSrc.home-manager` in the mkLib call, or pin a
+            source named `home-manager` in the `sources` passed to mkLib; an evaluation
             that names its home-manager through `ecosystemSrc` runs on the
             composed library carrying `hm` from that tree.
           '';
@@ -169,14 +169,16 @@
 
       # Provenance derives from what composes: the ecosystem source
       # handed to the entry point and the nixpkgs the package set was
-      # instantiated from.
+      # instantiated from. `root` is the tree that builds the home, as
+      # the composition records it (`lib.caisson-core.libManifest.root`);
+      # its out path is recorded as `selfOutPath`, the field of schema 3.
       mkSourceMeta =
         {
           profileName,
           hostName ? null,
           hostKind ? "standalone",
           schemaVersion ? 3,
-          self ? null,
+          root ? null,
           nixpkgsOutPath ? null,
           homeManagerOutPath ? null,
           baseSystem ? null,
@@ -189,7 +191,7 @@
               profileName
               schemaVersion
               ;
-            selfOutPath = resolveOutPath self;
+            selfOutPath = resolveOutPath root;
             inherit nixpkgsOutPath homeManagerOutPath;
             # The out path of the host's NixOS system *without* home-manager:
             # the coherence check compares this string, so it must not carry

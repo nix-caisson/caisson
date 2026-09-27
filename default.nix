@@ -6,34 +6,22 @@
 # configs/structural/caisson, with `caisson.manifest` beside them.
 # flake.nix is the flake top over the same configuration.
 #
-# The two trees the composition needs are fetched from the pins below.
-# They are this top's pins, in step with flake.lock; moving them is a
-# pin advance like any other.
+# The pins are the ones in flake.lock, read without the flake evaluator
+# by caisson-core's flake-compat reader, so this top and the flake top
+# build from the same trees and a pin advance moves both. caisson-core
+# itself is fetched from its node in the lock first, since the reader
+# is one of its functions. The root is the working tree, named by its
+# revision when clean (an impure read, as a flakeless top's is).
 let
 
-  pins = {
-    caisson-core = {
-      type = "github";
-      owner = "nix-caisson";
-      repo = "caisson-core";
-      rev = "d40cfeb7a6cfbce40651f632f1a1760b5a7c8dbd";
-      narHash = "sha256-009HyksTcB8ysvnmYDCikLU936WD0HEUZL2ttKojoKE=";
-    };
-    nixpkgs-lib = {
-      type = "github";
-      owner = "nix-community";
-      repo = "nixpkgs.lib";
-      rev = "b91d4f1bc958e0bdfd6cb3db4a280486006f5002";
-      narHash = "sha256-XtTdVeJX6X/gU+vGIUEJHirotv/lYP5+Q9irMH6HWPY=";
-    };
-  };
+  lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+  coreNode = lock.nodes.${lock.nodes.${lock.root}.inputs.caisson-core};
 
-  core = import (builtins.fetchTree pins.caisson-core);
+  core = import (builtins.fetchTree coreNode.locked);
 
   lib = core.mkLib {
-    inputs = {
-      nixpkgs-lib = builtins.fetchTree pins.nixpkgs-lib;
-    };
+    inherit (core.pins.flake-compat ./.) sources;
+    root = core.pins.gitRoot ./.;
     namespace = "caisson";
     systems = import ./systems.nix;
     modules = core.mkModules ./modules;

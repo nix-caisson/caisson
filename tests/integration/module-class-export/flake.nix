@@ -15,7 +15,7 @@
     inputs@{ parent, ... }:
     let
       lib = parent.lib.caisson-core.mkLib {
-        inherit inputs;
+        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
 
         libOverlays = _mkLibOverlay: {
           flake-parts = parent.libOverlays.flake-parts;

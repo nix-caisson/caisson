@@ -44,9 +44,10 @@
           '';
 
       # The `evalModules` call: the framework modules of the class, the
-      # selection and the configuration's module, over the manifest's
-      # inputs. The configuration's name comes from the manifest,
-      # through the core module.
+      # selection and the configuration's module, with the composition's
+      # pinned sources as the `inputs` special argument. The
+      # configuration's name comes from the manifest, through the core
+      # module.
       compose =
         {
 
@@ -81,7 +82,7 @@
             class = "structural";
             specialArgs = {
               lib = final;
-              inputs = manifest.inputs;
+              inputs = manifest.sources;
             }
             // (if pkgSets != null then { inherit pkgSets; } else { })
             // specialArgs;

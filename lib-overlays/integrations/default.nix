@@ -40,13 +40,14 @@
 #   resolveEcosystemSrc  the layered ecosystem-source resolution:
 #                        caisson-core's `resolve` (the explicit
 #                        argument, then the composition's declared
-#                        `defaultEcosystemSrc.<name>`, then an input
-#                        with exactly the declared name), with the miss
-#                        interpreted here, where the integration knows
-#                        what to say; the resolver itself never formats
-#                        a message, because a miss is the plain value
-#                        null. The declarations and inputs are read from
-#                        the composition's manifest; a manifest-less
+#                        `defaultEcosystemSrc.<name>`, then the pinned
+#                        source with exactly the declared name), with
+#                        the miss interpreted here, where the
+#                        integration knows what to say; the resolver
+#                        itself never formats a message, because a miss
+#                        is the plain value null. The declarations and
+#                        sources are read from the composition's
+#                        manifest; a manifest-less
 #                        composition resolves only the explicit
 #                        argument.
 #   coreModules          the two selections every integration draws
@@ -88,7 +89,7 @@
           resolved = final.caisson-core.resolve {
             inherit name explicit;
             defaults = manifest.defaultEcosystemSrc or { };
-            inputs = manifest.inputs or { };
+            sources = manifest.sources or { };
           };
         in
         if resolved != null then
@@ -97,7 +98,7 @@
           throw ''
             ${context}: no ${name} ecosystem source. Pass `ecosystemSrc`
             explicitly, declare `defaultEcosystemSrc.${name}` in the mkLib call,
-            or name the source `${name}` in the inputs passed to mkLib.
+            or pin a source named `${name}` in the `sources` passed to mkLib.
           '';
 
       named =

@@ -30,7 +30,9 @@
       core = caisson-core.lib.caisson-core;
 
       lib = core.mkLib {
-        inherit inputs;
+        # The flake pin reader: the inputs as the pinned sources, and
+        # the root from `self`.
+        inherit (core.pins.flake inputs) sources root;
         namespace = "caisson";
         systems = import ./systems.nix;
         modules = core.mkModules ./modules;

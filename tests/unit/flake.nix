@@ -45,7 +45,7 @@
     let
       core = inputs.caisson-core.lib.caisson-core;
       lib = core.mkLib {
-        inherit inputs;
+        inherit (core.pins.flake inputs) sources root;
         defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
         # Registered from the parent's source path: a flake cannot
         # reference files outside its own tree, and reading the
