@@ -14,6 +14,12 @@
   <a href="https://nix-caisson.github.io/docs/reference/lib.html">Reference</a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/nix-caisson/caisson/actions/workflows/drift.yml"><img alt="drift" src="https://github.com/nix-caisson/caisson/actions/workflows/drift.yml/badge.svg?branch=main&event=schedule"></a>
+</p>
+
+<p align="center"><sub>The drift badge reports the daily run of the pinned-world suite against the current upstreams (nixpkgs, home-manager, colmena, terranix, system-manager); red means an upstream moved and broke an expectation caisson holds.</sub></p>
+
 ---
 
 caisson exists to make a flake ecosystem practical to build on.

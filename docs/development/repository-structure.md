@@ -1,14 +1,13 @@
 # Repository structure
 
-The caisson family is three repositories, with boundaries drawn along
-churn gradients rather than domain lines: each repository's rate of
+The caisson family is two repositories, with the boundary drawn along
+the churn gradient rather than domain lines: each repository's rate of
 change is part of its contract.
 
 | Repository | Moves | Holds |
 |---|---|---|
 | [caisson-core](https://github.com/nix-caisson/caisson-core) | rarely (frozen contract) | keyed composition (`compose`, `resolve`) and the library lifecycle (`mkLib`, registration, the manifest) |
-| caisson (this repository) | at ecosystem speed | the integrations and the pkgs-dependent tooling |
-| [caisson-compat](https://github.com/nix-caisson/caisson-compat) | at upstream speed | pinned-world tests and compatibility exports |
+| caisson (this repository) | at ecosystem speed | the integrations, the pkgs-dependent tooling, and the pinned-world suite with its pins |
 
 ## caisson-core
 
@@ -47,29 +46,27 @@ caisson's exported overlays and modules. Hand-wired evaluations (the
 sandboxed test harnesses, which receive every tree as an argument)
 inject the same names beside `self`.
 
-## caisson-compat
+## The pinned world
 
-The churn quarantine. caisson-compat pins concrete versions of
-everything: caisson, caisson-core, and the upstream world (nixpkgs
-lib, flake-parts). Two audiences use it:
+The upstream world caisson is tested against (nixpkgs, home-manager,
+colmena, terranix, system-manager, and the test tooling) is pinned in
+`tests/dependencies/flake.lock`, a lock only the checks and formatter
+partitions read, so caisson's `flake.nix` carries no churning pin. The
+pinned-world suite, `tests/pinned-world`, composes caisson with those
+pins and exercises it end to end; it is the `pinned-world` check, so a
+pull request is judged against the last known good world, and a
+change to caisson lands with the probe changes it needs in the same
+commit.
 
-- **Consumers outside the caisson ecosystem** depend on caisson-compat
-  and get ordinary, follows-overridable pins that track upstream.
-- **The stable repositories test through it.** Their CI fetches
-  caisson-compat and runs its suite with `--override-input` pointing
-  back at the local working tree, so a change to caisson or
-  caisson-core is exercised against the pinned world without either
-  stable repository carrying churning pins of its own.
+Drift is detected separately. The `drift` workflow runs daily on
+`main`, advances the pins in the working tree without committing, and
+builds the suite check against today's upstreams. A red run means an
+upstream moved and broke an expectation caisson holds; the committed
+pins are the last known good and move in the commit that fixes it.
+The README badge reports that run.
 
-Because compat's routine job is advancing its pins, its update runs
-double as drift detection: a pin advance that fails against the
-current stable repositories signals an upstream evaluation-shape
-change that caisson must absorb. The stable repositories rev on those
-events, not on a schedule.
-
-All three repositories are public, so cross-repository fetches in CI
-need no credential. caisson-compat runs on push, pull request,
-weekly schedule (the pin advance that doubles as drift detection,
-auto-landed when green), and manual dispatch, and the stable
-repositories carry non-blocking `compat-suite` jobs that fetch
-compat at HEAD and override their own pin with the working tree.
+The suite lived in a third repository, caisson-compat, whose lock
+pinned caisson; the stable repositories fetched it at HEAD and ran it
+with `--override-input`. A breaking change to caisson then needed a
+companion change there that could not be green until caisson had
+landed, so the suite moved here.
