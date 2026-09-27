@@ -23,6 +23,12 @@ rec {
       # The call back through the fixpoint.
       viaFixpoint = lib.hm.reachesLib;
     };
+    # The entry the integration's source metadata module defines into
+    # `home.activation`, with the shape of the real one.
+    entryBefore = before: data: {
+      inherit data before;
+      after = [ ];
+    };
   };
 
   maintainers = {

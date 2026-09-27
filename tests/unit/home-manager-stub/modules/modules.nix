@@ -43,6 +43,12 @@ let
           type = lib.types.str;
           default = "activation-package";
         };
+        # The activation entries, which the integration's source
+        # metadata module defines into.
+        home.activation = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+        };
         assertions = lib.mkOption {
           type = lib.types.listOf lib.types.attrs;
           default = [ ];
