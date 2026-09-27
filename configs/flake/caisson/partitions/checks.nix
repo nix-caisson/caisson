@@ -8,7 +8,7 @@
 {
 
   partitions.checks = {
-    extraInputs = lib.caisson-core.partitionExtraInputs ../../../../tests/dependencies;
+    extraInputs = (lib.caisson-core.pins.flake-compat ../../../../tests/dependencies).sources;
     module =
       { inputs, self, ... }:
       {
@@ -121,7 +121,7 @@
                 core = import ${inputs.caisson-core.outPath};
               in
               core.mkLib {
-                inputs = { };
+                sources = { };
                 defaultEcosystemSrc.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
                 modules = core.mkModules ${self.outPath}/modules;
                 libOverlays = core.mkLibOverlays ${self.outPath}/lib-overlays;

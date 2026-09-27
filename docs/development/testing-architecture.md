@@ -21,7 +21,7 @@ All checks are produced by the **checks partition**
 (`configs/flake/caisson/partitions/checks.nix`). This partition:
 
 1. Pulls in development-time dependencies from `tests/dependencies` via
-   `lib.caisson-core.partitionExtraInputs`
+   the flake-compat pin reader, `lib.caisson-core.pins.flake-compat`
 2. Evaluates each test and example flake from source with
    `callConsumerFlake`, resolving the flake's declared inputs from a shared
    pool
@@ -48,14 +48,15 @@ polluting the main flake's input set or forcing consumers to fetch them.
 The partition declares:
 
 ```nix
-extraInputs = lib.caisson-core.partitionExtraInputs ../../../../tests/dependencies;
+extraInputs = (lib.caisson-core.pins.flake-compat ../../../../tests/dependencies).sources;
 ```
 
-`partitionExtraInputs` (part of caisson-core's kernel) loads the lockfile'd
-dependencies flake and returns its resolved inputs. It goes through the
-kernel's patched `flake-compat` rather than `builtins.getFlake`, which cannot
-handle paths in pure evaluation mode, and it stays safe under read-only
-evaluation (`nix flake check --no-build`). The returned inputs are merged into
+`pins.flake-compat` (one of caisson-core's pin readers) resolves the lock of
+the dependencies flake the way flake-compat does and returns its inputs as
+pinned sources, each flake input with its outputs, without evaluating the
+dependencies flake itself. It does not go through `builtins.getFlake`, which
+cannot handle paths in pure evaluation mode, and it stays safe under
+read-only evaluation (`nix flake check --no-build`). The returned inputs are merged into
 the partition's `inputs` module argument; this is how `nixpkgs`, `nix-unit`,
 `treefmt-nix`, and the rest become available inside the partition module
 without being declared in the main `flake.nix`.
@@ -145,7 +146,7 @@ source path with the directory readers.
 ```nix
 core = inputs.caisson-core.lib.caisson-core;
 lib = core.mkLib {
-  inherit inputs;
+  inherit (core.pins.flake inputs) sources root;
   defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
   modules = core.mkModules (parent.outPath + "/modules");
   libOverlays = core.mkLibOverlays (parent.outPath + "/lib-overlays");
@@ -224,7 +225,7 @@ module composition behave as expected from a consumer's perspective.
 Each integration test is a standalone flake under `tests/integration/<name>/` that:
 
 1. Takes `parent` (caisson's evaluated outputs, from the pool) as an input
-2. Calls `parent.lib.caisson-core.mkLib { inherit inputs; ... }` to bootstrap
+2. Calls `parent.lib.caisson-core.mkLib { inherit (parent.lib.caisson-core.pins.flake inputs) sources root; ... }` to bootstrap
 3. Uses `lib.caisson.flake-parts.mkConfiguration` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
    worked
@@ -269,7 +270,7 @@ inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 Its `outputs` is empty. It exists for three reasons:
 
 1. **Partition input source:** The checks and formatter partitions load it
-   through `partitionExtraInputs` to pull these inputs into their evaluation
+   through `pins.flake-compat` to pull these inputs into their evaluation
    without adding them to caisson's main `flake.nix`.
 
 2. **`follows` target for test flakes:** The standalone test flakes use

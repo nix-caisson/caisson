@@ -53,7 +53,7 @@ let
     mkLib = testMkLib;
   };
 
-  mockInputs = {
+  mockSources = {
     # The real mirror: a tree with lib/ (the nixpkgs-lib entry reads it
     # by input name) whose `lib` is what test bodies read.
     nixpkgs-lib = inputs.nixpkgs-lib;
@@ -72,7 +72,7 @@ let
       libOverlays ? { },
       ...
     }@args:
-    caisson.mkLib ({ inputs = mockInputs; } // args);
+    caisson.mkLib ({ sources = mockSources; } // args);
 
   # The errors Nix raises when a call does not match the pattern of an
   # entry point, as `expectedError` values: the entry point is named
@@ -118,7 +118,7 @@ in
 
       # A composition declaring a namespace and contributing it.
       namedLib = caisson.mkLib {
-        inputs = mockInputs;
+        sources = mockSources;
         namespace = "the-namespace";
         libOverlays = _mkLibOverlay: {
           the-namespace = mkLibOverlay (
@@ -135,7 +135,7 @@ in
       };
 
       # The same composition with no namespace declared.
-      unnamedLib = caisson.mkLib { inputs = mockInputs; };
+      unnamedLib = caisson.mkLib { sources = mockSources; };
     in
     {
       "test: the selector reads the namespace off the library it is handed" = {
@@ -982,7 +982,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             modules = callbackLib: {
               flake = {
                 inspect = callbackLib.caisson.flake-parts.mkModule (
@@ -1024,7 +1024,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               provider = mkLibOverlay (
                 { ... }:
@@ -1064,7 +1064,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               marker = mkLibOverlay (
                 { ... }:
@@ -1136,7 +1136,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             modules = callbackLib: {
               flake = {
                 fromAlias = callbackLib.caisson.flake-parts.mkModule (
@@ -1166,7 +1166,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               fromAlias = lib.caisson-core.mkLibOverlay (
                 { ... }:
@@ -1187,7 +1187,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = mkLibOverlayArg: {
               fromFunction = mkLibOverlayArg (
                 { ... }:
@@ -1208,7 +1208,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = mkLibOverlayArg: {
               marker = mkLibOverlayArg (
                 { ... }:
@@ -1258,7 +1258,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               nixpkgs-lib = mkLibOverlay (
                 { ... }:
@@ -1491,7 +1491,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
 
             modules = _lib: {
               testClass = {
@@ -1527,7 +1527,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
 
             modules = _lib: {
               flake = {
@@ -1560,7 +1560,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            inputs = mockInputs;
+            sources = mockSources;
             modules = _lib: {
               testClass = {
                 only = mkModule "test-class" ({ ... }: { });
@@ -1676,7 +1676,7 @@ in
         extra:
         caisson.mkLib (
           {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
             };
@@ -1714,7 +1714,7 @@ in
         expr =
           let
             myLib = mkResolutionLib {
-              inputs = mockInputs // {
+              sources = mockSources // {
                 terranix = terranixStub "input";
               };
             };
@@ -1730,7 +1730,7 @@ in
         expr =
           let
             myLib = mkResolutionLib {
-              inputs = mockInputs // {
+              sources = mockSources // {
                 terranix = terranixStub "input";
               };
               defaultEcosystemSrc.terranix = terranixStub "declared";
@@ -1782,7 +1782,7 @@ in
       mkComposition =
         extraOverlays:
         caisson.mkLib {
-          inputs = mockInputs;
+          sources = mockSources;
           defaultEcosystemSrc.nixpkgs = nixosStub;
           libOverlays =
             _mkLibOverlay:
@@ -1959,7 +1959,7 @@ in
         declaration: extraOverlays:
         caisson.mkLib (
           {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays =
               _mkLibOverlay:
               {
@@ -2001,7 +2001,7 @@ in
         declaration:
         caisson.mkLib (
           {
-            inputs = mockInputs;
+            sources = mockSources;
             libOverlays = _mkLibOverlay: {
               home-manager = {
                 imports = [
@@ -2397,7 +2397,7 @@ in
   structural =
     let
       registeringLib = caisson.mkLib {
-        inputs = mockInputs;
+        sources = mockSources;
         modules = callbackLib: {
           flake = {
             thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
@@ -2448,7 +2448,7 @@ in
       # that namespace to the composed library, so what the lib export
       # selects is observable beside the composition that declares none.
       namespacedLib = caisson.mkLib {
-        inputs = mockInputs;
+        sources = mockSources;
         namespace = "named-composition";
         libOverlays = _mkLibOverlay: {
           named-composition = mkLibOverlay (
@@ -2606,7 +2606,7 @@ in
             mkOutputs =
               tag:
               (caisson.mkLib {
-                inputs = mockInputs;
+                sources = mockSources;
                 namespace = "rev-independent";
                 modules = callbackLib: {
                   flake = {
@@ -2651,7 +2651,7 @@ in
           let
             outputs =
               (caisson.mkLib {
-                inputs = mockInputs;
+                sources = mockSources;
                 modules = callbackLib: {
                   flake = {
                     thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
@@ -2704,7 +2704,7 @@ in
   integrations =
     let
       declaringLib = caisson.mkLib {
-        inputs = mockInputs;
+        sources = mockSources;
         libOverlays = _mkLibOverlay: {
           # An owner whose pattern requires nothing.
           probe = mkLibOverlay (
@@ -3206,7 +3206,7 @@ in
     let
       hmStub = ./home-manager-stub;
       myLib = caisson.mkLib {
-        inputs = mockInputs;
+        sources = mockSources;
         defaultEcosystemSrc.home-manager = hmStub;
         libOverlays = _mkLibOverlay: {
           home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");

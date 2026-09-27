@@ -23,7 +23,7 @@
       # module reaches the evaluation through the closure of the
       # overlay, so nothing else is registered or selected.
       lib = parent.lib.caisson-core.mkLib {
-        inherit inputs;
+        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
 
         # The namespace this composition contributes to the composed
         # library. `caisson.lib.export.enabled` publishes the namespace

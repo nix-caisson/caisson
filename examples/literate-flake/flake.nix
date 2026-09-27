@@ -76,7 +76,9 @@
       core = caisson.lib.caisson-core;
 
       lib = core.mkLib {
-        inherit inputs;
+        # The flake pin reader: the inputs as the pinned sources the
+        # composition closes over, and the root from `self`.
+        inherit (core.pins.flake inputs) sources root;
 
         # The namespace this composition contributes to the composed
         # library, and so the name this flake holds: `lib.export.enabled`

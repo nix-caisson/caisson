@@ -38,7 +38,7 @@ let
   # last occurrence of a key supplies its value.
   registered =
     (core.mkLib {
-      inputs = { };
+      sources = { };
       defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
       libOverlays = _mkLibOverlay: inputs.caisson.libOverlays;
     }).caisson-core.libManifest.libOverlays;
@@ -109,7 +109,6 @@ let
     "mkModules"
     "mkNixpkgsLibEntry"
     "modules"
-    "partitionExtraInputs"
     "pins"
     "pkgsManifest"
     "resolve"
@@ -132,7 +131,7 @@ let
   # `ecosystemSrc` is colmena's, and nixpkgs resolves from the
   # declaration, as it does in a consumer flake.
   hiveLib = core.mkLib {
-    inputs = { };
+    sources = { };
     projects = {
       caisson = inputs.caisson;
     };
@@ -237,10 +236,10 @@ let
       in
       r.lib.sawCaisson;
 
-    resolverFindsRealInput =
+    resolverFindsRealSource =
       resolve {
         name = "nixpkgs-lib";
-        inputs = { inherit (inputs) nixpkgs-lib; };
+        sources = { inherit (inputs) nixpkgs-lib; };
       } == inputs.nixpkgs-lib;
 
     integrationNamespacesPresent = builtins.all (ns: composed.lib.caisson ? ${ns}) [
@@ -593,7 +592,7 @@ let
     overlayBorneModulesReachAdapters =
       let
         contributingLib = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           libOverlays = _mkLibOverlay: {
             nixos = inputs.caisson.libOverlays.nixos;
@@ -642,7 +641,7 @@ let
     manifestTravelsWithMkLibCompositions =
       let
         composedWithMkLib = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           libOverlays = _mkLibOverlay: {
             flake-parts = inputs.caisson.libOverlays.flake-parts;
@@ -653,11 +652,12 @@ let
       builtins.attrNames manifest == [
         "configs"
         "defaultEcosystemSrc"
-        "inputs"
         "libOverlays"
         "modules"
         "namespace"
         "projects"
+        "root"
+        "sources"
         "systems"
       ]
       && manifest.namespace == null
@@ -678,7 +678,7 @@ let
     systemsDeclaredOnMkLibReachFlakeParts =
       let
         composedWithSystems = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           defaultEcosystemSrc.flake-parts = inputs.flake-parts;
           systems = [
@@ -708,7 +708,7 @@ let
     projectConsumptionComposesCaissonWhole =
       let
         composedFromProject = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           projects = {
             caisson = inputs.caisson;
@@ -732,7 +732,7 @@ let
     declaredEcosystemServesAdapters =
       let
         composedWithDeclaration = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
           libOverlays = _mkLibOverlay: {
             nixos = inputs.caisson.libOverlays.nixos;
@@ -777,7 +777,7 @@ let
     structuralTopMatchesFlakeParts =
       let
         composedWithBoth = core.mkLib {
-          inputs = { };
+          sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           defaultEcosystemSrc.flake-parts = inputs.flake-parts;
           systems = [ "x86_64-linux" ];

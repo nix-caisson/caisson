@@ -12,8 +12,9 @@
 #
 # flake-parts itself comes from the composition, resolved like every
 # ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
-# in the mkLib call, the entry named `flake-parts` in the inputs passed
-# to mkLib), and is taken as a source: its flake.nix is called with the
+# in the mkLib call, the pinned source named `flake-parts` in the
+# `sources` passed to mkLib), and is taken as a source: its flake.nix is
+# called with the
 # composed library standing in for its `nixpkgs-lib` input, so the
 # module evaluation runs on the same library everything else in the
 # composition does, and on no library flake-parts assembled for itself.
@@ -150,8 +151,10 @@
           # deduplicate. It comes from the manifest rather than the
           # module evaluation because moduleLocation is consumed before
           # that evaluation exists.
+          # flake-parts' `inputs` are the composition's pinned sources;
+          # `evaluate` adds `self`.
           ecosystemArgs = (if name != null then { moduleLocation = name; } else { }) // {
-            inputs = manifest.inputs;
+            inputs = manifest.sources;
             specialArgs = {
               lib = final;
             }
@@ -169,7 +172,45 @@
           };
         };
 
-      evaluate = composed: callArgs: composed.flakeParts.lib.mkFlake callArgs composed.module;
+      # flake-parts reads the flake's `self` from `inputs.self`, and its
+      # modules take `self` and `self'` as arguments. The integration
+      # ties that knot the way Nix does for a flake: `self` is the
+      # evaluation's outputs with the root's source info (out path,
+      # revision, last-modified) beside them, and `self.inputs` the
+      # pinned sources. A composition with no root names no tree, so
+      # its `self` has no out path. An `inputs` handed in through the
+      # WithEcosystemArgs twin that carries its own `self` is taken as
+      # it is.
+      evaluate =
+        composed: callArgs:
+        let
+          given = callArgs.inputs or { };
+          root = manifest.root or null;
+          # The root's source-info fields that name something: a flake's
+          # `self` carries only the fields its tree has, so a reader of
+          # `self.rev or …` sees a dirty tree as Nix hands it over.
+          sourceInfo = if root == null then { } else final.filterAttrs (_: value: value != null) root;
+          inputs = if given ? self then given else given // { inherit self; };
+          self =
+            outputs
+            // sourceInfo
+            // {
+              _type = "flake";
+              inherit inputs outputs sourceInfo;
+              outPath =
+                if root == null then
+                  throw ''
+                    caisson.flake-parts.mkConfiguration: `self.outPath` was read, but the
+                    composition names no root. Pass `root` to caisson-core.mkLib
+                    (`inherit (caisson-core.lib.caisson-core.pins.flake inputs) sources root;`
+                    at a flake top).
+                  ''
+                else
+                  root.outPath;
+            };
+          outputs = composed.flakeParts.lib.mkFlake (callArgs // { inherit inputs; }) composed.module;
+        in
+        outputs;
 
       evaluation = selection.mkEvaluation { inherit compose evaluate; };
 

@@ -28,7 +28,7 @@
       # Compose a library with mkLib. parent.lib mirrors the framework
       # namespaces of the composed library (`caisson`, `caisson-core`).
       lib = parent.lib.caisson-core.mkLib {
-        inherit inputs;
+        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
         libOverlays = _mkLibOverlay: {
           flake-parts = parent.libOverlays.flake-parts;
         };
