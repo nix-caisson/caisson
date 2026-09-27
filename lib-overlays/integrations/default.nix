@@ -189,20 +189,27 @@
             hints = allHints;
           };
         in
+        # The check returns the arguments or throws, and `seq` forces
+        # that choice before the evaluation is entered: a refused call
+        # throws at the entry point, with no composition or evaluator
+        # frames above the message. Weak head normal form is enough,
+        # since the check reads the argument names alone; the values
+        # stay as lazy as the caller passed them.
         {
           mkConfiguration =
             rawArgs:
             let
-              composed = compose (check rawArgs);
+              args = check rawArgs;
+              composed = compose args;
             in
-            evaluate composed composed.ecosystemArgs;
+            builtins.seq args (evaluate composed composed.ecosystemArgs);
           mkConfigurationWithEcosystemArgs =
             rawArgs:
             let
               args = checkOpen rawArgs;
               composed = compose args;
             in
-            evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { }));
+            builtins.seq args (evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { })));
         };
 
       # An integration that owns a module class, declared. The result

@@ -99,11 +99,16 @@
           } rawArgs;
           composed = composeEvalConfig args;
         in
-        evalConfig composed (
-          composed.ecosystemArgs
-          // {
-            baseModules = import "${composed.src}/nixos/modules/module-list.nix";
-          }
+        # The check is forced before the evaluation is entered, as in
+        # the generated entry points: a refused call throws with no
+        # composition or evaluator frames above the message.
+        builtins.seq args (
+          evalConfig composed (
+            composed.ecosystemArgs
+            // {
+              baseModules = import "${composed.src}/nixos/modules/module-list.nix";
+            }
+          )
         );
 
       hints = {

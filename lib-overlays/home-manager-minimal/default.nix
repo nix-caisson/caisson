@@ -35,6 +35,12 @@
             "check"
             "sourceMeta"
           ];
+          # The composition of the homeManager class destructures both
+          # without a default, so the alt requires what the owner does.
+          required = [
+            "pkgSets"
+            "configModule"
+          ];
           hints = {
             configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
             pkgs = "pass the package set as `pkgSets.pkgs`.";

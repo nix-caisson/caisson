@@ -2820,6 +2820,51 @@ in
               };
             }
           );
+          # An owner and an alt whose compositions throw the moment
+          # they are forced, so the message of a refused call shows
+          # whether the signature check or the composition fired. The
+          # evaluator returns the composition itself, so forcing the
+          # result forces the composition through no other route:
+          # a merge of the call's arguments forces its operands in
+          # an order the Nix version decides.
+          probe-forcing = mkLibOverlay (
+            { contributeClasses, ... }:
+            {
+              overlay =
+                final: prev:
+                let
+                  integration = final.caisson.integrations.mkIntegration {
+                    name = "probe-forcing";
+                    class = "probeForcing";
+                    required = [ "configModule" ];
+                    compose = _args: throw "compose was forced";
+                    evaluate = composed: _callArgs: composed;
+                  };
+                in
+                contributeClasses prev integration.classes
+                // {
+                  caisson = (prev.caisson or { }) // {
+                    probe-forcing = integration.namespace;
+                  };
+                };
+            }
+          );
+          probe-forcing-alt = mkLibOverlay (
+            { ... }:
+            {
+              overlay = final: prev: {
+                caisson = (prev.caisson or { }) // {
+                  probe-forcing-alt = final.caisson.integrations.mkAltIntegration {
+                    name = "probe-forcing-alt";
+                    over = final.caisson.probe-forcing;
+                    required = [ "configModule" ];
+                    compose = _args: throw "compose was forced";
+                    evaluate = composed: _callArgs: composed;
+                  };
+                };
+              };
+            }
+          );
         };
       };
     in
@@ -2941,6 +2986,70 @@ in
           }).configModule;
         expected = { };
       };
+
+      # The signature is checked before the evaluation is entered. The
+      # probe's composition throws the moment it is forced, so a
+      # refused call that reached it would fail with "compose was
+      # forced"; the signature message is the proof that it did not.
+      "test: a missing argument is refused before the composition is forced" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfiguration { }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-forcing\\.mkConfiguration requires `configModule`;.*";
+        };
+      };
+
+      "test: an unknown argument is refused before the composition is forced" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfiguration {
+          configModule = { };
+          bogus = 1;
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-forcing\\.mkConfiguration does not accept `bogus`;.*";
+        };
+      };
+
+      "test: the twin refuses before the composition is forced" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfigurationWithEcosystemArgs {
+          ecosystemArgs = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-forcing\\.mkConfigurationWithEcosystemArgs requires `configModule`;.*";
+        };
+      };
+
+      "test: an alt refuses before the composition is forced" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing-alt.mkConfiguration { }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.probe-forcing-alt\\.mkConfiguration requires `configModule`;.*";
+        };
+      };
+
+      # The probe throws when composed, so the tests above are about
+      # ordering and not about a composition that never runs.
+      "test: an accepted call reaches the composition" = {
+        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfiguration {
+          configModule = { };
+        }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "compose was forced";
+        };
+      };
+
+      # The check reads the argument names alone: a value the
+      # composition never reads is never forced, whatever it holds.
+      "test: the check forces the argument names alone" = {
+        expr =
+          (declaringLib.caisson.probe.mkConfiguration {
+            configModule = throw "the value was forced";
+            tag = "t";
+          }).tag;
+        expected = "t";
+      };
     };
 
   # The two evaluators of the `homeManager` class: home-manager
@@ -3052,6 +3161,18 @@ in
       "test: the alt declares no class of its own" = {
         expr = myLib.caisson-core.classes.homeManager.integration;
         expected = "home-manager";
+      };
+
+      # The composition destructures `pkgSets` and `configModule`
+      # without a default, and the alt declares both, so a missing one
+      # is reported under the alt's name rather than as a Nix
+      # function-argument error from inside the composition.
+      "test: the alt requires what the composition destructures" = {
+        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration { }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration requires `pkgSets`, `configModule`;.*";
+        };
       };
 
       # `minimal` is not an argument of either entry point: it names
