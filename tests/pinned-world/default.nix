@@ -48,6 +48,7 @@ let
     "caisson-core/compose"
     "caisson-core/kernel"
     "caisson-core/lifecycle"
+    "caisson-core/pins"
     "caisson-core/readers"
     "caisson-core/resolve"
   ];
@@ -109,6 +110,7 @@ let
     "mkNixpkgsLibEntry"
     "modules"
     "partitionExtraInputs"
+    "pins"
     "pkgsManifest"
     "resolve"
   ];
