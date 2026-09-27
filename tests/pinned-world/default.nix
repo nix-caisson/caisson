@@ -114,6 +114,12 @@ let
     "resolve"
   ];
 
+  # Every name in `expected` is among `actual`. The probes hold caisson
+  # to the names it relies on; a name caisson-core adds beside them is
+  # not caisson's to refuse, so an addition upstream passes and a removal
+  # or rename fails.
+  includesAll = expected: actual: builtins.all (name: builtins.elem name actual) expected;
+
   pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
 
   minimalNixosBase =
@@ -144,7 +150,7 @@ let
 
     composesTheCaissonLibrary =
       builtins.attrNames composed.lib.caisson == expectedCaissonNames
-      && builtins.attrNames composed.lib.caisson-core == expectedCoreNames
+      && includesAll expectedCoreNames (builtins.attrNames composed.lib.caisson-core)
       &&
         composed.meta.order == coreNames
         ++ [
@@ -649,7 +655,7 @@ let
         };
         manifest = composedWithMkLib.caisson-core.libManifest;
       in
-      builtins.attrNames manifest == [
+      includesAll [
         "configs"
         "defaultEcosystemSrc"
         "libOverlays"
@@ -659,17 +665,18 @@ let
         "root"
         "sources"
         "systems"
-      ]
+      ] (builtins.attrNames manifest)
       && manifest.namespace == null
       && manifest.systems == null
       && composedWithMkLib.caisson-core.pkgsManifest == null
       && composedWithMkLib.caisson-core.evalManifest == null
-      &&
-        builtins.attrNames manifest.libOverlays == coreNames
+      && includesAll (
+        coreNames
         ++ [
           "flake-parts"
           "nixpkgs-lib"
         ]
+      ) (builtins.attrNames manifest.libOverlays)
       && composedWithMkLib.caisson.flake-parts ? mkConfiguration;
 
     # A tree declares its platforms once, on mkLib; the flake-parts
