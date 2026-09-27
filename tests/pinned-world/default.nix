@@ -30,7 +30,12 @@ let
   # the manifest, each keyed by its registry name and importing the
   # published nixpkgs-lib entry. The suite composes them with
   # caisson-core's `compose` directly, the way mkLib does, so the
-  # composition guarantees are probed on the real entries.
+  # composition guarantees are probed on the real entries. The
+  # `nixpkgs-lib` import each exported overlay carries is the entry of
+  # the tree that built it, caisson's own pin; mkLib replaces every
+  # published key with the composing tree's entry, and a direct
+  # composition does the same by listing the world's entry, since the
+  # last occurrence of a key supplies its value.
   registered =
     (core.mkLib {
       inputs = { };
@@ -60,6 +65,9 @@ let
       registered.terranix
       registered.system-manager
       registered.structural
+      # Last, so its value replaces the pin the overlays carry while
+      # its position stays where the first import placed it.
+      registered.nixpkgs-lib
     ];
   };
 
@@ -160,6 +168,14 @@ let
       ] == "a,b"
       && composed.lib ? evalModules
       && composed.lib ? mkOption;
+
+    # The module system of the composed library comes from the declared
+    # world, not from the pin of the tree that built the exported
+    # overlays. The two differ as soon as tests/dependencies moves ahead
+    # of caisson's own lock, which is what the drift workflow does.
+    composedLibraryIsTheDeclaredNixpkgsLib =
+      (builtins.unsafeGetAttrPos "evalModules" composed.lib.modules).file
+      == "${inputs.nixpkgs-lib}/lib/modules.nix";
 
     flakePartsLibReexported = composed.lib ? flake-parts;
 
