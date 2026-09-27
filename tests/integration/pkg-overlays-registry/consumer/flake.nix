@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+{
+  description = "Integration test: a consumer of a project's package overlays";
+
+  inputs = {
+    deps.url = "path:../../../dependencies";
+
+    parent.url = "path:../../../..";
+    producer.url = "path:../producer";
+
+    nixpkgs.follows = "deps/nixpkgs";
+    flake-parts.follows = "deps/flake-parts";
+  };
+
+  outputs =
+    inputs@{ parent, producer, ... }:
+    let
+      core = parent.lib.caisson-core;
+      lib = core.mkLib {
+        inherit (core.pins.flake inputs) sources root;
+        namespace = "consumer";
+        projects = {
+          caisson = parent;
+          inherit producer;
+        };
+        pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
+        configs = core.mkModules ./configs;
+      };
+    in
+    lib.caisson.flake-parts.mkConfiguration {
+      configModule = lib.caisson-core.configs.flake.consumer;
+    };
+}

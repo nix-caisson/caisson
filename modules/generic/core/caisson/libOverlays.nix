@@ -12,7 +12,10 @@ in
       description = ''
         Function that selects which registered library overlays to
         export. Receives the set of overlays registered via `mkLib` and
-        returns the subset to publish.
+        returns the subset to publish. Defaults to the overlays this
+        composition registers itself: an entry a consumed project
+        contributed (`<project>/<name>`) or caisson-core publishes into
+        every composition leaves only when a selector names it.
       '';
     };
 
@@ -21,7 +24,7 @@ in
   config = {
     caisson.libOverlays = {
       export.enabled = lib.mkDefault true;
-      exported = overlays: { };
+      exported = lib.mkDefault (lib.filterAttrs (_: overlay: (overlay.project or null) == null));
     };
 
     caisson.exports.libOverlays =
