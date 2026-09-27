@@ -84,6 +84,17 @@
               path = self.outPath + "/tests/integration/nixpkgs-no-pkg-sets";
             };
 
+            # A project that registers package overlays, and a consumer
+            # that takes them through `projects`.
+            pkgOverlaysProducerOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/pkg-overlays-registry/producer";
+            };
+
+            pkgOverlaysConsumerOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/pkg-overlays-registry/consumer";
+              overrides.producer = pkgOverlaysProducerOutputs;
+            };
+
             # Unit Tests
             unitTestOutputs = callConsumer {
               path = self.outPath + "/tests/unit";
@@ -144,6 +155,8 @@
               // nixpkgsOverlayExportOutputs.checks.${system}
               // nixpkgsInterfaceConsumerOutputs.checks.${system}
               // nixpkgsNoPkgSetsOutputs.checks.${system}
+              // pkgOverlaysProducerOutputs.checks.${system}
+              // pkgOverlaysConsumerOutputs.checks.${system}
               // unitTestOutputs.checks.${system}
               // {
                 literate-flake-default = exampleOutputs.packages.${system}.default;

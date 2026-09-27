@@ -7,5 +7,6 @@
     ./lib.nix
     ./libOverlays.nix
     ./modules.nix
+    ./pkgOverlays.nix
   ];
 }

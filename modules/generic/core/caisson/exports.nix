@@ -27,5 +27,10 @@ in
       description = "Per class, the registered modules `caisson.modules.<class>.exported` selected, merged with what lies beneath.";
     };
 
+    pkgOverlays = lib.mkOption {
+      type = lib.types.attrsOf lib.types.raw;
+      description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what lies beneath.";
+    };
+
   };
 }
