@@ -2715,6 +2715,18 @@ in
         expected = "home-manager";
       };
 
+      # The composition destructures `pkgSets` and `configModule`
+      # without a default, and the alt declares both, so a missing one
+      # is reported under the alt's name rather than as a Nix
+      # function-argument error from inside the composition.
+      "test: the alt requires what the composition destructures" = {
+        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration { }) true;
+        expectedError = {
+          type = "ThrownError";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration requires `pkgSets`, `configModule`;.*";
+        };
+      };
+
       # `minimal` is not an argument of either entry point: it names
       # the evaluation, so the message points at the entry point that
       # evaluates that way.
