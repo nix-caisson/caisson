@@ -756,30 +756,67 @@
             host fingerprint: ${hostFp}
             target fingerprint: ${targetFp}
           '';
+      evaluation = selection.mkEvaluation {
+        compose = compose { };
+        inherit evaluate;
+      };
+
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
-        accepted = [
-          "osConfig"
-          "check"
-          "sourceMeta"
-        ];
-        # What `mkCommonArgs` destructures without a default. The
-        # package set is checked twice, for two different mistakes:
-        # the signature reports `pkgSets` absent, `assertPkgSets`
-        # reports a `pkgSets` that carries no `pkgs`.
-        required = [
-          "pkgSets"
-          "configModule"
-        ];
-        hints = {
-          configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-          pkgs = "pass the package set as `pkgSets.pkgs`.";
-          extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
-          minimal = "the module list belongs to the entry point: mkConfiguration evaluates with home-manager's whole module tree, lib.caisson.home-manager-minimal.mkConfiguration with the necessary modules alone.";
-        };
-        compose = compose { };
-        inherit evaluate;
+        # The signature of the entry points over the homeManager class,
+        # the ones of `lib.caisson.home-manager-minimal` included.
+        # `mkCommonArgs` destructures `pkgSets` and `configModule`
+        # without a default and supplies the value of every optional
+        # argument left out. The package set is checked twice, for two
+        # different mistakes: the pattern reports `pkgSets` absent,
+        # `assertPkgSets` reports a `pkgSets` that carries no `pkgs`.
+        mkConfiguration =
+          {
+            # The configuration's module. Further modules of the class
+            # are selected with `moduleImports`, from the registry.
+            # home-manager's module list belongs to the entry point:
+            # mkConfiguration evaluates with the whole module tree,
+            # lib.caisson.home-manager-minimal.mkConfiguration with the
+            # necessary modules alone.
+            configModule,
+            # The package sets; `pkgSets.pkgs` is the set the evaluation
+            # runs on.
+            pkgSets,
+            # The home-manager source tree; resolved from the
+            # composition's declarations when absent.
+            ecosystemSrc ? null,
+            # The selection over the homeManager class of the registry;
+            # every entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies; home-manager names these `extraSpecialArgs`.
+            specialArgs ? null,
+            # The NixOS configuration around this one, the `osConfig`
+            # module argument.
+            osConfig ? null,
+            # home-manager's `check`.
+            check ? null,
+            # The source metadata the activation coherence check
+            # compares; derived from the sources when absent.
+            sourceMeta ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets,
+            ecosystemSrc ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            osConfig ? null,
+            check ? null,
+            sourceMeta ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
         extra = {
           inherit
             assertSourceCoherence

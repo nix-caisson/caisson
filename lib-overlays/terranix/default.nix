@@ -81,19 +81,47 @@
         else
           composed.src.lib.terranixConfiguration callArgs;
 
+      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+
       integration = selection.mkIntegration {
         name = "terranix";
         class = "terranix";
-        # `pkgSets` defaults to null here: the evaluator step accepts a
+        # `compose` destructures `configModule` without a default and
+        # supplies the value of every optional argument left out.
+        # `pkgSets` is optional here: the evaluator step accepts a
         # package set from `ecosystemArgs` instead, and reports the
         # miss when neither arrives.
-        required = [ "configModule" ];
-        hints = {
-          extraArgs = "pass extra module arguments as `specialArgs`.";
-          pkgs = "pass the package set as `pkgSets.pkgs`.";
-          system = "pass the package set as `pkgSets.pkgs`; terranix evaluates against it.";
-        };
-        inherit compose evaluate;
+        mkConfiguration =
+          {
+            # The configuration's module. Further modules of the class
+            # are selected with `moduleImports`, from the registry.
+            configModule,
+            # The package sets; `pkgSets.pkgs` is the `pkgs` terranix
+            # evaluates against, in place of `system`.
+            pkgSets ? null,
+            # The terranix flake; resolved from the composition's
+            # declarations when absent.
+            ecosystemSrc ? null,
+            # The selection over the terranix class of the registry;
+            # every entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies; terranix names these `extraArgs`.
+            specialArgs ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets ? null,
+            ecosystemSrc ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
       };
     in
     contributeClasses prev integration.classes
