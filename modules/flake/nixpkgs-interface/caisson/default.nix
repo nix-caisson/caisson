@@ -5,7 +5,8 @@
   options.caisson.nixpkgs.overlays.all = lib.mkOption {
     description = ''
       The registry of known nixpkgs overlays, keyed by name. Each value is
-      a function from this flake's `configName` to an overlay.
+      a function from this flake's namespace (the one the
+      composition declares on mkLib) to an overlay.
 
       Registering an overlay here does nothing by itself. The nixpkgs
       flake module's package sets select from this registry through

@@ -21,6 +21,7 @@
     let
       lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
+        namespace = "final-consumer";
         libOverlays = _mkLibOverlay: {
           flake-parts = parent.libOverlays.flake-parts;
           middle-chain = middle-flake.libOverlays.default;

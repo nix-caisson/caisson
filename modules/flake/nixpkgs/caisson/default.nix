@@ -2,8 +2,17 @@
 { closure-lib, ... }:
 { config, lib, ... }:
 let
-  configName = config.caisson.configInfo.configName;
-  coreOverlay = (final: prev: { "${configName}" = prev."${configName}" or { }; });
+  # The namespace this composition declares on mkLib, taken from the
+  # manifest the composed library carries (`lib` is that library). It
+  # names the flake's package scope (`pkgs.<namespace>`) and keys the
+  # overlays built over it. A composition that declares none has no
+  # such scope, and the message says so where the name is first needed.
+  declaredNamespace = lib.caisson-core.libManifest.namespace or null;
+  namespace =
+    assert lib.assertMsg (declaredNamespace != null)
+      "The nixpkgs flake module names this flake's package scope `pkgs.<namespace>`, but this composition declares no namespace. Declare `namespace` in the mkLib call.";
+    declaredNamespace;
+  coreOverlay = (final: prev: { "${namespace}" = prev."${namespace}" or { }; });
   cfg = config.caisson.nixpkgs.config;
   reifyPkgSet =
     system: overlays: name: pkgSet:
@@ -43,7 +52,7 @@ in
 
     packages = {
       export.enabled = lib.mkOption {
-        description = "Whether to export this flake's own package scope (pkgs.<configName>) as the packages output. Defaults to following pkgs.export.enabled.";
+        description = "Whether to export this flake's package scope (pkgs.<namespace>, the namespace the composition declares) as the packages output. Defaults to following pkgs.export.enabled.";
         type = lib.types.bool;
         default = config.caisson.nixpkgs.pkgs.export.enabled;
         defaultText = lib.literalExpression "config.caisson.nixpkgs.pkgs.export.enabled";
@@ -77,7 +86,7 @@ in
   config = (
     let
       allOverlays = builtins.mapAttrs (
-        name: overlayFunc: overlayFunc config.caisson.configInfo.configName
+        name: overlayFunc: overlayFunc namespace
       ) config.caisson.nixpkgs.overlays.all;
     in
     {
@@ -111,7 +120,7 @@ in
           );
           legacyPackages = lib.mkIf config.caisson.nixpkgs.pkgs.export.enabled pkgs;
           packages = lib.mkIf config.caisson.nixpkgs.packages.export.enabled (
-            builtins.removeAttrs pkgs."${configName}" [
+            builtins.removeAttrs pkgs."${namespace}" [
               "callPackage"
               "newScope"
               "overrideScope"

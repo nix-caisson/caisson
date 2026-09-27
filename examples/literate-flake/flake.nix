@@ -78,6 +78,12 @@
       lib = core.mkLib {
         inherit inputs;
 
+        # The namespace this composition contributes to the composed
+        # library, and so the name this flake holds: `lib.export.enabled`
+        # publishes `lib.literate-flake` because of this declaration, and
+        # the package scope would land at `pkgs.literate-flake`.
+        namespace = "literate-flake";
+
         projects = {
           inherit caisson;
         };

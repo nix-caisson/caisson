@@ -21,6 +21,7 @@
     let
       lib = parent.lib.caisson-core.mkLib {
         inherit inputs;
+        namespace = "nixpkgs-overlay-export";
         projects = {
           caisson = parent;
         };

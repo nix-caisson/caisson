@@ -12,12 +12,9 @@
   systems = [ "x86_64-linux" ];
 
   caisson = {
-    # Identifies this flake in doc strings and as the lib export namespace.
-    # With this set, `flake.lib` exposes `lib.literate-flake` (our overlay output).
-    configInfo.configName = "literate-flake";
-
-    # Opt in to exporting the composed library as a flake output.
-    # Requires configName to be set.
+    # Opt in to exporting the composed library as a flake output. What
+    # gets published is the namespace the composition declares on mkLib,
+    # so `flake.lib` exposes `lib.literate-flake` (our overlay output).
     lib.export.enabled = true;
   };
 

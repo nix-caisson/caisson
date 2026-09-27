@@ -14,8 +14,6 @@
 
   systems = [ "x86_64-linux" ];
 
-  caisson.configInfo.configName = "nixpkgs-overlay-export";
-
   caisson.nixpkgs = {
     overlays = {
       all = {

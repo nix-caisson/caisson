@@ -13,8 +13,6 @@ in
 {
   systems = [ "x86_64-linux" ];
 
-  caisson.configInfo.configName = "nixpkgs-consumer";
-
   caisson.nixpkgs = {
     config = {
       allowUnfree = true;
