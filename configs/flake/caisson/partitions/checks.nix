@@ -112,6 +112,22 @@
             };
             evalWeightBaseline = self.outPath + "/tests/eval-weight/baseline.json";
 
+            # The library the argument-error check evaluates against:
+            # caisson's overlays and modules composed from store paths,
+            # the way default.nix composes them, since the sandbox can
+            # fetch nothing.
+            argumentErrorsLib = ''
+              let
+                core = import ${inputs.caisson-core.outPath};
+              in
+              core.mkLib {
+                inputs = { };
+                defaultEcosystemSrc.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
+                modules = core.mkModules ${self.outPath}/modules;
+                libOverlays = core.mkLibOverlays ${self.outPath}/lib-overlays;
+              }
+            '';
+
           in
           {
             # Duplicated in formatter.nix: partitions evaluate independently,
@@ -149,6 +165,26 @@
                     };
                   in
                   builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
+                # The argument error of every entry point comes from Nix
+                # itself, raised at the call site with no frame of caisson
+                # above it: the real evaluator runs each wrong call and the
+                # script reads the trace, since nix-unit sees messages
+                # alone. The evaluator runs the way nix-unit's does in
+                # the sandbox, on a local store beside the real one.
+                argument-errors =
+                  pkgs.runCommand "argument-errors"
+                    {
+                      nativeBuildInputs = [ pkgs.nix ];
+                    }
+                    ''
+                      export HOME="$(realpath .)"
+                      unset NIX_STORE
+                      export NIX_STORE_DIR=${builtins.storeDir}
+                      export NIX_REMOTE="$HOME/storedata"
+                      bash ${self.outPath}/tests/argument-errors/check.sh ${lib.escapeShellArg argumentErrorsLib} \
+                        --impure --extra-experimental-features nix-command
+                      touch $out
+                    '';
                 minimal-consumer-all-outputs = builtins.seq minimalConsumerOutputs.flakeModule (
                   builtins.seq minimalConsumerOutputs.lib (
                     pkgs.runCommand "minimal-consumer-all-outputs" { } "touch $out"

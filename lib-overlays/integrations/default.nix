@@ -7,7 +7,7 @@
 # `mkAltIntegration` generate an integration from its declaration
 # (design section 8) out of these pieces.
 #
-#   checkArgs            the closed signature of an entry point: every
+#   mkEvaluation         the evaluation an entry point performs: every
 #                        integration takes exactly the caisson-shaped
 #                        arguments (configModule, moduleImports,
 #                        specialArgs, pkgSets, ecosystemSrc, and the
@@ -20,11 +20,23 @@
 #                        each entry point is the way to the evaluator's
 #                        full surface: the same arguments plus
 #                        `ecosystemArgs`, merged over the composed call
-#                        verbatim, last. A declaration also names the
-#                        arguments the entry point must be given, so a
-#                        missing one is reported here, by the entry
-#                        point's name, rather than as a Nix function
-#                        argument error inside the composition.
+#                        verbatim, last.
+#
+#                        The signature is the pattern of the entry
+#                        point. An entry point is a function of an
+#                        attribute set pattern with no `...`, so Nix
+#                        matches the call against the pattern before any
+#                        of the body exists: a missing or unexpected
+#                        argument is Nix's error, named after the
+#                        entry point and raised at the call site, with
+#                        no frame of the composition or the evaluator
+#                        above it. The pattern names every argument the
+#                        entry point takes and marks the optional ones
+#                        with `? null`; the composition supplies the
+#                        value of an omitted argument, so the pattern
+#                        binds `@args` and hands the call on as it came.
+#                        `builtins.functionArgs` reads the signature
+#                        back as data.
 #   resolveEcosystemSrc  the layered ecosystem-source resolution:
 #                        caisson-core's `resolve` (the explicit
 #                        argument, then the composition's declared
@@ -60,44 +72,6 @@
   overlay =
     final: prev:
     let
-
-      checkArgs =
-        {
-          # the entry point, for the message
-          context,
-          # the argument names it takes
-          accepted,
-          # the argument names it must be given; the rest are optional
-          required ? [ ],
-          # per-name pointers for the common mistakes (an evaluator
-          # name where a caisson name exists)
-          hints ? { },
-          # the twin's name, or null when checking the twin itself
-          open ? null,
-        }:
-        args:
-        let
-          takes = "it takes ${builtins.concatStringsSep ", " accepted}";
-          unknown = builtins.filter (name: !(builtins.elem name accepted)) (builtins.attrNames args);
-          name = builtins.head unknown;
-          unknownMessage =
-            if hints ? ${name} then
-              "${context} does not accept `${name}`: ${hints.${name}}"
-            else if open != null then
-              "${context} does not accept `${name}`; ${takes}. The evaluator's arguments are available through ${open}, in `ecosystemArgs`."
-            else
-              "${context} does not accept `${name}`; ${takes}. Evaluator arguments go in `ecosystemArgs`.";
-          missing = builtins.filter (name: !(args ? ${name})) required;
-          missingMessage = "${context} requires ${
-            builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") missing)
-          }; ${takes}.";
-        in
-        if unknown != [ ] then
-          throw unknownMessage
-        else if missing != [ ] then
-          throw missingMessage
-        else
-          args;
 
       resolveEcosystemSrc =
         {
@@ -138,89 +112,32 @@
         leaf: registry:
         builtins.map (name: registry.${name}) (builtins.filter (named leaf) (builtins.attrNames registry));
 
-      # The arguments every entry point takes; a declaration adds the
-      # few of its own.
-      commonAccepted = [
-        "ecosystemSrc"
-        "pkgSets"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-      ];
-      commonHints = {
-        modules = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-      };
-
-      # The entry points a declaration generates: `mkConfiguration`,
-      # which checks the arguments against the closed signature,
-      # composes the evaluator's call and evaluates it, and the
-      # `WithEcosystemArgs` twin, which merges `ecosystemArgs` over the
-      # composed call verbatim, last. `compose` takes the checked
-      # arguments and returns an attrset holding `ecosystemArgs`, the
-      # evaluator's call as composed, beside whatever `evaluate` needs;
-      # `evaluate` takes that attrset and the call to make.
-      mkEntryPoints =
-        {
-          name,
-          accepted,
-          required,
-          hints,
-          compose,
-          evaluate,
-        }:
+      # The body of both entry points, from the caisson arguments a
+      # pattern admitted: `compose` takes them and returns an attrset
+      # holding `ecosystemArgs`, the evaluator's call as composed,
+      # beside whatever `evaluate` needs; `evaluate` takes that attrset
+      # and the call to make. `ecosystemArgs`, which only the twin's
+      # pattern admits, is merged over the composed call verbatim,
+      # last.
+      mkEvaluation =
+        { compose, evaluate }:
+        args:
         let
-          context = "lib.caisson.${name}";
-          allAccepted = commonAccepted ++ accepted;
-          allHints = commonHints // hints;
-          check = checkArgs {
-            context = "${context}.mkConfiguration";
-            accepted = allAccepted;
-            inherit required;
-            hints = allHints;
-            open = "${context}.mkConfigurationWithEcosystemArgs";
-          };
-          # The twin takes the same arguments and requires the same
-          # ones; `ecosystemArgs` is merged over the composed call, and
-          # composing it still needs what the composition destructures.
-          checkOpen = checkArgs {
-            context = "${context}.mkConfigurationWithEcosystemArgs";
-            accepted = allAccepted ++ [ "ecosystemArgs" ];
-            inherit required;
-            hints = allHints;
-          };
+          composed = compose args;
         in
-        # The check returns the arguments or throws, and `seq` forces
-        # that choice before the evaluation is entered: a refused call
-        # throws at the entry point, with no composition or evaluator
-        # frames above the message. Weak head normal form is enough,
-        # since the check reads the argument names alone; the values
-        # stay as lazy as the caller passed them.
-        {
-          mkConfiguration =
-            rawArgs:
-            let
-              args = check rawArgs;
-              composed = compose args;
-            in
-            builtins.seq args (evaluate composed composed.ecosystemArgs);
-          mkConfigurationWithEcosystemArgs =
-            rawArgs:
-            let
-              args = checkOpen rawArgs;
-              composed = compose args;
-            in
-            builtins.seq args (evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { })));
-        };
+        evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { }));
 
-      # An integration that owns a module class, declared. The result
-      # holds `namespace`, the value of `lib.caisson.<name>` (the entry
-      # points, the registration form `mkModule` bound to the class,
-      # and whatever `extra` adds beside them: variants, adapters, the
-      # composition an alt over the class reads), and `classes`, the
-      # declaration of the class for the index, so `mkModules`
-      # registers the class through this integration. The overlay
-      # file writes both under their keys, since an overlay's output
-      # attribute names must not depend on `final`:
+      # An integration that owns a module class, declared. The
+      # declaration carries the two entry points as pattern functions,
+      # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
+      # result holds `namespace`, the value of `lib.caisson.<name>` (the
+      # entry points, the registration form `mkModule` bound to the
+      # class, and whatever `extra` adds beside them: variants,
+      # adapters, the composition an alt over the class reads), and
+      # `classes`, the declaration of the class for the index, so
+      # `mkModules` registers the class through this integration. The
+      # overlay file writes both under their keys, since an overlay's
+      # output attribute names must not depend on `final`:
       #
       #   overlay = final: prev:
       #     let integration = final.caisson.integrations.mkIntegration { ... }; in
@@ -230,32 +147,22 @@
         {
           name,
           class,
-          accepted ? [ ],
-          required ? [ ],
-          hints ? { },
-          compose,
-          evaluate,
+          mkConfiguration,
+          mkConfigurationWithEcosystemArgs,
           extra ? { },
         }:
         let
           mkModule = final.caisson-core.mkModule class;
         in
         {
-          namespace =
-            mkEntryPoints {
-              inherit
-                name
-                accepted
-                required
-                hints
-                compose
-                evaluate
-                ;
-            }
-            // {
-              inherit mkModule;
-            }
-            // extra;
+          namespace = {
+            inherit
+              mkConfiguration
+              mkConfigurationWithEcosystemArgs
+              mkModule
+              ;
+          }
+          // extra;
           classes = {
             ${class} = {
               integration = name;
@@ -267,33 +174,22 @@
       # An integration that evaluates a class another integration
       # owns, declared: `over` is the owning integration, reached
       # through the lib (`final.caisson.nixos`), and the class and its
-      # registration form belong to that integration; `compose` builds
-      # on the composition that integration publishes, so the two
+      # registration form belong to that integration; the entry points
+      # build on the composition that integration publishes, so the two
       # evaluators cannot express different configurations from the
       # same arguments. The result is the value of `lib.caisson.<name>`:
       # the entry points and `extra`, no `mkModule`, and no class
       # declaration.
       mkAltIntegration =
         {
-          name,
           over,
-          accepted ? [ ],
-          required ? [ ],
-          hints ? { },
-          compose,
-          evaluate,
+          mkConfiguration,
+          mkConfigurationWithEcosystemArgs,
           extra ? { },
         }:
         assert builtins.isAttrs over && over ? mkModule;
-        mkEntryPoints {
-          inherit
-            name
-            accepted
-            required
-            hints
-            compose
-            evaluate
-            ;
+        {
+          inherit mkConfiguration mkConfigurationWithEcosystemArgs;
         }
         // extra;
 
@@ -302,7 +198,7 @@
       caisson = (prev.caisson or { }) // {
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
-            checkArgs
+            mkEvaluation
             resolveEcosystemSrc
             mkIntegration
             mkAltIntegration

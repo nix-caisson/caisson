@@ -74,6 +74,33 @@ let
     }@args:
     caisson.mkLib ({ inputs = mockInputs; } // args);
 
+  # The errors Nix raises when a call does not match the pattern of an
+  # entry point, as `expectedError` values: the entry point is named
+  # in the message, so `fn` is the binding the pattern is written
+  # under. `[^']*` steps over the colour codes the evaluator puts
+  # inside the quotes; `name` may be an alternation, for a call that
+  # leaves more than one required argument out.
+  argumentError = fn: kind: name: {
+    type = "TypeError";
+    msg = "function '[^']*${fn}[^']*' called ${kind} argument '[^']*${name}[^']*'";
+  };
+  missingArgument = fn: argumentError fn "without required";
+  unexpectedArgument = fn: argumentError fn "with unexpected";
+
+  # The integrations the parent registers, each with the two entry
+  # points.
+  integrationNames = [
+    "nixos"
+    "nixos-minimal"
+    "home-manager"
+    "home-manager-minimal"
+    "flake-parts"
+    "structural"
+    "colmena"
+    "terranix"
+    "system-manager"
+  ];
+
 in
 {
   # The default selector for `caisson.lib.exported`: a function of the
@@ -1305,37 +1332,32 @@ in
   };
 
   flake-parts-mkConfiguration = {
+    # The entry point is a pattern function with no `...`: an argument
+    # the pattern does not name is Nix's function-argument error,
+    # raised before the composition is entered. `tryEval` cannot catch
+    # it, so each refusal is an expected error.
     "test: refuses inputs (they belong to mkLib)" = {
-      expr =
-        (builtins.tryEval (
-          lib.caisson.flake-parts.mkConfiguration {
-            inputs = { };
-            configModule = { };
-          }
-        )).success;
-      expected = false;
+      expr = lib.caisson.flake-parts.mkConfiguration {
+        inputs = { };
+        configModule = { };
+      };
+      expectedError = unexpectedArgument "mkConfiguration" "inputs";
     };
 
     "test: refuses modules (configModule and moduleImports carry them)" = {
-      expr =
-        (builtins.tryEval (
-          lib.caisson.flake-parts.mkConfiguration {
-            modules = [ ];
-            configModule = { };
-          }
-        )).success;
-      expected = false;
+      expr = lib.caisson.flake-parts.mkConfiguration {
+        modules = [ ];
+        configModule = { };
+      };
+      expectedError = unexpectedArgument "mkConfiguration" "modules";
     };
 
     "test: refuses evaluator arguments outside the ecosystem-args twin" = {
-      expr =
-        (builtins.tryEval (
-          lib.caisson.flake-parts.mkConfiguration {
-            configModule = { };
-            ecosystemArgs = { };
-          }
-        )).success;
-      expected = false;
+      expr = lib.caisson.flake-parts.mkConfiguration {
+        configModule = { };
+        ecosystemArgs = { };
+      };
+      expectedError = unexpectedArgument "mkConfiguration" "ecosystemArgs";
     };
 
     "test: filteredArgs strips reserved keys" = {
@@ -2560,41 +2582,17 @@ in
         expected = { };
       };
 
-      # No entry point takes a `name`, and the refusal says where a name
-      # does come from: the namespace declared on mkLib.
-      "test: a name argument is refused, pointing at the mkLib declaration" = {
-        expr =
-          let
-            attempt = builtins.tryEval (
-              builtins.deepSeq (namespacedLib.caisson.structural.mkConfiguration {
-                configModule = { };
-                moduleImports = _modules: [ ];
-                name = "named-top";
-              }) true
-            );
-            # A `name` that reached the evaluation would name the
-            # configuration, so the lib export still selecting the
-            # declared namespace is what proves the argument was refused
-            # rather than quietly taking effect.
-            named = builtins.tryEval (
-              (namespacedLib.caisson.structural.mkConfiguration {
-                configModule = {
-                  caisson.lib.export.enabled = true;
-                };
-                moduleImports = _modules: [ ];
-                name = "named-top";
-              }).value.caisson.exports.lib
-            );
-          in
-          {
-            refused = !attempt.success;
-            neverNamesTheConfiguration =
-              named.success -> named.value == { marker = "from-the-namespace-overlay"; };
-          };
-        expected = {
-          refused = true;
-          neverNamesTheConfiguration = true;
+      # No entry point takes a `name`: a name comes from the namespace
+      # declared on mkLib. The pattern of the entry point refuses the
+      # argument before the evaluation exists, so a `name` can never
+      # quietly name the configuration.
+      "test: a name argument is refused" = {
+        expr = namespacedLib.caisson.structural.mkConfiguration {
+          configModule = { };
+          moduleImports = _modules: [ ];
+          name = "named-top";
         };
+        expectedError = unexpectedArgument "mkConfiguration" "name";
       };
 
       # flake-parts keys an exported module by moduleLocation, which
@@ -2673,26 +2671,20 @@ in
         expected = false;
       };
 
-      "test: an evaluator argument is refused with a hint" = {
-        expr =
-          (builtins.tryEval (
-            builtins.deepSeq (registeringLib.caisson.structural.mkConfiguration {
-              configModule = { };
-              modules = [ ];
-            }) true
-          )).success;
-        expected = false;
+      "test: an evaluator argument is refused" = {
+        expr = registeringLib.caisson.structural.mkConfiguration {
+          configModule = { };
+          modules = [ ];
+        };
+        expectedError = unexpectedArgument "mkConfiguration" "modules";
       };
 
       "test: ecosystemSrc is refused, the integration wrapping no ecosystem" = {
-        expr =
-          (builtins.tryEval (
-            builtins.deepSeq (registeringLib.caisson.structural.mkConfiguration {
-              configModule = { };
-              ecosystemSrc = ./.;
-            }) true
-          )).success;
-        expected = false;
+        expr = registeringLib.caisson.structural.mkConfiguration {
+          configModule = { };
+          ecosystemSrc = ./.;
+        };
+        expectedError = unexpectedArgument "mkConfiguration" "ecosystemSrc";
       };
 
       "test: the twin evaluates the same call with nothing merged" = {
@@ -2705,23 +2697,23 @@ in
       };
     };
 
-  # The integration constructors: an owner declares a class and an
-  # evaluator; an alt declares the owner and another evaluator.
+  # The integration constructors: an owner declares a class and its
+  # entry points; an alt declares the owner and its entry points.
+  # An entry point is a pattern function, so its signature is what Nix
+  # matches the call against.
   integrations =
     let
       declaringLib = caisson.mkLib {
         inputs = mockInputs;
         libOverlays = _mkLibOverlay: {
+          # An owner whose pattern requires nothing.
           probe = mkLibOverlay (
             { contributeClasses, ... }:
             {
               overlay =
                 final: prev:
                 let
-                  integration = final.caisson.integrations.mkIntegration {
-                    name = "probe";
-                    class = "probe";
-                    accepted = [ "tag" ];
+                  evaluation = final.caisson.integrations.mkEvaluation {
                     compose = args: {
                       ecosystemArgs = {
                         modules = (args.moduleImports or (_modules: [ ])) (final.caisson-core.modules.probe or { });
@@ -2729,6 +2721,25 @@ in
                       };
                     };
                     evaluate = _composed: callArgs: callArgs;
+                  };
+                  integration = final.caisson.integrations.mkIntegration {
+                    name = "probe";
+                    class = "probe";
+                    mkConfiguration =
+                      {
+                        configModule ? null,
+                        moduleImports ? null,
+                        tag ? null,
+                      }@args:
+                      evaluation args;
+                    mkConfigurationWithEcosystemArgs =
+                      {
+                        configModule ? null,
+                        moduleImports ? null,
+                        tag ? null,
+                        ecosystemArgs ? null,
+                      }@args:
+                      evaluation args;
                     extra = {
                       marker = true;
                     };
@@ -2745,11 +2756,10 @@ in
           probe-alt = mkLibOverlay (
             { ... }:
             {
-              overlay = final: prev: {
-                caisson = (prev.caisson or { }) // {
-                  probe-alt = final.caisson.integrations.mkAltIntegration {
-                    name = "probe-alt";
-                    over = final.caisson.probe;
+              overlay =
+                final: prev:
+                let
+                  evaluation = final.caisson.integrations.mkEvaluation {
                     compose = _args: {
                       ecosystemArgs = {
                         alt = true;
@@ -2757,27 +2767,37 @@ in
                     };
                     evaluate = _composed: callArgs: callArgs;
                   };
+                in
+                {
+                  caisson = (prev.caisson or { }) // {
+                    probe-alt = final.caisson.integrations.mkAltIntegration {
+                      over = final.caisson.probe;
+                      mkConfiguration =
+                        {
+                          configModule ? null,
+                        }@args:
+                        evaluation args;
+                      mkConfigurationWithEcosystemArgs =
+                        {
+                          configModule ? null,
+                          ecosystemArgs ? null,
+                        }@args:
+                        evaluation args;
+                    };
+                  };
                 };
-              };
             }
           );
-          # An owner whose composition destructures two arguments
-          # without a default, declared, and an alt over it that
-          # requires the same.
+          # An owner whose pattern requires two arguments, the ones its
+          # composition destructures without a default, and an alt over
+          # it that requires one.
           probe-strict = mkLibOverlay (
             { contributeClasses, ... }:
             {
               overlay =
                 final: prev:
                 let
-                  integration = final.caisson.integrations.mkIntegration {
-                    name = "probe-strict";
-                    class = "probeStrict";
-                    accepted = [ "tag" ];
-                    required = [
-                      "pkgSets"
-                      "configModule"
-                    ];
+                  evaluation = final.caisson.integrations.mkEvaluation {
                     compose =
                       {
                         pkgSets,
@@ -2791,6 +2811,25 @@ in
                       };
                     evaluate = _composed: callArgs: callArgs;
                   };
+                  integration = final.caisson.integrations.mkIntegration {
+                    name = "probe-strict";
+                    class = "probeStrict";
+                    mkConfiguration =
+                      {
+                        configModule,
+                        pkgSets,
+                        tag ? null,
+                      }@args:
+                      evaluation args;
+                    mkConfigurationWithEcosystemArgs =
+                      {
+                        configModule,
+                        pkgSets,
+                        tag ? null,
+                        ecosystemArgs ? null,
+                      }@args:
+                      evaluation args;
+                  };
                 in
                 contributeClasses prev integration.classes
                 // {
@@ -2803,12 +2842,10 @@ in
           probe-strict-alt = mkLibOverlay (
             { ... }:
             {
-              overlay = final: prev: {
-                caisson = (prev.caisson or { }) // {
-                  probe-strict-alt = final.caisson.integrations.mkAltIntegration {
-                    name = "probe-strict-alt";
-                    over = final.caisson.probe-strict;
-                    required = [ "configModule" ];
+              overlay =
+                final: prev:
+                let
+                  evaluation = final.caisson.integrations.mkEvaluation {
                     compose = args: {
                       ecosystemArgs = {
                         inherit (args) configModule;
@@ -2816,13 +2853,26 @@ in
                     };
                     evaluate = _composed: callArgs: callArgs;
                   };
+                in
+                {
+                  caisson = (prev.caisson or { }) // {
+                    probe-strict-alt = final.caisson.integrations.mkAltIntegration {
+                      over = final.caisson.probe-strict;
+                      mkConfiguration = { configModule }@args: evaluation args;
+                      mkConfigurationWithEcosystemArgs =
+                        {
+                          configModule,
+                          ecosystemArgs ? null,
+                        }@args:
+                        evaluation args;
+                    };
+                  };
                 };
-              };
             }
           );
           # An owner and an alt whose compositions throw the moment
-          # they are forced, so the message of a refused call shows
-          # whether the signature check or the composition fired. The
+          # they are forced, so the error of a refused call shows
+          # whether the pattern or the composition fired. The
           # evaluator returns the composition itself, so forcing the
           # result forces the composition through no other route:
           # a merge of the call's arguments forces its operands in
@@ -2833,12 +2883,20 @@ in
               overlay =
                 final: prev:
                 let
+                  evaluation = final.caisson.integrations.mkEvaluation {
+                    compose = _args: throw "compose was forced";
+                    evaluate = composed: _callArgs: composed;
+                  };
                   integration = final.caisson.integrations.mkIntegration {
                     name = "probe-forcing";
                     class = "probeForcing";
-                    required = [ "configModule" ];
-                    compose = _args: throw "compose was forced";
-                    evaluate = composed: _callArgs: composed;
+                    mkConfiguration = { configModule }@args: evaluation args;
+                    mkConfigurationWithEcosystemArgs =
+                      {
+                        configModule,
+                        ecosystemArgs ? null,
+                      }@args:
+                      evaluation args;
                   };
                 in
                 contributeClasses prev integration.classes
@@ -2852,19 +2910,45 @@ in
           probe-forcing-alt = mkLibOverlay (
             { ... }:
             {
-              overlay = final: prev: {
-                caisson = (prev.caisson or { }) // {
-                  probe-forcing-alt = final.caisson.integrations.mkAltIntegration {
-                    name = "probe-forcing-alt";
-                    over = final.caisson.probe-forcing;
-                    required = [ "configModule" ];
+              overlay =
+                final: prev:
+                let
+                  evaluation = final.caisson.integrations.mkEvaluation {
                     compose = _args: throw "compose was forced";
                     evaluate = composed: _callArgs: composed;
                   };
+                in
+                {
+                  caisson = (prev.caisson or { }) // {
+                    probe-forcing-alt = final.caisson.integrations.mkAltIntegration {
+                      over = final.caisson.probe-forcing;
+                      mkConfiguration = { configModule }@args: evaluation args;
+                      mkConfigurationWithEcosystemArgs =
+                        {
+                          configModule,
+                          ecosystemArgs ? null,
+                        }@args:
+                        evaluation args;
+                    };
+                  };
                 };
-              };
             }
           );
+        };
+      };
+
+      # A stand-in colmena source with the two attributes the
+      # integration reads, enough to evaluate a colmena configuration
+      # whose module reads its node constructors.
+      colmenaStub = {
+        lib.makeHive = _: {
+          __schema = "v0.5";
+        };
+        nixosModules = {
+          deploymentOptions = { };
+          assertionModule = { };
+          keyChownModule = { };
+          keyServiceModule = { };
         };
       };
     in
@@ -2882,7 +2966,7 @@ in
         };
       };
 
-      "test: the generated entry points check the signature and merge ecosystemArgs last" = {
+      "test: the entry points evaluate the composed call and merge ecosystemArgs last" = {
         expr = {
           plain =
             (declaringLib.caisson.probe.mkConfiguration {
@@ -2894,19 +2978,30 @@ in
               configModule = { };
               ecosystemArgs.tag = "override";
             }).tag;
-          refused =
-            !(builtins.tryEval (
-              builtins.deepSeq (declaringLib.caisson.probe.mkConfiguration {
-                configModule = { };
-                bogus = 1;
-              }) true
-            )).success;
         };
         expected = {
           plain = "t";
           open = "override";
-          refused = true;
         };
+      };
+
+      # The pattern of an entry point is its signature: an argument the
+      # pattern does not name is Nix's function-argument error,
+      # named after the entry point.
+      "test: an argument the pattern does not name is refused" = {
+        expr = declaringLib.caisson.probe.mkConfiguration {
+          configModule = { };
+          bogus = 1;
+        };
+        expectedError = unexpectedArgument "mkConfiguration" "bogus";
+      };
+
+      "test: the entry point refuses ecosystemArgs, which the twin admits" = {
+        expr = declaringLib.caisson.probe.mkConfiguration {
+          configModule = { };
+          ecosystemArgs = { };
+        };
+        expectedError = unexpectedArgument "mkConfiguration" "ecosystemArgs";
       };
 
       "test: an alt carries entry points only" = {
@@ -2923,62 +3018,42 @@ in
         };
       };
 
-      # A declaration names the arguments its composition destructures
-      # without a default, so the entry point reports a missing one
-      # itself instead of letting the Nix function-argument error
-      # surface from inside the composition.
-      "test: a missing required argument names the entry point and the argument" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration { }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration requires `pkgSets`, `configModule`; it takes .*configModule.*";
-        };
+      # A pattern names the arguments the composition destructures
+      # without a default, so a missing one is Nix's function-argument
+      # error, named after the entry point, and never an error from
+      # inside the composition. Which of two missing arguments Nix
+      # names first is for Nix to decide, so the empty call admits
+      # either.
+      "test: a missing required argument is reported under the entry point" = {
+        expr = declaringLib.caisson.probe-strict.mkConfiguration { };
+        expectedError = missingArgument "mkConfiguration" "(configModule|pkgSets)";
       };
 
       "test: a required argument missing beside the others is reported alone" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration {
+        expr = declaringLib.caisson.probe-strict.mkConfiguration {
           configModule = { };
-        }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration requires `pkgSets`;.*";
         };
+        expectedError = missingArgument "mkConfiguration" "pkgSets";
       };
 
       "test: the twin requires the same arguments" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfigurationWithEcosystemArgs {
+        expr = declaringLib.caisson.probe-strict.mkConfigurationWithEcosystemArgs {
           ecosystemArgs = { };
-        }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-strict\\.mkConfigurationWithEcosystemArgs requires `pkgSets`, `configModule`;.*";
         };
+        expectedError = missingArgument "mkConfigurationWithEcosystemArgs" "(configModule|pkgSets)";
       };
 
-      "test: an alt declares what its composition destructures" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-strict-alt.mkConfiguration {
-          pkgSets = { };
-        }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-strict-alt\\.mkConfiguration requires `configModule`;.*";
-        };
+      "test: an alt requires what its pattern names" = {
+        expr = declaringLib.caisson.probe-strict-alt.mkConfiguration { };
+        expectedError = missingArgument "mkConfiguration" "configModule";
       };
 
-      "test: an unknown argument is still reported before a missing one" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-strict.mkConfiguration { bogus = 1; }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-strict\\.mkConfiguration does not accept `bogus`; it takes .*";
-        };
-      };
-
-      "test: an integration declaring nothing required takes no arguments at all" = {
+      "test: an integration requiring nothing takes no arguments at all" = {
         expr = (declaringLib.caisson.probe.mkConfiguration { }).tag;
         expected = "none";
       };
 
-      "test: the arguments a required declaration names are accepted" = {
+      "test: the arguments a pattern names are accepted" = {
         expr =
           (declaringLib.caisson.probe-strict.mkConfiguration {
             pkgSets = { };
@@ -2987,45 +3062,33 @@ in
         expected = { };
       };
 
-      # The signature is checked before the evaluation is entered. The
-      # probe's composition throws the moment it is forced, so a
-      # refused call that reached it would fail with "compose was
-      # forced"; the signature message is the proof that it did not.
+      # The pattern is matched before the body exists. The probe's
+      # composition throws the moment it is forced, so a refused call
+      # that reached it would fail with "compose was forced"; the
+      # function-argument error is the proof that it did not.
       "test: a missing argument is refused before the composition is forced" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfiguration { }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-forcing\\.mkConfiguration requires `configModule`;.*";
-        };
+        expr = declaringLib.caisson.probe-forcing.mkConfiguration { };
+        expectedError = missingArgument "mkConfiguration" "configModule";
       };
 
       "test: an unknown argument is refused before the composition is forced" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfiguration {
+        expr = declaringLib.caisson.probe-forcing.mkConfiguration {
           configModule = { };
           bogus = 1;
-        }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-forcing\\.mkConfiguration does not accept `bogus`;.*";
         };
+        expectedError = unexpectedArgument "mkConfiguration" "bogus";
       };
 
       "test: the twin refuses before the composition is forced" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing.mkConfigurationWithEcosystemArgs {
+        expr = declaringLib.caisson.probe-forcing.mkConfigurationWithEcosystemArgs {
           ecosystemArgs = { };
-        }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-forcing\\.mkConfigurationWithEcosystemArgs requires `configModule`;.*";
         };
+        expectedError = missingArgument "mkConfigurationWithEcosystemArgs" "configModule";
       };
 
       "test: an alt refuses before the composition is forced" = {
-        expr = builtins.deepSeq (declaringLib.caisson.probe-forcing-alt.mkConfiguration { }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.probe-forcing-alt\\.mkConfiguration requires `configModule`;.*";
-        };
+        expr = declaringLib.caisson.probe-forcing-alt.mkConfiguration { };
+        expectedError = missingArgument "mkConfiguration" "configModule";
       };
 
       # The probe throws when composed, so the tests above are about
@@ -3040,9 +3103,81 @@ in
         };
       };
 
-      # The check reads the argument names alone: a value the
+      # The integrations the parent registers, as this composition
+      # carries them: `builtins.functionArgs` reads each pattern back.
+      "test: every twin takes the arguments of its entry point plus ecosystemArgs" = {
+        expr = builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value =
+              builtins.functionArgs lib.caisson.${name}.mkConfigurationWithEcosystemArgs
+              == builtins.functionArgs lib.caisson.${name}.mkConfiguration // { ecosystemArgs = true; };
+          }) integrationNames
+        );
+        expected = builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value = true;
+          }) integrationNames
+        );
+      };
+
+      "test: every entry point requires configModule and takes pkgSets" = {
+        expr = builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value =
+              let
+                signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
+              in
+              signature ? configModule && !signature.configModule && signature ? pkgSets;
+          }) integrationNames
+        );
+        expected = builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value = true;
+          }) integrationNames
+        );
+      };
+
+      "test: mkConfigurationFull takes the arguments of nixos.mkConfiguration" = {
+        expr = builtins.functionArgs lib.caisson.nixos.mkConfigurationFull;
+        expected = builtins.functionArgs lib.caisson.nixos.mkConfiguration;
+      };
+
+      # The node constructors a colmena configuration receives forward
+      # to the nixos entry points, and their patterns are the same, so
+      # a wrong argument is reported under the constructor's name.
+      "test: the colmena node constructors take the arguments of the nixos entry points" = {
+        expr =
+          let
+            hive = lib.caisson.colmena.mkConfiguration {
+              ecosystemSrc = colmenaStub;
+              configModule =
+                { mkNixosConfiguration, mkNixosConfigurationWithEcosystemArgs, ... }:
+                {
+                  meta.description = builtins.toJSON {
+                    node =
+                      builtins.functionArgs mkNixosConfiguration
+                      == builtins.functionArgs lib.caisson.nixos.mkConfiguration;
+                    twin =
+                      builtins.functionArgs mkNixosConfigurationWithEcosystemArgs
+                      == builtins.functionArgs lib.caisson.nixos.mkConfigurationWithEcosystemArgs;
+                  };
+                };
+            };
+          in
+          builtins.fromJSON hive.metaConfig.description;
+        expected = {
+          node = true;
+          twin = true;
+        };
+      };
+
+      # The pattern reads the argument names alone: a value the
       # composition never reads is never forced, whatever it holds.
-      "test: the check forces the argument names alone" = {
+      "test: the pattern forces the argument names alone" = {
         expr =
           (declaringLib.caisson.probe.mkConfiguration {
             configModule = throw "the value was forced";
@@ -3164,38 +3299,25 @@ in
       };
 
       # The composition destructures `pkgSets` and `configModule`
-      # without a default, and the alt declares both, so a missing one
-      # is reported under the alt's name rather than as a Nix
-      # function-argument error from inside the composition.
+      # without a default, and the pattern of the alt names both, so a
+      # missing one is Nix's function-argument error at the entry
+      # point and never an error from inside the composition.
       "test: the alt requires what the composition destructures" = {
-        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration { }) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration requires `pkgSets`, `configModule`;.*";
-        };
+        expr = myLib.caisson.home-manager-minimal.mkConfiguration { };
+        expectedError = missingArgument "mkConfiguration" "(configModule|pkgSets)";
       };
 
       # `minimal` is not an argument of either entry point: it names
-      # the evaluation, so the message points at the entry point that
-      # evaluates that way.
-      "test: the owner refuses minimal and points at the alt" = {
-        expr = builtins.deepSeq (myLib.caisson.home-manager.mkConfiguration (
-          commonArgs // { minimal = true; }
-        )) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager\\.mkConfiguration does not accept `minimal`:.*lib\\.caisson\\.home-manager-minimal\\.mkConfiguration with the necessary modules alone\\.";
-        };
+      # the evaluation, and each entry point is the one that evaluates
+      # its way.
+      "test: the owner refuses minimal" = {
+        expr = myLib.caisson.home-manager.mkConfiguration (commonArgs // { minimal = true; });
+        expectedError = unexpectedArgument "mkConfiguration" "minimal";
       };
 
-      "test: the alt refuses minimal and points back at the owner" = {
-        expr = builtins.deepSeq (myLib.caisson.home-manager-minimal.mkConfiguration (
-          commonArgs // { minimal = false; }
-        )) true;
-        expectedError = {
-          type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration does not accept `minimal`:.*lib\\.caisson\\.home-manager\\.mkConfiguration evaluates with home-manager's whole module tree\\.";
-        };
+      "test: the alt refuses minimal" = {
+        expr = myLib.caisson.home-manager-minimal.mkConfiguration (commonArgs // { minimal = false; });
+        expectedError = unexpectedArgument "mkConfiguration" "minimal";
       };
 
       # The twin of the alt reaches the evaluator's full surface, so

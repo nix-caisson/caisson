@@ -48,6 +48,24 @@ plumbing works.
   git checkout -- tests/dependencies/flake.lock
   ```
 
+## Argument Errors (Trace Shape)
+
+- **Scope:** The argument error of every entry point (`mkConfiguration`,
+  its `WithEcosystemArgs` twin, `nixos.mkConfigurationFull`, the colmena
+  node constructors) is Nix's function-argument error, raised at the
+  call site: between `error:` and the message stands the call site and
+  no frame of caisson.
+- **Location:** `tests/argument-errors/check.sh`
+- **Mechanism:** nix-unit matches error messages and cannot see frames, so
+  the script runs the real evaluator (`nix eval`) against each entry point
+  with a wrong call and reads the trace. The `argument-errors` check runs
+  it in the sandbox over a library composed from store paths.
+- **Execution against the flake's library, from a checkout:**
+  ```bash
+  tests/argument-errors/check.sh \
+    'let f = builtins.getFlake "path:'"$PWD"'"; in f.lib' --impure
+  ```
+
 ## Integration Testing (Test Flakes)
 
 - **Scope:** Module composition, end-to-end evaluation, and build success.

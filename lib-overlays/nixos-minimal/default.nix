@@ -25,53 +25,73 @@
       over =
         final.caisson.nixos
           or (throw "lib.caisson.nixos-minimal evaluates the nixos class and needs the nixos integration composed beside it.");
+
+      evaluation = final.caisson.integrations.mkEvaluation {
+        compose =
+          args:
+          let
+            common = over.compose {
+              context = "lib.caisson.nixos-minimal.mkConfiguration";
+              nixpkgsModule = false;
+            } args;
+          in
+          common
+          // {
+            ecosystemArgs = {
+              prefix = args.prefix or [ ];
+              modules = common.modules;
+              specialArgs = common.specialArgs;
+              # `nixos/lib/default.nix` of the nixpkgs source takes
+              # `lib` and defaults it to `import ../../lib`, the
+              # library of the tree it lives in. It is the argument
+              # of that file rather than of `evalModules`, so
+              # `evaluate` reads it out of the call and hands it to
+              # the import; the twin replaces it like any other
+              # evaluator argument.
+              lib = common.lib;
+            };
+          };
+        evaluate =
+          composed: callArgs:
+          (import "${composed.src}/nixos/lib" {
+            inherit (callArgs) lib;
+          }).evalModules
+            (builtins.removeAttrs callArgs [ "lib" ]);
+      };
     in
     {
       caisson = (prev.caisson or { }) // {
         nixos-minimal = final.caisson.integrations.mkAltIntegration {
-          name = "nixos-minimal";
           inherit over;
-          accepted = [ "prefix" ];
-          # The composition of the nixos class destructures both
-          # without a default, so the alt requires what the owner does.
-          required = [
-            "pkgSets"
-            "configModule"
-          ];
-          hints = {
-            pkgs = "pass the package set as `pkgSets.pkgs`.";
-            baseModules = "the minimal evaluator takes no base modules; lib.caisson.nixos.mkConfiguration evaluates with NixOS' module list.";
-          };
-          compose =
-            args:
-            let
-              common = over.compose {
-                context = "lib.caisson.nixos-minimal.mkConfiguration";
-                nixpkgsModule = false;
-              } args;
-            in
-            common
-            // {
-              ecosystemArgs = {
-                prefix = args.prefix or [ ];
-                modules = common.modules;
-                specialArgs = common.specialArgs;
-                # `nixos/lib/default.nix` of the nixpkgs source takes
-                # `lib` and defaults it to `import ../../lib`, the
-                # library of the tree it lives in. It is the argument
-                # of that file rather than of `evalModules`, so
-                # `evaluate` reads it out of the call and hands it to
-                # the import; the twin replaces it like any other
-                # evaluator argument.
-                lib = common.lib;
-              };
-            };
-          evaluate =
-            composed: callArgs:
-            (import "${composed.src}/nixos/lib" {
-              inherit (callArgs) lib;
-            }).evalModules
-              (builtins.removeAttrs callArgs [ "lib" ]);
+          # The arguments of `lib.caisson.nixos.mkConfiguration`,
+          # documented there, plus `prefix`. The composition of the
+          # nixos class destructures `pkgSets` and `configModule`
+          # without a default. The minimal evaluator takes no base
+          # modules; lib.caisson.nixos.mkConfiguration evaluates with
+          # NixOS' module list.
+          mkConfiguration =
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              # The `prefix` of evalModules, the option path the
+              # evaluation sits at.
+              prefix ? null,
+            }@args:
+            evaluation args;
+          mkConfigurationWithEcosystemArgs =
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              prefix ? null,
+              ecosystemArgs ? null,
+            }@args:
+            evaluation args;
         };
       };
     };

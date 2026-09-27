@@ -24,34 +24,50 @@
       over =
         final.caisson.home-manager
           or (throw "lib.caisson.home-manager-minimal evaluates the homeManager class and needs the home-manager integration composed beside it.");
+
+      evaluation = final.caisson.integrations.mkEvaluation {
+        compose = over.compose {
+          context = "lib.caisson.home-manager-minimal.mkConfiguration";
+          minimal = true;
+        };
+        inherit (over) evaluate;
+      };
     in
     {
       caisson = (prev.caisson or { }) // {
         home-manager-minimal = final.caisson.integrations.mkAltIntegration {
-          name = "home-manager-minimal";
           inherit over;
-          accepted = [
-            "osConfig"
-            "check"
-            "sourceMeta"
-          ];
-          # The composition of the homeManager class destructures both
-          # without a default, so the alt requires what the owner does.
-          required = [
-            "pkgSets"
-            "configModule"
-          ];
-          hints = {
-            configuration = "pass the configuration's module as `configModule`; registered class modules are selected with `moduleImports`.";
-            pkgs = "pass the package set as `pkgSets.pkgs`.";
-            extraSpecialArgs = "pass extra module arguments as `specialArgs`.";
-            minimal = "this entry point is the minimal module list; lib.caisson.home-manager.mkConfiguration evaluates with home-manager's whole module tree.";
-          };
-          compose = over.compose {
-            context = "lib.caisson.home-manager-minimal.mkConfiguration";
-            minimal = true;
-          };
-          inherit (over) evaluate;
+          # The arguments of `lib.caisson.home-manager.mkConfiguration`,
+          # documented there. The composition of the homeManager class
+          # destructures `pkgSets` and `configModule` without a
+          # default. This entry point evaluates with the necessary
+          # modules alone; lib.caisson.home-manager.mkConfiguration
+          # evaluates with home-manager's whole module tree.
+          mkConfiguration =
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              osConfig ? null,
+              check ? null,
+              sourceMeta ? null,
+            }@args:
+            evaluation args;
+          mkConfigurationWithEcosystemArgs =
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              osConfig ? null,
+              check ? null,
+              sourceMeta ? null,
+              ecosystemArgs ? null,
+            }@args:
+            evaluation args;
         };
       };
     };

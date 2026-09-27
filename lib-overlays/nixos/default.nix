@@ -79,56 +79,82 @@
         };
       evalConfig = composed: callArgs: import "${composed.src}/nixos/lib/eval-config.nix" callArgs;
 
+      evaluation = final.caisson.integrations.mkEvaluation {
+        compose = composeEvalConfig;
+        evaluate = evalConfig;
+      };
+
       # eval-config with nixpkgs' module list passed explicitly as
-      # `baseModules`.
+      # `baseModules`. The signature is the one of `mkConfiguration`.
       mkConfigurationFull =
-        rawArgs:
+        {
+          configModule,
+          pkgSets,
+          ecosystemSrc ? null,
+          moduleImports ? null,
+          specialArgs ? null,
+          system ? null,
+        }@args:
         let
-          args = final.caisson.integrations.checkArgs {
-            context = "lib.caisson.nixos.mkConfigurationFull";
-            accepted = [
-              "ecosystemSrc"
-              "pkgSets"
-              "configModule"
-              "moduleImports"
-              "specialArgs"
-              "system"
-            ];
-            inherit hints required;
-            open = "lib.caisson.nixos.mkConfigurationWithEcosystemArgs";
-          } rawArgs;
           composed = composeEvalConfig args;
         in
-        # The check is forced before the evaluation is entered, as in
-        # the generated entry points: a refused call throws with no
-        # composition or evaluator frames above the message.
-        builtins.seq args (
-          evalConfig composed (
-            composed.ecosystemArgs
-            // {
-              baseModules = import "${composed.src}/nixos/modules/module-list.nix";
-            }
-          )
+        evalConfig composed (
+          composed.ecosystemArgs
+          // {
+            baseModules = import "${composed.src}/nixos/modules/module-list.nix";
+          }
         );
 
-      hints = {
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        baseModules = "the base module list belongs to the entry point: mkConfiguration and mkConfigurationFull evaluate with NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration without it.";
-      };
-      # What the shared composition destructures without a default,
-      # for every entry point over it. `assertPkgSets` there reports
-      # the narrower mistake, a `pkgSets` that carries no `pkgs`.
-      required = [
-        "pkgSets"
-        "configModule"
-      ];
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
         class = "nixos";
-        accepted = [ "system" ];
-        inherit hints required;
-        compose = composeEvalConfig;
-        evaluate = evalConfig;
+        # The signature of the entry points over the nixos class; the
+        # colmena node constructors take the same arguments, and
+        # `lib.caisson.nixos-minimal` these plus `prefix`. The
+        # composition (compose.nix) destructures `pkgSets` and
+        # `configModule` without a default and supplies the value of
+        # every optional argument left out; it checks the package set
+        # again, for the narrower mistake, a `pkgSets` that carries no
+        # `pkgs`.
+        mkConfiguration =
+          {
+            # The configuration's module. Further modules of the class
+            # are selected with `moduleImports`, from the registry. The
+            # base module list belongs to the entry point:
+            # mkConfiguration and mkConfigurationFull evaluate with
+            # NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration
+            # without it.
+            configModule,
+            # The package sets; `pkgSets.pkgs` is the set the evaluation
+            # runs on.
+            pkgSets,
+            # The nixpkgs source tree; resolved from the composition's
+            # declarations when absent.
+            ecosystemSrc ? null,
+            # The selection over the nixos class of the registry; every
+            # entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies.
+            specialArgs ? null,
+            # eval-config's `system`; the host platform of
+            # `pkgSets.pkgs` when absent.
+            system ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets,
+            ecosystemSrc ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            system ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
         extra = {
           inherit mkConfigurationFull;
           # The two-stage composition an alt over this class reads.

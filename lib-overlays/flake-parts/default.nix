@@ -171,20 +171,50 @@
 
       evaluate = composed: callArgs: composed.flakeParts.lib.mkFlake callArgs composed.module;
 
+      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+
       integration = selection.mkIntegration {
         name = "flake-parts";
         class = "flake";
-        # What `compose` destructures without a default.
-        required = [ "configModule" ];
-        # flake-parts' mkFlake arguments this entry point composes are
-        # refused with a pointer to the caisson argument.
-        hints = {
-          inputs = "the flake's inputs come from the composition's manifest; pass them to caisson-core.mkLib.";
-          self = "the flake's outputs come from the composition's manifest; pass inputs (self included) to caisson-core.mkLib.";
-          moduleLocation = "the flake's name is the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
-          name = "a configuration's name is the attribute its parent declares it under, or, with no parent, the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
-        };
-        inherit compose evaluate;
+        # `compose` destructures `configModule` without a default and
+        # supplies the value of every optional argument left out. What
+        # mkFlake takes beyond these comes from the composition's
+        # manifest, through caisson-core.mkLib: the flake's `inputs`
+        # (`self` among them) and its `moduleLocation`, the namespace
+        # the composition declares, which is also the name of the
+        # configuration.
+        mkConfiguration =
+          {
+            # The configuration's module. Further modules of the class
+            # are selected with `moduleImports`, from the registry.
+            configModule,
+            # The package sets for the flake evaluation itself, handed
+            # to the flake-class modules as the `pkgSets` special
+            # argument.
+            pkgSets ? null,
+            # The flake-parts source; resolved from the composition's
+            # declarations when absent.
+            ecosystemSrc ? null,
+            # The selection over the flake class of the registry; every
+            # entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies.
+            specialArgs ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets ? null,
+            ecosystemSrc ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
         extra = {
           inherit types;
         };

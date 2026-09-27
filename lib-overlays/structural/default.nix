@@ -48,7 +48,7 @@
       # inputs. The configuration's name comes from the manifest,
       # through the core module.
       compose =
-        args@{
+        {
 
           configModule,
 
@@ -64,35 +64,30 @@
 
           ...
         }:
-        # The closed signature admits `ecosystemSrc` for every
-        # integration; this one has no ecosystem to resolve it against.
-        if args ? ecosystemSrc then
-          throw "lib.caisson.structural takes no `ecosystemSrc`: the structural integration wraps no ecosystem."
-        else
-          let
-            registry = final.caisson-core.modules.structural or { };
+        let
+          registry = final.caisson-core.modules.structural or { };
 
-            # The framework module of the class: the core of caisson
-            # itself, read from the closure so it is there however this
-            # integration was registered, plus every `core` the
-            # composition registered.
-            frameworkModules = [
-              closure-lib.caisson-core.modules.structural.core
-            ]
-            ++ selection.coreModules registry;
-          in
-          {
-            ecosystemArgs = {
-              class = "structural";
-              specialArgs = {
-                lib = final;
-                inputs = manifest.inputs;
-              }
-              // (if pkgSets != null then { inherit pkgSets; } else { })
-              // specialArgs;
-              modules = frameworkModules ++ moduleImports registry ++ [ configModule ];
-            };
+          # The framework module of the class: the core of caisson
+          # itself, read from the closure so it is there however this
+          # integration was registered, plus every `core` the
+          # composition registered.
+          frameworkModules = [
+            closure-lib.caisson-core.modules.structural.core
+          ]
+          ++ selection.coreModules registry;
+        in
+        {
+          ecosystemArgs = {
+            class = "structural";
+            specialArgs = {
+              lib = final;
+              inputs = manifest.inputs;
+            }
+            // (if pkgSets != null then { inherit pkgSets; } else { })
+            // specialArgs;
+            modules = frameworkModules ++ moduleImports registry ++ [ configModule ];
           };
+        };
 
       evaluate =
         _composed: callArgs:
@@ -105,6 +100,8 @@
             exports = evaluated.config.caisson.exports;
           };
         };
+
+      evaluation = selection.mkEvaluation { inherit compose evaluate; };
 
       # What a tool reads from a top: the exports, with the manifest
       # beside them for `manifestOf` and `topside --file`.
@@ -121,12 +118,40 @@
       integration = selection.mkIntegration {
         name = "structural";
         class = "structural";
-        # What `compose` destructures without a default.
-        required = [ "configModule" ];
-        hints = {
-          name = "a configuration's name is the attribute its parent declares it under, or, with no parent, the namespace the composition declares; pass `namespace` to caisson-core.mkLib.";
-        };
-        inherit compose evaluate;
+        # `compose` destructures `configModule` without a default and
+        # supplies the value of every optional argument left out. The
+        # integration wraps no ecosystem, so there is no `ecosystemSrc`
+        # here. A configuration's name is the attribute its parent
+        # declares it under, or, with no parent, the namespace the
+        # composition declares: `namespace`, passed to
+        # caisson-core.mkLib.
+        mkConfiguration =
+          {
+            # The configuration's module. Further modules of the class
+            # are selected with `moduleImports`, from the registry.
+            configModule,
+            # The package sets, handed to the modules as the `pkgSets`
+            # special argument.
+            pkgSets ? null,
+            # The selection over the structural class of the registry;
+            # every entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies.
+            specialArgs ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
         extra = {
           inherit mkTopConfiguration;
         };

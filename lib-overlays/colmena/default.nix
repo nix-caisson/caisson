@@ -82,45 +82,16 @@
         ];
       };
 
-      nodeAccepted = [
-        "ecosystemSrc"
-        "pkgSets"
-        "configModule"
-        "moduleImports"
-        "specialArgs"
-        "system"
-      ];
-      # A node is a NixOS configuration; the constructors forward to
-      # lib.caisson.nixos, whose composition destructures both without
-      # a default. Declaring them here names the module argument the
-      # configuration actually called.
-      nodeRequired = [
-        "pkgSets"
-        "configModule"
-      ];
-      nodeHints = {
-        modules = "pass the host's module as `configModule`; registered nixos-class modules are selected with `moduleImports`.";
-        pkgs = "pass the package set as `pkgSets.pkgs`.";
-        deployment = "set `deployment.*` in the host's configModule; the node declares those options.";
-      };
-      checkNodeArgs = final.caisson.integrations.checkArgs {
-        context = "mkNixosConfiguration (the module argument of a colmena configuration)";
-        accepted = nodeAccepted;
-        required = nodeRequired;
-        hints = nodeHints;
-        open = "mkNixosConfigurationWithEcosystemArgs";
-      };
-      checkOpenNodeArgs = final.caisson.integrations.checkArgs {
-        context = "mkNixosConfigurationWithEcosystemArgs (the module argument of a colmena configuration)";
-        accepted = nodeAccepted ++ [ "ecosystemArgs" ];
-        required = nodeRequired;
-        hints = nodeHints;
-      };
-
       # The node constructors a colmena configuration receives, closed
       # over its colmena source: nixos.mkConfiguration over the host's
       # module plus the deployment module. Their `ecosystemSrc` is
-      # nixpkgs, as for any NixOS configuration.
+      # nixpkgs, as for any NixOS configuration. A node is a NixOS
+      # configuration, so each constructor takes the arguments of the
+      # nixos entry point it forwards to, documented at
+      # `lib.caisson.nixos.mkConfiguration`, as its pattern: a wrong
+      # argument is reported under the constructor's name, at the
+      # configuration that called it. `deployment.*` is set in the
+      # host's configModule; the node declares those options.
       mkNodeConstructors =
         src:
         let
@@ -137,24 +108,28 @@
               };
             };
         in
-        # The node check is forced before the arguments reach the
-        # nixos entry point, as in the generated entry points: a
-        # refused node throws under the constructor's name, with no
-        # frames of the nixos check or its composition above the
-        # message.
         {
           mkNixosConfiguration =
-            rawArgs:
-            let
-              args = checkNodeArgs rawArgs;
-            in
-            builtins.seq args (final.caisson.nixos.mkConfiguration (nodeArgsOf args));
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              system ? null,
+            }@args:
+            final.caisson.nixos.mkConfiguration (nodeArgsOf args);
           mkNixosConfigurationWithEcosystemArgs =
-            rawArgs:
-            let
-              args = checkOpenNodeArgs rawArgs;
-            in
-            builtins.seq args (final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args));
+            {
+              configModule,
+              pkgSets,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+              system ? null,
+              ecosystemArgs ? null,
+            }@args:
+            final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args);
         };
 
       # The options of the class. `meta` declares the keys colmena's
@@ -291,21 +266,51 @@
               };
           };
 
+      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+
       integration = selection.mkIntegration {
         name = "colmena";
         class = "caisson-colmena";
-        # `pkgSets` defaults to null here: a colmena configuration
-        # needs one only for `colmena eval`, which reports the miss.
-        required = [ "configModule" ];
-        # The keys of colmena's hive format, refused with a pointer to
-        # the option of the colmena configuration that holds the fact.
-        hints = {
-          meta = "colmena's metadata is the `meta` option of the colmena configuration.";
-          nodes = "the nodes are the `nodes` option of the colmena configuration.";
-          defaults = "there is no module shared by every node: each node is an evaluated NixOS configuration (the `mkNixosConfiguration` module argument); select shared modules there.";
-          network = "colmena's metadata is the `meta` option of the colmena configuration.";
-        };
-        inherit compose evaluate;
+        # `compose` destructures `configModule` without a default and
+        # supplies the value of every optional argument left out. The
+        # keys of colmena's hive format are not arguments: `meta` and
+        # `nodes` are options of the colmena configuration, and there
+        # is no `defaults` module shared by every node, each node being
+        # an evaluated NixOS configuration (the `mkNixosConfiguration`
+        # module argument) that selects its shared modules itself.
+        mkConfiguration =
+          {
+            # The colmena configuration's module: `meta` and
+            # `nodes.<name>`. Further modules of the class are selected
+            # with `moduleImports`, from the registry.
+            configModule,
+            # The package sets, handed to the modules as the `pkgSets`
+            # special argument; `colmena eval` needs `pkgSets.pkgs`
+            # and reports the miss.
+            pkgSets ? null,
+            # The colmena flake; resolved from the composition's
+            # declarations when absent.
+            ecosystemSrc ? null,
+            # The selection over the caisson-colmena class of the
+            # registry; every entry named `default` when absent.
+            moduleImports ? null,
+            # Extra module arguments, merged over the ones the framework
+            # supplies.
+            specialArgs ? null,
+          }@args:
+          evaluation args;
+        # The same arguments and `ecosystemArgs`, the evaluator's
+        # arguments merged over the composed call last.
+        mkConfigurationWithEcosystemArgs =
+          {
+            configModule,
+            pkgSets ? null,
+            ecosystemSrc ? null,
+            moduleImports ? null,
+            specialArgs ? null,
+            ecosystemArgs ? null,
+          }@args:
+          evaluation args;
       };
     in
     contributeClasses prev integration.classes
