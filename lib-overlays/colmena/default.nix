@@ -137,12 +137,24 @@
               };
             };
         in
+        # The node check is forced before the arguments reach the
+        # nixos entry point, as in the generated entry points: a
+        # refused node throws under the constructor's name, with no
+        # frames of the nixos check or its composition above the
+        # message.
         {
           mkNixosConfiguration =
-            rawArgs: final.caisson.nixos.mkConfiguration (nodeArgsOf (checkNodeArgs rawArgs));
+            rawArgs:
+            let
+              args = checkNodeArgs rawArgs;
+            in
+            builtins.seq args (final.caisson.nixos.mkConfiguration (nodeArgsOf args));
           mkNixosConfigurationWithEcosystemArgs =
             rawArgs:
-            final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf (checkOpenNodeArgs rawArgs));
+            let
+              args = checkOpenNodeArgs rawArgs;
+            in
+            builtins.seq args (final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args));
         };
 
       # The options of the class. `meta` declares the keys colmena's
