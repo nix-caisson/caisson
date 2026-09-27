@@ -20,6 +20,34 @@ plumbing works.
   nix build .#checks.<system>.<checkName> -L
   ```
 
+## Pinned-World Suite
+
+- **Scope:** caisson composed with concrete pinned versions of the upstream
+  world (nixpkgs, home-manager, colmena, terranix, system-manager) and
+  exercised end to end: a home configuration, a NixOS system with the
+  home-manager adapter, a colmena hive, a terranix and a system-manager
+  configuration, and the composition guarantees of the real exported
+  overlays. Every upstream expectation caisson relies on is a probe here.
+- **Location:** `tests/pinned-world/default.nix`; the pins in
+  `tests/dependencies/flake.lock`.
+- **Mechanism:** The checks partition forces the suite's `summary` at
+  evaluation time as the `pinned-world` check, so `nix flake check` runs it
+  at the committed pins and a change to caisson is judged against the last
+  known good world. The `drift` workflow runs daily on `main`, advances the
+  pins in the working tree without committing, and builds the same check
+  against today's upstreams; its badge is on the README. Red there means an
+  upstream moved and broke an expectation, and the committed pins move in
+  the commit that fixes it.
+- **Execution:**
+  ```bash
+  nix build .#checks.<system>.pinned-world -L
+
+  # Against today's upstreams, the way the drift workflow does:
+  nix flake update --flake ./tests/dependencies
+  nix build .#checks.<system>.pinned-world -L
+  git checkout -- tests/dependencies/flake.lock
+  ```
+
 ## Integration Testing (Test Flakes)
 
 - **Scope:** Module composition, end-to-end evaluation, and build success.

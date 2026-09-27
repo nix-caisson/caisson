@@ -25,20 +25,3 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix flake check -L
-  # The slipping compat run: caisson-compat's pinned-world suite with
-  # this working tree overriding the caisson pin. Needs the
-  # non-blocking by design (compat HEAD is mutable external state).
-  compat-suite:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v7
-      - uses: DeterminateSystems/nix-installer-action@v22
-        with:
-          # Upstream Nix, not Determinate Nix: the action has
-          # defaulted determinate to true since v21, and this
-          # project targets the Nix everyone else runs.
-          determinate: false
-      - run: |
-          nix eval 'github:nix-caisson/caisson-compat#lib.caisson-compat.tests.summary' \
-            --override-input caisson "path:$PWD"

@@ -135,6 +135,20 @@
                 debug-disabled =
                   assert !(self ? debug);
                   pkgs.runCommand "debug-disabled" { } "touch $out";
+                # The pinned-world suite, forced at evaluation time: the
+                # tree itself composed with the upstream pins of
+                # tests/dependencies, so the check evaluates caisson
+                # against the committed world. The drift workflow builds
+                # this check alone over advanced pins.
+                pinned-world =
+                  let
+                    suite = import (self.outPath + "/tests/pinned-world") {
+                      inputs = inputs // {
+                        caisson = self;
+                      };
+                    };
+                  in
+                  builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
                 minimal-consumer-all-outputs = builtins.seq minimalConsumerOutputs.flakeModule (
                   builtins.seq minimalConsumerOutputs.lib (
                     pkgs.runCommand "minimal-consumer-all-outputs" { } "touch $out"
