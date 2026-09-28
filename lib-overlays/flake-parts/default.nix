@@ -136,7 +136,7 @@
           # The name this configuration holds: the namespace the
           # composition declares on mkLib, since a flake evaluation has
           # no parent to declare it under an attribute.
-          name = manifest.namespace or null;
+          name = manifest.name or null;
 
         in
         {

@@ -17,7 +17,7 @@
       default =
         composedLib:
         let
-          namespace = composedLib.caisson-core.libManifest.namespace or null;
+          namespace = composedLib.caisson-core.libManifest.name or null;
         in
         assert lib.assertMsg (namespace != null)
           "caisson.lib.export.enabled is true but this composition declares no namespace, so there is no library namespace to publish. Declare `namespace` in the mkLib call, select the parts to publish with caisson.lib.exported, or disable lib export.";
