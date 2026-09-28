@@ -240,8 +240,8 @@ checks.composition-success =
 ```
 
 `minimal-consumer` goes further by also exercising `flakeModules.default` and
-the lib export, whose default selector publishes the namespace the composition
-declares on `mkLib`, and verifying that the consumer's outputs include expected
+the lib export, whose default selector publishes the namespace named after the
+`name` the composition declares on `mkLib`, and verifying that the consumer's outputs include expected
 attributes (`flakeModule`, `lib`). `module-class-export` tests the generic
 module class system: it registers modules under synthetic classes via the
 `modules` attrset, configures per-class export controls, and asserts that

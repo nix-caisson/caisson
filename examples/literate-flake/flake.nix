@@ -80,11 +80,12 @@
         # composition closes over, and the root from `self`.
         inherit (core.pins.flake inputs) sources root;
 
-        # The namespace this composition contributes to the composed
-        # library, and so the name this flake holds: `lib.export.enabled`
-        # publishes `lib.literate-flake` because of this declaration, and
-        # the package scope would land at `pkgs.literate-flake`.
-        namespace = "literate-flake";
+        # The project's name, which this flake holds and which is the
+        # namespace it contributes to the composed library:
+        # `lib.export.enabled` publishes `lib.literate-flake` because of
+        # this declaration, and the package scope would land at
+        # `pkgs.literate-flake`.
+        name = "literate-flake";
 
         projects = {
           inherit caisson;

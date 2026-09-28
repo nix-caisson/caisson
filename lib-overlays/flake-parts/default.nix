@@ -133,9 +133,9 @@
 
           importedModules = moduleImports registry;
 
-          # The name this configuration holds: the namespace the
-          # composition declares on mkLib, since a flake evaluation has
-          # no parent to declare it under an attribute.
+          # The name this configuration holds: the name the composition
+          # declares on mkLib, since a flake evaluation has no parent to
+          # declare it under an attribute.
           name = manifest.name or null;
 
         in
@@ -147,7 +147,7 @@
           # revs (e.g. directly and via a sibling whose lock is one bump
           # behind) collect two copies of the same option declarations
           # and fail with "option ... is already declared". The
-          # composition's namespace is rev-independent, so such copies
+          # project's name is rev-independent, so such copies
           # deduplicate. It comes from the manifest rather than the
           # module evaluation because moduleLocation is consumed before
           # that evaluation exists.
@@ -221,8 +221,8 @@
         # supplies the value of every optional argument left out. What
         # mkFlake takes beyond these comes from the composition's
         # manifest, through caisson-core.mkLib: the flake's `inputs`
-        # (`self` among them) and its `moduleLocation`, the namespace
-        # the composition declares, which is also the name of the
+        # (`self` among them) and its `moduleLocation`, the name the
+        # composition declares, which is also the name of the
         # configuration.
         mkConfiguration =
           {

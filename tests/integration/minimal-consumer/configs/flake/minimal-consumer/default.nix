@@ -5,7 +5,8 @@
   systems = [ "x86_64-linux" ];
 
   # The default selector for `caisson.lib.exported` looks the namespace
-  # the composition declares up in the composed library, so this alone
+  # named after the composition's declared `name` up in the composed
+  # library, so this alone
   # decides what the `lib` flake output carries.
   caisson.lib.export.enabled = true;
 

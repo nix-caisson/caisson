@@ -123,9 +123,8 @@
         # supplies the value of every optional argument left out. The
         # integration wraps no ecosystem, so there is no `ecosystemSrc`
         # here. A configuration's name is the attribute its parent
-        # declares it under, or, with no parent, the namespace the
-        # composition declares: `namespace`, passed to
-        # caisson-core.mkLib.
+        # declares it under, or, with no parent, the name the
+        # composition declares: `name`, passed to caisson-core.mkLib.
         mkConfiguration =
           {
             # The configuration's module. Further modules of the class
