@@ -1107,6 +1107,33 @@ in
       };
     };
 
+    # The package overlay registry on mkLib (`pkgOverlays`) is the only
+    # route for package overlays: the flake-parts option that once held
+    # them is not declared, so setting it is the module system's
+    # undeclared-option error.
+    "test: caisson.nixpkgs.overlays.all is not an option" = {
+      expr =
+        let
+          outputs = lib.caisson.flake-parts.mkConfiguration {
+            configModule = mkFlakePartsModule (
+              { ... }:
+              {
+                systems = [ "x86_64-linux" ];
+                caisson.nixpkgs.overlays.all.legacy =
+                  _namespace: _final: _prev:
+                  { };
+              }
+            );
+            moduleImports = modules: [ modules.nixpkgs ];
+          };
+        in
+        builtins.deepSeq (builtins.attrNames outputs) true;
+      expectedError = {
+        type = "ThrownError";
+        msg = "The option `caisson\\.nixpkgs\\.overlays' does not exist";
+      };
+    };
+
     "test: modules.flake attrset receives working modules in flake-parts.mkConfiguration" = {
       expr =
         let

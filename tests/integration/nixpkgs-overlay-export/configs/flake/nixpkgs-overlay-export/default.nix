@@ -2,7 +2,6 @@
 { ... }:
 {
   inputs,
-  lib,
   self,
   ...
 }:
@@ -14,29 +13,14 @@
 
   systems = [ "x86_64-linux" ];
 
-  caisson.nixpkgs = {
-    overlays = {
-      all = {
-        polyfillOnly = lib.caisson.nixpkgs.mkPolyfillOverlay (
-          _final: _prev: {
-            exportedPolyfill = "ok";
-          }
-        );
-        internalOnly = lib.caisson.nixpkgs.mkPolyfillOverlay (
-          _final: _prev: {
-            internalOnly = true;
-          }
-        );
-      };
-      exported = overlays: {
-        inherit (overlays) polyfillOnly;
-      };
-      export.enabled = true;
-    };
-    pkgSets = {
-      pkgs = {
-        pkgFunction = import inputs.nixpkgs;
-      };
+  # The export selector publishes one of the two local registry entries.
+  caisson.pkgOverlays.exported = registry: {
+    inherit (registry) polyfillOnly;
+  };
+
+  caisson.nixpkgs.pkgSets = {
+    pkgs = {
+      pkgFunction = import inputs.nixpkgs;
     };
   };
 
@@ -56,6 +40,7 @@
         in
         assert exportedNames == [ "polyfillOnly" ];
         assert !(self.overlays ? internalOnly);
+        assert builtins.attrNames self.pkgOverlays == [ "polyfillOnly" ];
         assert first == second;
         assert downstreamPkgs.exportedPolyfill == "ok";
         pkgs.runCommand "nixpkgs-overlay-export-success" { } "touch $out";
