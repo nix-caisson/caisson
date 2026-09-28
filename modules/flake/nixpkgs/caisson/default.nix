@@ -6,16 +6,16 @@
   ...
 }:
 let
-  # The namespace this composition declares on mkLib, taken from the
+  # The project's name, declared as `name` on mkLib and taken from the
   # manifest the composed library carries (`lib` is that library). It
-  # names the flake's package scope (`pkgs.<namespace>`) and keys the
+  # names the flake's package scope (`pkgs.<name>`) and keys the
   # overlays built over it. A composition that declares none has no
   # such scope, and the message says so where the name is first needed.
-  declaredNamespace = lib.caisson-core.libManifest.name or null;
+  declaredName = lib.caisson-core.libManifest.name or null;
   namespace =
-    assert lib.assertMsg (declaredNamespace != null)
-      "The nixpkgs flake module names this flake's package scope `pkgs.<namespace>`, but this composition declares no namespace. Declare `namespace` in the mkLib call.";
-    declaredNamespace;
+    assert lib.assertMsg (declaredName != null)
+      "The nixpkgs flake module names this flake's package scope `pkgs.<name>` after the project's name, but this composition declares no name. Declare `name` in the mkLib call.";
+    declaredName;
   coreOverlay = (final: prev: { "${namespace}" = prev."${namespace}" or { }; });
   cfg = config.caisson.nixpkgs.config;
 

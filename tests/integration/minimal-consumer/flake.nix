@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 {
-  description = "Minimal consumer test -- no custom modules, and the lib export taking its namespace from the composition";
+  description = "Minimal consumer test -- no custom modules, and the lib export taking its namespace from the project's name";
 
   inputs = {
     # Standalone equivalent (without shared deps infrastructure):
@@ -25,11 +25,12 @@
       lib = parent.lib.caisson-core.mkLib {
         inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
 
-        # The namespace this composition contributes to the composed
-        # library. `caisson.lib.export.enabled` publishes the namespace
-        # named here, so the `lib` flake output is this overlay's
-        # contribution and nothing else.
-        namespace = "minimal-consumer";
+        # The project's name, also the namespace this composition
+        # contributes to the composed library.
+        # `caisson.lib.export.enabled` publishes the namespace named
+        # here, so the `lib` flake output is this overlay's contribution
+        # and nothing else.
+        name = "minimal-consumer";
 
         libOverlays = mkLibOverlay: {
           flake-parts = parent.libOverlays.flake-parts;

@@ -17,7 +17,7 @@
       core = parent.lib.caisson-core;
       lib = core.mkLib {
         inherit (core.pins.flake inputs) sources root;
-        namespace = "producer";
+        name = "producer";
         projects = {
           caisson = parent;
         };

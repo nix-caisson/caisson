@@ -21,7 +21,7 @@
         # name: the final consumer registers this composition's exported
         # overlay under the same string, so the two halves of the chain
         # agree on a name neither derives from a path.
-        namespace = "middle-chain";
+        name = "middle-chain";
 
         modules = lib: {
           flake = {

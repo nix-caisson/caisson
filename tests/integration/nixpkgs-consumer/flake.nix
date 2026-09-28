@@ -23,7 +23,7 @@
         inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
-        namespace = "nixpkgs-consumer";
+        name = "nixpkgs-consumer";
         projects = {
           caisson = parent;
         };

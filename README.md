@@ -67,10 +67,10 @@ and `lib-overlays/<name>`.
         # composition closes over, and the root from `self`.
         inherit (core.pins.flake inputs) sources root;
 
-        # The namespace this flake contributes to the composed library,
-        # and so the name of the configuration below, which no parent
-        # declares.
-        namespace = "my-flake";
+        # The project's name: the name of the configuration below,
+        # which no parent declares, and the namespace this flake
+        # contributes to the composed library.
+        name = "my-flake";
 
         # Consume caisson as a project: its integrations and its
         # exported modules join the registries under `caisson/<name>`.

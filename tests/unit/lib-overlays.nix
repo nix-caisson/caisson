@@ -104,8 +104,8 @@ let
 in
 {
   # The default selector for `caisson.lib.exported`: a function of the
-  # composed library that looks up the namespace that library's
-  # composition declares. These tests apply it to libraries directly, so
+  # composed library that looks up the namespace named after the
+  # project, the `name` that library's composition declares. These tests apply it to libraries directly, so
   # what they observe is the lookup and nothing around it.
   libExport =
     let
@@ -116,10 +116,11 @@ in
           moduleImports = _modules: [ ];
         }).value.caisson.lib.exported;
 
-      # A composition declaring a namespace and contributing it.
+      # A composition declaring a name and contributing the namespace
+      # of that name.
       namedLib = caisson.mkLib {
         sources = mockSources;
-        namespace = "the-namespace";
+        name = "the-namespace";
         libOverlays = _mkLibOverlay: {
           the-namespace = mkLibOverlay (
             { ... }:
@@ -134,7 +135,7 @@ in
         };
       };
 
-      # The same composition with no namespace declared.
+      # The same composition with no name declared.
       unnamedLib = caisson.mkLib { sources = mockSources; };
     in
     {
@@ -155,7 +156,7 @@ in
         };
       };
 
-      "test: the selector refuses a library whose composition declares no namespace" = {
+      "test: the selector refuses a library whose composition declares no name" = {
         expr = (builtins.tryEval (builtins.deepSeq ((selectorOf namedLib) unnamedLib) true)).success;
         expected = false;
       };
@@ -2471,12 +2472,13 @@ in
           );
         };
       };
-      # The same composition with a namespace declared, contributing
-      # that namespace to the composed library, so what the lib export
-      # selects is observable beside the composition that declares none.
+      # The same composition with a name declared, contributing the
+      # namespace of that name to the composed library, so what the lib
+      # export selects is observable beside the composition that
+      # declares none.
       namespacedLib = caisson.mkLib {
         sources = mockSources;
-        namespace = "named-composition";
+        name = "named-composition";
         libOverlays = _mkLibOverlay: {
           named-composition = mkLibOverlay (
             { ... }:
@@ -2565,9 +2567,9 @@ in
       };
 
       # The lib export reader: the namespace it selects comes from the
-      # composed library it is handed, so declaring one on mkLib is the
-      # whole of what decides which namespace gets published.
-      "test: the lib export selects the namespace the composition declares" = {
+      # composed library it is handed, so declaring a name on mkLib is
+      # the whole of what decides which namespace gets published.
+      "test: the lib export selects the namespace named after the declared name" = {
         expr =
           (namespacedLib.caisson.structural.mkConfiguration {
             configModule = {
@@ -2583,7 +2585,7 @@ in
       # Declaring none is a state the tree supports, up to the point
       # something asks for a name. The lib export is such a reader, and
       # what it produces is the message, not a missing attribute.
-      "test: the lib export refuses a composition that declares no namespace" = {
+      "test: the lib export refuses a composition that declares no name" = {
         expr =
           (builtins.tryEval (
             builtins.deepSeq
@@ -2600,7 +2602,7 @@ in
 
       # Nothing asking for a name is the ordinary case for a composition
       # that declares none: the evaluation goes through.
-      "test: a composition declaring no namespace evaluates without one" = {
+      "test: a composition declaring no name evaluates without one" = {
         expr =
           (registeringLib.caisson.structural.mkConfiguration {
             configModule = { };
@@ -2609,8 +2611,8 @@ in
         expected = { };
       };
 
-      # No entry point takes a `name`: a name comes from the namespace
-      # declared on mkLib. The pattern of the entry point refuses the
+      # No entry point takes a `name`: a parentless configuration's name
+      # is the one declared on mkLib. The pattern of the entry point refuses the
       # argument before the evaluation exists, so a `name` can never
       # quietly name the configuration.
       "test: a name argument is refused" = {
@@ -2624,17 +2626,17 @@ in
 
       # flake-parts keys an exported module by moduleLocation, which
       # defaults to self.outPath, a rev-sensitive identity. The
-      # composition's namespace is rev-independent, so two revisions of
-      # one flake key their modules identically and deduplicate rather
-      # than colliding on an already-declared option.
-      "test: moduleLocation is the declared namespace, not a store path" = {
+      # project's name is rev-independent, so two revisions of one flake
+      # key their modules identically and deduplicate rather than
+      # colliding on an already-declared option.
+      "test: moduleLocation is the declared name, not a store path" = {
         expr =
           let
             mkOutputs =
               tag:
               (caisson.mkLib {
                 sources = mockSources;
-                namespace = "rev-independent";
+                name = "rev-independent";
                 modules = callbackLib: {
                   flake = {
                     thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
@@ -2668,12 +2670,12 @@ in
         };
       };
 
-      # With no namespace declared, moduleLocation is not set and
+      # With no name declared, moduleLocation is not set and
       # flake-parts falls back to its own default, derived from `self`.
       # These compositions supply no `self`, so that fallback is
       # observable as flake-parts' own complaint rather than as a
-      # namespace-shaped identity.
-      "test: a composition declaring no namespace leaves moduleLocation to flake-parts" = {
+      # name-shaped identity.
+      "test: a composition declaring no name leaves moduleLocation to flake-parts" = {
         expr =
           let
             outputs =

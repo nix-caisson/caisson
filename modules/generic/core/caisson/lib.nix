@@ -11,18 +11,19 @@
       description = ''
         Function that selects which parts of the composed library to
         publish as the `lib` export. Receives the composed library;
-        defaults to the namespace that library's composition declares
-        (`namespace` on mkLib, carried in the manifest).
+        defaults to the namespace named after the project, the `name`
+        that library's composition declares on mkLib (carried in the
+        manifest).
       '';
       default =
         composedLib:
         let
-          namespace = composedLib.caisson-core.libManifest.name or null;
+          name = composedLib.caisson-core.libManifest.name or null;
         in
-        assert lib.assertMsg (namespace != null)
-          "caisson.lib.export.enabled is true but this composition declares no namespace, so there is no library namespace to publish. Declare `namespace` in the mkLib call, select the parts to publish with caisson.lib.exported, or disable lib export.";
-        composedLib.${namespace};
-      defaultText = "composedLib: composedLib.\${the namespace the composition declares}";
+        assert lib.assertMsg (name != null)
+          "caisson.lib.export.enabled is true but this composition declares no name, so there is no library namespace to publish. Declare `name` in the mkLib call, select the parts to publish with caisson.lib.exported, or disable lib export.";
+        composedLib.${name};
+      defaultText = "composedLib: composedLib.\${the name the composition declares}";
     };
 
   };

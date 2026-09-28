@@ -22,7 +22,7 @@ let
   lib = core.mkLib {
     inherit (core.pins.flake-compat ./.) sources;
     root = core.pins.gitRoot ./.;
-    namespace = "caisson";
+    name = "caisson";
     systems = import ./systems.nix;
     modules = core.mkModules ./modules;
     configs = core.mkModules ./configs;

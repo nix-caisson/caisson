@@ -21,7 +21,7 @@
     let
       lib = parent.lib.caisson-core.mkLib {
         inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
-        namespace = "nixpkgs-overlay-export";
+        name = "nixpkgs-overlay-export";
         projects = {
           caisson = parent;
         };
