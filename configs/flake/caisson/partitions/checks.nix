@@ -76,10 +76,6 @@
               path = self.outPath + "/tests/integration/nixpkgs-overlay-export";
             };
 
-            nixpkgsInterfaceConsumerOutputs = callConsumer {
-              path = self.outPath + "/tests/integration/nixpkgs-interface-consumer";
-            };
-
             nixpkgsNoPkgSetsOutputs = callConsumer {
               path = self.outPath + "/tests/integration/nixpkgs-no-pkg-sets";
             };
@@ -153,7 +149,6 @@
               // libConsumerChainFinalOutputs.checks.${system}
               // nixpkgsConsumerOutputs.checks.${system}
               // nixpkgsOverlayExportOutputs.checks.${system}
-              // nixpkgsInterfaceConsumerOutputs.checks.${system}
               // nixpkgsNoPkgSetsOutputs.checks.${system}
               // pkgOverlaysProducerOutputs.checks.${system}
               // pkgOverlaysConsumerOutputs.checks.${system}

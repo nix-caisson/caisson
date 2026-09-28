@@ -27,6 +27,7 @@
         projects = {
           caisson = parent;
         };
+        pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

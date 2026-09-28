@@ -38,7 +38,6 @@
           core
           default
           nixpkgs
-          nixpkgs-interface
           ;
       };
       generic.exported = modules: { inherit (modules) core; };

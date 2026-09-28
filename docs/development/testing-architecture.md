@@ -307,7 +307,7 @@ The checks partition merges outputs from all test and example flakes into a sing
 | `module-class-export-success` | `tests/integration/module-class-export/` | Class-keyed module export and disable |
 | `lib-consumer-chain-success` | `tests/integration/lib-consumer-chain/` | Transitive consumption through a middle flake |
 | `pkg-overlays-registry-producer` | `tests/integration/pkg-overlays-registry/producer/` | A package set applies the project `default` package overlay and its imports once; the `pkgOverlays` and `overlays` outputs carry the local entries; entries caisson contributed through `projects` are not exported by default |
-| `pkg-overlays-registry-consumer` | `tests/integration/pkg-overlays-registry/consumer/` | The consumer package sets apply both defaults, a shared import once, and a named entry only where selected; a project entry leaves only when a selector names it; an `overlays.all` entry a project module pushed in is not exported by default |
+| `pkg-overlays-registry-consumer` | `tests/integration/pkg-overlays-registry/consumer/` | The consumer package sets apply both defaults, a shared import once, and a named entry only where selected; a project entry leaves only when a selector names it |
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
 | `debug-disabled` | `checks.nix` (inline) | `self.debug` is not exposed in production |

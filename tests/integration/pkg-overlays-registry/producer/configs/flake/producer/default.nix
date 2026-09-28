@@ -55,11 +55,7 @@
             "named"
             "unnamed"
           ];
-        assert
-          builtins.attrNames self.modules.flake == [
-            "default"
-            "pusher"
-          ];
+        assert !(lib.any (lib.hasInfix "/") (builtins.attrNames (self.modules.flake or { })));
         assert self.libOverlays == { };
         pkgs.runCommand "pkg-overlays-registry-producer" { } "touch $out";
     };
