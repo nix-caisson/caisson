@@ -660,13 +660,13 @@ let
         "defaultEcosystemSrc"
         "libOverlays"
         "modules"
-        "namespace"
         "projects"
         "root"
         "sources"
         "systems"
+        "type"
       ] (builtins.attrNames manifest)
-      && manifest.namespace == null
+      && !(manifest ? name)
       && manifest.systems == null
       && composedWithMkLib.caisson-core.pkgsManifest == null
       && composedWithMkLib.caisson-core.evalManifest == null

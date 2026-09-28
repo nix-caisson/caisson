@@ -11,7 +11,7 @@ let
   # names the flake's package scope (`pkgs.<namespace>`) and keys the
   # overlays built over it. A composition that declares none has no
   # such scope, and the message says so where the name is first needed.
-  declaredNamespace = lib.caisson-core.libManifest.namespace or null;
+  declaredNamespace = lib.caisson-core.libManifest.name or null;
   namespace =
     assert lib.assertMsg (declaredNamespace != null)
       "The nixpkgs flake module names this flake's package scope `pkgs.<namespace>`, but this composition declares no namespace. Declare `namespace` in the mkLib call.";
