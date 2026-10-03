@@ -354,9 +354,9 @@
           # A package config for every configuration registered in
           # `configs/nixpkgsConfig`, by its name, each as
           # `mkConfiguration` builds it with no `configModule`. The
-          # arguments apply to all of them; a selection or a config
-          # that differs is ordinary attrset code beside it
-          # (`mkConfigurations { } // { slim = mkConfiguration { }; }`).
+          # arguments apply to all of them; a tree that wants only some
+          # configs, or one that differs, declares them with
+          # `mkConfiguration` instead.
           mkConfigurations =
             {
               moduleImports ? null,
