@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The producer's flake: its package set applies its own default entry,
+# The producer's flake: its package set applies the default entry it registers,
 # and its exports hold what it registers itself and nothing caisson
 # contributed through `projects`.
 { ... }:
@@ -12,8 +12,6 @@
 }:
 {
   systems = [ "x86_64-linux" ];
-
-  caisson.nixpkgs.pkgSets.pkgs.pkgFunction = import inputs.nixpkgs;
 
   perSystem =
     { pkgs, system, ... }:

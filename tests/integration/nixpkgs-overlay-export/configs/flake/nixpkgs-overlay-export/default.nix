@@ -18,12 +18,6 @@
     inherit (registry) polyfillOnly;
   };
 
-  caisson.nixpkgs.pkgSets = {
-    pkgs = {
-      pkgFunction = import inputs.nixpkgs;
-    };
-  };
-
   perSystem =
     { pkgs, system, ... }:
     {

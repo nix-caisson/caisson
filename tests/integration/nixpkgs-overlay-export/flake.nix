@@ -22,10 +22,12 @@
       lib = parent.lib.caisson-core.mkLib {
         inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
         name = "nixpkgs-overlay-export";
+        systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
         };
         pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        pkgSets = lib: { default = lib.caisson.nixpkgs.mkConfiguration { }; };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

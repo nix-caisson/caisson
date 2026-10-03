@@ -19,12 +19,25 @@
       lib = core.mkLib {
         inherit (core.pins.flake inputs) sources root;
         name = "consumer";
+        systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
           inherit producer;
         };
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
         configs = core.mkModules ./configs;
+        pkgSets = lib: {
+          default = lib.caisson.nixpkgs.mkConfiguration { };
+          # Selects the extra entry of the producer by name, in place of
+          # the default selection.
+          withExtra = lib.caisson.nixpkgs.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays."producer/extra" ];
+              };
+          };
+        };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

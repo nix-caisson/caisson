@@ -24,10 +24,28 @@
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
+        systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
         };
         pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        # `default` applies the default selection plus the polyfill
+        # entry and allows unfree packages; `slim` applies the default
+        # selection alone.
+        pkgSets = lib: {
+          default = lib.caisson.nixpkgs.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                allowUnfree = true;
+                caisson.nixpkgs.overlays = [
+                  lib.caisson.nixpkgs.overlays.default
+                  lib.caisson.nixpkgs.overlays.polyfill
+                ];
+              };
+          };
+          slim = lib.caisson.nixpkgs.mkConfiguration { };
+        };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
