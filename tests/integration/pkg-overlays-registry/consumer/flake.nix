@@ -28,14 +28,8 @@
         configs = core.mkModules ./configs;
         pkgSets = lib: {
           default = lib.caisson.nixpkgs.mkConfiguration { };
-          # Selects the extra entry of the producer by name, in place of
-          # the default selection.
           withExtra = lib.caisson.nixpkgs.mkConfiguration {
-            configModule =
-              { lib, ... }:
-              {
-                caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays."producer/extra" ];
-              };
+            configModule = lib.caisson-core.configs.nixpkgsConfig.withExtra;
           };
         };
       };
