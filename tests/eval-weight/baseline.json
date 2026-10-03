@@ -1,11 +1,11 @@
 {
   "caisson-overhead": {
-    "nrThunks": 29700,
-    "nrValues": 38371,
-    "nrEnvs": 22804,
-    "nrFunctionCalls": 19258,
-    "nrPrimOpCalls": 10119,
-    "totalAllocBytes": 1812160,
+    "nrThunks": 31981,
+    "nrValues": 41367,
+    "nrEnvs": 24618,
+    "nrFunctionCalls": 20687,
+    "nrPrimOpCalls": 11356,
+    "totalAllocBytes": 2027280,
     "nixpkgsEvals": 0,
     "nixpkgsLibEvals": 0,
     "moduleSystemEvals": 10
