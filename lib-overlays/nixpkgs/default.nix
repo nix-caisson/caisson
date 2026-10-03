@@ -351,6 +351,21 @@
           # mkLib has recorded them.
           pkgSets = final.caisson-core.libManifest.pkgSets or { };
 
+          # A package config for every configuration registered in
+          # `configs/nixpkgsConfig`, by its name, each as
+          # `mkConfiguration` builds it with no `configModule`. The
+          # arguments apply to all of them; a selection or a config
+          # that differs is ordinary attrset code beside it
+          # (`mkConfigurations { } // { slim = mkConfiguration { }; }`).
+          mkConfigurations =
+            {
+              moduleImports ? null,
+              ecosystemSrc ? null,
+            }@args:
+            builtins.mapAttrs (_: _: finalizeConfiguration args) (
+              final.caisson-core.configs.nixpkgsConfig or { }
+            );
+
           # The package overlay registry visible here, by registry
           # name, for a package config module's overlay selection
           # (`caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays.<name> ];`).

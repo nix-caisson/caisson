@@ -26,11 +26,15 @@
         };
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
         configs = core.mkModules ./configs;
-        pkgSets = lib: {
-          default = lib.caisson.nixpkgs.mkConfiguration { };
-          # Its module is found by name, configs/nixpkgsConfig/withExtra.
-          withExtra = lib.caisson.nixpkgs.mkConfiguration { };
-        };
+        # A config per registered configuration (here `withExtra`, from
+        # configs/nixpkgsConfig/withExtra), and `default`, which has no
+        # configuration of its name.
+        pkgSets =
+          lib:
+          lib.caisson.nixpkgs.mkConfigurations { }
+          // {
+            default = lib.caisson.nixpkgs.mkConfiguration { };
+          };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
