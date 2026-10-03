@@ -80,6 +80,10 @@
               path = self.outPath + "/tests/integration/nixpkgs-no-pkg-sets";
             };
 
+            nixpkgsPkgSetsOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-pkg-sets";
+            };
+
             # A project that registers package overlays, and a consumer
             # that takes them through `projects`.
             pkgOverlaysProducerOutputs = callConsumer {
@@ -150,6 +154,7 @@
               // nixpkgsConsumerOutputs.checks.${system}
               // nixpkgsOverlayExportOutputs.checks.${system}
               // nixpkgsNoPkgSetsOutputs.checks.${system}
+              // nixpkgsPkgSetsOutputs.checks.${system}
               // pkgOverlaysProducerOutputs.checks.${system}
               // pkgOverlaysConsumerOutputs.checks.${system}
               // unitTestOutputs.checks.${system}

@@ -103,9 +103,9 @@
 
           # Package sets for the flake evaluation itself, handed to the
           # flake-class modules as the `pkgSets` special argument. Per
-          # system package sets are the nixpkgs integration's business
-          # (caisson.nixpkgs.pkgSets); this is the flake-level slot the
-          # other integrations also carry.
+          # system package sets are built by the nixpkgs integration
+          # (caisson.nixpkgs.pkgSets); this is the flake-level argument
+          # the other integrations take as well.
           pkgSets ? null,
 
           specialArgs ? { },
