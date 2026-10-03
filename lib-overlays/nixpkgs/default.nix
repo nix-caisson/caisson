@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The nixpkgs integration: it owns the `nixpkgsConfig` class, the
-# class nixpkgs evaluates its own `pkgs/top-level/config.nix` under,
+# class nixpkgs evaluates `pkgs/top-level/config.nix` under,
 # and builds package sets from package configs.
 #
 # A package config is declared in mkLib's `pkgSets` as a
@@ -227,7 +227,7 @@
           # The config handed to nixpkgs: the evaluated config without
           # caisson's options.
           config = checkedConfig lib configEval (builtins.removeAttrs configEval.config [ "caisson" ]);
-          # The project's own scope, `pkgs.<project>`, present in every
+          # The project's scope, `pkgs.<project>`, present in every
           # set even when nothing contributes to it.
           projectName = parent.name or null;
           scopeOverlay = final': prev': { ${projectName} = prev'.${projectName} or { }; };

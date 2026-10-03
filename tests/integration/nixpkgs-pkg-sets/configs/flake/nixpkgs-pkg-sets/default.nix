@@ -38,7 +38,7 @@
           "aarch64-multiplatform"
           "hello"
         ];
-        # A variant that re-enters with its own config.
+        # A variant that re-enters with a different config.
         assert same [
           "pkgsChecked"
           "hello"
