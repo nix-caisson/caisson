@@ -28,6 +28,9 @@
         assert !(pkgSets.slim ? polyfilledFlag);
         assert pkgSets.slim."nixpkgs-consumer" ? integration-sample;
         assert (pkgSets.default.config.allowUnfree or false);
+        assert (pkgSets.explicit.config.allowUnfree or false);
+        assert pkgSets.explicit ? polyfilledFlag;
+        assert !(pkgSets.slim.config.allowUnfree or false);
         pkgs.runCommand "nixpkgs-consumer-success" { } "touch $out";
     };
 }

@@ -225,7 +225,14 @@
           pkgOverlayRegistry = parent.pkgOverlays or { };
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
-          configModule = args.configModule or null;
+          # The config's module: the one passed, else the configuration
+          # registered under the config's name
+          # (`configs/nixpkgsConfig/<name>`), else none.
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else
+              (lib.caisson-core.configs.nixpkgsConfig or { }).${name} or null;
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
             # The composed lib, so a config module reads
@@ -290,7 +297,8 @@
             ancestors = (parent.ancestors or [ ]) ++ [ parent ];
             nearest = parent.nearest or { };
             inputs = [ ];
-            # A package config declares no children of its own, so its
+            # A package config declares no configurations beneath it
+            # (its sets are built, not declared), so its
             # childless and full manifests coincide.
             childless = false;
             inherit (caissonConfig) systems;
@@ -310,8 +318,11 @@
           {
             # The package config's module, of class nixpkgsConfig:
             # nixpkgs' options at the top level, caisson's under
-            # `caisson.nixpkgs`. Further modules of the class are
-            # selected with `moduleImports`, from the registry.
+            # `caisson.nixpkgs`. When absent, the configuration
+            # registered under the config's name
+            # (`lib.caisson-core.configs.nixpkgsConfig.<name>`), if any.
+            # Further modules of the class are selected with
+            # `moduleImports`, from the registry.
             configModule ? null,
             # The selection over the nixpkgsConfig class of the
             # registry; every entry named `default` when absent.

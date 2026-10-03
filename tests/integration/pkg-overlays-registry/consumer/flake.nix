@@ -28,9 +28,8 @@
         configs = core.mkModules ./configs;
         pkgSets = lib: {
           default = lib.caisson.nixpkgs.mkConfiguration { };
-          withExtra = lib.caisson.nixpkgs.mkConfiguration {
-            configModule = lib.caisson-core.configs.nixpkgsConfig.withExtra;
-          };
+          # Its module is found by name, configs/nixpkgsConfig/withExtra.
+          withExtra = lib.caisson.nixpkgs.mkConfiguration { };
         };
       };
     in
