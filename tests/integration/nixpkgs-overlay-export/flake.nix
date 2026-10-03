@@ -27,7 +27,8 @@
           caisson = parent;
         };
         pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        pkgSets = lib: { default = lib.caisson.nixpkgs.mkConfiguration { }; };
+        configs = parent.lib.caisson-core.mkModules ./configs;
+        pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

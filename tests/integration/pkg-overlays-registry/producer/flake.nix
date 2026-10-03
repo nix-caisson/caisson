@@ -25,7 +25,7 @@
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
         modules = core.mkModules ./modules;
         configs = core.mkModules ./configs;
-        pkgSets = lib: { default = lib.caisson.nixpkgs.mkConfiguration { }; };
+        pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {
