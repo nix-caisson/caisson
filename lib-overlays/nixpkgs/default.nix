@@ -5,9 +5,9 @@
 # and builds package sets from package configs.
 #
 # A package config is declared in mkLib's `pkgSets` as a
-# `lib.caisson.nixpkgs.mkConfiguration` call. It is a deferred child:
-# mkLib finalizes it with the name it is declared under and its parent
-# manifest. Finalizing evaluates the config module over upstream's
+# `lib.caisson.nixpkgs.mkConfiguration` call, which returns a function
+# of `{ name, parent }`: mkLib calls it with the name it is declared
+# under and its parent manifest. That call evaluates the config module over upstream's
 # `config.nix`, with caisson's options under `caisson.nixpkgs`, and
 # builds a package set per system in `caisson.nixpkgs.systems` as the
 # config's children. caisson performs the instantiation itself rather
@@ -286,13 +286,6 @@
         in
         manifest;
 
-      mkDeferred =
-        args:
-        final.caisson-core.mkDeferredChild {
-          integration = "nixpkgs";
-          finalize = finalizeConfiguration args;
-        };
-
       integration = selection.mkIntegration {
         name = "nixpkgs";
         class = "nixpkgsConfig";
@@ -310,7 +303,7 @@
             # declarations when absent.
             ecosystemSrc ? null,
           }@args:
-          mkDeferred args;
+          finalizeConfiguration args;
         # The same arguments and `ecosystemArgs`, the instantiation's
         # arguments (`crossSystem`, `crossOverlays`, `stdenvStages`)
         # merged over the composed ones last, for every set.
@@ -321,7 +314,7 @@
             ecosystemSrc ? null,
             ecosystemArgs ? null,
           }@args:
-          mkDeferred args;
+          finalizeConfiguration args;
         extra = {
 
           # The package configs declared at this lib, by config name:
