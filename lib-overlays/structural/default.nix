@@ -58,7 +58,7 @@
           moduleImports ? selection.defaultModuleImports,
 
           # Package sets handed to the modules as the `pkgSets` special
-          # argument, the slot every integration carries.
+          # argument, which every integration takes.
           pkgSets ? null,
 
           specialArgs ? { },
