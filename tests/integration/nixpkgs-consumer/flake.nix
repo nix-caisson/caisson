@@ -24,10 +24,23 @@
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
+        systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
         };
         pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        configs = parent.lib.caisson-core.mkModules ./configs;
+        # `default` finds its module by name, configs/nixpkgsConfig/default;
+        # `slim` has none registered and applies the default selection
+        # alone; `explicit` names the `default` configuration as its
+        # module.
+        pkgSets = lib: {
+          default = lib.caisson.nixpkgs.mkConfiguration { };
+          slim = lib.caisson.nixpkgs.mkConfiguration { };
+          explicit = lib.caisson.nixpkgs.mkConfiguration {
+            configModule = lib.caisson-core.configs.nixpkgsConfig.default;
+          };
+        };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

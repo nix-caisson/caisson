@@ -19,12 +19,16 @@
       lib = core.mkLib {
         inherit (core.pins.flake inputs) sources root;
         name = "consumer";
+        systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
           inherit producer;
         };
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
         configs = core.mkModules ./configs;
+        # A package config per configuration in configs/nixpkgsConfig:
+        # `default` and `withExtra`.
+        pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
     lib.caisson.flake-parts.mkConfiguration {

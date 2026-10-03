@@ -163,6 +163,10 @@
         let
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
+            # The composed lib, as every caisson evaluation hands it to
+            # its modules; without it the module system passes the lib
+            # upstream built `lib/modules.nix` with.
+            specialArgs.lib = lib;
             modules = [
               "${src}/pkgs/top-level/config.nix"
               {
@@ -185,7 +189,16 @@
             systems = lib.mkOption {
               description = "The systems this package config builds a package set for, one child per system.";
               type = lib.types.listOf lib.types.str;
-              default = parent.systems or [ ];
+              default =
+                if (parent.systems or null) == null then
+                  throw ''
+                    The nixpkgs package config builds a set per system in force where it is
+                    declared, but none are declared. Declare `systems` in the mkLib call
+                    (e.g. `systems = [ "x86_64-linux" ];`), or set `caisson.nixpkgs.systems`
+                    in the config's module.
+                  ''
+                else
+                  parent.systems;
               defaultText = lib.literalMD "the systems in force at the level the config is declared at";
             };
             overlays = lib.mkOption {
@@ -212,9 +225,20 @@
           pkgOverlayRegistry = parent.pkgOverlays or { };
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
-          configModule = args.configModule or null;
+          # The config's module: the one passed, else the configuration
+          # registered under the config's name
+          # (`configs/nixpkgsConfig/<name>`), else none.
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else
+              (lib.caisson-core.configs.nixpkgsConfig or { }).${name} or null;
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
+            # The composed lib, so a config module reads
+            # `lib.caisson.nixpkgs.overlays` and the rest of the lib the
+            # config is declared under.
+            specialArgs.lib = lib;
             modules = [
               "${src}/pkgs/top-level/config.nix"
               (caissonConfigModule { inherit parent pkgOverlayRegistry; })
@@ -273,7 +297,8 @@
             ancestors = (parent.ancestors or [ ]) ++ [ parent ];
             nearest = parent.nearest or { };
             inputs = [ ];
-            # A package config declares no children of its own, so its
+            # A package config declares no configurations beneath it
+            # (its sets are built, not declared), so its
             # childless and full manifests coincide.
             childless = false;
             inherit (caissonConfig) systems;
@@ -293,8 +318,11 @@
           {
             # The package config's module, of class nixpkgsConfig:
             # nixpkgs' options at the top level, caisson's under
-            # `caisson.nixpkgs`. Further modules of the class are
-            # selected with `moduleImports`, from the registry.
+            # `caisson.nixpkgs`. When absent, the configuration
+            # registered under the config's name
+            # (`lib.caisson-core.configs.nixpkgsConfig.<name>`), if any.
+            # Further modules of the class are selected with
+            # `moduleImports`, from the registry.
             configModule ? null,
             # The selection over the nixpkgsConfig class of the
             # registry; every entry named `default` when absent.
@@ -322,6 +350,11 @@
           # `children.nixpkgs.<system>`. Empty until the full lib, where
           # mkLib has recorded them.
           pkgSets = final.caisson-core.libManifest.pkgSets or { };
+
+          # The package overlay registry visible here, by registry
+          # name, for a package config module's overlay selection
+          # (`caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays.<name> ];`).
+          overlays = final.caisson-core.libManifest.pkgOverlays or { };
 
           mkScope = (
             pkgs: scopeFunction: final.makeScope pkgs.newScope (scope: scopeFunction scope.callPackage)

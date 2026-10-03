@@ -154,6 +154,28 @@
         }:
         let
           mkModule = final.caisson-core.mkModule class;
+
+          # A configuration for every configuration registered in the
+          # class (`configs/<class>/<name>`), by its name, each as
+          # `mkConfiguration` builds it without `configModule`. The
+          # arguments apply to all of them; a tree that wants only some,
+          # or one that differs, declares them with `mkConfiguration`.
+          # It exists for an integration whose `mkConfiguration` takes
+          # `configModule` as optional, which is the mark that it finds
+          # the module registered under the configuration's name.
+          findsModuleByName = (final.functionArgs mkConfiguration).configModule or false;
+          mkConfigurations = final.setFunctionArgs (
+            args:
+            if args ? configModule then
+              throw ''
+                lib.caisson.${name}.mkConfigurations gives every configuration the
+                module registered under its name; pass `configModule` to
+                lib.caisson.${name}.mkConfiguration for a configuration that takes
+                another.
+              ''
+            else
+              builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson-core.configs.${class} or { })
+          ) (builtins.removeAttrs (final.functionArgs mkConfiguration) [ "configModule" ]);
         in
         {
           namespace = {
@@ -163,6 +185,7 @@
               mkModule
               ;
           }
+          // (if findsModuleByName then { inherit mkConfigurations; } else { })
           // extra;
           classes = {
             ${class} = {

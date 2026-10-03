@@ -17,17 +17,6 @@ in
   systems = [ "x86_64-linux" ];
 
   caisson = {
-    nixpkgs = {
-      pkgSets = {
-        pkgs.pkgFunction = import inputs.nixpkgs;
-        # Selects the extra entry of the producer by name, in place of
-        # the default selection.
-        withExtra = {
-          pkgFunction = import inputs.nixpkgs;
-          pkgOverlayImports = registry: [ registry."producer/extra" ];
-        };
-      };
-    };
     # A project's entry leaves when a selector names it.
     pkgOverlays.exported = registry: local registry // { inherit (registry) "producer/extra"; };
     modules.generic.exported = modules: local modules // { inherit (modules) "producer/named"; };

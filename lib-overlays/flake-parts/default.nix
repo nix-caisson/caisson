@@ -104,7 +104,8 @@
           # Package sets for the flake evaluation itself, handed to the
           # flake-class modules as the `pkgSets` special argument. Per
           # system package sets are built by the nixpkgs integration
-          # (caisson.nixpkgs.pkgSets); this is the flake-level argument
+          # from the package configs declared on mkLib (`pkgSets`) and
+          # reach perSystem as `pkgSets`; this is the flake-level argument
           # the other integrations take as well.
           pkgSets ? null,
 
