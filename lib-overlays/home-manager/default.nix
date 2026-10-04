@@ -4,8 +4,9 @@
 # contributes the declared home-manager's library to the composition
 # as `lib.hm`, and evaluates the class over the composed library with
 # home-manager's module list. Beside the entry points it carries the
-# adapters that place a home-manager configuration inside a NixOS one,
-# and the source metadata the activation coherence check compares.
+# adapters that place a home-manager configuration inside a NixOS
+# configuration, and the source metadata the activation coherence
+# check compares.
 {
   contributeClasses,
   entries,
@@ -92,7 +93,7 @@
           mkHmLib declaredSrc final
         else
           throw ''
-            lib.hm: this composition declares no home-manager. Declare one as
+            lib.hm: this composition declares no home-manager. Declare it as
             `defaultEcosystemSrc.home-manager` in the mkLib call, or pin a
             source named `home-manager` in the `sources` passed to mkLib; an evaluation
             that names its home-manager through `ecosystemSrc` runs on the
@@ -101,28 +102,28 @@
 
       # The library an evaluation runs on: the composed library with
       # the module system tied over it. The module system hands `lib`
-      # to every module it evaluates, the ones of the main evaluation
+      # to every module it evaluates, those of the main evaluation
       # through `specialArgs` and the rest, submodules and the
-      # evaluations home-manager's tree runs beside the main one (the
-      # manual's option documentation), from the library the module
+      # evaluations home-manager's tree runs beside the main evaluation
+      # (the manual's option documentation), from the library the module
       # system's files closed over. The module system of the composed
-      # library is the one nixpkgs built, closed over the nixpkgs
+      # library is what nixpkgs built, closed over the nixpkgs
       # fixpoint, which has none of what the composition contributed.
       # Applying `extend` to that fixpoint re-ties the nixpkgs library
-      # over a new one, and the library the modules run on takes its
+      # over a new fixpoint, and the library the modules run on takes its
       # `modules`, `types` and `evalModules` from that re-tied copy, so
       # every module the evaluation creates, however deep, receives
       # this library, with `lib.hm` and everything the composition
       # contributed. The result is extensible, and an `extend` over it
-      # (the `docs/default.nix` of home-manager applies one) keeps all
+      # (which the `docs/default.nix` of home-manager applies) keeps all
       # of it.
       #
       # `hmSrc` names the tree `hm` comes from when the composition
       # declares none: `hm` and the home-manager maintainers merged
       # into the nixpkgs list are then built over this library, the
-      # way the entries below build them over the composed one, so the
-      # `lib.hm` calls inside `hm` resolve to this `hm`. With null the
-      # composed library carries `hm` already, as the entry.
+      # way the entries below build them over the composed library, so
+      # the `lib.hm` calls inside `hm` resolve to this `hm`. With null
+      # the composed library carries `hm` already, as the entry.
       mkEvaluationLib =
         hmSrc:
         final.extend (
@@ -278,7 +279,7 @@
         );
 
       # The composition of the class, shared by every evaluator over
-      # it: one definition of the module list, the package set and the
+      # it: the definition of the module list, the package set and the
       # special arguments, so the evaluators cannot express different
       # profiles from the same arguments. `minimal` selects
       # home-manager's module list, and belongs to the entry point
@@ -386,13 +387,13 @@
 
       # The evaluation, from the composed library. `modules/default.nix`
       # of the home-manager source is the standalone entry point, and
-      # its one lib-construction step, `import ./lib/stdlib-extended.nix
+      # its lib-construction step, `import ./lib/stdlib-extended.nix
       # lib`, rebuilds nixpkgs' fixpoint through `extend` and drops
       # every attribute the composition contributed: the modules would
       # run on a library reassembled inside the evaluator. Everything
       # else that entry point does is reproduced here line for line
       # against the same source tree, with the composed library
-      # standing where it built one.
+      # standing where it built a library.
       #
       # The module list, the module files, the class name and
       # `modulesPath` all come from the tree `modulesPath` names, so
@@ -437,8 +438,8 @@
               # The `lib` argument every module receives.
               # `evalModules` builds that argument from the `lib` its
               # `lib/modules.nix` closed over, which is the
-              # fixpoint the `nixpkgs-lib` entry read rather than the
-              # one this composition built, and `// specialArgs` in
+              # fixpoint the `nixpkgs-lib` entry read rather than
+              # what this composition built, and `// specialArgs` in
               # that file is where a caller says otherwise. Naming it
               # here is what puts the composed library, `lib.hm` among
               # its attributes, in front of the modules.
@@ -540,7 +541,7 @@
           # manager starts.  It leaves `users.users` untouched, so it is safe for
           # systemd-homed hosts, where a NixOS-created passwd entry would
           # conflict with the homed user record and the home directory is
-          # only mounted at login anyway.  Limited to one user: a single
+          # only mounted at login anyway.  Limited to one user: a
           # shared unit cannot carry per-user ExecStarts.
           activationMode ? "upstream",
           specialArgs ? { },
@@ -599,12 +600,13 @@
           if activationMode == "user-service" then
             # No home-manager NixOS module at all: it cannot evaluate without
             # a `users.users.<name>` entry (its injected defs dereference the
-            # user record), and creating one would conflict with
+            # user record), and creating the entry would conflict with
             # systemd-homed's ownership of the account.  Instead each user is
             # evaluated with the same standalone evaluator (mkConfiguration)
             # that `home-manager switch` uses (the embedded generation is the
-            # standalone one by construction), and a complete /etc user unit
-            # runs its activation when the user's service manager starts.
+            # standalone generation by construction), and a complete /etc
+            # user unit runs its activation when the user's service manager
+            # starts.
             (
               let
                 username = builtins.head (builtins.attrNames users);
@@ -767,10 +769,10 @@
         name = "home-manager";
         class = "homeManager";
         # The signature of the entry points over the homeManager class,
-        # the ones of `lib.caisson.home-manager-minimal` included.
+        # those of `lib.caisson.home-manager-minimal` included.
         # `mkCommonArgs` destructures `pkgSets` and `configModule`
         # without a default and supplies the value of every optional
-        # argument left out. The package set is checked twice, for two
+        # argument left out. The package set is checked twice, for
         # different mistakes: the pattern reports `pkgSets` absent,
         # `assertPkgSets` reports a `pkgSets` that carries no `pkgs`.
         mkConfiguration =
@@ -791,11 +793,11 @@
             # The selection over the homeManager class of the registry;
             # every entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies; home-manager names these `extraSpecialArgs`.
             specialArgs ? null,
-            # The NixOS configuration around this one, the `osConfig`
-            # module argument.
+            # The NixOS configuration around this configuration, the
+            # `osConfig` module argument.
             osConfig ? null,
             # home-manager's `check`.
             check ? null,

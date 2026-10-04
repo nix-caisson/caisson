@@ -71,7 +71,7 @@ in
           in
           {
             # Every package config's set at this system, by config
-            # name, the one place a bare `pkgSets` module argument is
+            # name, the only place a bare `pkgSets` module argument is
             # set.
             inherit pkgSets;
             # The `default` config's set is `pkgs`. A flake that

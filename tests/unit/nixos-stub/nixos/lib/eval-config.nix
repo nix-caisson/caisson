@@ -9,7 +9,7 @@
 # lands in the `lib` directory beside this one.
 #
 # The real file draws `evalModules` from `./default.nix` of this
-# directory with the `minimalModules` feature flag, and this one does
+# directory with the `minimalModules` feature flag, and this file does
 # the same, so the library reaches the module system by the route it
 # reaches it upstream.
 evalConfigArgs@{

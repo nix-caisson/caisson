@@ -3,7 +3,7 @@
 This document explains how caisson's tests are wired into the flake's check
 infrastructure. The setup is non-obvious: test flakes live as independent
 `flake.nix` files in the source tree but are not evaluated by the Nix flake
-machinery. Instead, a flake-parts partition evaluates each one from source with
+machinery. Instead, a flake-parts partition evaluates each test flake from source with
 `lib.caisson-core.callConsumerFlake`, which wires inputs explicitly.
 
 > **Nix version note (2.31.3, March 2026):** The evaluate-from-source pattern
@@ -37,7 +37,7 @@ to replace the main evaluation's `checks` with the partition's `checks`, so
 ### The reason for the partition
 
 flake-parts partitions allow a flake to declare outputs that depend on inputs not
-listed in the main `flake.nix`. caisson's flake declares only the three inputs
+listed in the main `flake.nix`. caisson's flake declares only the inputs
 its evaluation composes with (caisson-core, nixpkgs-lib, flake-parts), and
 it deliberately avoids depending on full `nixpkgs` or development tools like
 `nix-unit`. The checks partition brings in these heavier dependencies without
@@ -63,7 +63,7 @@ without being declared in the main `flake.nix`.
 
 ### Partition module structure
 
-Inside the partition module, `inputs` contains both the main flake's inputs and the
+Inside the partition module, `inputs` contains the main flake's inputs and the
 extra inputs from the dependencies flake. `self` refers to caisson's outputs
 (as seen by the partition). The module has a full flake-parts evaluation context
 with its `perSystem`, `imports`, etc.
@@ -72,7 +72,7 @@ with its `perSystem`, `imports`, etc.
 
 ### The pattern
 
-For each test or example flake, `checks.nix` builds one call:
+For each test or example flake, `checks.nix` builds a call:
 
 ```nix
 consumerPool = {
@@ -164,10 +164,10 @@ nothing can fetch. A source-only input carries the path and applies nothing. The
 overlay files register from that path because a flake cannot reference files
 outside its source tree, and the modules register with them: an overlay
 registered from its file reads the registry of the composition that
-registered it (the `core` of its class, for one), so the two go together.
+registered it (the `core` of its class, for example), so the two go together.
 
 The tests are not only testing library functions in isolation; the composition
-and `lib.caisson.flake-parts.mkTopConfiguration` path is the same one a downstream consumer exercises, so they
+and `lib.caisson.flake-parts.mkTopConfiguration` path is the same path a downstream consumer exercises, so they
 verify that the framework's composition machinery works end-to-end.
 
 ### nix-unit integration
@@ -179,7 +179,7 @@ imports the nix-unit flake-parts module:
 imports = [ inputs.nix-unit.modules.flake.default ];
 ```
 
-This module adds two key options:
+This module adds these key options:
 
 - `flake.tests`: a nested attrset of test groups, each containing named tests
   with `{ expr; expected; }` pairs
@@ -246,7 +246,7 @@ attributes (`flakeModule`, `lib`). `module-class-export` tests the generic
 module class system: it registers modules under synthetic classes via the
 `modules` attrset, configures per-class export controls, and asserts that
 enabled classes appear in `flake.modules` while disabled classes have their
-module content suppressed. `lib-consumer-chain` evaluates a two-hop consumer
+module content suppressed. `lib-consumer-chain` evaluates a consumer
 chain (caisson, a middle flake, a final consumer) to verify that exported
 overlays and modules compose transitively.
 
@@ -267,7 +267,7 @@ inputs.nixpkgs-lib.url = "github:nix-community/nixpkgs.lib";
 inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 ```
 
-Its `outputs` is empty. It exists for three reasons:
+Its `outputs` is empty. It exists for these reasons:
 
 1. **Partition input source:** The checks and formatter partitions load it
    through `pins.flake-compat` to pull these inputs into their evaluation
@@ -295,7 +295,7 @@ both documentation and regression tests: if the example stops evaluating,
 
 ## Complete Check Inventory
 
-The checks partition merges outputs from all test and example flakes into a single
+The checks partition merges outputs from all test and example flakes into the
 `checks.<system>` attrset. As of this writing, `nix flake check` runs:
 
 | Check | Source | What it verifies |

@@ -71,7 +71,7 @@
           };
         };
 
-      # terranix evaluates against a package set, `pkgs` or one it
+      # terranix evaluates against a package set, `pkgs` or a set it
       # instantiates for `system`. The composed call carries `pkgs` from
       # `pkgSets.pkgs`; the twin may supply either in `ecosystemArgs`.
       evaluate =
@@ -105,7 +105,7 @@
             # The selection over the terranix class of the registry;
             # every entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies; terranix names these `extraArgs`.
             specialArgs ? null,
           }@args:

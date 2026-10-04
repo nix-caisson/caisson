@@ -8,10 +8,10 @@
 # evaluation.
 #
 # The real file lists home-manager's whole module tree when `minimal`
-# is false and the necessary modules alone when it is true. This one
+# is false and the necessary modules alone when it is true. This file
 # lists the options a test configuration sets, the
 # `home.activationPackage`, `news` and `assertions` names the
-# evaluation reads, and one module that stands for the tree the real
+# evaluation reads, and a module that stands for the tree the real
 # file drops: it declares the option a minimal configuration has to
 # import for itself.
 {
@@ -96,7 +96,7 @@ let
             default = true;
           };
           # Which module list the evaluation imported, read by name so
-          # a test sees the difference the two entry points make.
+          # a test sees the difference the entry points make.
           moduleList = lib.mkOption {
             type = lib.types.str;
             default = "";

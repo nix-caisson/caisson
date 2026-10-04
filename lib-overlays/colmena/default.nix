@@ -18,7 +18,7 @@
 # `ecosystemSrc` is nixpkgs as for any NixOS configuration. A node is
 # an ordinary NixOS configuration that also declares `deployment`; a
 # consumer that exports it as `nixosConfigurations.<host>` reads it
-# back from the hive, one evaluation for nixos-rebuild and colmena
+# back from the hive, the same evaluation for nixos-rebuild and colmena
 # apply. Projects can contribute colmena modules through the registry
 # like any other class.
 {
@@ -71,7 +71,7 @@
         "allowApplyAll"
       ];
 
-      # colmena's public node modules, as one NixOS module.
+      # colmena's public node modules, as a NixOS module.
       mkDeploymentModule = src: {
         _file = "caisson-colmena:deployment";
         imports = [
@@ -181,7 +181,7 @@
           '';
 
       # colmena's binary selects nodes with a filter whose grammar
-      # reserves two characters: a leading `@` names a tag and a `,`
+      # reserves characters: a leading `@` names a tag and a `,`
       # separates entries. A node whose name uses either, or is empty,
       # could never be addressed, so the configuration refuses it
       # before any node is evaluated.
@@ -294,7 +294,7 @@
             # The selection over the caisson-colmena class of the
             # registry; every entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
           }@args:

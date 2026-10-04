@@ -21,8 +21,9 @@ shift
 flags=("$@")
 
 # Every entry point takes `configModule` and `pkgSets`. All but the
-# structural and flake-parts ones require `configModule`; the `nixos`
-# ones require `pkgSets` too, so an empty call may report either.
+# structural and flake-parts entry points require `configModule`; the
+# `nixos` entry points require `pkgSets` too, so an empty call may
+# report either.
 namespaces=(
   nixos
   nixos-minimal
@@ -81,7 +82,7 @@ check() {
 # check_node LABEL CALL MESSAGE_REGEX: the trace of CALL, which
 # reaches a node constructor through a module evaluation, carries a
 # message matching MESSAGE_REGEX, and the last frame above the message
-# is the one where the module system evaluates the definitions the
+# is the frame where the module system evaluates the definitions the
 # constructor was called from: a frame of the constructor itself would
 # stand between that frame and the message.
 check_node() {
@@ -140,7 +141,7 @@ check "nixos.mkConfigurationFull { bogus, configModule, pkgSets.pkgs }" \
 
 # The colmena node constructors, module arguments of a colmena
 # configuration, reached through a stand-in colmena source with the
-# two attributes the integration reads.
+# attributes the integration reads.
 colmena_stub='{ lib.makeHive = _: { __schema = "v0.5"; }; nixosModules = { deploymentOptions = { }; assertionModule = { }; keyChownModule = { }; keyServiceModule = { }; }; }'
 node_call() {
   printf '(lib.caisson.colmena.mkConfiguration { ecosystemSrc = %s; configModule = { %s, ... }: { nodes.probe = %s %s; }; }).nodes.probe' \

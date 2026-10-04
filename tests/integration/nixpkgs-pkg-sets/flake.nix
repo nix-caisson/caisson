@@ -27,7 +27,7 @@
         };
         modules = core.mkModules ./modules;
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
-        # Two package configs: `default` takes the default selections,
+        # The package configs: `default` takes the default selections,
         # `unfree` selects the registered nixpkgsConfig module as well.
         pkgSets = lib: {
           default = lib.caisson.nixpkgs.mkConfiguration { };

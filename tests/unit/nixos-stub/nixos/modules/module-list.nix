@@ -4,7 +4,7 @@
 # tree: the base module list `nixos/lib/eval-config.nix` defaults to
 # and `lib.caisson.nixos.mkConfigurationFull` passes explicitly. The
 # real list is the NixOS module tree, which is where `nixpkgs.pkgs`
-# and the rest of the NixOS options are declared; this one declares
+# and the rest of the NixOS options are declared; this list declares
 # `nixpkgs.pkgs`, so an evaluation carrying NixOS' nixpkgs module has
 # the option that module defines, and an option a configuration reads
 # to show the list reached the evaluation.

@@ -2,7 +2,7 @@
 #
 # A stand-in for `modules/lib/default.nix` of the home-manager source:
 # the function the integration composes as the `hm` entry. It has that
-# file's signature, `{ lib }:`, and the two properties the entry
+# file's signature, `{ lib }:`, and the properties the entry
 # depends on.
 #
 # Its functions reach the library they were built over, so reading
@@ -24,7 +24,7 @@ rec {
       viaFixpoint = lib.hm.reachesLib;
     };
     # The entry the integration's source metadata module defines into
-    # `home.activation`, with the shape of the real one.
+    # `home.activation`, with the shape of the real entry.
     entryBefore = before: data: {
       inherit data before;
       after = [ ];

@@ -4,7 +4,7 @@
 # integration copies it into the flake outputs, and a parent passes
 # it up. Each part is defined by the module that declares its
 # selector, and a configuration that holds another beneath it merges
-# that one's exports in as a further definition.
+# the exports of the configuration beneath in as a further definition.
 { lib, ... }:
 let
   types = import ../types.nix { inherit lib; };
