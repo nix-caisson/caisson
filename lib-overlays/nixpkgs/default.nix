@@ -12,7 +12,7 @@
 # builds a package set per system in `caisson.nixpkgs.systems` as the
 # config's children. caisson performs the instantiation itself rather
 # than calling `pkgs/top-level/default.nix`, which would evaluate the
-# config again and build the set on the lib it imports from its own
+# config again and build the set on the lib it imports from the nixpkgs
 # tree: it resolves the systems, boots the stdenv stages and hands
 # `stage.nix` the composed lib with `pkgsManifest` filled in, so
 # `pkgs.lib` carries the set's manifest.
@@ -355,6 +355,64 @@
           # name, for a package config module's overlay selection
           # (`caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays.<name> ];`).
           overlays = final.caisson-core.libManifest.pkgOverlays or { };
+
+          # A package config as what the legacy readers take (`import
+          # ./. { }`, `nix-build -A`, `nix-shell -p`, `nix-env -f`,
+          # `nix repl -f`): the set for the current system, with
+          # `__functor` taking the legacy arguments and returning the
+          # set for the system asked for. Nix auto-calls a lambda and
+          # not a functor, so `nix-build -A hello` indexes the set and
+          # `import ./. { system = "aarch64-linux"; }` calls it.
+          # `builtins.currentSystem` is the legacy default and absent in
+          # pure evaluation, where the result is the functor alone and
+          # a caller passes `system`. `overlays` are applied over the
+          # config's selection with the set's `appendOverlays`; a
+          # `config` is refused, since the config is the package
+          # config's module. Nothing beyond `__functor` is added: the
+          # set carries its manifest in `pkgs.lib`.
+          mkTopPkgSet =
+            packageConfig:
+            let
+              sets = packageConfig.children.nixpkgs;
+              setAt =
+                system:
+                if sets ? ${system} then
+                  sets.${system}.value
+                else
+                  throw ''
+                    The package config `${packageConfig.name}` has no set for
+                    `${system}`; it builds ${
+                      if sets == { } then
+                        "no sets"
+                      else
+                        "sets for " + builtins.concatStringsSep ", " (builtins.attrNames sets)
+                    }. Add the system to `systems` in the mkLib call, or to
+                    `caisson.nixpkgs.systems` in the config's module.
+                  '';
+              call =
+                {
+                  system ?
+                    builtins.currentSystem or (throw ''
+                      lib.caisson.nixpkgs.mkTopPkgSet: pure evaluation has no current
+                      system; pass `system`.
+                    ''),
+                  config ? { },
+                  overlays ? [ ],
+                }:
+                if config != { } then
+                  throw ''
+                    lib.caisson.nixpkgs.mkTopPkgSet: the set's nixpkgs config is the
+                    package config `${packageConfig.name}`, declared in its module
+                    (configs/nixpkgsConfig/${packageConfig.name}); a `config` argument
+                    cannot replace it.
+                  ''
+                else if overlays == [ ] then
+                  setAt system
+                else
+                  (setAt system).appendOverlays overlays;
+              current = if builtins ? currentSystem then setAt builtins.currentSystem else { };
+            in
+            current // { __functor = _self: call; };
 
           mkScope = (
             pkgs: scopeFunction: final.makeScope pkgs.newScope (scope: scopeFunction scope.callPackage)
