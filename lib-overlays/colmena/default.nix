@@ -171,23 +171,22 @@
         };
 
       # A node as declared is a NixOS configuration, finalized under
-      # the node's name with the composition's manifest as its parent.
-      # A node is a machine, so the configuration has to come to
-      # exactly one evaluation, whose value is the evaluated NixOS
-      # configuration the hive holds.
+      # the node's name with the composition's manifest as its parent,
+      # which gives its evaluations by system. A node is a machine, so
+      # there has to be exactly one evaluation, whose value is the
+      # evaluated NixOS configuration the hive holds.
       checkNode =
         name: declared:
         let
-          configuration = final.caisson-core.finalizeChild {
+          evaluations = final.caisson-core.finalizeChild {
             inherit name;
             parent = final.caisson-core.libManifest;
             what = "`nodes.${name}`";
           } declared;
-          evaluation = final.caisson.integrations.elideSystems configuration;
-          systems = builtins.attrNames configuration.children.system;
-          node = evaluation.value;
+          systems = builtins.attrNames evaluations;
+          node = evaluations.${builtins.head systems}.value;
         in
-        if (evaluation._type or null) != "caisson-manifest" then
+        if builtins.length systems != 1 then
           throw ''
             lib.caisson.colmena.mkConfiguration: nodes.${name} is a machine, and
             the NixOS configuration declared for it has ${

@@ -110,9 +110,10 @@
       # evaluated configuration, which is what `nixos-rebuild --file`
       # reads and what a test or the REPL evaluates with no
       # configuration above it. Where the composition has several
-      # systems in force, or none, it is the evaluated configurations
-      # by system. Its name is the name the composition declares on
-      # mkLib.
+      # systems in force, it is the evaluated configurations by
+      # system, and where it has none, the empty set: the evaluations
+      # are named as anything published is (`integrations.topValue`).
+      # Its name is the name the composition declares on mkLib.
       mkTopConfiguration =
         rawArgs:
         final.caisson.integrations.topValue (
@@ -122,6 +123,13 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
         class = "nixos";
+        # A top publishes NixOS configurations as
+        # `nixosConfigurations.<name>`, each the evaluated
+        # configuration, which is what `nixos-rebuild` reads.
+        exportsTo = {
+          attrset = "nixosConfigurations";
+          value = manifest: manifest.value;
+        };
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixos.configurations.<name>` finalizes it, and

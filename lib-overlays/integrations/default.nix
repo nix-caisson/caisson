@@ -150,6 +150,13 @@
           class,
           mkConfiguration,
           mkConfigurationWithEcosystemArgs,
+          # Where a top publishes the configurations of this
+          # integration, and what of each: `attrset`, the output
+          # attribute set (`nixosConfigurations`), and `value`, the
+          # function from a configuration's manifest to what is
+          # published. Absent for an integration whose configurations
+          # are not published under a name.
+          exportsTo ? null,
           extra ? { },
         }:
         let
@@ -187,6 +194,7 @@
               ;
           }
           // (if findsModuleByName then { inherit mkConfigurations; } else { })
+          // (if exportsTo == null then { } else { inherit exportsTo; })
           // extra;
           classes = {
             ${class} = {
@@ -217,32 +225,163 @@
           final.genAttrs names (name: config.caisson.${name}.configurations)
         );
 
-      # The evaluations of a per-system configuration with the system
-      # left out where nothing needs it: the evaluation itself where
-      # the configuration has exactly one, and the evaluations by
-      # system otherwise. The tree always holds them by system
-      # (`children.system`); this is the step that drops the system
-      # for a reader that addresses the configuration alone.
-      elideSystems =
-        manifest:
-        let
-          evaluations = manifest.children.system;
-          systems = builtins.attrNames evaluations;
-        in
-        if builtins.length systems == 1 then evaluations.${builtins.head systems} else evaluations;
+      isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
-      # What a tool reads from a per-system configuration that is a
-      # top: the evaluated value where the configuration has exactly
-      # one evaluation, and the evaluated values by system otherwise.
-      topValue =
-        manifest:
+      # Where the configurations of an integration are published, and
+      # what of each: the `exportsTo` the integration declares, or null
+      # for an integration whose configurations are not published
+      # under a name (structural, flake-parts).
+      exportsToOf = manifest: (final.caisson.${manifest.type} or { }).exportsTo or null;
+
+      # A published name, from the segments `caisson-core.elide` keeps
+      # of a path: the segments in path order, separated by `/`. Every
+      # name caisson publishes is written here.
+      displayName = builtins.concatStringsSep "/";
+
+      # The entries a configuration passes up for the configurations
+      # declared beneath it at any depth: for each, its manifest and
+      # its path from here, a list of `{ type, name }` segments. A
+      # configuration evaluated at a system has that system above its
+      # name on the path. `selected` is what each integration's
+      # `exported` selected, by integration and then name, each value a
+      # manifest or the evaluations of a configuration by system. A
+      # configuration whose integration declares `exportsTo` is an
+      # entry, and every configuration contributes the entries it
+      # passes up in turn, with its segments in front.
+      entriesOf =
+        selected:
+        builtins.concatMap (
+          integration:
+          builtins.concatMap (
+            name:
+            let
+              finalized = selected.${integration}.${name};
+              segment = {
+                type = integration;
+                inherit name;
+              };
+              beneath =
+                if isManifest finalized then
+                  [
+                    {
+                      prefix = [ segment ];
+                      manifest = finalized;
+                    }
+                  ]
+                else
+                  builtins.map (system: {
+                    prefix = [
+                      {
+                        type = "system";
+                        name = system;
+                      }
+                      segment
+                    ];
+                    manifest = finalized.${system};
+                  }) (builtins.attrNames finalized);
+            in
+            builtins.concatMap (
+              { prefix, manifest }:
+              (
+                if exportsToOf manifest == null then
+                  [ ]
+                else
+                  [
+                    {
+                      path = prefix;
+                      inherit manifest;
+                    }
+                  ]
+              )
+              ++ builtins.map (entry: entry // { path = prefix ++ entry.path; }) (
+                manifest.outputs.exports.configurations or [ ]
+              )
+            ) beneath
+          ) (builtins.attrNames selected.${integration})
+        ) (builtins.attrNames selected);
+
+      # What a top publishes of the entries passed up to it, by the
+      # output attribute set each entry's integration declares and
+      # then name. Within an attribute set the names come from
+      # `caisson-core.elide` over the paths: a name that is alone stays
+      # bare, and names that collide gain the segments that tell them
+      # apart. Entries that still share a name are refused, with their
+      # paths.
+      publish =
+        entries:
         let
-          elided = elideSystems manifest;
+          attrsetOf = entry: (exportsToOf entry.manifest).attrset;
+          attrsets = final.unique (builtins.map attrsetOf entries);
+          showPath =
+            path:
+            builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
+          publishIn =
+            attrset:
+            let
+              members = builtins.filter (entry: attrsetOf entry == attrset) entries;
+              names = builtins.map displayName (
+                final.caisson-core.elide (builtins.map (entry: entry.path) members)
+              );
+              named = final.zipListsWith (name: entry: { inherit name entry; }) names members;
+              clashing = builtins.filter (
+                name: builtins.length (builtins.filter (other: other == name) names) > 1
+              ) (final.unique names);
+            in
+            if clashing != [ ] then
+              throw ''
+                ${attrset}: these configurations would be published under the same
+                name, `${builtins.head clashing}`:
+                ${builtins.concatStringsSep "\n" (
+                  builtins.map (item: "  ${showPath item.entry.path}") (
+                    builtins.filter (item: item.name == builtins.head clashing) named
+                  )
+                )}
+              ''
+            else
+              builtins.listToAttrs (
+                builtins.map (item: {
+                  inherit (item) name;
+                  value = (exportsToOf item.entry.manifest).value item.entry.manifest;
+                }) named
+              );
         in
-        if (elided._type or null) == "caisson-manifest" then
-          elided.value
+        final.genAttrs attrsets publishIn;
+
+      # What a tool reads from a top that is a configuration evaluated
+      # at a system, given its evaluations by system. They are named
+      # like anything published, by `caisson-core.elide` over their
+      # paths; the top is addressed by the file that returns it, so the
+      # name of the top is left out of each. Where that leaves a single
+      # evaluation with no name, the result is its value, the evaluated
+      # configuration; otherwise it is the values by what is left of
+      # each name.
+      topValue =
+        evaluations:
+        let
+          systems = builtins.attrNames evaluations;
+          kept = final.caisson-core.elide (
+            builtins.map (system: [
+              {
+                type = "system";
+                name = system;
+              }
+              {
+                inherit (evaluations.${system}) type;
+                name = evaluations.${system}.name or "";
+              }
+            ]) systems
+          );
+          names = builtins.map (segments: displayName (final.init segments)) kept;
+        in
+        if names == [ "" ] then
+          evaluations.${builtins.head systems}.value
         else
-          builtins.mapAttrs (_: evaluation: evaluation.value) elided;
+          builtins.listToAttrs (
+            final.zipListsWith (name: system: {
+              inherit name;
+              inherit (evaluations.${system}) value;
+            }) names systems
+          );
 
       # An integration that evaluates a class another integration
       # owns, declared: `over` is the owning integration, reached
@@ -272,9 +411,11 @@
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
             childrenOf
-            elideSystems
+            displayName
+            entriesOf
             mkEvaluation
             names
+            publish
             topValue
             resolveEcosystemSrc
             mkIntegration

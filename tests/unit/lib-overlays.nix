@@ -1866,6 +1866,31 @@ in
             // extraOverlays;
         };
       myLib = mkComposition { };
+      # A composition with a single system in force, a stand-in package
+      # config, and a NixOS configuration registered under the name
+      # `machine`, which records the name and the system its evaluation
+      # carries.
+      publishingLib = caisson.mkLib {
+        sources = mockSources;
+        name = "publishing";
+        defaultEcosystemSrc.nixpkgs = nixosStub;
+        systems = [ "x86_64-linux" ];
+        pkgSets = stubPkgSets { default = { }; };
+        libOverlays = _mkLibOverlay: {
+          nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+        };
+        configs = callbackLib: {
+          nixos.machine = callbackLib.caisson.nixos.mkModule (
+            { ... }:
+            { lib, ... }:
+            {
+              imports = [ probeModule ];
+              seenLib.name = lib.caisson-core.evalManifest.name;
+              seenLib.at = lib.caisson-core.evalManifest.system;
+            }
+          );
+        };
+      };
       # A configuration module that records what the library the
       # module system handed it carries. It declares the option it
       # sets, the way a NixOS configuration module declares anything
@@ -2037,13 +2062,13 @@ in
         };
       };
 
-      # A NixOS configuration has an evaluation for every system in
-      # force where it is declared, by system, also when that is a
-      # single system, and none when no system is in force. A top
-      # read as a tool reads it is the evaluated configuration where
-      # there is exactly one, and the evaluated configurations by
-      # system otherwise.
-      "test: a nixos configuration has an evaluation for every system in force" = {
+      # A NixOS configuration is an evaluation for every system in
+      # force where it is declared: finalizing it gives its evaluations
+      # by system, also when that is a single system, and none when no
+      # system is in force. A top read as a tool reads it is the
+      # evaluated configuration where there is a single evaluation, and
+      # the evaluated configurations by system where there are several.
+      "test: a nixos configuration is an evaluation for every system in force" = {
         expr =
           let
             on =
@@ -2057,7 +2082,7 @@ in
                   nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
                 };
               };
-            configurationOn =
+            evaluationsOn =
               systems:
               let
                 composed = on systems;
@@ -2070,15 +2095,19 @@ in
               "x86_64-linux"
               "aarch64-linux"
             ];
+            x86 = (evaluationsOn several).x86_64-linux;
           in
           {
-            none = builtins.attrNames (configurationOn null).children.system;
-            empty = builtins.attrNames (configurationOn [ ]).children.system;
-            single = builtins.attrNames (configurationOn [ "x86_64-linux" ]).children.system;
-            several = builtins.mapAttrs (
-              _: evaluation: evaluation.value.config.stub.system
-            ) (configurationOn several).children.system;
-            configurationHasNoValue = (configurationOn several) ? value;
+            none = builtins.attrNames (evaluationsOn null);
+            empty = builtins.attrNames (evaluationsOn [ ]);
+            single = builtins.attrNames (evaluationsOn [ "x86_64-linux" ]);
+            several = builtins.mapAttrs (_: evaluation: evaluation.value.config.stub.system) (
+              evaluationsOn several
+            );
+            name = x86.name;
+            above = {
+              inherit (x86.parent) type name;
+            };
             topOfNone = topOn null;
             topOfSingle = (topOn [ "x86_64-linux" ]).config.stub.system;
             topOfSeveral = builtins.mapAttrs (_: evaluated: evaluated.config.stub.system) (topOn several);
@@ -2091,7 +2120,11 @@ in
             aarch64-linux = "aarch64-linux";
             x86_64-linux = "x86_64-linux";
           };
-          configurationHasNoValue = false;
+          name = "machine";
+          above = {
+            type = "system";
+            name = "x86_64-linux";
+          };
           topOfNone = { };
           topOfSingle = "x86_64-linux";
           topOfSeveral = {
@@ -2104,34 +2137,14 @@ in
       # A NixOS configuration declared beneath another configuration
       # is finalized under the attribute it is declared under, and
       # takes the configuration registered under that name when it
-      # passes no module.
+      # passes no module. In the tree its evaluation sits under its
+      # name, beneath the system, beneath the configuration that
+      # declares it.
       "test: a nixos configuration is declared beneath a configuration and found by name" = {
         expr =
           let
-            nesting = caisson.mkLib {
-              sources = mockSources;
-              name = "nesting";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
-              systems = [ "x86_64-linux" ];
-              pkgSets = stubPkgSets { default = { }; };
-              libOverlays = _mkLibOverlay: {
-                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
-              };
-              configs = callbackLib: {
-                nixos.machine = callbackLib.caisson.nixos.mkModule (
-                  { ... }:
-                  { lib, ... }:
-                  {
-                    imports = [ probeModule ];
-                    seenLib.name = lib.caisson-core.evalManifest.parent.name;
-                    seenLib.at = lib.caisson-core.evalManifest.name;
-                    seenLib.beneath = lib.caisson-core.evalManifest.parent.parent.type;
-                  }
-                );
-              };
-            };
-            top = nesting.caisson-core.finalizeTop (
-              nesting.caisson.structural.mkConfiguration {
+            top = publishingLib.caisson-core.finalizeTop (
+              publishingLib.caisson.structural.mkConfiguration {
                 moduleImports = _modules: [ ];
                 configModule =
                   { lib, ... }:
@@ -2140,33 +2153,159 @@ in
                   };
               }
             );
-            machine = top.children.nixos.machine;
-            evaluation = machine.children.system.x86_64-linux;
+            system = top.children.system.x86_64-linux;
+            machine = system.children.nixos.machine;
           in
           {
+            children = builtins.attrNames top.children;
+            systems = builtins.attrNames top.children.system;
+            systemType = system.type;
             type = machine.type;
-            evaluations = builtins.attrNames machine.children.system;
-            name = evaluation.value.config.seenLib.name;
-            at = evaluation.value.config.seenLib.at;
-            beneath = evaluation.value.config.seenLib.beneath;
-            parentChildless = machine.parent.childless;
+            name = machine.value.config.seenLib.name;
+            at = machine.value.config.seenLib.at;
+            beneath = builtins.map (ancestor: ancestor.type) machine.ancestors;
             nearest = builtins.attrNames machine.nearest;
-            outputs = builtins.attrNames evaluation.outputs;
+            outputs = builtins.attrNames machine.outputs;
           };
         expected = {
+          children = [ "system" ];
+          systems = [ "x86_64-linux" ];
+          systemType = "system";
           type = "nixos";
-          evaluations = [ "x86_64-linux" ];
           name = "machine";
           at = "x86_64-linux";
-          beneath = "structural";
-          parentChildless = true;
-          nearest = [ "structural" ];
+          beneath = [
+            "lib"
+            "structural"
+            "system"
+          ];
+          nearest = [
+            "structural"
+            "system"
+          ];
           outputs = [
             "images"
             "toplevel"
             "vm"
             "vmWithBootLoader"
           ];
+        };
+      };
+
+      # What a top publishes: the NixOS configurations declared beneath
+      # it, at any depth, as `nixosConfigurations.<name>`, each the
+      # evaluated configuration. The names come from the paths: a name
+      # that is alone stays bare, with the system above it and the
+      # structural configuration it sits in left out, and the same
+      # name in several structural configurations gains their names.
+      "test: a top publishes the nixos configurations beneath it under names from their paths" = {
+        expr =
+          let
+            machineIn =
+              lib: name:
+              lib.caisson.nixos.mkConfiguration {
+                configModule = {
+                  imports = [ probeModule ];
+                  seenLib.name = name;
+                };
+              };
+            group =
+              lib: machines:
+              lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations = lib.genAttrs machines (machineIn lib);
+                  };
+              };
+            tree =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.direct = machineIn lib "direct";
+                caisson.structural.configurations.a = group lib [
+                  "host-1"
+                  "host-2"
+                ];
+                caisson.structural.configurations.b = group lib [ "host-1" ];
+              };
+            structuralTop = publishingLib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = tree;
+            };
+            flakeTop = publishingLib.caisson.flake-parts.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = {
+                imports = [ tree ];
+              };
+            };
+          in
+          {
+            structural = builtins.attrNames structuralTop.nixosConfigurations;
+            flake = builtins.attrNames flakeTop.nixosConfigurations;
+            evaluated = structuralTop.nixosConfigurations."a/host-1".config.stub.system;
+            keepsTheRegistries = structuralTop ? libOverlays && !(structuralTop ? configurations);
+          };
+        expected = {
+          structural = [
+            "a/host-1"
+            "b/host-1"
+            "direct"
+            "host-2"
+          ];
+          flake = [
+            "a/host-1"
+            "b/host-1"
+            "direct"
+            "host-2"
+          ];
+          evaluated = "x86_64-linux";
+          keepsTheRegistries = true;
+        };
+      };
+
+      # With several systems in force, a name is published for each
+      # evaluation, told apart by the system. `exported` selects what
+      # is passed up, and what it leaves out is not published.
+      "test: a top publishes an evaluation per system, and only what is selected" = {
+        expr =
+          let
+            severalLib = caisson.mkLib {
+              sources = mockSources;
+              name = "several";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [
+                "x86_64-linux"
+                "aarch64-linux"
+              ];
+              libOverlays = _mkLibOverlay: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+            };
+            top =
+              exported:
+              severalLib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                      configModule = probeModule;
+                    };
+                    caisson.nixos.exported = exported;
+                  };
+              };
+          in
+          {
+            all = builtins.attrNames (top (configurations: configurations)).nixosConfigurations;
+            none = (top (_configurations: { })) ? nixosConfigurations;
+          };
+        expected = {
+          all = [
+            "aarch64-linux/machine"
+            "x86_64-linux/machine"
+          ];
+          none = false;
         };
       };
 

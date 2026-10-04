@@ -10,8 +10,7 @@
 # evaluation runs on, and `manifest`, the manifest of the evaluation.
 # A NixOS configuration has an evaluation for every system in force
 # where it is declared, so the manifest is that of an evaluation at a
-# system: the system and the package sets come from it, and the name
-# of the configuration from its parent, the configuration.
+# system: the name, the system and the package sets come from it.
 {
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
@@ -23,7 +22,7 @@ let
   selection = lib.caisson.integrations;
 
   # The name of the configuration this is an evaluation of.
-  name = manifest.parent.name or null;
+  name = manifest.name or null;
 
   # The system of this evaluation.
   inherit (manifest) system;
