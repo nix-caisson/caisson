@@ -1945,11 +1945,13 @@ in
         expr = {
           minimal = minimalConfiguration.config.stub.fromBaseModules or null;
           full =
-            (myLib.caisson-core.finalizeTop (
-              myLib.caisson.nixos.mkConfigurationFull {
-                configModule = probeModule;
-              }
-            )).value.config.stub.fromBaseModules;
+            (myLib.caisson.integrations.topValue (
+              myLib.caisson-core.finalizeTop (
+                myLib.caisson.nixos.mkConfigurationFull {
+                  configModule = probeModule;
+                }
+              )
+            )).config.stub.fromBaseModules;
         };
         expected = {
           minimal = null;
@@ -1963,27 +1965,31 @@ in
       # `nixos/lib`.
       "test: the twin replaces the library of a nixos evaluation" = {
         expr =
-          (myLib.caisson-core.finalizeTop (
-            myLib.caisson.nixos.mkConfigurationWithEcosystemArgs {
-              configModule = probeModule;
-              ecosystemArgs.lib = myLib // {
-                caissonMarker = "from-ecosystemArgs";
-              };
-            }
-          )).value.libArgument.caissonMarker or null;
+          (myLib.caisson.integrations.topValue (
+            myLib.caisson-core.finalizeTop (
+              myLib.caisson.nixos.mkConfigurationWithEcosystemArgs {
+                configModule = probeModule;
+                ecosystemArgs.lib = myLib // {
+                  caissonMarker = "from-ecosystemArgs";
+                };
+              }
+            )
+          )).libArgument.caissonMarker or null;
         expected = "from-ecosystemArgs";
       };
 
       "test: the twin replaces the library of a minimal evaluation" = {
         expr =
-          (myLib.caisson-core.finalizeTop (
-            myLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
-              configModule = probeModule;
-              ecosystemArgs.lib = myLib // {
-                caissonMarker = "from-ecosystemArgs";
-              };
-            }
-          )).value.libArgument.caissonMarker or null;
+          (myLib.caisson.integrations.topValue (
+            myLib.caisson-core.finalizeTop (
+              myLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+                configModule = probeModule;
+                ecosystemArgs.lib = myLib // {
+                  caissonMarker = "from-ecosystemArgs";
+                };
+              }
+            )
+          )).libArgument.caissonMarker or null;
         expected = "from-ecosystemArgs";
       };
 
@@ -2031,40 +2037,67 @@ in
         };
       };
 
-      # The system comes from the composition: a composition that
-      # declares none, or more than one, cannot place a NixOS
-      # configuration.
-      "test: a nixos configuration needs a single system in force" = {
+      # A NixOS configuration has an evaluation for every system in
+      # force where it is declared, by system, also when that is a
+      # single system, and none when no system is in force. A top
+      # read as a tool reads it is the evaluated configuration where
+      # there is exactly one, and the evaluated configurations by
+      # system otherwise.
+      "test: a nixos configuration has an evaluation for every system in force" = {
         expr =
           let
-            systemOf =
+            on =
               systems:
-              (builtins.tryEval
-                (
-                  (caisson.mkLib {
-                    sources = mockSources;
-                    defaultEcosystemSrc.nixpkgs = nixosStub;
-                    inherit systems;
-                    libOverlays = _mkLibOverlay: {
-                      nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
-                    };
-                  }).caisson.nixos.mkTopConfiguration
-                    { configModule = probeModule; }
-                ).config.stub.system
-              ).success;
-          in
-          {
-            none = systemOf null;
-            single = systemOf [ "x86_64-linux" ];
-            several = systemOf [
+              caisson.mkLib {
+                sources = mockSources;
+                name = "machine";
+                defaultEcosystemSrc.nixpkgs = nixosStub;
+                inherit systems;
+                libOverlays = _mkLibOverlay: {
+                  nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+                };
+              };
+            configurationOn =
+              systems:
+              let
+                composed = on systems;
+              in
+              composed.caisson-core.finalizeTop (
+                composed.caisson.nixos.mkConfiguration { configModule = probeModule; }
+              );
+            topOn = systems: (on systems).caisson.nixos.mkTopConfiguration { configModule = probeModule; };
+            several = [
               "x86_64-linux"
               "aarch64-linux"
             ];
+          in
+          {
+            none = builtins.attrNames (configurationOn null).children.system;
+            empty = builtins.attrNames (configurationOn [ ]).children.system;
+            single = builtins.attrNames (configurationOn [ "x86_64-linux" ]).children.system;
+            several = builtins.mapAttrs (
+              _: evaluation: evaluation.value.config.stub.system
+            ) (configurationOn several).children.system;
+            configurationHasNoValue = (configurationOn several) ? value;
+            topOfNone = topOn null;
+            topOfSingle = (topOn [ "x86_64-linux" ]).config.stub.system;
+            topOfSeveral = builtins.mapAttrs (_: evaluated: evaluated.config.stub.system) (topOn several);
           };
         expected = {
-          none = false;
-          single = true;
-          several = false;
+          none = [ ];
+          empty = [ ];
+          single = [ "x86_64-linux" ];
+          several = {
+            aarch64-linux = "aarch64-linux";
+            x86_64-linux = "x86_64-linux";
+          };
+          configurationHasNoValue = false;
+          topOfNone = { };
+          topOfSingle = "x86_64-linux";
+          topOfSeveral = {
+            aarch64-linux = "aarch64-linux";
+            x86_64-linux = "x86_64-linux";
+          };
         };
       };
 
@@ -2090,8 +2123,9 @@ in
                   { lib, ... }:
                   {
                     imports = [ probeModule ];
-                    seenLib.name = lib.caisson-core.evalManifest.name;
-                    seenLib.beneath = lib.caisson-core.evalManifest.parent.type;
+                    seenLib.name = lib.caisson-core.evalManifest.parent.name;
+                    seenLib.at = lib.caisson-core.evalManifest.name;
+                    seenLib.beneath = lib.caisson-core.evalManifest.parent.parent.type;
                   }
                 );
               };
@@ -2107,18 +2141,23 @@ in
               }
             );
             machine = top.children.nixos.machine;
+            evaluation = machine.children.system.x86_64-linux;
           in
           {
             type = machine.type;
-            name = machine.value.config.seenLib.name;
-            beneath = machine.value.config.seenLib.beneath;
+            evaluations = builtins.attrNames machine.children.system;
+            name = evaluation.value.config.seenLib.name;
+            at = evaluation.value.config.seenLib.at;
+            beneath = evaluation.value.config.seenLib.beneath;
             parentChildless = machine.parent.childless;
             nearest = builtins.attrNames machine.nearest;
-            outputs = builtins.attrNames machine.outputs;
+            outputs = builtins.attrNames evaluation.outputs;
           };
         expected = {
           type = "nixos";
+          evaluations = [ "x86_64-linux" ];
           name = "machine";
+          at = "x86_64-linux";
           beneath = "structural";
           parentChildless = true;
           nearest = [ "structural" ];
@@ -3226,6 +3265,34 @@ in
           ];
           flakeLibOverlays = [ "provider" ];
           topReturnsTheFlakeOutputs = true;
+        };
+      };
+
+      # flake-parts' `systems` defaults to the systems the composition
+      # declares. A composition that declares none has no system in
+      # force, so the flake evaluates and has no per-system outputs.
+      "test: a flake with no system in force has no per-system outputs" = {
+        expr =
+          let
+            outputs = (caisson.mkLib { sources = mockSources; }).caisson.flake-parts.mkTopConfiguration {
+              configModule = {
+                perSystem =
+                  { ... }:
+                  {
+                    packages.probe = throw "evaluated with no system";
+                  };
+                flake.reached = true;
+              };
+              moduleImports = _modules: [ ];
+            };
+          in
+          {
+            inherit (outputs) reached;
+            packages = outputs.packages or { };
+          };
+        expected = {
+          reached = true;
+          packages = { };
         };
       };
 

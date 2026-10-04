@@ -64,6 +64,7 @@
         args:
         final.caisson-core.mkConfiguration {
           type = "nixos-minimal";
+          perSystem = true;
           evaluate = evaluate args;
         };
     in
@@ -99,11 +100,13 @@
             }@args:
             configuration args;
           extra = {
-            # A minimal evaluation that is a top: the evaluated
-            # configuration.
+            # A minimal configuration that is a top, as
+            # `lib.caisson.nixos.mkTopConfiguration` returns it.
             mkTopConfiguration =
               rawArgs:
-              (final.caisson-core.finalizeTop (final.caisson.nixos-minimal.mkConfiguration rawArgs)).value;
+              final.caisson.integrations.topValue (
+                final.caisson-core.finalizeTop (final.caisson.nixos-minimal.mkConfiguration rawArgs)
+              );
           };
         };
       };

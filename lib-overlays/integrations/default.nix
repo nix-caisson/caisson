@@ -217,6 +217,33 @@
           final.genAttrs names (name: config.caisson.${name}.configurations)
         );
 
+      # The evaluations of a per-system configuration with the system
+      # left out where nothing needs it: the evaluation itself where
+      # the configuration has exactly one, and the evaluations by
+      # system otherwise. The tree always holds them by system
+      # (`children.system`); this is the step that drops the system
+      # for a reader that addresses the configuration alone.
+      elideSystems =
+        manifest:
+        let
+          evaluations = manifest.children.system;
+          systems = builtins.attrNames evaluations;
+        in
+        if builtins.length systems == 1 then evaluations.${builtins.head systems} else evaluations;
+
+      # What a tool reads from a per-system configuration that is a
+      # top: the evaluated value where the configuration has exactly
+      # one evaluation, and the evaluated values by system otherwise.
+      topValue =
+        manifest:
+        let
+          elided = elideSystems manifest;
+        in
+        if (elided._type or null) == "caisson-manifest" then
+          elided.value
+        else
+          builtins.mapAttrs (_: evaluation: evaluation.value) elided;
+
       # An integration that evaluates a class another integration
       # owns, declared: `over` is the owning integration, reached
       # through the lib (`final.caisson.nixos`), and the class and its
@@ -245,8 +272,10 @@
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
             childrenOf
+            elideSystems
             mkEvaluation
             names
+            topValue
             resolveEcosystemSrc
             mkIntegration
             mkAltIntegration

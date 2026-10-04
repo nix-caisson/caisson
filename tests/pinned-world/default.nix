@@ -575,19 +575,22 @@ let
     # `ecosystemArgs`, applied last.
     ecosystemArgsTwinsReachTheEvaluator =
       let
-        minimal =
-          (hiveLib.caisson-core.finalizeTop (
-            hiveLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
-              ecosystemSrc = inputs.nixpkgs;
-              configModule =
-                { lib, ... }:
-                {
-                  options.probe = lib.mkOption { type = lib.types.raw; };
-                  config.probe = "minimal";
-                };
-              ecosystemArgs.prefix = [ "probe-prefix" ];
-            }
-          )).value;
+        minimal = (
+          hiveLib.caisson.integrations.topValue (
+            hiveLib.caisson-core.finalizeTop (
+              hiveLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+                ecosystemSrc = inputs.nixpkgs;
+                configModule =
+                  { lib, ... }:
+                  {
+                    options.probe = lib.mkOption { type = lib.types.raw; };
+                    config.probe = "minimal";
+                  };
+                ecosystemArgs.prefix = [ "probe-prefix" ];
+              }
+            )
+          )
+        );
         terraform = composed.lib.caisson.terranix.mkConfigurationWithEcosystemArgs {
           ecosystemSrc = inputs.terranix;
           configModule = {

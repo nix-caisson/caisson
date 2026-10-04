@@ -8,8 +8,10 @@
 #
 # It is a function of the view being evaluated: `lib`, the library the
 # evaluation runs on, and `manifest`, the manifest of the evaluation.
-# The configuration's system and its package sets come from the
-# manifest, as its name does.
+# A NixOS configuration has an evaluation for every system in force
+# where it is declared, so the manifest is that of an evaluation at a
+# system: the system and the package sets come from it, and the name
+# of the configuration from its parent, the configuration.
 {
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
@@ -20,30 +22,17 @@ args:
 let
   selection = lib.caisson.integrations;
 
-  what =
-    if manifest ? name then
-      "the NixOS configuration `${manifest.name}`"
-    else
-      "this NixOS configuration";
+  # The name of the configuration this is an evaluation of.
+  name = manifest.parent.name or null;
 
-  # The system the tree confers on the configuration: the system in
-  # force where it is declared.
-  systems = manifest.systems or null;
-  system =
-    if systems == null || systems == [ ] then
-      throw ''
-        ${context}: ${what} has no system. A configuration takes its system
-        from the composition; pass `systems` to caisson-core.mkLib.
-      ''
-    else if builtins.length systems > 1 then
-      throw ''
-        ${context}: ${what} is declared where more than one system is in
-        force (${builtins.concatStringsSep ", " systems}). A NixOS configuration is
-        evaluated at a single system; declare it in a composition whose
-        `systems` names that system alone.
-      ''
+  # The system of this evaluation.
+  inherit (manifest) system;
+
+  what =
+    if name != null then
+      "the NixOS configuration `${name}` at ${system}"
     else
-      builtins.head systems;
+      "this NixOS configuration at ${system}";
 
   # The package configs visible to the configuration, each projected
   # to its set at the configuration's system, by config name.
@@ -52,7 +41,7 @@ let
     name: config:
     (config.children.nixpkgs.${system} or (throw ''
       ${context}: the package config `${name}` builds no set for ${system},
-      the system of ${what}. Add the system to `caisson.nixpkgs.systems`
+      which ${what} needs. Add the system to `caisson.nixpkgs.systems`
       in the config's module.
     '')
     ).value
@@ -109,8 +98,8 @@ let
   configModule =
     if (args.configModule or null) != null then
       args.configModule
-    else if manifest ? name then
-      registered.${manifest.name} or null
+    else if name != null then
+      registered.${name} or null
     else
       null;
 in

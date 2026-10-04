@@ -100,15 +100,24 @@
         variant: args:
         final.caisson-core.mkConfiguration {
           type = "nixos";
+          # A NixOS configuration is evaluated at a system: it has an
+          # evaluation for every system in force where it is declared.
+          perSystem = true;
           evaluate = evaluate variant args;
         };
 
-      # A NixOS configuration that is a top: the evaluated
-      # configuration, which is what `nixos-rebuild --file` reads and
-      # what a test or the REPL evaluates with no configuration above
-      # it. Its name is the name the composition declares on mkLib.
+      # A NixOS configuration that is a top, as a tool reads it: the
+      # evaluated configuration, which is what `nixos-rebuild --file`
+      # reads and what a test or the REPL evaluates with no
+      # configuration above it. Where the composition has several
+      # systems in force, or none, it is the evaluated configurations
+      # by system. Its name is the name the composition declares on
+      # mkLib.
       mkTopConfiguration =
-        rawArgs: (final.caisson-core.finalizeTop (final.caisson.nixos.mkConfiguration rawArgs)).value;
+        rawArgs:
+        final.caisson.integrations.topValue (
+          final.caisson-core.finalizeTop (final.caisson.nixos.mkConfiguration rawArgs)
+        );
 
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
@@ -119,9 +128,10 @@
         # `mkTopConfiguration` finalizes it at a top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # configuration's system and its package sets come from the
-        # composition, through the manifest; it selects its set with
-        # the `caisson.nixpkgs.pkgSet` option.
+        # configuration is evaluated at every system in force where it
+        # is declared, and its package sets come from the composition,
+        # through the manifest; it selects its set with the
+        # `caisson.nixpkgs.pkgSet` option.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
