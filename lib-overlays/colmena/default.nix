@@ -91,7 +91,10 @@
       # `lib.caisson.nixos.mkConfiguration`, as its pattern: a wrong
       # argument is reported under the constructor's name, at the
       # configuration that called it. `deployment.*` is set in the
-      # host's configModule; the node declares those options.
+      # host's configModule; the node declares those options. What a
+      # constructor returns is a NixOS configuration, a function of
+      # `{ name, parent }`, and the colmena configuration finalizes it
+      # under the name of the node it is declared as.
       mkNodeConstructors =
         src:
         let
@@ -112,21 +115,17 @@
           mkNixosConfiguration =
             {
               configModule,
-              pkgSets,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
-              system ? null,
             }@args:
             final.caisson.nixos.mkConfiguration (nodeArgsOf args);
           mkNixosConfigurationWithEcosystemArgs =
             {
               configModule,
-              pkgSets,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
-              system ? null,
               ecosystemArgs ? null,
             }@args:
             final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args);
@@ -171,9 +170,20 @@
           };
         };
 
+      # A node as declared is a NixOS configuration; finalized under the
+      # node's name, with the composition's manifest as its parent, its
+      # value is the evaluated NixOS configuration the hive holds.
       checkNode =
-        name: node:
-        if builtins.isAttrs node && node ? config && node.config ? deployment then
+        name: declared:
+        let
+          node =
+            (final.caisson-core.finalizeChild {
+              inherit name;
+              parent = final.caisson-core.libManifest;
+              what = "`nodes.${name}`";
+            } declared).value;
+        in
+        if node ? config && node.config ? deployment then
           node
         else
           throw ''

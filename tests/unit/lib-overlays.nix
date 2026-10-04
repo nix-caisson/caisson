@@ -87,6 +87,27 @@ let
   missingArgument = fn: argumentError fn "without required";
   unexpectedArgument = fn: argumentError fn "with unexpected";
 
+  # Package configs for a composition whose package sets are stand-in
+  # values: `pkgSets` on mkLib, declaring a config per name whose set
+  # at x86_64-linux is the value given.
+  stubPkgSets =
+    sets: _lib:
+    builtins.mapAttrs (
+      _: pkgs:
+      { name, parent }:
+      {
+        _type = "caisson-manifest";
+        type = "nixpkgs";
+        inherit name parent;
+        children.nixpkgs.x86_64-linux = {
+          _type = "caisson-manifest";
+          type = "nixpkgs";
+          name = "x86_64-linux";
+          value = pkgs;
+        };
+      }
+    ) sets;
+
   # The integrations the parent registers, each with its entry
   # points.
   integrationNames = [
@@ -1814,6 +1835,17 @@ in
         caisson.mkLib {
           sources = mockSources;
           defaultEcosystemSrc.nixpkgs = nixosStub;
+          # A configuration takes its system and its package set from
+          # the composition.
+          systems = [ "x86_64-linux" ];
+          pkgSets = stubPkgSets {
+            default = {
+              marker = "the default set";
+            };
+            other = {
+              marker = "the other set";
+            };
+          };
           libOverlays =
             _mkLibOverlay:
             {
@@ -1856,13 +1888,11 @@ in
             nixpkgs = lib.isFunction lib.id;
           };
         };
-      configuration = myLib.caisson.nixos.mkConfiguration {
+      configuration = myLib.caisson.nixos.mkTopConfiguration {
         configModule = probeModule;
-        pkgSets.pkgs = { };
       };
-      minimalConfiguration = myLib.caisson.nixos-minimal.mkConfiguration {
+      minimalConfiguration = myLib.caisson.nixos-minimal.mkTopConfiguration {
         configModule = probeModule;
-        pkgSets.pkgs = { };
       };
     in
     {
@@ -1915,10 +1945,11 @@ in
         expr = {
           minimal = minimalConfiguration.config.stub.fromBaseModules or null;
           full =
-            (myLib.caisson.nixos.mkConfigurationFull {
-              configModule = probeModule;
-              pkgSets.pkgs = { };
-            }).config.stub.fromBaseModules;
+            (myLib.caisson-core.finalizeTop (
+              myLib.caisson.nixos.mkConfigurationFull {
+                configModule = probeModule;
+              }
+            )).value.config.stub.fromBaseModules;
         };
         expected = {
           minimal = null;
@@ -1932,26 +1963,172 @@ in
       # `nixos/lib`.
       "test: the twin replaces the library of a nixos evaluation" = {
         expr =
-          (myLib.caisson.nixos.mkConfigurationWithEcosystemArgs {
-            configModule = probeModule;
-            pkgSets.pkgs = { };
-            ecosystemArgs.lib = myLib // {
-              caissonMarker = "from-ecosystemArgs";
-            };
-          }).libArgument.caissonMarker or null;
+          (myLib.caisson-core.finalizeTop (
+            myLib.caisson.nixos.mkConfigurationWithEcosystemArgs {
+              configModule = probeModule;
+              ecosystemArgs.lib = myLib // {
+                caissonMarker = "from-ecosystemArgs";
+              };
+            }
+          )).value.libArgument.caissonMarker or null;
         expected = "from-ecosystemArgs";
       };
 
       "test: the twin replaces the library of a minimal evaluation" = {
         expr =
-          (myLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
-            configModule = probeModule;
-            pkgSets.pkgs = { };
-            ecosystemArgs.lib = myLib // {
-              caissonMarker = "from-ecosystemArgs";
-            };
-          }).libArgument.caissonMarker or null;
+          (myLib.caisson-core.finalizeTop (
+            myLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+              configModule = probeModule;
+              ecosystemArgs.lib = myLib // {
+                caissonMarker = "from-ecosystemArgs";
+              };
+            }
+          )).value.libArgument.caissonMarker or null;
         expected = "from-ecosystemArgs";
+      };
+
+      # A NixOS configuration takes its package set from the
+      # composition: the package config named `default` unless a
+      # module of the configuration selects another with
+      # `caisson.nixpkgs.pkgSet`, at the system the composition
+      # declares. The sets also reach the modules by config name, as
+      # the `pkgSets` special argument.
+      "test: a nixos configuration selects its package set by name" = {
+        expr =
+          let
+            selecting =
+              pkgSet:
+              (myLib.caisson.nixos.mkTopConfiguration {
+                configModule =
+                  { pkgSets, ... }:
+                  {
+                    imports = [ probeModule ];
+                    config = {
+                      caisson.nixpkgs.pkgSet = pkgSet;
+                      seenLib.byName = builtins.mapAttrs (_: set: set.marker) pkgSets;
+                    };
+                  };
+              }).config;
+          in
+          {
+            default = configuration.config.nixpkgs.pkgs.marker;
+            other = (selecting "other").nixpkgs.pkgs.marker;
+            byName = (selecting "default").seenLib.byName;
+            system = configuration.config.stub.system;
+            minimal = minimalConfiguration._module.args.pkgs.marker;
+            unknown = (builtins.tryEval (selecting "missing").nixpkgs.pkgs.marker).success;
+          };
+        expected = {
+          default = "the default set";
+          other = "the other set";
+          byName = {
+            default = "the default set";
+            other = "the other set";
+          };
+          system = "x86_64-linux";
+          minimal = "the default set";
+          unknown = false;
+        };
+      };
+
+      # The system comes from the composition: a composition that
+      # declares none, or more than one, cannot place a NixOS
+      # configuration.
+      "test: a nixos configuration needs a single system in force" = {
+        expr =
+          let
+            systemOf =
+              systems:
+              (builtins.tryEval
+                (
+                  (caisson.mkLib {
+                    sources = mockSources;
+                    defaultEcosystemSrc.nixpkgs = nixosStub;
+                    inherit systems;
+                    libOverlays = _mkLibOverlay: {
+                      nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+                    };
+                  }).caisson.nixos.mkTopConfiguration
+                    { configModule = probeModule; }
+                ).config.stub.system
+              ).success;
+          in
+          {
+            none = systemOf null;
+            single = systemOf [ "x86_64-linux" ];
+            several = systemOf [
+              "x86_64-linux"
+              "aarch64-linux"
+            ];
+          };
+        expected = {
+          none = false;
+          single = true;
+          several = false;
+        };
+      };
+
+      # A NixOS configuration declared beneath another configuration
+      # is finalized under the attribute it is declared under, and
+      # takes the configuration registered under that name when it
+      # passes no module.
+      "test: a nixos configuration is declared beneath a configuration and found by name" = {
+        expr =
+          let
+            nesting = caisson.mkLib {
+              sources = mockSources;
+              name = "nesting";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { default = { }; };
+              libOverlays = _mkLibOverlay: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+              configs = callbackLib: {
+                nixos.machine = callbackLib.caisson.nixos.mkModule (
+                  { ... }:
+                  { lib, ... }:
+                  {
+                    imports = [ probeModule ];
+                    seenLib.name = lib.caisson-core.evalManifest.name;
+                    seenLib.beneath = lib.caisson-core.evalManifest.parent.type;
+                  }
+                );
+              };
+            };
+            top = nesting.caisson-core.finalizeTop (
+              nesting.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration { };
+                  };
+              }
+            );
+            machine = top.children.nixos.machine;
+          in
+          {
+            type = machine.type;
+            name = machine.value.config.seenLib.name;
+            beneath = machine.value.config.seenLib.beneath;
+            parentChildless = machine.parent.childless;
+            nearest = builtins.attrNames machine.nearest;
+            outputs = builtins.attrNames machine.outputs;
+          };
+        expected = {
+          type = "nixos";
+          name = "machine";
+          beneath = "structural";
+          parentChildless = true;
+          nearest = [ "structural" ];
+          outputs = [
+            "images"
+            "toplevel"
+            "vm"
+            "vmWithBootLoader"
+          ];
+        };
       };
 
       # A `lib` the caller passes in `specialArgs` takes precedence
@@ -1959,9 +2136,8 @@ in
       # argument does.
       "test: the caller's specialArgs lib takes precedence" = {
         expr =
-          (myLib.caisson.nixos.mkConfiguration {
+          (myLib.caisson.nixos.mkTopConfiguration {
             configModule = probeModule;
-            pkgSets.pkgs = { };
             specialArgs.lib = myLib // {
               caissonMarker = "from-specialArgs";
             };
@@ -3490,10 +3666,12 @@ in
         );
       };
 
-      # The structural and flake-parts entry points take `configModule`
-      # as optional: each finds the configuration registered under the
-      # name of the configuration.
-      "test: every entry point takes configModule and pkgSets, and all but structural and flake-parts require configModule" =
+      # The entry points whose constructor returns a configuration take
+      # `configModule` as optional: each finds the configuration
+      # registered under the name of the configuration. The nixos
+      # entry points take no `pkgSets`: a NixOS configuration takes
+      # its package sets from the composition.
+      "test: every entry point takes configModule, optional where it is found by name, and pkgSets except on nixos" =
         {
           expr = builtins.listToAttrs (
             builtins.map (name: {
@@ -3501,10 +3679,17 @@ in
               value =
                 let
                   signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
+                  byName = builtins.elem name [
+                    "structural"
+                    "flake-parts"
+                    "nixos"
+                    "nixos-minimal"
+                  ];
+                  nixosClass = name == "nixos" || name == "nixos-minimal";
                 in
                 signature ? configModule
-                && signature.configModule == (name == "structural" || name == "flake-parts")
-                && signature ? pkgSets;
+                && signature.configModule == byName
+                && (signature ? pkgSets) == !nixosClass;
             }) integrationNames
           );
           expected = builtins.listToAttrs (
@@ -3532,12 +3717,17 @@ in
                 { mkNixosConfiguration, mkNixosConfigurationWithEcosystemArgs, ... }:
                 {
                   meta.description = builtins.toJSON {
+                    # A node names its module, where a NixOS
+                    # configuration may take the configuration
+                    # registered under its name; the argument names
+                    # are the same.
                     node =
-                      builtins.functionArgs mkNixosConfiguration
-                      == builtins.functionArgs lib.caisson.nixos.mkConfiguration;
+                      builtins.attrNames (builtins.functionArgs mkNixosConfiguration)
+                      == builtins.attrNames (builtins.functionArgs lib.caisson.nixos.mkConfiguration);
                     twin =
-                      builtins.functionArgs mkNixosConfigurationWithEcosystemArgs
-                      == builtins.functionArgs lib.caisson.nixos.mkConfigurationWithEcosystemArgs;
+                      builtins.attrNames (builtins.functionArgs mkNixosConfigurationWithEcosystemArgs)
+                      == builtins.attrNames (builtins.functionArgs lib.caisson.nixos.mkConfigurationWithEcosystemArgs);
+                    requiresItsModule = !(builtins.functionArgs mkNixosConfiguration).configModule;
                   };
                 };
             };
@@ -3546,6 +3736,7 @@ in
         expected = {
           node = true;
           twin = true;
+          requiresItsModule = true;
         };
       };
 
