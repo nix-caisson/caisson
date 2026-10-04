@@ -20,10 +20,12 @@ lib_expr="$1"
 shift
 flags=("$@")
 
-# Every entry point takes `configModule` and `pkgSets`. All but the
-# structural and flake-parts entry points require `configModule`; the
-# `nixos` entry points require `pkgSets` too, so an empty call may
-# report either.
+# Every entry point takes `configModule`. The structural, flake-parts,
+# nixos and nixos-minimal entry points require nothing: each finds the
+# configuration registered under the name of the configuration. The
+# others require `configModule`, and take `pkgSets`, which the nixos
+# entry points do not: a NixOS configuration takes its package sets
+# from the composition.
 namespaces=(
   nixos
   nixos-minimal
@@ -106,38 +108,52 @@ check_node() {
 }
 
 missing="function '[^']*%s' called without required argument '(configModule|pkgSets)'"
+
+# The arguments a call passes beside the wrong argument.
+given_for() {
+  case "$1" in
+    nixos | nixos-minimal) printf 'configModule = { };' ;;
+    *) printf 'configModule = { }; pkgSets.pkgs = { };' ;;
+  esac
+}
+requires_nothing() {
+  case "$1" in
+    structural | flake-parts | nixos | nixos-minimal) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 unexpected="function '[^']*%s' called with unexpected argument 'bogus'"
 
 for ns in "${namespaces[@]}"; do
+  given=$(given_for "$ns")
   for fn in mkConfiguration mkConfigurationWithEcosystemArgs; do
     ep="lib.caisson.$ns.$fn"
-    # A structural or flake-parts entry point requires nothing: it
-    # finds the configuration registered under the configuration's
-    # name.
-    if [ "$ns" != structural ] && [ "$ns" != flake-parts ]; then
+    if ! requires_nothing "$ns"; then
       # shellcheck disable=SC2059
       check "$ns.$fn { }" "$ep { }" "$(printf "$missing" "$fn")"
     fi
     # shellcheck disable=SC2059
-    check "$ns.$fn { bogus, configModule, pkgSets.pkgs }" \
-      "$ep { bogus = 1; configModule = { }; pkgSets.pkgs = { }; }" "$(printf "$unexpected" "$fn")"
+    check "$ns.$fn { bogus, ... }" \
+      "$ep { bogus = 1; $given }" "$(printf "$unexpected" "$fn")"
   done
   # The twin admits `ecosystemArgs`; the entry point refuses it.
   # shellcheck disable=SC2059
   check "$ns.mkConfigurationWithEcosystemArgs { bogus, ecosystemArgs, ... }" \
-    "lib.caisson.$ns.mkConfigurationWithEcosystemArgs { bogus = 1; configModule = { }; pkgSets.pkgs = { }; ecosystemArgs = { }; }" \
+    "lib.caisson.$ns.mkConfigurationWithEcosystemArgs { bogus = 1; $given ecosystemArgs = { }; }" \
     "$(printf "$unexpected" mkConfigurationWithEcosystemArgs)"
   check "$ns.mkConfiguration { ecosystemArgs, ... }" \
-    "lib.caisson.$ns.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; ecosystemArgs = { }; }" \
+    "lib.caisson.$ns.mkConfiguration { $given ecosystemArgs = { }; }" \
     "function '[^']*mkConfiguration' called with unexpected argument 'ecosystemArgs'"
 done
 
 # shellcheck disable=SC2059
-check "nixos.mkConfigurationFull { }" "lib.caisson.nixos.mkConfigurationFull { }" "$(printf "$missing" mkConfigurationFull)"
-# shellcheck disable=SC2059
-check "nixos.mkConfigurationFull { bogus, configModule, pkgSets.pkgs }" \
-  "lib.caisson.nixos.mkConfigurationFull { bogus = 1; configModule = { }; pkgSets.pkgs = { }; }" \
+check "nixos.mkConfigurationFull { bogus, configModule }" \
+  "lib.caisson.nixos.mkConfigurationFull { bogus = 1; configModule = { }; }" \
   "$(printf "$unexpected" mkConfigurationFull)"
+# A nixos entry point takes no package sets.
+check "nixos.mkConfiguration { pkgSets, ... }" \
+  "lib.caisson.nixos.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
+  "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
 
 # The colmena node constructors, module arguments of a colmena
 # configuration, reached through a stand-in colmena source with the
@@ -151,8 +167,8 @@ for fn in mkNixosConfiguration mkNixosConfigurationWithEcosystemArgs; do
   # shellcheck disable=SC2059
   check_node "colmena node $fn { }" "$(node_call "$fn" '{ }')" "$(printf "$missing" "$fn")"
   # shellcheck disable=SC2059
-  check_node "colmena node $fn { bogus, configModule, pkgSets.pkgs }" \
-    "$(node_call "$fn" '{ bogus = 1; configModule = { }; pkgSets.pkgs = { }; }')" "$(printf "$unexpected" "$fn")"
+  check_node "colmena node $fn { bogus, configModule }" \
+    "$(node_call "$fn" '{ bogus = 1; configModule = { }; }')" "$(printf "$unexpected" "$fn")"
 done
 
 if [ "$failures" != 0 ]; then

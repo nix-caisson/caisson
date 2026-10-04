@@ -20,22 +20,39 @@ let
 
   integrations = lib.caisson.integrations.names;
 
-  # The configurations passed up, of every integration: none in the
-  # childless view, and none in an evaluation that carries no manifest.
-  exported =
-    if manifest == null || manifest.childless then
-      [ ]
-    else
-      builtins.concatMap (
-        integration:
-        builtins.attrValues (
-          config.caisson.${integration}.exported config.caisson.${integration}.configurations
-        )
-      ) integrations;
+  isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
-  # A part of `caisson.exports`, as the configurations passed up
-  # export it.
-  passedUp = part: lib.mkMerge (builtins.map (child: child.outputs.exports.${part}) exported);
+  # What each integration's `exported` selected of the configurations
+  # declared here, by integration and then name: nothing in the
+  # childless view, and nothing in an evaluation that carries no
+  # manifest.
+  selected =
+    if manifest == null || manifest.childless then
+      { }
+    else
+      lib.genAttrs integrations (
+        integration: config.caisson.${integration}.exported config.caisson.${integration}.configurations
+      );
+
+  # The manifests passed up: a configuration evaluated at a system
+  # stands for each of its evaluations.
+  exported = builtins.concatMap (
+    integration:
+    builtins.concatMap (
+      finalized: if isManifest finalized then [ finalized ] else builtins.attrValues finalized
+    ) (builtins.attrValues selected.${integration})
+  ) (builtins.attrNames selected);
+
+  # A registry part of `caisson.exports`, as the configurations passed
+  # up export it. A configuration whose integration exports no
+  # registries contributes nothing.
+  passedUp =
+    part:
+    lib.mkMerge (
+      builtins.map (child: child.outputs.exports.${part}) (
+        builtins.filter (child: child.outputs ? exports) exported
+      )
+    );
 
   finalize =
     integration: name: child:
@@ -45,6 +62,16 @@ let
         inherit name what;
         parent = manifest.childlessManifest;
       } child;
+      # The integration of what was declared: of the manifest, or of
+      # the evaluations of a configuration evaluated at a system, null
+      # where it has none.
+      declaredType =
+        if isManifest finalized then
+          finalized.type
+        else if finalized == { } then
+          null
+        else
+          (builtins.head (builtins.attrValues finalized)).type;
     in
     if manifest == null then
       throw ''
@@ -60,17 +87,28 @@ let
         options of the ${manifest.type} configuration are readable there.
         Put the value in one of those options and read it there.
       ''
-    else if finalized.type != integration then
-      throw ''
-        ${what} is declared with a ${finalized.type} configuration.
-        Declare it under `caisson.${finalized.type}.configurations`.
-      ''
+    else if declaredType != null && declaredType != integration then
+      throw (
+        if builtins.elem declaredType integrations then
+          ''
+            ${what} is declared with a ${declaredType} configuration.
+            Declare it under `caisson.${declaredType}.configurations`.
+          ''
+        else
+          ''
+            ${what} is declared with a ${declaredType} configuration, and a
+            ${declaredType} configuration cannot be declared beneath another
+            configuration.
+          ''
+      )
     else
       finalized;
 
 in
 {
-  config.caisson.exports = lib.genAttrs [ "lib" "libOverlays" "modules" "pkgOverlays" ] passedUp;
+  config.caisson.exports = lib.genAttrs [ "lib" "libOverlays" "modules" "pkgOverlays" ] passedUp // {
+    configurations = lib.caisson.integrations.entriesOf selected;
+  };
 
   options.caisson = lib.genAttrs integrations (integration: {
     exported = lib.mkOption {

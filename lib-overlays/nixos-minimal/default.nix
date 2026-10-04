@@ -26,53 +26,66 @@
         final.caisson.nixos
           or (throw "lib.caisson.nixos-minimal evaluates the nixos class and needs the nixos integration composed beside it.");
 
-      evaluation = final.caisson.integrations.mkEvaluation {
-        compose =
-          args:
-          let
-            common = over.compose {
-              context = "lib.caisson.nixos-minimal.mkConfiguration";
-              nixpkgsModule = false;
-            } args;
-          in
-          common
-          // {
-            ecosystemArgs = {
-              prefix = args.prefix or [ ];
-              modules = common.modules;
-              specialArgs = common.specialArgs;
-              # `nixos/lib/default.nix` of the nixpkgs source takes
-              # `lib` and defaults it to `import ../../lib`, the
-              # library of the tree it lives in. It is the argument
-              # of that file rather than of `evalModules`, so
-              # `evaluate` reads it out of the call and hands it to
-              # the import; the twin replaces it like any other
-              # evaluator argument.
-              lib = common.lib;
-            };
-          };
-        evaluate =
-          composed: callArgs:
-          (import "${composed.src}/nixos/lib" {
-            inherit (callArgs) lib;
-          }).evalModules
-            (builtins.removeAttrs callArgs [ "lib" ]);
-      };
+      # The evaluator's call, on the view being evaluated: `evalModules`
+      # from nixos/lib over the composition of the nixos class.
+      # `ecosystemArgs`, which only the twin's pattern admits, is
+      # merged over the call last.
+      evaluate =
+        args: view:
+        let
+          common = over.compose {
+            context = "lib.caisson.nixos-minimal.mkConfiguration";
+            nixpkgsModule = false;
+          } view args;
+          callArgs = {
+            prefix = if (args.prefix or null) == null then [ ] else args.prefix;
+            modules = common.modules;
+            specialArgs = common.specialArgs;
+            # `nixos/lib/default.nix` of the nixpkgs source takes
+            # `lib` and defaults it to `import ../../lib`, the
+            # library of the tree it lives in. It is the argument
+            # of that file rather than of `evalModules`, so it is
+            # read out of the call here and handed to the import;
+            # the twin replaces it like any other evaluator
+            # argument.
+            lib = common.lib;
+          }
+          // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
+        in
+        {
+          value =
+            (import "${common.src}/nixos/lib" {
+              inherit (callArgs) lib;
+            }).evalModules
+              (builtins.removeAttrs callArgs [ "lib" ]);
+        };
+
+      configuration =
+        args:
+        final.caisson-core.mkConfiguration {
+          # In the tree an evaluation of an alt is a configuration of
+          # the integration that owns the class: it is declared under
+          # `caisson.nixos.configurations`, published where NixOS
+          # configurations are, and `nearest.nixos` for what is beneath
+          # it.
+          type = "nixos";
+          perSystem = true;
+          evaluate = evaluate args;
+        };
     in
     {
       caisson = (prev.caisson or { }) // {
         nixos-minimal = final.caisson.integrations.mkAltIntegration {
           inherit over;
           # The arguments of `lib.caisson.nixos.mkConfiguration`,
-          # documented there, plus `prefix`. The composition of the
-          # nixos class destructures `pkgSets` and `configModule`
-          # without a default. The minimal evaluator takes no base
-          # modules; lib.caisson.nixos.mkConfiguration evaluates with
-          # NixOS' module list.
+          # documented there, plus `prefix`, and the same result: a
+          # configuration, a function of `{ name, parent }`. The
+          # minimal evaluator takes no base modules;
+          # lib.caisson.nixos.mkConfiguration evaluates with NixOS'
+          # module list.
           mkConfiguration =
             {
-              configModule,
-              pkgSets,
+              configModule ? null,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
@@ -80,18 +93,26 @@
               # evaluation sits at.
               prefix ? null,
             }@args:
-            evaluation args;
+            configuration args;
           mkConfigurationWithEcosystemArgs =
             {
-              configModule,
-              pkgSets,
+              configModule ? null,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
               prefix ? null,
               ecosystemArgs ? null,
             }@args:
-            evaluation args;
+            configuration args;
+          extra = {
+            # A minimal configuration that is a top, as
+            # `lib.caisson.nixos.mkTopConfiguration` returns it.
+            mkTopConfiguration =
+              rawArgs:
+              final.caisson.integrations.topValue (
+                final.caisson-core.finalizeTop (final.caisson.nixos-minimal.mkConfiguration rawArgs)
+              );
+          };
         };
       };
     };

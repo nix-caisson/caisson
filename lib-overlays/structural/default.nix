@@ -101,7 +101,10 @@
           evaluate = evaluate args;
         };
 
-      # What a tool reads from a top: the exports, with the manifest
+      # What a tool reads from a top: the registries it exports and the
+      # configurations declared beneath it, each published under the
+      # output attribute set its integration declares and named from
+      # its path (`nixosConfigurations.<name>`), with the manifest
       # beside them for `manifestOf` and `topside --file`. A top has no
       # parent to declare it under an attribute, so its name is the name
       # the composition declares on mkLib.
@@ -109,8 +112,10 @@
         rawArgs:
         let
           manifest = final.caisson-core.finalizeTop (final.caisson.structural.mkConfiguration rawArgs);
+          exports = manifest.outputs.exports;
         in
-        manifest.outputs.exports
+        builtins.removeAttrs exports [ "configurations" ]
+        // final.caisson.integrations.publish exports.configurations
         // {
           caisson.manifest = manifest;
         };

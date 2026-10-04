@@ -91,7 +91,10 @@
       # `lib.caisson.nixos.mkConfiguration`, as its pattern: a wrong
       # argument is reported under the constructor's name, at the
       # configuration that called it. `deployment.*` is set in the
-      # host's configModule; the node declares those options.
+      # host's configModule; the node declares those options. What a
+      # constructor returns is a NixOS configuration, a function of
+      # `{ name, parent }`, and the colmena configuration finalizes it
+      # under the name of the node it is declared as.
       mkNodeConstructors =
         src:
         let
@@ -112,21 +115,17 @@
           mkNixosConfiguration =
             {
               configModule,
-              pkgSets,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
-              system ? null,
             }@args:
             final.caisson.nixos.mkConfiguration (nodeArgsOf args);
           mkNixosConfigurationWithEcosystemArgs =
             {
               configModule,
-              pkgSets,
               ecosystemSrc ? null,
               moduleImports ? null,
               specialArgs ? null,
-              system ? null,
               ecosystemArgs ? null,
             }@args:
             final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args);
@@ -171,9 +170,33 @@
           };
         };
 
+      # A node as declared is a NixOS configuration, finalized under
+      # the node's name with the composition's manifest as its parent,
+      # which gives its evaluations by system. A node is a machine, so
+      # there has to be exactly one evaluation, whose value is the
+      # evaluated NixOS configuration the hive holds.
       checkNode =
-        name: node:
-        if builtins.isAttrs node && node ? config && node.config ? deployment then
+        name: declared:
+        let
+          evaluations = final.caisson-core.finalizeChild {
+            inherit name;
+            parent = final.caisson-core.libManifest;
+            what = "`nodes.${name}`";
+          } declared;
+          systems = builtins.attrNames evaluations;
+          node = evaluations.${builtins.head systems}.value;
+        in
+        if builtins.length systems != 1 then
+          throw ''
+            lib.caisson.colmena.mkConfiguration: nodes.${name} is a machine, and
+            the NixOS configuration declared for it has ${
+              if systems == [ ] then
+                "no evaluation, since no system is in force"
+              else
+                "an evaluation at each of ${builtins.concatStringsSep ", " systems}"
+            }. A node is evaluated at exactly one system.
+          ''
+        else if node ? config && node.config ? deployment then
           node
         else
           throw ''

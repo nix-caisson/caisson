@@ -122,6 +122,28 @@ let
 
   pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
 
+  # What a composition declares for the NixOS configurations evaluated
+  # on it: the system, and a package config whose set at that system is
+  # `pkgs`.
+  declaresPkgs = {
+    systems = [ "x86_64-linux" ];
+    pkgSets = _lib: {
+      default =
+        { name, parent }:
+        {
+          _type = "caisson-manifest";
+          type = "nixpkgs";
+          inherit name parent;
+          children.nixpkgs.x86_64-linux = {
+            _type = "caisson-manifest";
+            type = "nixpkgs";
+            name = "x86_64-linux";
+            value = pkgs;
+          };
+        };
+    };
+  };
+
   minimalNixosBase =
     { ... }:
     {
@@ -136,15 +158,18 @@ let
   # The colmena probes compose with declared ecosystems: a node's
   # `ecosystemSrc` is colmena's, and nixpkgs resolves from the
   # declaration, as it does in a consumer flake.
-  hiveLib = core.mkLib {
-    sources = { };
-    projects = {
-      caisson = inputs.caisson;
-    };
-    defaultEcosystemSrc = {
-      inherit (inputs) nixpkgs colmena;
-    };
-  };
+  hiveLib = core.mkLib (
+    declaresPkgs
+    // {
+      sources = { };
+      projects = {
+        caisson = inputs.caisson;
+      };
+      defaultEcosystemSrc = {
+        inherit (inputs) nixpkgs colmena;
+      };
+    }
+  );
 
   results = {
 
@@ -260,9 +285,8 @@ let
 
     minimalNixosSystemEvaluates =
       let
-        system = composed.lib.caisson.nixos-minimal.mkConfiguration {
+        system = hiveLib.caisson.nixos-minimal.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
           # The minimal evaluator carries no nixpkgs module, so the
           # package set arrives as the `pkgs` module argument.
           configModule =
@@ -331,9 +355,8 @@ let
 
     nixosAdapterUpstreamModeEvaluatesEndToEnd =
       let
-        system = composed.lib.caisson.nixos.mkConfiguration {
+        system = hiveLib.caisson.nixos.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
           configModule =
             { ... }:
             {
@@ -369,9 +392,8 @@ let
 
     nixosAdapterUserServiceModeEvaluatesEndToEnd =
       let
-        system = composed.lib.caisson.nixos.mkConfiguration {
+        system = hiveLib.caisson.nixos.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
           configModule =
             { ... }:
             {
@@ -406,7 +428,6 @@ let
             {
               meta.allowApplyAll = false;
               nodes.probe-node = mkNixosConfiguration {
-                pkgSets.pkgs = pkgs;
                 configModule = {
                   imports = [ minimalNixosBase ];
                   networking.hostName = "probe";
@@ -439,15 +460,13 @@ let
             {
               nodes.probe = mkNixosConfiguration {
                 ecosystemSrc = inputs.nixpkgs;
-                pkgSets.pkgs = pkgs;
                 configModule = hostModule;
               };
             };
         };
         node = hive.nodes.probe;
-        system = hiveLib.caisson.nixos.mkConfiguration {
+        system = hiveLib.caisson.nixos.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
           configModule = hostModule;
         };
       in
@@ -461,7 +480,6 @@ let
       !(builtins.tryEval
         (hiveLib.caisson.colmena.mkConfiguration {
           configModule.nodes.plain = hiveLib.caisson.nixos.mkConfiguration {
-            pkgSets.pkgs = pkgs;
             configModule = minimalNixosBase;
           };
         }).nodes.plain
@@ -482,7 +500,6 @@ let
                   (
                     hostName: peer:
                     mkNixosConfiguration {
-                      pkgSets.pkgs = pkgs;
                       configModule =
                         { ... }:
                         {
@@ -522,7 +539,6 @@ let
                 { mkNixosConfiguration, ... }:
                 {
                   nodes.${nodeName} = mkNixosConfiguration {
-                    pkgSets.pkgs = pkgs;
                     configModule = minimalNixosBase;
                   };
                 };
@@ -559,17 +575,22 @@ let
     # `ecosystemArgs`, applied last.
     ecosystemArgsTwinsReachTheEvaluator =
       let
-        minimal = composed.lib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
-          ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
-          configModule =
-            { lib, ... }:
-            {
-              options.probe = lib.mkOption { type = lib.types.raw; };
-              config.probe = "minimal";
-            };
-          ecosystemArgs.prefix = [ "probe-prefix" ];
-        };
+        minimal = (
+          hiveLib.caisson.integrations.topValue (
+            hiveLib.caisson-core.finalizeTop (
+              hiveLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+                ecosystemSrc = inputs.nixpkgs;
+                configModule =
+                  { lib, ... }:
+                  {
+                    options.probe = lib.mkOption { type = lib.types.raw; };
+                    config.probe = "minimal";
+                  };
+                ecosystemArgs.prefix = [ "probe-prefix" ];
+              }
+            )
+          )
+        );
         terraform = composed.lib.caisson.terranix.mkConfigurationWithEcosystemArgs {
           ecosystemSrc = inputs.terranix;
           configModule = {
@@ -597,41 +618,43 @@ let
 
     overlayBorneModulesReachAdapters =
       let
-        contributingLib = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          libOverlays = _mkLibOverlay: {
-            nixos = inputs.caisson.libOverlays.nixos;
-            nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
-            contrib = core.mkLibOverlay (
-              {
-                mkModule,
-                contributeModules,
-                ...
-              }:
-              {
-                imports = [ ];
-                overlay =
-                  _final: prev:
-                  contributeModules prev {
-                    nixos.pinned-world-probe = mkModule "nixos" (
-                      { ... }:
-                      { lib, ... }:
-                      {
-                        options.compatProbe = lib.mkOption {
-                          type = lib.types.bool;
-                          default = true;
-                        };
-                      }
-                    );
-                  };
-              }
-            );
-          };
-        };
-        system = contributingLib.caisson.nixos-minimal.mkConfiguration {
+        contributingLib = core.mkLib (
+          declaresPkgs
+          // {
+            sources = { };
+            defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+            libOverlays = _mkLibOverlay: {
+              nixos = inputs.caisson.libOverlays.nixos;
+              nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
+              contrib = core.mkLibOverlay (
+                {
+                  mkModule,
+                  contributeModules,
+                  ...
+                }:
+                {
+                  imports = [ ];
+                  overlay =
+                    _final: prev:
+                    contributeModules prev {
+                      nixos.pinned-world-probe = mkModule "nixos" (
+                        { ... }:
+                        { lib, ... }:
+                        {
+                          options.compatProbe = lib.mkOption {
+                            type = lib.types.bool;
+                            default = true;
+                          };
+                        }
+                      );
+                    };
+                }
+              );
+            };
+          }
+        );
+        system = contributingLib.caisson.nixos-minimal.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
           configModule =
             { lib, ... }:
             {
@@ -714,16 +737,18 @@ let
 
     projectConsumptionComposesCaissonWhole =
       let
-        composedFromProject = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          projects = {
-            caisson = inputs.caisson;
-          };
-        };
-        system = composedFromProject.caisson.nixos-minimal.mkConfiguration {
+        composedFromProject = core.mkLib (
+          declaresPkgs
+          // {
+            sources = { };
+            defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+            projects = {
+              caisson = inputs.caisson;
+            };
+          }
+        );
+        system = composedFromProject.caisson.nixos-minimal.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
-          pkgSets.pkgs = pkgs;
           configModule =
             { pkgs, lib, ... }:
             {
@@ -738,16 +763,18 @@ let
 
     declaredEcosystemServesAdapters =
       let
-        composedWithDeclaration = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
-          libOverlays = _mkLibOverlay: {
-            nixos = inputs.caisson.libOverlays.nixos;
-            nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
-          };
-        };
-        system = composedWithDeclaration.caisson.nixos-minimal.mkConfiguration {
-          pkgSets.pkgs = pkgs;
+        composedWithDeclaration = core.mkLib (
+          declaresPkgs
+          // {
+            sources = { };
+            defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
+            libOverlays = _mkLibOverlay: {
+              nixos = inputs.caisson.libOverlays.nixos;
+              nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
+            };
+          }
+        );
+        system = composedWithDeclaration.caisson.nixos-minimal.mkTopConfiguration {
           configModule =
             { lib, pkgs, ... }:
             {

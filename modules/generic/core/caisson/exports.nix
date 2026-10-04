@@ -27,6 +27,18 @@ in
       description = "Per class, the registered modules `caisson.modules.<class>.exported` selected, merged with what lies beneath.";
     };
 
+    configurations = lib.mkOption {
+      type = lib.types.listOf lib.types.raw;
+      internal = true;
+      description = ''
+        The configurations declared beneath this configuration, at any
+        depth, that it passes up: for each, its manifest and its path
+        from here, a list of `{ type, name }` segments. A top names
+        them from their paths and publishes each under the output
+        attribute set its integration declares.
+      '';
+    };
+
     pkgOverlays = lib.mkOption {
       type = lib.types.attrsOf lib.types.raw;
       description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what lies beneath.";

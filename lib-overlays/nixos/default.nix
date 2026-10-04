@@ -28,10 +28,11 @@
         context = "caisson.nixos";
       };
 
-      composeNixos = import ./compose.nix { inherit final; };
+      composeNixos = import ./compose.nix;
 
-      # The composition of the class: the module list, the special
-      # arguments and the resolved nixpkgs source, from the caisson
+      # The composition of the class, on the view being evaluated: the
+      # module list, the special arguments, the system, the package
+      # sets and the resolved nixpkgs source, from the caisson
       # arguments. Every entry point here builds on it, and so does an
       # integration that evaluates the nixos class with another
       # evaluator (nixos-minimal), through `lib.caisson.nixos.compose`.
@@ -43,25 +44,26 @@
           # set is the `pkgs` module argument.
           nixpkgsModule ? true,
         }:
-        args:
-        composeNixos { inherit context nixpkgsModule; } args
+        view: args:
+        composeNixos { inherit context nixpkgsModule; } view args
         // {
           src = resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
-            manifest = final.caisson-core.libManifest or { };
+            manifest = view.lib.caisson-core.libManifest or { };
           };
         };
 
-      # eval-config evaluations. `system` defaults to the package set's
-      # host platform.
-      composeEvalConfig =
-        args:
+      # The evaluator's call, on the view being evaluated: eval-config
+      # over the composition, at the configuration's system.
+      # `baseModules` is passed where the entry point names NixOS'
+      # module list itself. `ecosystemArgs`, which only the twin's
+      # pattern admits, is merged over the call last.
+      evaluate =
+        { explicitBaseModules }:
+        args: view:
         let
-          common = compose { } args;
-        in
-        common
-        // {
-          ecosystemArgs = {
+          common = compose { } view args;
+          callArgs = {
             modules = common.modules;
             specialArgs = common.specialArgs;
             # `nixos/lib/eval-config.nix` of the nixpkgs source
@@ -71,63 +73,84 @@
             # merging and its type checking, and the library the
             # result publishes as `.lib`.
             lib = common.lib;
-            system =
-              args.system or (common.checkedPkgSets.pkgs.stdenv.hostPlatform.system
-                or (common.checkedPkgSets.pkgs.system or null)
-              );
+            system = common.system;
+          }
+          // (
+            if explicitBaseModules then
+              { baseModules = import "${common.src}/nixos/modules/module-list.nix"; }
+            else
+              { }
+          )
+          // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
+          value = import "${common.src}/nixos/lib/eval-config.nix" callArgs;
+        in
+        {
+          inherit value;
+          # What `nixos-rebuild` reads from a configuration, each a
+          # reference into `config.system.build`.
+          outputs = {
+            toplevel = value.config.system.build.toplevel;
+            vm = value.config.system.build.vm;
+            vmWithBootLoader = value.config.system.build.vmWithBootLoader;
+            images = value.config.system.build.images;
           };
         };
-      evalConfig = composed: callArgs: import "${composed.src}/nixos/lib/eval-config.nix" callArgs;
 
-      evaluation = final.caisson.integrations.mkEvaluation {
-        compose = composeEvalConfig;
-        evaluate = evalConfig;
-      };
+      configuration =
+        variant: args:
+        final.caisson-core.mkConfiguration {
+          type = "nixos";
+          # A NixOS configuration is evaluated at a system: it has an
+          # evaluation for every system in force where it is declared.
+          perSystem = true;
+          evaluate = evaluate variant args;
+        };
 
-      # eval-config with nixpkgs' module list passed explicitly as
-      # `baseModules`. The signature is that of `mkConfiguration`.
-      mkConfigurationFull =
-        {
-          configModule,
-          pkgSets,
-          ecosystemSrc ? null,
-          moduleImports ? null,
-          specialArgs ? null,
-          system ? null,
-        }@args:
-        let
-          composed = composeEvalConfig args;
-        in
-        evalConfig composed (
-          composed.ecosystemArgs
-          // {
-            baseModules = import "${composed.src}/nixos/modules/module-list.nix";
-          }
+      # A NixOS configuration that is a top, as a tool reads it: the
+      # evaluated configuration, which is what `nixos-rebuild --file`
+      # reads and what a test or the REPL evaluates with no
+      # configuration above it. Where the composition has several
+      # systems in force, it is the evaluated configurations by
+      # system, and where it has none, the empty set: the evaluations
+      # are named as anything published is (`integrations.topValue`).
+      # Its name is the name the composition declares on mkLib.
+      mkTopConfiguration =
+        rawArgs:
+        final.caisson.integrations.topValue (
+          final.caisson-core.finalizeTop (final.caisson.nixos.mkConfiguration rawArgs)
         );
 
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
         class = "nixos";
-        # The signature of the entry points over the nixos class; the
-        # colmena node constructors take the same arguments, and
+        # A top publishes NixOS configurations as
+        # `nixosConfigurations.<name>`, each the evaluated
+        # configuration, which is what `nixos-rebuild` reads.
+        exportsTo = {
+          attrset = "nixosConfigurations";
+          value = manifest: manifest.value;
+        };
+        # What these return is a configuration, a function of
+        # `{ name, parent }`: a parent that declares it under
+        # `caisson.nixos.configurations.<name>` finalizes it, and
+        # `mkTopConfiguration` finalizes it at a top. The colmena node
+        # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # composition (compose.nix) destructures `pkgSets` and
-        # `configModule` without a default and supplies the value of
-        # every optional argument left out; it checks the package set
-        # again, for the narrower mistake, a `pkgSets` that carries no
-        # `pkgs`.
+        # configuration is evaluated at every system in force where it
+        # is declared, and its package sets come from the composition,
+        # through the manifest; it selects its set with the
+        # `caisson.nixpkgs.pkgSet` option.
         mkConfiguration =
           {
-            # The configuration's module. Further modules of the class
-            # are selected with `moduleImports`, from the registry. The
-            # base module list belongs to the entry point:
-            # mkConfiguration and mkConfigurationFull evaluate with
-            # NixOS' module list, lib.caisson.nixos-minimal.mkConfiguration
-            # without it.
-            configModule,
-            # The package sets; `pkgSets.pkgs` is the set the evaluation
-            # runs on.
-            pkgSets,
+            # The configuration's module. When absent, the configuration
+            # registered under the configuration's name
+            # (`lib.caisson-core.configs.nixos.<name>`), if any. Further
+            # modules of the class are selected with `moduleImports`,
+            # from the registry. The base module list belongs to the
+            # entry point: mkConfiguration and mkConfigurationFull
+            # evaluate with NixOS' module list,
+            # lib.caisson.nixos-minimal.mkConfiguration without it.
+            configModule ? null,
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -137,27 +160,32 @@
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
-            # eval-config's `system`; the host platform of
-            # `pkgSets.pkgs` when absent.
-            system ? null,
           }@args:
-          evaluation args;
+          configuration { explicitBaseModules = false; } args;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
           {
-            configModule,
-            pkgSets,
+            configModule ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             specialArgs ? null,
-            system ? null,
             ecosystemArgs ? null,
           }@args:
-          evaluation args;
+          configuration { explicitBaseModules = false; } args;
         extra = {
-          inherit mkConfigurationFull;
-          # The two-stage composition an alt over this class reads.
+          inherit mkTopConfiguration;
+          # eval-config with nixpkgs' module list passed explicitly as
+          # `baseModules`. The signature is that of `mkConfiguration`.
+          mkConfigurationFull =
+            {
+              configModule ? null,
+              ecosystemSrc ? null,
+              moduleImports ? null,
+              specialArgs ? null,
+            }@args:
+            configuration { explicitBaseModules = true; } args;
+          # The composition an alt over this class reads.
           inherit compose;
         };
       };
