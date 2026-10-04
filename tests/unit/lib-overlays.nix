@@ -2352,6 +2352,72 @@ in
           };
       };
 
+      # A configuration reaches the top through every level above it,
+      # whatever their integrations: each level passes up what is
+      # beneath it. Here a machine sits beneath a machine, beneath a
+      # structural configuration, beneath a flake-parts configuration,
+      # and the modules of those levels declare configurations and
+      # nothing else.
+      "test: a configuration is published through levels of any integration" = {
+        expr =
+          let
+            top = publishingLib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.flake-parts.configurations.site = lib.caisson.flake-parts.mkConfiguration {
+                    moduleImports = _modules: [ ];
+                    configModule =
+                      { lib, ... }:
+                      {
+                        caisson.structural.configurations.rack = lib.caisson.structural.mkConfiguration {
+                          moduleImports = _modules: [ ];
+                          configModule =
+                            { lib, ... }:
+                            {
+                              caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
+                                configModule =
+                                  { lib, ... }:
+                                  {
+                                    caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                                      configModule = { ... }: { };
+                                    };
+                                  };
+                              };
+                            };
+                        };
+                      };
+                  };
+                };
+            };
+            image =
+              top.caisson.manifest.children.flake-parts.site.children.structural.rack.children.system.x86_64-linux.children.nixos.host.children.system.x86_64-linux.children.nixos.image;
+          in
+          {
+            published = builtins.attrNames top.nixosConfigurations;
+            # What is published is the evaluation in the tree.
+            same = top.nixosConfigurations.image == image.value;
+            above = builtins.map (ancestor: ancestor.type) image.ancestors;
+          };
+        expected = {
+          published = [
+            "host"
+            "image"
+          ];
+          same = true;
+          above = [
+            "lib"
+            "structural"
+            "flake-parts"
+            "structural"
+            "system"
+            "nixos"
+            "system"
+          ];
+        };
+      };
+
       # The configurations beneath a NixOS configuration, in the tree
       # and at a top: they are in its manifest, under
       # their system where they are evaluated at one, they see it as
