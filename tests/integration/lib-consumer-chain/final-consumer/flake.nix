@@ -28,7 +28,7 @@
         };
       };
     in
-    lib.caisson.flake-parts.mkConfiguration {
+    lib.caisson.flake-parts.mkTopConfiguration {
       configModule = lib.caisson.flake-parts.mkModule ./configs/flake/final-consumer;
     };
 }

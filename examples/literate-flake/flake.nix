@@ -99,7 +99,7 @@
     /*
       Step 2: Create the flake outputs.
 
-      `lib.caisson.flake-parts.mkConfiguration` wraps flake-parts' mkFlake, injecting the framework's core
+      `lib.caisson.flake-parts.mkTopConfiguration` wraps flake-parts' mkFlake, injecting the framework's core
       module and threading `lib` as a special arg so modules receive
       the fully composed library.
 
@@ -114,7 +114,7 @@
         nixpkgs integration's module layer). The `core` entries of the
         class apply to every evaluation regardless.
     */
-    lib.caisson.flake-parts.mkConfiguration {
+    lib.caisson.flake-parts.mkTopConfiguration {
       configModule = lib.caisson-core.configs.flake.literate-flake;
     };
 }

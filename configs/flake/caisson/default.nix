@@ -1,22 +1,13 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake top's configuration: the shared configuration of what
-# caisson exports, evaluated beneath this top with its exports merged
-# into this top's exports, plus the checks partition only a flake
-# evaluation carries. Both the configuration and the evaluation come
-# from the closure, the composition this configuration was registered
-# in.
-{ closure-inputs, closure-lib, ... }:
-{ ... }:
-let
-  # A flake-parts evaluation holds no configurations beneath it, so
-  # the shared configuration is finalized here, as a top is.
-  impl = closure-lib.caisson-core.finalizeTop (
-    closure-lib.caisson.structural.mkConfiguration {
-      configModule = closure-lib.caisson-core.configs.structural.impl;
-    }
-  );
-in
+# caisson exports, declared beneath this top under the name it is
+# registered by (configs/structural/impl), plus the checks partition
+# only a flake evaluation carries. What the shared configuration
+# exports is passed up into this top's exports, and from there into
+# the flake outputs.
+{ closure-inputs, ... }:
+{ lib, ... }:
 {
 
   imports = [
@@ -30,6 +21,6 @@ in
 
   debug = false;
 
-  caisson.exports = impl.outputs.exports;
+  caisson.structural.configurations.impl = lib.caisson.structural.mkConfiguration { };
 
 }

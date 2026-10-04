@@ -696,7 +696,7 @@ let
             flake-parts = inputs.caisson.libOverlays.flake-parts;
           };
         };
-        outputs = composedWithSystems.caisson.flake-parts.mkConfiguration {
+        outputs = composedWithSystems.caisson.flake-parts.mkTopConfiguration {
           configModule = {
             perSystem =
               { system, ... }:
@@ -799,7 +799,7 @@ let
         top = composedWithBoth.caisson.structural.mkTopConfiguration {
           configModule = selectors;
         };
-        flake = composedWithBoth.caisson.flake-parts.mkConfiguration {
+        flake = composedWithBoth.caisson.flake-parts.mkTopConfiguration {
           configModule = selectors;
         };
       in

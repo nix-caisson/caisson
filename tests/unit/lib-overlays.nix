@@ -19,7 +19,7 @@ let
 
   # Test-facing mkLib: registers the flake-parts and structural
   # integrations into every test composition (so composed test
-  # libraries carry caisson.flake-parts.mkConfiguration and
+  # libraries carry caisson.flake-parts.mkTopConfiguration and
   # caisson.structural.mkTopConfiguration), and otherwise defers to
   # caisson-core.mkLib.
   # Malformed arguments pass through untouched so the machinery's
@@ -1003,7 +1003,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1049,7 +1049,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1093,7 +1093,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1117,7 +1117,7 @@ in
     "test: caisson.nixpkgs.overlays.all is not an option" = {
       expr =
         let
-          outputs = lib.caisson.flake-parts.mkConfiguration {
+          outputs = lib.caisson.flake-parts.mkTopConfiguration {
             configModule = mkFlakePartsModule (
               { ... }:
               {
@@ -1137,7 +1137,7 @@ in
       };
     };
 
-    "test: modules.flake attrset receives working modules in flake-parts.mkConfiguration" = {
+    "test: modules.flake attrset receives working modules in flake-parts.mkTopConfiguration" = {
       expr =
         let
           myLib = mkTestLib {
@@ -1162,7 +1162,7 @@ in
       expected = true;
     };
 
-    "test: modules registered via lib aliases work in flake-parts.mkConfiguration" = {
+    "test: modules registered via lib aliases work in flake-parts.mkTopConfiguration" = {
       expr =
         let
           myLib = caisson.mkLib {
@@ -1178,7 +1178,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1264,7 +1264,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1367,7 +1367,7 @@ in
     # raised before the composition is entered. `tryEval` cannot catch
     # it, so each refusal is an expected error.
     "test: refuses inputs (they belong to mkLib)" = {
-      expr = lib.caisson.flake-parts.mkConfiguration {
+      expr = lib.caisson.flake-parts.mkTopConfiguration {
         inputs = { };
         configModule = { };
       };
@@ -1375,7 +1375,7 @@ in
     };
 
     "test: refuses modules (configModule and moduleImports carry them)" = {
-      expr = lib.caisson.flake-parts.mkConfiguration {
+      expr = lib.caisson.flake-parts.mkTopConfiguration {
         modules = [ ];
         configModule = { };
       };
@@ -1383,7 +1383,7 @@ in
     };
 
     "test: refuses evaluator arguments outside the ecosystem-args twin" = {
-      expr = lib.caisson.flake-parts.mkConfiguration {
+      expr = lib.caisson.flake-parts.mkTopConfiguration {
         configModule = { };
         ecosystemArgs = { };
       };
@@ -1425,7 +1425,7 @@ in
     };
 
     "test: specialArgs merges with user-provided specialArgs" = {
-      # flake-parts.mkConfiguration merges { lib = final; } with any specialArgs the caller provides.
+      # flake-parts.mkTopConfiguration merges { lib = final; } with any specialArgs the caller provides.
       expr =
         let
           filteredArgs = {
@@ -1539,7 +1539,7 @@ in
             };
           };
 
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1572,7 +1572,7 @@ in
             };
           };
 
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -1586,7 +1586,7 @@ in
       expected = true;
     };
 
-    "test: flake-parts.mkConfiguration works when modules.flake is absent" = {
+    "test: flake-parts.mkTopConfiguration works when modules.flake is absent" = {
       expr =
         let
           myLib = caisson.mkLib {
@@ -1597,7 +1597,7 @@ in
               };
             };
           };
-          outputs = myLib.caisson.flake-parts.mkConfiguration {
+          outputs = myLib.caisson.flake-parts.mkTopConfiguration {
             configModule = myLib.caisson.flake-parts.mkModule (
               { ... }:
               {
@@ -2577,7 +2577,7 @@ in
             top = registeringLib.caisson.structural.mkTopConfiguration {
               configModule = registeringLib.caisson.structural.mkModule selectors;
             };
-            flake = registeringLib.caisson.flake-parts.mkConfiguration {
+            flake = registeringLib.caisson.flake-parts.mkTopConfiguration {
               configModule = registeringLib.caisson.flake-parts.mkModule (
                 { ... }:
                 {
@@ -2702,7 +2702,7 @@ in
                     thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
                   };
                 };
-              }).caisson.flake-parts.mkConfiguration
+              }).caisson.flake-parts.mkTopConfiguration
                 {
                   configModule = {
                     systems = [ "x86_64-linux" ];
@@ -2746,7 +2746,7 @@ in
                     thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
                   };
                 };
-              }).caisson.flake-parts.mkConfiguration
+              }).caisson.flake-parts.mkTopConfiguration
                 {
                   configModule = {
                     systems = [ "x86_64-linux" ];
@@ -2980,30 +2980,76 @@ in
         };
       };
 
-      # A flake-parts evaluation carries no manifest, so a configuration
-      # declared beneath one is refused when it is read.
-      "test: a flake-parts evaluation holds no configurations beneath it" = {
+      # A flake-parts evaluation holds configurations beneath it as a
+      # structural one does: each is finalized under its name and the
+      # childless manifest of the flake evaluation, and what it exports
+      # is passed up into the flake outputs.
+      "test: a flake-parts evaluation holds configurations beneath it" = {
         expr =
           let
-            outputs = nestingLib.caisson.flake-parts.mkConfiguration {
-              configModule =
-                { config, lib, ... }:
-                {
-                  systems = [ "x86_64-linux" ];
-                  caisson.structural.configurations.inner = lib.caisson.structural.mkConfiguration { };
-                  flake.declared = builtins.attrNames config.caisson.structural.configurations;
-                  flake.read = config.caisson.structural.configurations.inner.name;
-                };
-              moduleImports = _modules: [ ];
-            };
+            top = registeringLib.caisson-core.finalizeTop (
+              registeringLib.caisson.flake-parts.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    systems = [ "x86_64-linux" ];
+                    caisson.modules.flake.exported = _modules: { };
+                    caisson.libOverlays.exported = _overlays: { };
+                    caisson.structural.configurations.inner = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule = {
+                        caisson.modules.flake.exported = modules: { inherit (modules) thing; };
+                        caisson.libOverlays.exported = overlays: { inherit (overlays) provider; };
+                      };
+                    };
+                  };
+                moduleImports = _modules: [ ];
+              }
+            );
+            inner = top.children.structural.inner;
           in
           {
-            inherit (outputs) declared;
-            read = (builtins.tryEval outputs.read).success;
+            type = top.type;
+            children = builtins.mapAttrs (_: builtins.attrNames) top.children;
+            innerParent = {
+              inherit (inner.parent) type childless;
+            };
+            innerNearest = builtins.attrNames inner.nearest;
+            flakeModules = builtins.attrNames top.outputs.flake.modules.flake;
+            flakeLibOverlays = builtins.attrNames top.outputs.flake.libOverlays;
+            # `mkTopConfiguration` is the finalized configuration's flake
+            # outputs.
+            topReturnsTheFlakeOutputs =
+              let
+                args = {
+                  configModule = {
+                    systems = [ "x86_64-linux" ];
+                  };
+                  moduleImports = _modules: [ ];
+                };
+                finalized = registeringLib.caisson-core.finalizeTop (
+                  registeringLib.caisson.flake-parts.mkConfiguration args
+                );
+              in
+              builtins.attrNames (registeringLib.caisson.flake-parts.mkTopConfiguration args)
+              == builtins.attrNames finalized.outputs.flake;
           };
         expected = {
-          declared = [ "inner" ];
-          read = false;
+          type = "flake-parts";
+          children = {
+            structural = [ "inner" ];
+          };
+          innerParent = {
+            type = "flake-parts";
+            childless = true;
+          };
+          innerNearest = [ "flake-parts" ];
+          flakeModules = [
+            "default"
+            "thing"
+          ];
+          flakeLibOverlays = [ "provider" ];
+          topReturnsTheFlakeOutputs = true;
         };
       };
 
@@ -3444,10 +3490,10 @@ in
         );
       };
 
-      # The structural entry point takes `configModule` as optional: it
-      # finds the configuration registered under the configuration's
-      # name.
-      "test: every entry point takes configModule and pkgSets, and all but structural require configModule" =
+      # The structural and flake-parts entry points take `configModule`
+      # as optional: each finds the configuration registered under the
+      # name of the configuration.
+      "test: every entry point takes configModule and pkgSets, and all but structural and flake-parts require configModule" =
         {
           expr = builtins.listToAttrs (
             builtins.map (name: {
@@ -3456,7 +3502,9 @@ in
                 let
                   signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
                 in
-                signature ? configModule && signature.configModule == (name == "structural") && signature ? pkgSets;
+                signature ? configModule
+                && signature.configModule == (name == "structural" || name == "flake-parts")
+                && signature ? pkgSets;
             }) integrationNames
           );
           expected = builtins.listToAttrs (

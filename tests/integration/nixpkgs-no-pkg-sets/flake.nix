@@ -26,7 +26,7 @@
         };
       };
     in
-    lib.caisson.flake-parts.mkConfiguration {
+    lib.caisson.flake-parts.mkTopConfiguration {
       # The default default applies caisson/default, which carries the
       # nixpkgs machinery through the projects channel; this flake
       # configures none of it.

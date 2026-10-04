@@ -37,7 +37,7 @@ fit together instead of colliding.
 ## Quick start
 
 Use `caisson-core.mkLib` to compose your library, then
-`lib.caisson.flake-parts.mkConfiguration` to produce the flake outputs. By convention, your primary configuration
+`lib.caisson.flake-parts.mkTopConfiguration` to produce the flake outputs. By convention, your primary configuration
 lives in `configs/flake/<flake-name>`, and the registrations are read
 from the directories: `modules/<class>/<name>`, `configs/<class>/<name>`
 and `lib-overlays/<name>`.
@@ -93,7 +93,7 @@ and `lib-overlays/<name>`.
 
       };
 
-    in lib.caisson.flake-parts.mkConfiguration {
+    in lib.caisson.flake-parts.mkTopConfiguration {
 
       # Convention: your primary config lives in configs/flake/<flake-name>
       configModule = lib.caisson-core.configs.flake.my-flake;
