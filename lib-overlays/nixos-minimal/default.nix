@@ -88,6 +88,7 @@
               configModule ? null,
               ecosystemSrc ? null,
               moduleImports ? null,
+              extraModuleImports ? null,
               specialArgs ? null,
               # The `prefix` of evalModules, the option path the
               # evaluation sits at.
@@ -99,6 +100,7 @@
               configModule ? null,
               ecosystemSrc ? null,
               moduleImports ? null,
+              extraModuleImports ? null,
               specialArgs ? null,
               prefix ? null,
               ecosystemArgs ? null,

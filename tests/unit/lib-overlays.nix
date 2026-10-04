@@ -2360,16 +2360,27 @@ in
       "test: a configuration registers modules for the configurations beneath it" = {
         expr =
           let
-            noted =
-              note:
-              { lib, ... }:
-              {
-                options.notes = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ ];
-                };
-                config.notes = [ note ];
-              };
+            # The option the test modules define into, keyed so that a
+            # configuration importing several of them declares it
+            # once.
+            notesOption = {
+              key = "test-notes-option";
+              imports = [
+                (
+                  { lib, ... }:
+                  {
+                    options.notes = lib.mkOption {
+                      type = lib.types.listOf lib.types.str;
+                      default = [ ];
+                    };
+                  }
+                )
+              ];
+            };
+            noted = note: {
+              imports = [ notesOption ];
+              config.notes = [ note ];
+            };
             top = publishingLib.caisson-core.finalizeTop (
               publishingLib.caisson.structural.mkConfiguration {
                 moduleImports = _modules: [ ];
@@ -2390,6 +2401,12 @@ in
                     caisson.nixos.configurations.chosen = lib.caisson.nixos.mkConfiguration {
                       configModule = { ... }: { };
                       moduleImports = modules: [ modules.spare ];
+                    };
+                    # `extraModuleImports` adds to the default, which
+                    # `moduleImports` replaces.
+                    caisson.nixos.configurations.added = lib.caisson.nixos.mkConfiguration {
+                      configModule = { ... }: { };
+                      extraModuleImports = modules: [ modules.spare ];
                     };
                     caisson.structural.configurations.rack = lib.caisson.structural.mkConfiguration {
                       configModule =
@@ -2412,6 +2429,7 @@ in
             top = top.value.config.notes;
             direct = machines.direct.value.config.notes;
             chosen = machines.chosen.value.config.notes;
+            added = builtins.sort builtins.lessThan machines.added.value.config.notes;
             rack = rack.value.config.notes;
             deep = deep.value.config.notes;
             registryAtTop = builtins.attrNames (top.modules.nixos or { });
@@ -2421,6 +2439,10 @@ in
           top = [ "top" ];
           direct = [ "site" ];
           chosen = [ "spare" ];
+          added = [
+            "site"
+            "spare"
+          ];
           rack = [ "structural site" ];
           deep = [ "rack site" ];
           registryAtTop = [ ];

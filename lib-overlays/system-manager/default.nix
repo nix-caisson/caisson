@@ -40,6 +40,7 @@
         {
           configModule,
           moduleImports ? selection.defaultModuleImports,
+          extraModuleImports ? (_registry: [ ]),
           specialArgs ? { },
           pkgSets ? null,
           ...
@@ -48,7 +49,7 @@
           registry = final.caisson-core.modules.systemManager or { };
           # The framework module of the class: every registered `core`, forced.
           coreModules = selection.coreModules registry;
-          selectedModules = moduleImports registry;
+          selectedModules = moduleImports registry ++ extraModuleImports registry;
           # system-manager instantiates nixpkgs itself from
           # `nixpkgs.hostPlatform`; a supplied package set seeds that
           # platform (an explicit hostPlatform wins) and is passed as
@@ -199,6 +200,7 @@
             # The selection over the systemManager class of the
             # registry; every entry named `default` when absent.
             moduleImports ? null,
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies; system-manager names these `extraSpecialArgs`.
             specialArgs ? null,
@@ -212,6 +214,7 @@
             pkgSets ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:

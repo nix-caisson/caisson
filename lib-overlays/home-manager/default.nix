@@ -296,6 +296,7 @@
           pkgSets,
           configModule,
           moduleImports ? selection.defaultModuleImports,
+          extraModuleImports ? (_registry: [ ]),
           specialArgs ? { },
           osConfig ? null,
           check ? true,
@@ -304,7 +305,7 @@
         }:
         let
           checkedPkgSets = assertPkgSetsFor context pkgSets;
-          selectedModules = moduleImports registry;
+          selectedModules = moduleImports registry ++ extraModuleImports registry;
           hmSource = resolveOutPath (resolveSrc ecosystemSrc);
           resolvedSourceMeta =
             if sourceMeta != null then
@@ -494,10 +495,11 @@
       mkStandaloneAdapter =
         args@{
           moduleImports ? selection.defaultModuleImports,
+          extraModuleImports ? (_registry: [ ]),
           ...
         }:
         let
-          selectedModules = moduleImports registry;
+          selectedModules = moduleImports registry ++ extraModuleImports registry;
         in
         {
           homeModules = coreModules ++ selectedModules;
@@ -527,6 +529,7 @@
           baseSystem ? null,
           sourceMeta ? null,
           moduleImports ? selection.defaultModuleImports,
+          extraModuleImports ? (_registry: [ ]),
           sharedModules ? [ ],
           useGlobalPkgs ? true,
           useUserPackages ? true,
@@ -564,7 +567,7 @@
           }:
           let
             checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
-            sharedClassModules = coreModules ++ moduleImports registry;
+            sharedClassModules = coreModules ++ moduleImports registry ++ extraModuleImports registry;
             hmSource = resolveOutPath (resolveSrc ecosystemSrc);
             resolvedSourceMeta =
               if sourceMeta != null then
@@ -793,6 +796,7 @@
             # The selection over the homeManager class of the registry;
             # every entry named `default` when absent.
             moduleImports ? null,
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies; home-manager names these `extraSpecialArgs`.
             specialArgs ? null,
@@ -814,6 +818,7 @@
             pkgSets,
             ecosystemSrc ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             osConfig ? null,
             check ? null,

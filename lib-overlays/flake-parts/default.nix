@@ -96,9 +96,7 @@
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "flake" registry;
 
-          moduleImports = selection.moduleImportsOf "flake" { inherit lib manifest; } (
-            args.moduleImports or null
-          );
+          moduleImports = selection.moduleImportsOf "flake" { inherit lib manifest; } args;
 
           # The name this configuration holds: the attribute its parent
           # declares it under, or, at a top, the name the composition
@@ -238,9 +236,13 @@
             # The flake-parts source; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
-            # The selection over the flake class of the registry; every
-            # entry named `default` when absent.
+            # The selection over the flake class of the registry. It
+            # replaces the default of the class, which is every entry
+            # named `default` followed by what the configurations
+            # above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
@@ -254,6 +256,7 @@
             pkgSets ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:

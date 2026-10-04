@@ -207,6 +207,11 @@
               default = defaultPkgOverlays pkgOverlayRegistry;
               defaultText = lib.literalMD "every registry entry named `default` or `<project>/default`";
             };
+            extraOverlays = lib.mkOption {
+              description = "Package overlay registry entries applied in addition to `overlays`. A definition of `overlays` replaces its default, and a definition here adds to whichever selection is in force.";
+              type = lib.types.listOf lib.types.raw;
+              default = [ ];
+            };
           };
         };
 
@@ -245,6 +250,7 @@
             ]
             ++ selection.coreModules registry
             ++ moduleImports registry
+            ++ (if (args.extraModuleImports or null) == null then [ ] else args.extraModuleImports registry)
             ++ (if configModule == null then [ ] else [ configModule ]);
           };
           caissonConfig = configEval.config.caisson.nixpkgs;
@@ -257,7 +263,7 @@
           scopeOverlay = final': prev': { ${projectName} = prev'.${projectName} or { }; };
           overlays =
             (if projectName == null then [ ] else [ scopeOverlay ])
-            ++ lib.caisson-core.pkgOverlaysFor caissonConfig.overlays;
+            ++ lib.caisson-core.pkgOverlaysFor (caissonConfig.overlays ++ caissonConfig.extraOverlays);
           ecosystemArgs = args.ecosystemArgs or { };
 
           setFor =
@@ -276,7 +282,7 @@
                 childless = false;
                 children = { };
                 inherit system;
-                entries = builtins.map (entry: entry.key) caissonConfig.overlays;
+                entries = builtins.map (entry: entry.key) (caissonConfig.overlays ++ caissonConfig.extraOverlays);
                 value = pkgs;
               };
               pkgs = instantiate src (
@@ -303,7 +309,9 @@
             childless = false;
             inherit (caissonConfig) systems;
             ecosystemSrc = src;
-            pkgOverlays = builtins.map (entry: entry.key) caissonConfig.overlays;
+            pkgOverlays = builtins.map (entry: entry.key) (
+              caissonConfig.overlays ++ caissonConfig.extraOverlays
+            );
             value = configEval;
             inherit config;
             children.nixpkgs = final.genAttrs caissonConfig.systems setFor;
@@ -327,6 +335,7 @@
             # The selection over the nixpkgsConfig class of the
             # registry; every entry named `default` when absent.
             moduleImports ? null,
+            extraModuleImports ? null,
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -339,6 +348,7 @@
           {
             configModule ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             ecosystemSrc ? null,
             ecosystemArgs ? null,
           }@args:
