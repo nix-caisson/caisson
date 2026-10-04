@@ -50,8 +50,7 @@ let
       throw ''
         ${what} is declared in an evaluation that carries no manifest
         (`lib.caisson-core.evalManifest` is null there), so no
-        configuration can be finalized beneath it. A flake-parts
-        evaluation is one.
+        configuration can be finalized beneath it.
       ''
     else if manifest.childless then
       throw ''

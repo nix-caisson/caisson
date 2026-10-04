@@ -2,7 +2,7 @@
 /*
   A flake module defines options, config, and per-system outputs.
 
-  Because lib.caisson.flake-parts.mkConfiguration threads the composed `lib` as a special arg, modules
+  Because the flake-parts integration threads the composed `lib` as a special arg, modules
   receive the full library -- including overlays registered by this flake.
   Here we use `lib.literate-flake.greet` which was added by our library overlay.
 

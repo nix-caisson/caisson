@@ -43,7 +43,7 @@
         };
       };
     in
-    lib.caisson.flake-parts.mkConfiguration {
+    lib.caisson.flake-parts.mkTopConfiguration {
       # The default default applies caisson/default, which carries the
       # nixpkgs machinery, so it arrives through the projects channel.
       configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-consumer;

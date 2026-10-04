@@ -21,8 +21,8 @@ shift
 flags=("$@")
 
 # Every entry point takes `configModule` and `pkgSets`. All but the
-# structural ones require `configModule`; the `nixos` ones require
-# `pkgSets` too, so an empty call may report either.
+# structural and flake-parts ones require `configModule`; the `nixos`
+# ones require `pkgSets` too, so an empty call may report either.
 namespaces=(
   nixos
   nixos-minimal
@@ -110,9 +110,10 @@ unexpected="function '[^']*%s' called with unexpected argument 'bogus'"
 for ns in "${namespaces[@]}"; do
   for fn in mkConfiguration mkConfigurationWithEcosystemArgs; do
     ep="lib.caisson.$ns.$fn"
-    # A structural entry point requires nothing: it finds the
-    # configuration registered under the configuration's name.
-    if [ "$ns" != structural ]; then
+    # A structural or flake-parts entry point requires nothing: it
+    # finds the configuration registered under the configuration's
+    # name.
+    if [ "$ns" != structural ] && [ "$ns" != flake-parts ]; then
       # shellcheck disable=SC2059
       check "$ns.$fn { }" "$ep { }" "$(printf "$missing" "$fn")"
     fi

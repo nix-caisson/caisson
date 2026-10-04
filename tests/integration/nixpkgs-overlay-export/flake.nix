@@ -31,7 +31,7 @@
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
-    lib.caisson.flake-parts.mkConfiguration {
+    lib.caisson.flake-parts.mkTopConfiguration {
       configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-overlay-export;
     };
 }

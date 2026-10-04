@@ -41,10 +41,8 @@
       };
 
     in
-    lib.caisson.flake-parts.mkConfiguration {
-
-      configModule = lib.caisson-core.configs.flake.caisson;
-
-    };
+    # The configuration registered under the name the composition
+    # declares, configs/flake/caisson.
+    lib.caisson.flake-parts.mkTopConfiguration { };
 
 }
