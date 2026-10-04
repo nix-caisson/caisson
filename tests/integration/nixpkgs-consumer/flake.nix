@@ -28,8 +28,8 @@
         projects = {
           caisson = parent;
         };
-        pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        configs = parent.lib.caisson-core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson-core.mkModules ./configs;
         # `default` finds its module by name, configs/nixpkgsConfig/default;
         # `slim` has none registered and applies the default selection
         # alone; `explicit` names the `default` configuration as its

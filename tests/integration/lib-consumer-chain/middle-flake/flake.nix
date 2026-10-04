@@ -29,9 +29,9 @@
           };
         };
 
-        libOverlays = mkLibOverlay: {
+        libOverlays = coreLib: {
           flake-parts = parent.libOverlays.flake-parts;
-          default = mkLibOverlay ./lib-overlays/default;
+          default = coreLib.caisson-core.mkLibOverlay ./lib-overlays/default;
         };
       };
     in

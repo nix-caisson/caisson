@@ -22,7 +22,7 @@
       lib = parent.lib.caisson-core.mkLib {
         inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
         name = "final-consumer";
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           flake-parts = parent.libOverlays.flake-parts;
           middle-chain = middle-flake.libOverlays.default;
         };

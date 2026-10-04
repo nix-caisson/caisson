@@ -26,8 +26,8 @@
         projects = {
           caisson = parent;
         };
-        pkgOverlays = parent.lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        configs = parent.lib.caisson-core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson-core.mkModules ./configs;
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in

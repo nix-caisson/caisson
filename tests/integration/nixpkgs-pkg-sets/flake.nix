@@ -25,8 +25,8 @@
         defaultEcosystemSrc = {
           inherit (inputs) nixpkgs;
         };
-        modules = core.mkModules ./modules;
-        pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
+        modules = lib: lib.caisson-core.mkModules ./modules;
+        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
         # The package configs: `default` takes the default selections,
         # `unfree` selects the registered nixpkgsConfig module as well.
         pkgSets = lib: {

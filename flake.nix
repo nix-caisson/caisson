@@ -35,9 +35,9 @@
         inherit (core.pins.flake inputs) sources root;
         name = "caisson";
         systems = import ./systems.nix;
-        modules = core.mkModules ./modules;
-        configs = core.mkModules ./configs;
-        libOverlays = core.mkLibOverlays ./lib-overlays;
+        modules = lib: lib.caisson-core.mkModules ./modules;
+        configs = lib: lib.caisson-core.mkModules ./configs;
+        libOverlays = lib: lib.caisson-core.mkLibOverlays ./lib-overlays;
       };
 
     in
