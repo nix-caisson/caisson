@@ -5,7 +5,7 @@
 # it is given is what `evalModules` runs on, what the `pkgsModule` and
 # the module locations are built with, and what the result publishes
 # as `lib`. `lib` defaults to `import ../../lib`, the library of the
-# tree this file lives in, so an evaluation handed none of its own
+# tree this file lives in, so an evaluation handed no `lib`
 # lands in the `lib` directory beside this one.
 #
 # The real file draws `evalModules` from `./default.nix` of this

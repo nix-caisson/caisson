@@ -217,7 +217,7 @@
                     };
                   };
                   gates = [
-                    # The framework's own cost, isolated from nixpkgs churn:
+                    # The framework's cost, isolated from nixpkgs churn:
                     # this is the number that must not creep. It includes
                     # one instantiation of flake-parts' library over the
                     # composed lib, since the raw scenario's flake-parts is

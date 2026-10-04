@@ -9,7 +9,7 @@
 # message names that.
 throw ''
   The stand-in nixpkgs tree of the unit tests was asked for the library
-  of its own tree: a NixOS evaluation reached `import ../../lib` because
+  of its tree: a NixOS evaluation reached `import ../../lib` because
   it was handed no `lib`. A NixOS evaluation runs on the composed
   library, which the nixos integration threads into the evaluator.
 ''

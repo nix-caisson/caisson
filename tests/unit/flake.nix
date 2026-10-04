@@ -13,8 +13,8 @@
     deps.url = "path:../dependencies";
 
     # Source-only: the tests register the parent's overlay files into
-    # their own composition and never evaluate the parent's outputs
-    # (which would force the parent's own caisson-core pin).
+    # their composition and never evaluate the parent's outputs
+    # (which would force the parent's caisson-core pin).
     parent.url = "path:../..";
     parent.flake = false;
 
@@ -48,7 +48,7 @@
         inherit (core.pins.flake inputs) sources root;
         defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
         # Registered from the parent's source path: a flake cannot
-        # reference files outside its own tree, and reading the
+        # reference files outside its tree, and reading the
         # source forces none of the parent's outputs. The overlays
         # and the modules register together, since an overlay
         # registered from its file reads the registry of the

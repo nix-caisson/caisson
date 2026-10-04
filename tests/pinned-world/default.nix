@@ -32,7 +32,7 @@ let
   # caisson-core's `compose` directly, the way mkLib does, so the
   # composition guarantees are probed on the real entries. The
   # `nixpkgs-lib` import each exported overlay carries is the entry of
-  # the tree that built it, caisson's own pin; mkLib replaces every
+  # the tree that built it, caisson's pin; mkLib replaces every
   # published key with the composing tree's entry, and a direct
   # composition does the same by listing the world's entry, since the
   # last occurrence of a key supplies its value.
@@ -43,7 +43,7 @@ let
       libOverlays = _mkLibOverlay: inputs.caisson.libOverlays;
     }).caisson-core.libManifest.libOverlays;
 
-  # The registry names of caisson-core's own entries.
+  # The registry names of caisson-core's entries.
   coreNames = [
     "caisson-core/compose"
     "caisson-core/kernel"
@@ -179,7 +179,7 @@ let
     # The module system of the composed library comes from the declared
     # world, not from the pin of the tree that built the exported
     # overlays. The two differ as soon as tests/dependencies moves ahead
-    # of caisson's own lock, which is what the drift workflow does.
+    # of caisson's lock, which is what the drift workflow does.
     composedLibraryIsTheDeclaredNixpkgsLib =
       (builtins.unsafeGetAttrPos "evalModules" composed.lib.modules).file
       == "${inputs.nixpkgs-lib}/lib/modules.nix";
@@ -469,7 +469,7 @@ let
 
     # Node names colmena's flat hive reserved (meta, defaults, network)
     # are ordinary names here. A node is an evaluated NixOS
-    # configuration, so its module takes its host name from its own
+    # configuration, so its module takes its host name from its
     # definitions rather than from a `name` argument.
     colmenaNodesAreNamedFreely =
       let

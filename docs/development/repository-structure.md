@@ -28,7 +28,7 @@ The layer users reach for: the integrations (`structural`,
 `flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
 `home-manager-minimal`, `colmena`, `terranix`, `system-manager`), each
 a library overlay
-contributing its `lib.caisson` namespace, registering its own module
+contributing its `lib.caisson` namespace, registering its module
 class where it has one (`nixos-minimal` and `home-manager-minimal`
 each evaluate a class another integration
 owns and carry constructors only), and taking its ecosystem as an `ecosystemSrc` argument
