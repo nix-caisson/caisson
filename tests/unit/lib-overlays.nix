@@ -2019,35 +2019,38 @@ in
       };
 
       # A NixOS configuration takes its package set from the
-      # composition: the package config named `default` unless a
-      # module of the configuration selects another with
-      # `caisson.nixpkgs.pkgSet`, at the system the composition
-      # declares. The sets also reach the modules by config name, as
-      # the `pkgSets` special argument.
-      "test: a nixos configuration selects its package set by name" = {
+      # composition, at the system the composition declares: the set
+      # the `pkgSet` argument selects from the available sets, and the
+      # set named `default` when the argument is absent. Every
+      # available set still reaches the modules by config name, as the
+      # `pkgSets` special argument, whichever is selected.
+      "test: a nixos configuration selects its package set when it is constructed" = {
         expr =
           let
             selecting =
               pkgSet:
               (myLib.caisson.nixos.mkTopConfiguration {
+                inherit pkgSet;
                 configModule =
                   { pkgSets, ... }:
                   {
                     imports = [ probeModule ];
-                    config = {
-                      caisson.nixpkgs.pkgSet = pkgSet;
-                      seenLib.byName = builtins.mapAttrs (_: set: set.marker) pkgSets;
-                    };
+                    config.seenLib.byName = builtins.mapAttrs (_: set: set.marker) pkgSets;
                   };
               }).config;
+            other = selecting (pkgSets: pkgSets.other);
           in
           {
             default = configuration.config.nixpkgs.pkgs.marker;
-            other = (selecting "other").nixpkgs.pkgs.marker;
-            byName = (selecting "default").seenLib.byName;
+            other = other.nixpkgs.pkgs.marker;
+            byName = other.seenLib.byName;
             system = configuration.config.stub.system;
             minimal = minimalConfiguration._module.args.pkgs.marker;
-            unknown = (builtins.tryEval (selecting "missing").nixpkgs.pkgs.marker).success;
+            minimalOther =
+              (myLib.caisson.nixos-minimal.mkTopConfiguration {
+                pkgSet = pkgSets: pkgSets.other;
+                configModule = { ... }: { };
+              })._module.args.pkgs.marker;
           };
         expected = {
           default = "the default set";
@@ -2058,7 +2061,66 @@ in
           };
           system = "x86_64-linux";
           minimal = "the default set";
-          unknown = false;
+          minimalOther = "the other set";
+        };
+      };
+
+      # A configuration that selects nothing runs on the set named
+      # `default`, and a composition that declares none says so, with
+      # the sets it does declare.
+      "test: a configuration with no default package set and no selection is refused" = {
+        expr =
+          let
+            noDefault = caisson.mkLib {
+              sources = mockSources;
+              name = "no-default";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { stable = { }; };
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+            };
+          in
+          (noDefault.caisson.nixos.mkTopConfiguration {
+            configModule = { ... }: { };
+          }).config.nixpkgs.pkgs;
+        expectedError = {
+          type = "ThrownError";
+          msg = "runs on the package config named `default`,\\s+and the composition declares the package configs stable";
+        };
+      };
+
+      # The same argument selects what a flake's perSystem runs on.
+      "test: a flake selects the package set of perSystem when it is constructed" = {
+        expr =
+          let
+            pkgsOf =
+              args:
+              (myLib.caisson-core.finalizeTop (
+                myLib.caisson.flake-parts.mkConfiguration (
+                  args
+                  // {
+                    moduleImports = _modules: [ ];
+                    configModule = {
+                      systems = [ "x86_64-linux" ];
+                      perSystem =
+                        { pkgs, ... }:
+                        {
+                          legacyPackages.marker = pkgs.marker;
+                        };
+                    };
+                  }
+                )
+              )).outputs.flake.legacyPackages.x86_64-linux.marker;
+          in
+          {
+            default = pkgsOf { };
+            other = pkgsOf { pkgSet = pkgSets: pkgSets.other; };
+          };
+        expected = {
+          default = "the default set";
+          other = "the other set";
         };
       };
 

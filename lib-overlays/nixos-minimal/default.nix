@@ -87,6 +87,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
+              pkgSet ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
@@ -99,6 +100,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
+              pkgSet ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,

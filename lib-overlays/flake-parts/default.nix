@@ -139,12 +139,44 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
 
+          # The package set `perSystem` runs on, its `pkgs`: selected by
+          # the `pkgSet` argument from the package sets available at
+          # each system, the set named `default` when the argument is
+          # absent. A package config that builds no set for a system is
+          # not among the sets there, and a flake with nothing to select
+          # keeps the `pkgs` flake-parts provides. Every available set
+          # stays reachable by name, as the `pkgSets` argument of
+          # perSystem.
+          pkgSetModule = {
+            _file = "caisson-flake-parts:pkgSet";
+            perSystem =
+              { system, lib, ... }:
+              let
+                available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
+                  lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
+                    manifest.pkgSets or { }
+                  )
+                );
+              in
+              {
+                _module.args.pkgs = lib.mkIf ((args.pkgSet or null) != null || available ? default) (
+                  lib.mkDefault (
+                    selection.pkgSetOf {
+                      context = "lib.caisson.flake-parts.mkConfiguration";
+                      what = "the flake at ${system}";
+                    } available args
+                  )
+                );
+              };
+          };
+
           module = {
             imports = [
               flakeParts.flakeModules.flakeModules
               flakeParts.flakeModules.modules
             ]
             ++ frameworkModules
+            ++ [ pkgSetModule ]
             ++ moduleImports registry
             ++ (if configModule == null then [ ] else [ configModule ]);
           };
@@ -233,6 +265,11 @@
             # nixpkgs integration from the package configs declared on
             # mkLib (`pkgSets`) and reach perSystem as `pkgSets`.
             pkgSets ? null,
+            # The package set perSystem runs on, its `pkgs`, selected
+            # from the package sets available at each system, by
+            # package config name (`pkgSets: pkgSets.stable`). The set
+            # named `default` when absent.
+            pkgSet ? null,
             # The flake-parts source; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -254,6 +291,7 @@
           {
             configModule ? null,
             pkgSets ? null,
+            pkgSet ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,

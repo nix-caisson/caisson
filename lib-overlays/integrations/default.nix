@@ -162,6 +162,50 @@
         )
         ++ (if extra == null then [ ] else extra registry);
 
+      # The package sets available to an evaluation, by package config
+      # name: the package configs its manifest holds, each projected to
+      # its set at `system`. `context` names the entry point and `what`
+      # the configuration, for the message of a config that builds no
+      # set at that system.
+      pkgSetsAt =
+        { context, what }:
+        manifest: system:
+        builtins.mapAttrs (
+          name: config:
+          (config.children.nixpkgs.${system} or (throw ''
+            ${context}: the package config `${name}` builds no set for ${system},
+            which ${what} needs. Add the system to `caisson.nixpkgs.systems`
+            in the config's module.
+          '')
+          ).value
+        ) (manifest.pkgSets or { });
+
+      # The package set a configuration runs on, selected when the
+      # configuration is constructed: `pkgSet` of its arguments, a
+      # function of the available package sets (`pkgSets:
+      # pkgSets.stable`), and with none given the set named `default`.
+      # Every integration whose configurations run on a package set
+      # selects it here.
+      pkgSetOf =
+        { context, what }:
+        pkgSets: args:
+        let
+          given = args.pkgSet or null;
+        in
+        if given != null then
+          given pkgSets
+        else
+          pkgSets.default or (throw ''
+            ${context}: ${what} runs on the package config named `default`,
+            and the composition declares ${
+              if pkgSets == { } then
+                "no package configs"
+              else
+                "the package configs " + builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
+            }. Declare `default` with `pkgSets` on caisson-core.mkLib, or select
+            another with `pkgSet = pkgSets: pkgSets.<name>;`.
+          '');
+
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
       # configuration at a system, as caisson-core.mkConfiguration
@@ -528,6 +572,8 @@
             frameworkModules
             mkModuleConfiguration
             moduleImportsOf
+            pkgSetOf
+            pkgSetsAt
             ;
           coreModules = select "core";
           defaultModuleImports = select "default";

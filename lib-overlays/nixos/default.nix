@@ -138,8 +138,7 @@
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
         # configuration is evaluated at every system in force where it
         # is declared, and its package sets come from the composition,
-        # through the manifest; it selects its set with the
-        # `caisson.nixpkgs.pkgSet` option.
+        # through the manifest; `pkgSet` selects the set it runs on.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -154,6 +153,12 @@
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
+            # The package set the configuration runs on, selected from
+            # the package sets available where it is declared, by
+            # package config name, each at the system of the
+            # evaluation (`pkgSets: pkgSets.stable`). The set named
+            # `default` when absent.
+            pkgSet ? null,
             # The selection over the nixos class of the registry. It
             # replaces the default of the class, which is every entry
             # named `default` followed by what the configurations
@@ -172,6 +177,7 @@
           {
             configModule ? null,
             ecosystemSrc ? null,
+            pkgSet ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
@@ -186,6 +192,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
+              pkgSet ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
