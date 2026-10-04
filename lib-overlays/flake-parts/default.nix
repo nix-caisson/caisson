@@ -96,8 +96,9 @@
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "flake" registry;
 
-          moduleImports =
-            if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
+          moduleImports = selection.moduleImportsOf "flake" { inherit lib manifest; } (
+            args.moduleImports or null
+          );
 
           # The name this configuration holds: the attribute its parent
           # declares it under, or, at a top, the name the composition
