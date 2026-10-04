@@ -957,7 +957,7 @@ in
               kept = mkLibOverlay ({ ... }: { overlay = final: prev: { keptVal = "yes"; }; });
               dropped = mkLibOverlay ({ ... }: { overlay = final: prev: { droppedVal = "no"; }; });
             };
-            libOverlayImports = lib: [ lib.caisson-core.libManifest.libOverlays.kept ];
+            libOverlayImports = lib: [ lib.caisson-core.nixpkgs-lib.overlays.kept ];
           };
         in
         {
