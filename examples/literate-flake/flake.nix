@@ -47,7 +47,7 @@
 
         `caisson-core.mkLib` composes a library from registered overlays and
         injects the machinery, the module registry, and the manifest under
-        `lib.caisson-core`. Your own overlays contribute your extensions
+        `lib.caisson-core`. Your overlays contribute your extensions
         (here, `lib.literate-flake`).
 
         - `inputs` are closed over so that modules and overlays can reference
@@ -110,7 +110,7 @@
         to activate, like `libOverlayImports` for overlays; the consumed
         project's modules select under their prefixed names. When it is
         omitted, every registered entry named `default` applies: this
-        flake's own and "caisson/default", caisson's default module (the
+        flake's `default` and "caisson/default", caisson's default module (the
         nixpkgs integration's module layer). The `core` entries of the
         class apply to every evaluation regardless.
     */

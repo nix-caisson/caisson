@@ -12,7 +12,7 @@ let
   mkModule = lib.caisson-core.mkModule;
 
   # caisson's flake-parts integration overlay, recovered from this
-  # composition's own manifest, so test compositions can register it
+  # composition's manifest, so test compositions can register it
   # the way a consumer registering the exported overlay would.
   flakePartsOverlay = lib.caisson-core.libManifest.libOverlays.flake-parts;
   structuralOverlay = lib.caisson-core.libManifest.libOverlays.structural;
@@ -22,7 +22,7 @@ let
   # libraries carry caisson.flake-parts.mkConfiguration and
   # caisson.structural.mkTopConfiguration), and otherwise defers to
   # caisson-core.mkLib.
-  # Malformed arguments pass through untouched so the machinery's own
+  # Malformed arguments pass through untouched so the machinery's
   # shape errors stay observable.
   testMkLib =
     args:
@@ -1868,7 +1868,7 @@ in
       # evaluation: a module inside the evaluation sees the
       # composition's marker and a nixpkgs function at once, on one
       # library. `evalModules` builds the `lib` module argument from
-      # the library its own `lib/modules.nix` closed over, which is
+      # the library its `lib/modules.nix` closed over, which is
       # the fixpoint the `nixpkgs-lib` entry read rather than the one
       # this composition built, so the marker arrives only because the
       # composition names `lib` among the special arguments.
@@ -2671,9 +2671,9 @@ in
       };
 
       # With no name declared, moduleLocation is not set and
-      # flake-parts falls back to its own default, derived from `self`.
+      # flake-parts falls back to its default, derived from `self`.
       # These compositions supply no `self`, so that fallback is
-      # observable as flake-parts' own complaint rather than as a
+      # observable as flake-parts' complaint rather than as a
       # name-shaped identity.
       "test: a composition declaring no name leaves moduleLocation to flake-parts" = {
         expr =
@@ -3322,7 +3322,7 @@ in
       };
 
       # The class is declared once, by the integration that owns it.
-      "test: the alt declares no class of its own" = {
+      "test: the alt declares no class" = {
         expr = myLib.caisson-core.classes.homeManager.integration;
         expected = "home-manager";
       };

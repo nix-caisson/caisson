@@ -15,7 +15,7 @@
 #     in the source tree. `readFile` of a source path is pure and needs no
 #     store build, so evaluation stays cheap and `--no-build` succeeds.
 #   * `check`: a derivation that rebuilds `drv`, reads `${drv}/${subpath}`
-#     *at build time* (which is not IFD; a derivation reading its own build
+#     *at build time* (which is not IFD; a derivation reading its build
 #     inputs is ordinary), canonicalizes it, and diffs it against the
 #     committed memo. If the derivation's output has drifted from the memo,
 #     the check fails loud. This is the memo's cache-invalidation: a memo

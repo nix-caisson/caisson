@@ -38,7 +38,7 @@ to replace the main evaluation's `checks` with the partition's `checks`, so
 
 flake-parts partitions allow a flake to declare outputs that depend on inputs not
 listed in the main `flake.nix`. caisson's flake declares only the three inputs
-its own evaluation composes with (caisson-core, nixpkgs-lib, flake-parts), and
+its evaluation composes with (caisson-core, nixpkgs-lib, flake-parts), and
 it deliberately avoids depending on full `nixpkgs` or development tools like
 `nix-unit`. The checks partition brings in these heavier dependencies without
 polluting the main flake's input set or forcing consumers to fetch them.
@@ -64,9 +64,9 @@ without being declared in the main `flake.nix`.
 ### Partition module structure
 
 Inside the partition module, `inputs` contains both the main flake's inputs and the
-extra inputs from the dependencies flake. `self` refers to caisson's own outputs
+extra inputs from the dependencies flake. `self` refers to caisson's outputs
 (as seen by the partition). The module has a full flake-parts evaluation context
-with its own `perSystem`, `imports`, etc.
+with its `perSystem`, `imports`, etc.
 
 ## Evaluating Consumer Flakes with `callConsumerFlake`
 
@@ -97,7 +97,7 @@ The imported `flake.nix` is not a resolved flake: it has no resolved inputs, no
 `outPath`, no `self`. `callConsumerFlake` supplies each piece:
 
 - **`self`** becomes a lazy fixpoint over the outputs, mirroring normal flake
-  evaluation, where `self` is always a lazy reference to the flake's own
+  evaluation, where `self` is always a lazy reference to the flake's
   outputs.
 - **`outPath`** is set to the evaluated directory. This matters because config
   modules use relative paths (the unit test config imports
@@ -162,7 +162,7 @@ evaluating a flake input's value applies its outputs function, which would
 force the `caisson-core` input of caisson inside the nix-unit sandbox, where
 nothing can fetch. A source-only input carries the path and applies nothing. The
 overlay files register from that path because a flake cannot reference files
-outside its own source tree, and the modules register with them: an overlay
+outside its source tree, and the modules register with them: an overlay
 registered from its file reads the registry of the composition that
 registered it (the `core` of its class, for one), so the two go together.
 
@@ -280,7 +280,7 @@ Its `outputs` is empty. It exists for three reasons:
 
 3. **Single lockfile:** All development dependencies are locked in
    `tests/dependencies/flake.lock`, making version management straightforward.
-   The test flakes' own lockfiles are gitignored; standalone use generates
+   The test flakes' lockfiles are gitignored; standalone use generates
    them locally, and the `follows` wiring resolves them to the same versions.
 
 The dependencies flake uses `follows` internally to deduplicate transitive inputs

@@ -180,7 +180,7 @@
       # revision, last-modified) beside them, and `self.inputs` the
       # pinned sources. A composition with no root names no tree, so
       # its `self` has no out path. An `inputs` handed in through the
-      # WithEcosystemArgs twin that carries its own `self` is taken as
+      # WithEcosystemArgs twin that carries a `self` is taken as
       # it is.
       evaluate =
         composed: callArgs:

@@ -165,7 +165,7 @@ this project and assert that composition behaves as documented).
 ## Binary cache
 
 CI publishes the store paths it builds to a public cache at
-`caisson.cachix.org`, signed with the project's own key. Using it is
+`caisson.cachix.org`, signed with the project's key. Using it is
 optional; everything builds from source without it.
 
 ```

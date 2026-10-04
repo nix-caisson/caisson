@@ -67,7 +67,7 @@ in
   specialArgs = {
     pkgSets = checkedPkgSets;
     # The `lib` argument every module receives. `evalModules` builds
-    # that argument from the `lib` its own `lib/modules.nix` closed
+    # that argument from the `lib` its `lib/modules.nix` closed
     # over, which is the fixpoint the `nixpkgs-lib` entry read rather
     # than the one this composition built, and `// specialArgs` in that
     # file is where a caller says otherwise. Naming it here is what
