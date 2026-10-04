@@ -11,6 +11,11 @@
 {
   caisson.structural.configurations.impl = lib.caisson.structural.mkConfiguration { };
 
+  # Passing the exports up is written here by hand until re-export
+  # does it for every configuration declared beneath another. It reads
+  # the result of the configuration beneath, which only the evaluation
+  # that holds it can, hence the test; a module that only declares
+  # configurations needs none.
   caisson.exports =
     if lib.caisson-core.evalManifest.childless then
       { }
