@@ -111,10 +111,12 @@ in
     let
       selectorOf =
         composed:
-        (composed.caisson.structural.mkConfiguration {
-          configModule = { };
-          moduleImports = _modules: [ ];
-        }).value.caisson.lib.exported;
+        (composed.caisson-core.finalizeTop (
+          composed.caisson.structural.mkConfiguration {
+            configModule = { };
+            moduleImports = _modules: [ ];
+          }
+        )).value.config.caisson.lib.exported;
 
       # A composition declaring a name and contributing the namespace
       # of that name.
@@ -2492,6 +2494,54 @@ in
           );
         };
       };
+      # An option the nested configurations stamp, so which module a
+      # configuration evaluated is observable.
+      markerOption =
+        { lib, ... }:
+        {
+          options.marker = lib.mkOption { type = lib.types.str; };
+        };
+      # A composition whose registered configurations nest: the top,
+      # found under the name the composition declares, declares `inner`
+      # (found under its name) and `plain` (a module passed), and
+      # `inner` declares `leaf`, which reads the marker of the
+      # configuration it is declared in.
+      nestingLib = caisson.mkLib {
+        sources = mockSources;
+        name = "nesting";
+        configs = callbackLib: {
+          structural = {
+            nesting = callbackLib.caisson.structural.mkModule (
+              { ... }:
+              { lib, ... }:
+              {
+                imports = [ markerOption ];
+                marker = "top";
+                caisson.structural.configurations.inner = lib.caisson.structural.mkConfiguration { };
+                caisson.structural.configurations.plain = lib.caisson.structural.mkConfiguration {
+                  configModule = { };
+                };
+              }
+            );
+            inner = callbackLib.caisson.structural.mkModule (
+              { ... }:
+              { lib, ... }:
+              {
+                imports = [ markerOption ];
+                marker = "${lib.caisson-core.evalManifest.name}, registered";
+                caisson.structural.configurations.leaf = lib.caisson.structural.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ markerOption ];
+                      marker = "leaf beneath ${lib.caisson-core.evalManifest.parent.value.config.marker}";
+                    };
+                };
+              }
+            );
+          };
+        };
+      };
       selectors =
         { ... }:
         {
@@ -2551,18 +2601,22 @@ in
 
       "test: the default default applies the entries named default" = {
         expr =
-          (registeringLib.caisson.structural.mkConfiguration {
-            configModule = { };
-          }).value.whichEntry;
+          (registeringLib.caisson-core.finalizeTop (
+            registeringLib.caisson.structural.mkConfiguration {
+              configModule = { };
+            }
+          )).value.config.whichEntry;
         expected = "from-the-default";
       };
 
       "test: a selection by name replaces the default default" = {
         expr =
-          (registeringLib.caisson.structural.mkConfiguration {
-            configModule = { };
-            moduleImports = modules: [ modules.named ];
-          }).value.whichEntry;
+          (registeringLib.caisson-core.finalizeTop (
+            registeringLib.caisson.structural.mkConfiguration {
+              configModule = { };
+              moduleImports = modules: [ modules.named ];
+            }
+          )).value.config.whichEntry;
         expected = "from-the-registry";
       };
 
@@ -2571,12 +2625,14 @@ in
       # the whole of what decides which namespace gets published.
       "test: the lib export selects the namespace named after the declared name" = {
         expr =
-          (namespacedLib.caisson.structural.mkConfiguration {
-            configModule = {
-              caisson.lib.export.enabled = true;
-            };
-            moduleImports = _modules: [ ];
-          }).value.caisson.exports.lib;
+          (namespacedLib.caisson-core.finalizeTop (
+            namespacedLib.caisson.structural.mkConfiguration {
+              configModule = {
+                caisson.lib.export.enabled = true;
+              };
+              moduleImports = _modules: [ ];
+            }
+          )).value.config.caisson.exports.lib;
         expected = {
           marker = "from-the-namespace-overlay";
         };
@@ -2589,12 +2645,14 @@ in
         expr =
           (builtins.tryEval (
             builtins.deepSeq
-              (registeringLib.caisson.structural.mkConfiguration {
-                configModule = {
-                  caisson.lib.export.enabled = true;
-                };
-                moduleImports = _modules: [ ];
-              }).value.caisson.exports.lib
+              (registeringLib.caisson-core.finalizeTop (
+                registeringLib.caisson.structural.mkConfiguration {
+                  configModule = {
+                    caisson.lib.export.enabled = true;
+                  };
+                  moduleImports = _modules: [ ];
+                }
+              )).value.config.caisson.exports.lib
               true
           )).success;
         expected = false;
@@ -2604,10 +2662,12 @@ in
       # that declares none: the evaluation goes through.
       "test: a composition declaring no name evaluates without one" = {
         expr =
-          (registeringLib.caisson.structural.mkConfiguration {
-            configModule = { };
-            moduleImports = _modules: [ ];
-          }).value.caisson.exports.lib;
+          (registeringLib.caisson-core.finalizeTop (
+            registeringLib.caisson.structural.mkConfiguration {
+              configModule = { };
+              moduleImports = _modules: [ ];
+            }
+          )).value.config.caisson.exports.lib;
         expected = { };
       };
 
@@ -2716,12 +2776,185 @@ in
         expectedError = unexpectedArgument "mkConfiguration" "ecosystemSrc";
       };
 
+      # Configurations declared beneath a structural configuration,
+      # under `caisson.structural.configurations`: each is finalized
+      # with the attribute it is declared under and the childless
+      # manifest of the configuration that declares it, and takes the
+      # configuration registered under its name when it passes no
+      # module.
+      "test: a configuration declared beneath is finalized under its name and the childless parent" = {
+        expr =
+          let
+            top = nestingLib.caisson-core.finalizeTop (nestingLib.caisson.structural.mkConfiguration { });
+            inner = top.children.structural.inner;
+            leaf = inner.children.structural.leaf;
+          in
+          {
+            topName = top.name;
+            topChildren = builtins.mapAttrs (_: builtins.attrNames) top.children;
+            topOption = builtins.attrNames top.value.config.caisson.structural.configurations;
+            optionIsTheChild = top.value.config.caisson.structural.configurations.inner.name;
+            innerParent = {
+              inherit (inner.parent) name childless;
+              children = inner.parent.children;
+            };
+            innerMarker = inner.value.config.marker;
+            innerSeesItself = inner.value.config.caisson.manifest.name;
+            leafMarker = leaf.value.config.marker;
+            leafNearest = leaf.nearest.structural.name;
+            leafAncestors = builtins.map (ancestor: ancestor.name) leaf.ancestors;
+            plainHasNone = top.children.structural.plain.children;
+          };
+        expected = {
+          topName = "nesting";
+          topChildren = {
+            structural = [
+              "inner"
+              "plain"
+            ];
+          };
+          topOption = [
+            "inner"
+            "plain"
+          ];
+          optionIsTheChild = "inner";
+          innerParent = {
+            name = "nesting";
+            childless = true;
+            children = { };
+          };
+          innerMarker = "inner, registered";
+          innerSeesItself = "inner";
+          leafMarker = "leaf beneath inner, registered";
+          leafNearest = "inner";
+          leafAncestors = [
+            "nesting"
+            "nesting"
+            "inner"
+          ];
+          plainHasNone = { };
+        };
+      };
+
+      "test: mkConfigurations declares every registered configuration of the class" = {
+        expr = builtins.attrNames (nestingLib.caisson.structural.mkConfigurations { });
+        expected = [
+          "inner"
+          "nesting"
+        ];
+      };
+
+      # A configuration beneath sees the one that declares it without
+      # the configurations declared beneath it. A definition that reads
+      # one of them unguarded fails once a configuration beneath reads
+      # the value it defines, and the same definition is readable from
+      # the configuration that holds them.
+      "test: a configuration beneath cannot read a result of the configurations beside it" = {
+        expr =
+          let
+            top = nestingLib.caisson-core.finalizeTop (
+              nestingLib.caisson.structural.mkConfiguration {
+                configModule =
+                  { config, lib, ... }:
+                  {
+                    imports = [ markerOption ];
+                    marker = config.caisson.structural.configurations.quiet.value.config.marker;
+                    caisson.structural.configurations.quiet = lib.caisson.structural.mkConfiguration {
+                      configModule = {
+                        imports = [ markerOption ];
+                        marker = "quiet";
+                      };
+                    };
+                    caisson.structural.configurations.reader = lib.caisson.structural.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          imports = [ markerOption ];
+                          marker = lib.caisson-core.evalManifest.parent.value.config.marker;
+                        };
+                    };
+                  };
+              }
+            );
+          in
+          {
+            fromTheHolder = top.value.config.marker;
+            quiet = top.children.structural.quiet.value.config.marker;
+            reader = (builtins.tryEval top.children.structural.reader.value.config.marker).success;
+          };
+        expected = {
+          fromTheHolder = "quiet";
+          quiet = "quiet";
+          reader = false;
+        };
+      };
+
+      "test: what is declared beneath must be a configuration of that integration" = {
+        expr =
+          let
+            declaring =
+              definition:
+              (nestingLib.caisson-core.finalizeTop (
+                nestingLib.caisson.structural.mkConfiguration {
+                  configModule = { lib, ... }: definition lib;
+                }
+              )).children;
+          in
+          {
+            attrset =
+              (builtins.tryEval
+                (declaring (_lib: {
+                  caisson.structural.configurations.wrong = { };
+                })).structural.wrong.name
+              ).success;
+            otherIntegration =
+              (builtins.tryEval
+                (declaring (lib: {
+                  caisson.flake-parts.configurations.wrong = lib.caisson.structural.mkConfiguration { };
+                })).flake-parts.wrong.name
+              ).success;
+          };
+        expected = {
+          attrset = false;
+          otherIntegration = false;
+        };
+      };
+
+      # A flake-parts evaluation carries no manifest, so a configuration
+      # declared beneath one is refused when it is read.
+      "test: a flake-parts evaluation holds no configurations beneath it" = {
+        expr =
+          let
+            outputs = nestingLib.caisson.flake-parts.mkConfiguration {
+              configModule =
+                { config, lib, ... }:
+                {
+                  systems = [ "x86_64-linux" ];
+                  caisson.structural.configurations.inner = lib.caisson.structural.mkConfiguration { };
+                  flake.declared = builtins.attrNames config.caisson.structural.configurations;
+                  flake.read = config.caisson.structural.configurations.inner.name;
+                };
+              moduleImports = _modules: [ ];
+            };
+          in
+          {
+            inherit (outputs) declared;
+            read = (builtins.tryEval outputs.read).success;
+          };
+        expected = {
+          declared = [ "inner" ];
+          read = false;
+        };
+      };
+
       "test: the twin evaluates the same call with nothing merged" = {
         expr =
-          (registeringLib.caisson.structural.mkConfigurationWithEcosystemArgs {
-            configModule = { };
-            ecosystemArgs = { };
-          }).value.whichEntry;
+          (registeringLib.caisson-core.finalizeTop (
+            registeringLib.caisson.structural.mkConfigurationWithEcosystemArgs {
+              configModule = { };
+              ecosystemArgs = { };
+            }
+          )).value.config.whichEntry;
         expected = "from-the-default";
       };
     };
@@ -3151,24 +3384,28 @@ in
         );
       };
 
-      "test: every entry point requires configModule and takes pkgSets" = {
-        expr = builtins.listToAttrs (
-          builtins.map (name: {
-            inherit name;
-            value =
-              let
-                signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
-              in
-              signature ? configModule && !signature.configModule && signature ? pkgSets;
-          }) integrationNames
-        );
-        expected = builtins.listToAttrs (
-          builtins.map (name: {
-            inherit name;
-            value = true;
-          }) integrationNames
-        );
-      };
+      # The structural entry point takes `configModule` as optional: it
+      # finds the configuration registered under the configuration's
+      # name.
+      "test: every entry point takes configModule and pkgSets, and all but structural require configModule" =
+        {
+          expr = builtins.listToAttrs (
+            builtins.map (name: {
+              inherit name;
+              value =
+                let
+                  signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
+                in
+                signature ? configModule && signature.configModule == (name == "structural") && signature ? pkgSets;
+            }) integrationNames
+          );
+          expected = builtins.listToAttrs (
+            builtins.map (name: {
+              inherit name;
+              value = true;
+            }) integrationNames
+          );
+        };
 
       "test: mkConfigurationFull takes the arguments of nixos.mkConfiguration" = {
         expr = builtins.functionArgs lib.caisson.nixos.mkConfigurationFull;

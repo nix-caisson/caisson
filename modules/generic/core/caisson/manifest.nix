@@ -7,10 +7,17 @@ in
   options.caisson.manifest = lib.mkOption {
     type = types.manifest;
     readOnly = true;
-    default = lib.caisson-core.libManifest;
-    defaultText = "the composed library's caisson-core.libManifest";
+    default =
+      if lib.caisson-core.evalManifest != null then
+        lib.caisson-core.evalManifest
+      else
+        lib.caisson-core.libManifest;
+    defaultText = "the composed library's caisson-core.evalManifest, or its libManifest in an evaluation that carries none";
     description = ''
-      The composition's manifest: `sources` and `root` as the pin
+      The manifest of this evaluation, which carries the registries
+      and declared facts of the composition it is declared under; in
+      an evaluation that carries none, the composition's manifest.
+      Of the composition: `sources` and `root` as the pin
       reader gave them to mkLib (each pin recorded against the root),
       `defaultEcosystemSrc`, `systems` and `projects` as given to mkLib,
       plus the registered

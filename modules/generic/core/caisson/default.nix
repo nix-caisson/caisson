@@ -3,6 +3,7 @@
 {
   imports = [
     ./manifest.nix
+    ./configurations.nix
     ./exports.nix
     ./lib.nix
     ./libOverlays.nix

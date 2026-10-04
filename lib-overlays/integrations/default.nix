@@ -195,6 +195,27 @@
           };
         };
 
+      # The integrations a configuration may be declared of: those
+      # that own a class, by the class index. caisson's core module
+      # declares `caisson.<integration>.configurations` for each.
+      names =
+        let
+          owners = builtins.map (class: class.integration) (builtins.attrValues final.caisson-core.classes);
+        in
+        builtins.filter (name: name != "caisson-core") (final.unique owners);
+
+      # The configurations an evaluated configuration declares beneath
+      # it, by integration and then name, as the `children` an
+      # integration's `evaluate` returns: the values of its
+      # `caisson.<integration>.configurations` options, which finalize
+      # each one when read. An integration with none declared is left
+      # out.
+      childrenOf =
+        config:
+        final.filterAttrs (_: declared: declared != { }) (
+          final.genAttrs names (name: config.caisson.${name}.configurations)
+        );
+
       # An integration that evaluates a class another integration
       # owns, declared: `over` is the owning integration, reached
       # through the lib (`final.caisson.nixos`), and the class and its
@@ -222,7 +243,9 @@
       caisson = (prev.caisson or { }) // {
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
+            childrenOf
             mkEvaluation
+            names
             resolveEcosystemSrc
             mkIntegration
             mkAltIntegration
