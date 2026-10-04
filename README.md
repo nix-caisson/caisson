@@ -126,7 +126,7 @@ source by.
 | `terranix` | `terranix` | Terranix and Terraform configurations |
 | `colmena` | `colmena` | colmena configurations (class `caisson-colmena`), projected onto the hive colmena's binary reads; not compatible with colmena's hive modules |
 | `system-manager` | `system-manager` | system-manager configurations on foreign distros |
-| `structural` | none | a configuration that only exports: the top of a repository whose point is what it exports, such as caisson itself |
+| `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
 argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then

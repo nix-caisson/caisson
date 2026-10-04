@@ -30,6 +30,6 @@ let
   };
 
 in
-lib.caisson.structural.mkTopConfiguration {
-  configModule = lib.caisson-core.configs.structural.caisson;
-}
+# The configuration registered under the name the composition
+# declares, configs/structural/caisson.
+lib.caisson.structural.mkTopConfiguration { }

@@ -9,9 +9,13 @@
 { closure-inputs, closure-lib, ... }:
 { ... }:
 let
-  impl = closure-lib.caisson.structural.mkConfiguration {
-    configModule = closure-lib.caisson-core.configs.structural.impl;
-  };
+  # A flake-parts evaluation holds no configurations beneath it, so
+  # the shared configuration is finalized here, as a top is.
+  impl = closure-lib.caisson-core.finalizeTop (
+    closure-lib.caisson.structural.mkConfiguration {
+      configModule = closure-lib.caisson-core.configs.structural.impl;
+    }
+  );
 in
 {
 

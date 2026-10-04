@@ -20,8 +20,9 @@ lib_expr="$1"
 shift
 flags=("$@")
 
-# Every entry point takes `configModule` and `pkgSets`; the `nixos`
-# ones require `pkgSets` too, so an empty call may report either.
+# Every entry point takes `configModule` and `pkgSets`. All but the
+# structural ones require `configModule`; the `nixos` ones require
+# `pkgSets` too, so an empty call may report either.
 namespaces=(
   nixos
   nixos-minimal
@@ -109,8 +110,12 @@ unexpected="function '[^']*%s' called with unexpected argument 'bogus'"
 for ns in "${namespaces[@]}"; do
   for fn in mkConfiguration mkConfigurationWithEcosystemArgs; do
     ep="lib.caisson.$ns.$fn"
-    # shellcheck disable=SC2059
-    check "$ns.$fn { }" "$ep { }" "$(printf "$missing" "$fn")"
+    # A structural entry point requires nothing: it finds the
+    # configuration registered under the configuration's name.
+    if [ "$ns" != structural ]; then
+      # shellcheck disable=SC2059
+      check "$ns.$fn { }" "$ep { }" "$(printf "$missing" "$fn")"
+    fi
     # shellcheck disable=SC2059
     check "$ns.$fn { bogus, configModule, pkgSets.pkgs }" \
       "$ep { bogus = 1; configModule = { }; pkgSets.pkgs = { }; }" "$(printf "$unexpected" "$fn")"
