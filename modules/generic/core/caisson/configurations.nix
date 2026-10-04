@@ -7,10 +7,35 @@
 # it is declared, so the option finalizes each one when it is read,
 # with the attribute it is declared under and the childless manifest
 # of this evaluation. The names are known without finalizing anything.
-{ lib, ... }:
+#
+# Re-export: `caisson.<integration>.exported` selects, from those
+# configurations, the ones this configuration passes up, and what each
+# selected one exports is merged into `caisson.exports` here. It runs
+# in the evaluation that holds the configurations and not in the
+# childless view, where their results are not readable.
+{ config, lib, ... }:
 let
 
   manifest = lib.caisson-core.evalManifest;
+
+  integrations = lib.caisson.integrations.names;
+
+  # The configurations passed up, of every integration: none in the
+  # childless view, and none in an evaluation that carries no manifest.
+  exported =
+    if manifest == null || manifest.childless then
+      [ ]
+    else
+      builtins.concatMap (
+        integration:
+        builtins.attrValues (
+          config.caisson.${integration}.exported config.caisson.${integration}.configurations
+        )
+      ) integrations;
+
+  # One part of `caisson.exports`, as the configurations passed up
+  # export it.
+  passedUp = part: lib.mkMerge (builtins.map (child: child.outputs.exports.${part}) exported);
 
   finalize =
     integration: name: child:
@@ -46,7 +71,21 @@ let
 
 in
 {
-  options.caisson = lib.genAttrs lib.caisson.integrations.names (integration: {
+  config.caisson.exports = lib.genAttrs [ "lib" "libOverlays" "modules" "pkgOverlays" ] passedUp;
+
+  options.caisson = lib.genAttrs integrations (integration: {
+    exported = lib.mkOption {
+      type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
+      default = configurations: configurations;
+      defaultText = lib.literalMD "every configuration declared";
+      description = ''
+        Function that selects which of the ${integration} configurations
+        declared beneath this configuration it passes up. Receives
+        `caisson.${integration}.configurations` and returns the subset to
+        export; `_: { }` exports none. What each selected configuration
+        exports is merged into this configuration's `caisson.exports`.
+      '';
+    };
     configurations = lib.mkOption {
       type = lib.types.lazyAttrsOf lib.types.raw;
       default = { };

@@ -2836,6 +2836,66 @@ in
         };
       };
 
+      # Re-export: what the configurations declared beneath export is
+      # passed up into the exports of the configuration that declares
+      # them, at every depth, and `exported` selects which of them.
+      "test: what the configurations beneath export is passed up" = {
+        expr =
+          let
+            exportsOf =
+              exported:
+              (registeringLib.caisson-core.finalizeTop (
+                registeringLib.caisson.structural.mkConfiguration {
+                  moduleImports = _modules: [ ];
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.modules.flake.exported = modules: { inherit (modules) thing; };
+                      caisson.libOverlays.exported = _overlays: { };
+                      caisson.structural.exported = exported;
+                      caisson.structural.configurations.middle = lib.caisson.structural.mkConfiguration {
+                        moduleImports = _modules: [ ];
+                        configModule =
+                          { lib, ... }:
+                          {
+                            caisson.modules.flake.exported = _modules: { };
+                            caisson.libOverlays.exported = _overlays: { };
+                            caisson.structural.configurations.deep = lib.caisson.structural.mkConfiguration {
+                              moduleImports = _modules: [ ];
+                              configModule = {
+                                caisson.modules.flake.exported = modules: { inherit (modules) other; };
+                                caisson.libOverlays.exported = overlays: { inherit (overlays) provider; };
+                              };
+                            };
+                          };
+                      };
+                    };
+                }
+              )).outputs.exports;
+            names = exports: {
+              modules = builtins.attrNames exports.modules.flake;
+              libOverlays = builtins.attrNames exports.libOverlays;
+            };
+          in
+          {
+            all = names (exportsOf (configurations: configurations));
+            none = names (exportsOf (_configurations: { }));
+          };
+        expected = {
+          all = {
+            modules = [
+              "other"
+              "thing"
+            ];
+            libOverlays = [ "provider" ];
+          };
+          none = {
+            modules = [ "thing" ];
+            libOverlays = [ ];
+          };
+        };
+      };
+
       "test: mkConfigurations declares every registered configuration of the class" = {
         expr = builtins.attrNames (nestingLib.caisson.structural.mkConfigurations { });
         expected = [
