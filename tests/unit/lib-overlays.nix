@@ -2246,10 +2246,78 @@ in
             "system"
           ];
           outputs = [
+            "exports"
             "images"
             "toplevel"
             "vm"
             "vmWithBootLoader"
+          ];
+        };
+      };
+
+      # A NixOS configuration holds configurations beneath it as a
+      # structural configuration does: they are in its manifest, under
+      # their system where they are evaluated at one, they see it as
+      # the nearest NixOS configuration, and a top publishes them with
+      # the others.
+      "test: a nixos configuration holds configurations beneath it" = {
+        expr =
+          let
+            top = publishingLib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        imports = [ probeModule ];
+                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                          configModule =
+                            { ... }:
+                            {
+                              imports = [ probeModule ];
+                            };
+                        };
+                        caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                          moduleImports = _modules: [ ];
+                        };
+                      };
+                  };
+                };
+            };
+            host = top.caisson.manifest.children.system.x86_64-linux.children.nixos.host;
+            image = host.children.system.x86_64-linux.children.nixos.image;
+          in
+          {
+            beneath = builtins.attrNames host.children;
+            group = host.children.structural.group.type;
+            imageName = image.name;
+            imageEvaluates = image.value.config.seenLib ? marker;
+            imageNearest = image.nearest.nixos.name;
+            imageAncestors = builtins.map (ancestor: ancestor.type) image.ancestors;
+            published = builtins.attrNames top.nixosConfigurations;
+          };
+        expected = {
+          beneath = [
+            "structural"
+            "system"
+          ];
+          group = "structural";
+          imageName = "image";
+          imageEvaluates = true;
+          imageNearest = "host";
+          imageAncestors = [
+            "lib"
+            "structural"
+            "system"
+            "nixos"
+            "system"
+          ];
+          published = [
+            "host"
+            "image"
           ];
         };
       };

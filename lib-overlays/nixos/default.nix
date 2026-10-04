@@ -6,6 +6,7 @@
 # composition of the class, shared with any integration that evaluates
 # the class another way.
 {
+  closure-lib,
   contributeClasses,
   entries,
   mkLibOverlay,
@@ -45,7 +46,10 @@
           nixpkgsModule ? true,
         }:
         view: args:
-        composeNixos { inherit context nixpkgsModule; } view args
+        composeNixos {
+          inherit context nixpkgsModule;
+          closureCore = closure-lib.caisson-core.modules.nixos.core;
+        } view args
         // {
           src = resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
@@ -87,13 +91,17 @@
         {
           inherit value;
           # What `nixos-rebuild` reads from a configuration, each a
-          # reference into `config.system.build`.
+          # reference into `config.system.build`, and what the
+          # configuration passes up to its parent.
           outputs = {
             toplevel = value.config.system.build.toplevel;
             vm = value.config.system.build.vm;
             vmWithBootLoader = value.config.system.build.vmWithBootLoader;
             images = value.config.system.build.images;
+            exports = value.config.caisson.exports;
           };
+          # The configurations declared beneath this one.
+          children = view.lib.caisson.integrations.childrenOf value.config;
         };
 
       configuration =
