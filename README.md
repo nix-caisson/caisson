@@ -95,8 +95,9 @@ and `lib-overlays/<name>`.
 
     in lib.caisson.flake-parts.mkTopConfiguration {
 
-      # Convention: your primary config lives in configs/flake/<flake-name>
-      configModule = lib.caisson-core.configs.flake.my-flake;
+      # Your primary config is the one registered under the name declared
+      # above, configs/flake/my-flake. Pass `configModule` to evaluate
+      # another.
 
       # Which registered flake modules apply. Omitted, every entry named
       # `default` applies (this flake's `default` and `caisson/default`);
