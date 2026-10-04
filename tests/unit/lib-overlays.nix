@@ -2140,6 +2140,59 @@ in
       # passes no module. In the tree its evaluation sits under its
       # name, beneath the system, beneath the configuration that
       # declares it.
+      # A configuration declared under the option of another
+      # integration is refused, with the option it belongs under.
+      "test: a configuration declared under another integration's option is refused" = {
+        expr =
+          (publishingLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.inner = lib.caisson.structural.mkConfiguration {
+                  moduleImports = _modules: [ ];
+                };
+              };
+          }).caisson.manifest.children;
+        expectedError = {
+          type = "ThrownError";
+          msg = "Declare it under `caisson\\.structural\\.configurations`";
+        };
+      };
+
+      # The minimal evaluator is for a configuration read by itself: no
+      # option takes a configuration of it.
+      "test: a nixos-minimal configuration declared beneath a configuration is refused" = {
+        expr =
+          let
+            minimalLib = caisson.mkLib {
+              sources = mockSources;
+              name = "publishing";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { default = { }; };
+              libOverlays = _mkLibOverlay: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+                nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
+              };
+            };
+          in
+          (minimalLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.machine = lib.caisson.nixos-minimal.mkConfiguration {
+                  configModule = { ... }: { };
+                };
+              };
+          }).caisson.manifest.children;
+        expectedError = {
+          type = "ThrownError";
+          msg = "a\\s+nixos-minimal configuration cannot be declared beneath another\\s+configuration";
+        };
+      };
+
       "test: a nixos configuration is declared beneath a configuration and found by name" = {
         expr =
           let

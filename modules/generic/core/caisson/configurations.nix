@@ -88,10 +88,19 @@ let
         Put the value in one of those options and read it there.
       ''
     else if declaredType != null && declaredType != integration then
-      throw ''
-        ${what} is declared with a ${declaredType} configuration.
-        Declare it under `caisson.${declaredType}.configurations`.
-      ''
+      throw (
+        if builtins.elem declaredType integrations then
+          ''
+            ${what} is declared with a ${declaredType} configuration.
+            Declare it under `caisson.${declaredType}.configurations`.
+          ''
+        else
+          ''
+            ${what} is declared with a ${declaredType} configuration, and a
+            ${declaredType} configuration cannot be declared beneath another
+            configuration.
+          ''
+      )
     else
       finalized;
 
