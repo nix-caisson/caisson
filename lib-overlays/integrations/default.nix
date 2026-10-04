@@ -133,6 +133,24 @@
       frameworkModules =
         class: registry: [ closure-lib.caisson-core.modules.${class}.core ] ++ select "core" registry;
 
+      # The selection of an evaluation over the registry of its class,
+      # as a function of that registry: what `given`, the
+      # `moduleImports` of the configuration, selects, and with none
+      # given the default of the class, every entry named `default`
+      # followed by what the levels above the evaluation added for the
+      # class (`caisson.forChildren.defaultModuleImports`), each
+      # applied to the lib of the evaluation.
+      moduleImportsOf =
+        class:
+        { lib, manifest }:
+        given:
+        if given != null then
+          given
+        else
+          registry:
+          select "default" registry
+          ++ builtins.concatMap (selection: selection lib) (manifest.defaultModuleImports.${class} or [ ]);
+
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
       # configuration at a system, as caisson-core.mkConfiguration
@@ -168,6 +186,24 @@
                 exports = config.caisson.exports;
               };
               children = view.lib.caisson.integrations.childrenOf config;
+              # What the modules register for the configurations
+              # beneath (`caisson.forChildren`). Each module is keyed
+              # by where it is registered, so a selection that names
+              # it more than once imports it once.
+              forChildren = {
+                modules = builtins.mapAttrs (
+                  class:
+                  builtins.mapAttrs (
+                    name: module: {
+                      key = "caisson.forChildren.modules.${class}.${name} of ${type} ${view.manifest.name or ""}";
+                      imports = [ module ];
+                    }
+                  )
+                ) config.caisson.forChildren.modules;
+                defaultModuleImports = builtins.mapAttrs (_: selection: [
+                  selection
+                ]) config.caisson.forChildren.defaultModuleImports;
+              };
             };
         };
 
@@ -480,6 +516,7 @@
             mkAltIntegration
             frameworkModules
             mkModuleConfiguration
+            moduleImportsOf
             ;
           coreModules = select "core";
           defaultModuleImports = select "default";

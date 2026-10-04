@@ -87,8 +87,9 @@ let
   registry = lib.caisson-core.modules.nixos or { };
   # The framework module of the class, forced.
   coreModules = selection.frameworkModules "nixos" registry;
-  moduleImports =
-    if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
+  moduleImports = selection.moduleImportsOf "nixos" { inherit lib manifest; } (
+    args.moduleImports or null
+  );
 
   # The configuration's module: the module passed, else the
   # configuration registered under the configuration's name

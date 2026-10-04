@@ -2352,6 +2352,85 @@ in
           };
       };
 
+      # A configuration registers modules for the configurations
+      # beneath it and adds to the default selection of a class. They
+      # reach a configuration of that class at any depth, through
+      # levels of other integrations, and the configuration that
+      # registers them does not get them.
+      "test: a configuration registers modules for the configurations beneath it" = {
+        expr =
+          let
+            noted =
+              note:
+              { lib, ... }:
+              {
+                options.notes = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                };
+                config.notes = [ note ];
+              };
+            top = publishingLib.caisson-core.finalizeTop (
+              publishingLib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ (noted "top") ];
+                    caisson.forChildren.modules.nixos.site = noted "site";
+                    caisson.forChildren.modules.nixos.spare = noted "spare";
+                    caisson.forChildren.modules.structural.site = noted "structural site";
+                    caisson.forChildren.defaultModuleImports.nixos = lib: [ lib.caisson-core.modules.nixos.site ];
+                    caisson.forChildren.defaultModuleImports.structural = lib: [
+                      lib.caisson-core.modules.structural.site
+                    ];
+                    caisson.nixos.configurations.direct = lib.caisson.nixos.mkConfiguration {
+                      configModule = { ... }: { };
+                    };
+                    caisson.nixos.configurations.chosen = lib.caisson.nixos.mkConfiguration {
+                      configModule = { ... }: { };
+                      moduleImports = modules: [ modules.spare ];
+                    };
+                    caisson.structural.configurations.rack = lib.caisson.structural.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.forChildren.modules.nixos.site = noted "rack site";
+                          caisson.nixos.configurations.deep = lib.caisson.nixos.mkConfiguration {
+                            configModule = { ... }: { };
+                          };
+                        };
+                    };
+                  };
+              }
+            );
+            machines = top.children.system.x86_64-linux.children.nixos;
+            rack = top.children.structural.rack;
+            deep = rack.children.system.x86_64-linux.children.nixos.deep;
+          in
+          {
+            top = top.value.config.notes;
+            direct = machines.direct.value.config.notes;
+            chosen = machines.chosen.value.config.notes;
+            rack = rack.value.config.notes;
+            deep = deep.value.config.notes;
+            registryAtTop = builtins.attrNames (top.modules.nixos or { });
+            registryBeneath = builtins.attrNames machines.direct.modules.nixos;
+          };
+        expected = {
+          top = [ "top" ];
+          direct = [ "site" ];
+          chosen = [ "spare" ];
+          rack = [ "structural site" ];
+          deep = [ "rack site" ];
+          registryAtTop = [ ];
+          registryBeneath = [
+            "site"
+            "spare"
+          ];
+        };
+      };
+
       # A configuration reaches the top through every level above it,
       # whatever their integrations: each level passes up what is
       # beneath it. Here a machine sits beneath a machine, beneath a

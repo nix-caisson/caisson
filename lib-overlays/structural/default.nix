@@ -46,8 +46,9 @@
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "structural" registry;
 
-          moduleImports =
-            if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
+          moduleImports = selection.moduleImportsOf "structural" { inherit lib manifest; } (
+            args.moduleImports or null
+          );
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
