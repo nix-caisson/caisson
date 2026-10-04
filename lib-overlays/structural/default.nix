@@ -12,7 +12,6 @@
 # depth, declared beneath another configuration under
 # `caisson.structural.configurations`.
 {
-  closure-lib,
   contributeClasses,
   entries,
   mkLibOverlay,
@@ -44,14 +43,8 @@
           selection = lib.caisson.integrations;
           registry = lib.caisson-core.modules.structural or { };
 
-          # The framework module of the class: the core of caisson
-          # itself, read from the closure so it is there however this
-          # integration was registered, plus every `core` the
-          # composition registered.
-          frameworkModules = [
-            closure-lib.caisson-core.modules.structural.core
-          ]
-          ++ selection.coreModules registry;
+          # The framework module of the class.
+          frameworkModules = selection.frameworkModules "structural" registry;
 
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
@@ -88,15 +81,11 @@
         in
         {
           value = evaluated;
-          outputs = {
-            exports = evaluated.config.caisson.exports;
-          };
-          children = selection.childrenOf evaluated.config;
         };
 
       configuration =
         args:
-        final.caisson-core.mkConfiguration {
+        final.caisson.integrations.mkModuleConfiguration {
           type = "structural";
           evaluate = evaluate args;
         };

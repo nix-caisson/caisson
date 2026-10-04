@@ -15,10 +15,6 @@
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
   nixpkgsModule ? true,
-  # The core of caisson itself for the class, read from the closure of
-  # the integration so it is there however the integration was
-  # registered.
-  closureCore,
 }:
 { lib, manifest }:
 args:
@@ -89,11 +85,8 @@ let
     };
 
   registry = lib.caisson-core.modules.nixos or { };
-  # The framework module of the class, forced: the core of caisson
-  # itself, which declares the manifest, the configurations declared
-  # beneath this one and `caisson.exports`, plus every `core` the
-  # composition registered.
-  coreModules = [ closureCore ] ++ selection.coreModules registry;
+  # The framework module of the class, forced.
+  coreModules = selection.frameworkModules "nixos" registry;
   moduleImports =
     if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
 

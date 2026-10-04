@@ -51,24 +51,18 @@
             lib = common.lib;
           }
           // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
+        in
+        {
           value =
             (import "${common.src}/nixos/lib" {
               inherit (callArgs) lib;
             }).evalModules
               (builtins.removeAttrs callArgs [ "lib" ]);
-        in
-        {
-          inherit value;
-          # What the configuration passes up to its parent, and the
-          # configurations declared beneath it, as for any NixOS
-          # configuration.
-          outputs.exports = value.config.caisson.exports;
-          children = view.lib.caisson.integrations.childrenOf value.config;
         };
 
       configuration =
         args:
-        final.caisson-core.mkConfiguration {
+        final.caisson.integrations.mkModuleConfiguration {
           # In the tree an evaluation of an alt is a configuration of
           # the integration that owns the class: it is declared under
           # `caisson.nixos.configurations`, published where NixOS

@@ -19,7 +19,6 @@
 # module evaluation runs on the same library everything else in the
 # composition does, and on no library flake-parts assembled for itself.
 {
-  closure-lib,
   contributeClasses,
   entries,
   mkLibOverlay,
@@ -94,14 +93,8 @@
           # project) are selectable here.
           registry = lib.caisson-core.modules.flake or { };
 
-          # The framework module of the class: the core of caisson
-          # itself, read from the closure so it is there however this
-          # integration was registered, plus every `core` the
-          # composition registered.
-          frameworkModules = [
-            closure-lib.caisson-core.modules.flake.core
-          ]
-          ++ selection.coreModules registry;
+          # The framework module of the class.
+          frameworkModules = selection.frameworkModules "flake" registry;
 
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
@@ -199,14 +192,12 @@
           value = evaluated;
           outputs = {
             flake = outputs;
-            exports = evaluated.config.caisson.exports;
           };
-          children = selection.childrenOf evaluated.config;
         };
 
       configuration =
         args:
-        final.caisson-core.mkConfiguration {
+        final.caisson.integrations.mkModuleConfiguration {
           type = "flake-parts";
           evaluate = evaluate args;
         };

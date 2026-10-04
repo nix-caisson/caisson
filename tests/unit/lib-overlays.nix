@@ -2255,6 +2255,103 @@ in
         };
       };
 
+      # Every configuration holds configurations of any integration
+      # beneath it. The same module, declaring a configuration of each
+      # integration, is the module of a parent of each integration, and
+      # every parent holds every one of them.
+      "test: a configuration of any integration holds configurations of any integration" = {
+        expr =
+          let
+            beneath =
+              { lib, ... }:
+              {
+                caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                  moduleImports = _modules: [ ];
+                };
+                caisson.flake-parts.configurations.flake = lib.caisson.flake-parts.mkConfiguration {
+                  moduleImports = _modules: [ ];
+                };
+                caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                  configModule = { ... }: { };
+                };
+                caisson.nixos.configurations.small = lib.caisson.nixos-minimal.mkConfiguration {
+                  configModule = { ... }: { };
+                };
+              };
+            everyLib = caisson.mkLib {
+              sources = mockSources;
+              name = "publishing";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { default = { }; };
+              libOverlays = _mkLibOverlay: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+                nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
+              };
+            };
+            top = everyLib.caisson-core.finalizeTop (
+              everyLib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.structural.configurations.parent = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule = beneath;
+                    };
+                    caisson.flake-parts.configurations.parent = lib.caisson.flake-parts.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule = beneath;
+                    };
+                    caisson.nixos.configurations.parent = lib.caisson.nixos.mkConfiguration {
+                      configModule = beneath;
+                    };
+                    caisson.nixos.configurations.smallParent = lib.caisson.nixos-minimal.mkConfiguration {
+                      configModule = beneath;
+                    };
+                  };
+              }
+            );
+            held = parent: {
+              direct = builtins.mapAttrs (_: builtins.attrNames) (
+                builtins.removeAttrs parent.children [ "system" ]
+              );
+              atSystem = builtins.mapAttrs (_: builtins.attrNames) parent.children.system.x86_64-linux.children;
+              # The evaluations beneath are finished evaluations.
+              machineIsNixos = parent.children.system.x86_64-linux.children.nixos.machine.value ? config;
+            };
+            machines = top.children.system.x86_64-linux.children.nixos;
+          in
+          {
+            structural = held top.children.structural.parent;
+            flake-parts = held top.children.flake-parts.parent;
+            nixos = held machines.parent;
+            nixos-minimal = held machines.smallParent;
+          };
+        expected =
+          let
+            everything = {
+              direct = {
+                flake-parts = [ "flake" ];
+                structural = [ "group" ];
+              };
+              atSystem = {
+                nixos = [
+                  "machine"
+                  "small"
+                ];
+              };
+              machineIsNixos = true;
+            };
+          in
+          {
+            structural = everything;
+            flake-parts = everything;
+            nixos = everything;
+            nixos-minimal = everything;
+          };
+      };
+
       # A NixOS configuration holds configurations beneath it as a
       # structural configuration does: they are in its manifest, under
       # their system where they are evaluated at one, they see it as
