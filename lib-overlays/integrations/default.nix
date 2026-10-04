@@ -74,12 +74,10 @@
 #   mkModuleConfiguration
 #                        a configuration that is a module evaluation,
 #                        from the evaluator step of an integration.
-#                        Every such configuration holds configurations
-#                        of any integration beneath it, and this is
-#                        where that is written: the configurations its
-#                        modules declare are its children, and what
-#                        they export is passed up through it. An
-#                        integration writes neither.
+#                        It holds configurations of any integration
+#                        beneath it: the configurations its modules
+#                        declare are its children, and what they
+#                        export is passed up through it.
 { closure-lib, ... }:
 {
 
@@ -146,11 +144,10 @@
       # options are not `value.config`. Its module list carries
       # `frameworkModules` of its class.
       #
-      # What every such configuration has is added here: the
-      # configurations its modules declare under
+      # The configurations its modules declare under
       # `caisson.<integration>.configurations`, of any integration,
       # are its children, and `caisson.exports`, which carries what
-      # they pass up, is among its outputs.
+      # they pass up, is its `exports` output.
       mkModuleConfiguration =
         {
           type,
