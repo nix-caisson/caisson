@@ -5,7 +5,7 @@
   Overlays registered via mkLibOverlay take the closure attrset
   ({ closure-inputs, mkLibOverlay, ... }) as their first arg list and
   return an { imports ? [ ], overlay } attrset: the standard Nix overlay
-  signature (final: prev:) lives under `overlay`, and overlays this one
+  signature (final: prev:) lives under `overlay`, and overlays this overlay
   depends on go under `imports`. Overlays are composed left-to-right
   during `mkLib`, imports first.
 

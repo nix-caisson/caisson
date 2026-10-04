@@ -28,7 +28,7 @@
     nix-unit.inputs.flake-parts.follows = "flake-parts";
 
     # The tests compose with the deps world's caisson-core, not the
-    # one the parent's lock names.
+    # caisson-core the parent's lock names.
     caisson-core.follows = "deps/caisson-core";
 
   };

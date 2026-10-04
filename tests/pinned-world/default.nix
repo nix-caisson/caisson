@@ -5,8 +5,8 @@
 # (nixpkgs, home-manager, colmena, terranix, system-manager, read
 # from tests/dependencies) and exercised end to end. Every upstream
 # expectation caisson relies on is held by a probe here, so a pin
-# that moves and breaks one fails at evaluation, in this suite, rather
-# than in a consumer.
+# that moves and breaks an expectation fails at evaluation, in this
+# suite, rather than in a consumer.
 #
 # The checks partition runs it as the `pinned-world` check, so
 # `nix flake check` evaluates the suite at the committed pins and a
@@ -456,7 +456,7 @@ let
       && node.pkgs.hello.drvPath == pkgs.hello.drvPath;
 
     # A hive refuses a node that is not a colmena node. A node is
-    # checked when it is read, so the probe forces one.
+    # checked when it is read, so the probe forces a node.
     colmenaRefusesPlainNixosNodes =
       !(builtins.tryEval
         (hiveLib.caisson.colmena.mkConfiguration {
@@ -638,7 +638,7 @@ let
               options.nixpkgs.pkgs = lib.mkOption { type = lib.types.raw; };
             };
           # Selected by name: the default default is the entries named
-          # `default`, and this one is not.
+          # `default`, and this entry is not.
           moduleImports = modules: [ modules.pinned-world-probe ];
         };
       in
@@ -679,7 +679,7 @@ let
       ) (builtins.attrNames manifest.libOverlays)
       && composedWithMkLib.caisson.flake-parts ? mkConfiguration;
 
-    # A tree declares its platforms once, on mkLib; the flake-parts
+    # A tree declares its platforms on mkLib; the flake-parts
     # integration reads them from the manifest, so a flake module that
     # names no `systems` still enumerates them.
     systemsDeclaredOnMkLibReachFlakeParts =

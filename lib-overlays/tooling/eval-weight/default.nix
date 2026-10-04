@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Eval-weight measurement harness. Runs a pinned Nix evaluator inside a
 # derivation sandbox against explicitly wired inputs, captures the
-# NIX_SHOW_STATS counters, and (optionally) gates the deterministic ones
+# NIX_SHOW_STATS counters, and (optionally) gates the deterministic counters
 # against a committed baseline. Thunk/value/env/allocation counts are
 # reproducible for a fixed lock set and Nix version; CPU and wall-clock
 # time are machine-dependent, so they are always reported but not gated.

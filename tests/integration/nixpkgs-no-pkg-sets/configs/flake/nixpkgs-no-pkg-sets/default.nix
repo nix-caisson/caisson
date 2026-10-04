@@ -4,7 +4,7 @@
 # the `pkgSets` argument is empty. The composition declares no
 # name either, so this also covers the nixpkgs flake module
 # reaching a composition that names no package scope: with nothing
-# selecting one, the name is never needed.
+# selecting a scope, the name is never needed.
 { ... }:
 { ... }:
 {

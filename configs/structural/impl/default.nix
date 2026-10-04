@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # What caisson exports: every registered overlay and module, and the
-# composed library's framework namespaces. Both tops evaluate this
-# configuration beneath themselves and merge in what it exports.
+# composed library's framework namespaces. The flake top and the
+# structural top evaluate this configuration beneath themselves and
+# merge in what it exports.
 { ... }:
 { ... }:
 {

@@ -44,7 +44,7 @@
       };
 
       # The default package overlay selection: every entry named
-      # `default`, the one this composition registers and those the
+      # `default`, the entry this composition registers and those the
       # consumed projects contribute (`<project>/default`), as for
       # modules.
       defaultPkgOverlays =
@@ -334,7 +334,7 @@
           finalizeConfiguration args;
         # The same arguments and `ecosystemArgs`, the instantiation's
         # arguments (`crossSystem`, `crossOverlays`, `stdenvStages`)
-        # merged over the composed ones last, for every set.
+        # merged over the composed arguments last, for every set.
         mkConfigurationWithEcosystemArgs =
           {
             configModule ? null,

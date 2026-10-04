@@ -2,9 +2,9 @@
 #
 # The flake outputs of what the selectors chose: `caisson.exports`
 # copied into `flake.lib`, `flake.libOverlays`, `flake.modules` and,
-# when the selection holds any, `flake.pkgOverlays`, with the two
+# when the selection holds any, `flake.pkgOverlays`, with these
 # flake-parts conventions on top: the `flake` class always exports a
-# `default` entry (an empty module unless the selection provides one),
+# `default` entry (an empty module unless the selection provides it),
 # so `flakeModules.default` exists for consumers that import it by
 # convention, and `flake.flakeModules` mirrors `flake.modules.flake`.
 { config, lib, ... }:

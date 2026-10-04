@@ -249,7 +249,7 @@
             # The selection over the flake class of the registry; every
             # entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
           }@args:

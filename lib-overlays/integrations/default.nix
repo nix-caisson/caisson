@@ -2,7 +2,7 @@
 #
 # What an integration is written from: the functions every integration
 # overlay shares, under `lib.caisson.integrations`. Each integration
-# imports this overlay by key, so composing any one of them composes
+# imports this overlay by key, so composing any of them composes
 # this, and reads the functions through `final`. `mkIntegration` and
 # `mkAltIntegration` generate an integration from its declaration
 # (design section 8) out of these pieces.
@@ -11,7 +11,7 @@
 #                        integration takes exactly the caisson-shaped
 #                        arguments (configModule, moduleImports,
 #                        specialArgs, pkgSets, ecosystemSrc, and the
-#                        few of one target) and composes the evaluator's
+#                        few of its target) and composes the evaluator's
 #                        call from them. Nothing else is forwarded: an
 #                        evaluator argument handed in directly would be
 #                        silently overwritten, silently dropped, or
@@ -31,7 +31,7 @@
 #                        entry point and raised at the call site, with
 #                        no frame of the composition or the evaluator
 #                        above it. The pattern names every argument the
-#                        entry point takes and marks the optional ones
+#                        entry point takes and marks the optional arguments
 #                        with `? null`; the composition supplies the
 #                        value of an omitted argument, so the pattern
 #                        binds `@args` and hands the call on as it came.
@@ -50,7 +50,7 @@
 #                        manifest; a manifest-less
 #                        composition resolves only the explicit
 #                        argument.
-#   coreModules          the two selections every integration draws
+#   coreModules          the selections every integration draws
 #   defaultModuleImports from the registry of its class, by entry name:
 #                        every entry named `core` (the local `core` and
 #                        a consumed project's `<project>/core`) is the
@@ -129,7 +129,7 @@
         evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { }));
 
       # An integration that owns a module class, declared. The
-      # declaration carries the two entry points as pattern functions,
+      # declaration carries the entry points as pattern functions,
       # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
       # result holds `namespace`, the value of `lib.caisson.<name>` (the
       # entry points, the registration form `mkModule` bound to the
@@ -159,7 +159,8 @@
           # class (`configs/<class>/<name>`), by its name, each as
           # `mkConfiguration` builds it without `configModule`. The
           # arguments apply to all of them; a tree that wants only some,
-          # or one that differs, declares them with `mkConfiguration`.
+          # or a configuration that differs, declares them with
+          # `mkConfiguration`.
           # It exists for an integration whose `mkConfiguration` takes
           # `configModule` as optional, which is the mark that it finds
           # the module registered under the configuration's name.
@@ -208,7 +209,7 @@
       # it, by integration and then name, as the `children` an
       # integration's `evaluate` returns: the values of its
       # `caisson.<integration>.configurations` options, which finalize
-      # each one when read. An integration with none declared is left
+      # each entry when read. An integration with none declared is left
       # out.
       childrenOf =
         config:
@@ -220,7 +221,7 @@
       # owns, declared: `over` is the owning integration, reached
       # through the lib (`final.caisson.nixos`), and the class and its
       # registration form belong to that integration; the entry points
-      # build on the composition that integration publishes, so the two
+      # build on the composition that integration publishes, so the
       # evaluators cannot express different configurations from the
       # same arguments. The result is the value of `lib.caisson.<name>`:
       # the entry points and `extra`, no `mkModule`, and no class

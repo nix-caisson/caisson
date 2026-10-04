@@ -183,7 +183,7 @@
                 # above it: the real evaluator runs each wrong call and the
                 # script reads the trace, since nix-unit sees messages
                 # alone. The evaluator runs the way nix-unit's does in
-                # the sandbox, on a local store beside the real one.
+                # the sandbox, on a local store beside the real store.
                 argument-errors =
                   pkgs.runCommand "argument-errors"
                     {

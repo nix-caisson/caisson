@@ -2,7 +2,7 @@
 # Eval-weight control subject: the same trivial flake as
 # tests/integration/minimal-consumer, but built with bare flake-parts and
 # no caisson machinery. Subtracting this scenario from the
-# minimal-consumer one isolates caisson's overhead from the cost of
+# minimal-consumer scenario isolates caisson's overhead from the cost of
 # flake-parts and nixpkgs, which would otherwise drown it out.
 {
   caisson,

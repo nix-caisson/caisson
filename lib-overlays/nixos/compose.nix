@@ -2,7 +2,7 @@
 #
 # The composition the nixos integration's entry points share, and the
 # nixos-minimal integration reads through `lib.caisson.nixos.compose`:
-# one definition of the library, the module list and the special
+# the definition of the library, the module list and the special
 # arguments, so the evaluators of the class cannot express different
 # machines from the same arguments.
 { final }:
@@ -69,7 +69,7 @@ in
     # The `lib` argument every module receives. `evalModules` builds
     # that argument from the `lib` its `lib/modules.nix` closed
     # over, which is the fixpoint the `nixpkgs-lib` entry read rather
-    # than the one this composition built, and `// specialArgs` in that
+    # than what this composition built, and `// specialArgs` in that
     # file is where a caller says otherwise. Naming it here is what
     # puts the composed library in front of the modules.
     lib = final;

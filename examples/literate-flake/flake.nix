@@ -4,7 +4,7 @@
 
   inputs = {
     /*
-      This example lives inside the caisson repository, so its inputs use two
+      This example lives inside the caisson repository, so its inputs use
       patterns that differ from what an independent downstream flake would do:
 
       **Floating reference (`path:`):**  `caisson` points at the repository
@@ -56,7 +56,8 @@
           project's exported overlays and modules become available under
           `<project>/<name>`, and the usual selections pick from them per
           item. Registering caisson this way brings in its integrations
-          (`lib.caisson`, the flake-parts one included) and its exported modules.
+          (`lib.caisson`, the flake-parts integration included) and its
+          exported modules.
         - `modules` is a function from the composed `lib` returning the
           class-keyed registration. `mkModules` derives it from the
           conventional layout, `modules/<class>/<name>/default.nix`:
@@ -70,7 +71,7 @@
         - `libOverlays` is a function from an input-closed `mkLibOverlay`
           helper returning the registered library overlays; `mkLibOverlays`
           derives it from `lib-overlays/<name>/default.nix`. Registering
-          one by hand stays useful for cherry-picking or renaming a single
+          by hand stays useful for cherry-picking or renaming an
           overlay from elsewhere.
       */
       core = caisson.lib.caisson-core;

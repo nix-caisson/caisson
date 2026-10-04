@@ -5,7 +5,7 @@
 }:
 let
   # The passed lib is the composed library from the unit test flake,
-  # carrying both framework namespaces: `caisson-core` (machinery,
+  # carrying the framework namespaces: `caisson-core` (machinery,
   # registry, manifest) and `caisson` (the integrations).
   mkFlakePartsModule = lib.caisson.flake-parts.mkModule;
   mkLibOverlay = lib.caisson-core.mkLibOverlay;
@@ -87,7 +87,7 @@ let
   missingArgument = fn: argumentError fn "without required";
   unexpectedArgument = fn: argumentError fn "with unexpected";
 
-  # The integrations the parent registers, each with the two entry
+  # The integrations the parent registers, each with its entry
   # points.
   integrationNames = [
     "nixos"
@@ -148,7 +148,7 @@ in
         };
       };
 
-      # The selector reads the library passed to it, not the one the
+      # The selector reads the library passed to it, not the library the
       # configuration it came from was evaluated over: handing it another
       # composition's library selects that composition's namespace.
       "test: the selector follows the library, not the configuration it came from" = {
@@ -1464,7 +1464,7 @@ in
     };
 
     "test: the framework module and the default default are selected by name" = {
-      # Every entry named `core`, the local one and the `<project>/core`
+      # Every entry named `core`, the local entry and the `<project>/core`
       # of a consumed project, is the framework module of the class;
       # every entry named `default` is the default default, what
       # moduleImports selects when omitted.
@@ -1799,13 +1799,13 @@ in
   # The nixos and nixos-minimal integrations: the composed library is
   # the library a NixOS evaluation runs on, threaded into the
   # evaluator of each. The ecosystem source is a stand-in nixpkgs tree
-  # carrying the three files the integrations read,
+  # carrying the files the integrations read,
   # `nixos/lib/eval-config.nix`, `nixos/lib/default.nix` and
   # `nixos/modules/module-list.nix`, each with the signature of the
   # file it stands in for and its treatment of `lib`, including the
   # `import ../../lib` default that reaches the library of the tree.
   # That `lib` directory throws, so an evaluation handed no library
-  # fails where it reaches for one.
+  # fails where it reaches for a library.
   nixosLib =
     let
       nixosStub = ./nixos-stub;
@@ -1849,7 +1849,7 @@ in
           config.seenLib = {
             # An attribute this composition contributed and nixpkgs
             # does not have: present only if the library the modules
-            # run on is the composed one.
+            # run on is the composed library.
             marker = lib.caissonMarker or null;
             # A nixpkgs function, so the composed library is still
             # nixpkgs' library and not a bare marker.
@@ -1871,7 +1871,7 @@ in
       # composition's marker and a nixpkgs function at once, on one
       # library. `evalModules` builds the `lib` module argument from
       # the library its `lib/modules.nix` closed over, which is
-      # the fixpoint the `nixpkgs-lib` entry read rather than the one
+      # the fixpoint the `nixpkgs-lib` entry read rather than what
       # this composition built, so the marker arrives only because the
       # composition names `lib` among the special arguments.
       "test: the modules of a nixos evaluation see the composed library" = {
@@ -1955,7 +1955,7 @@ in
       };
 
       # A `lib` the caller passes in `specialArgs` takes precedence
-      # over the one the composition sets, the way every other special
+      # over the `lib` the composition sets, the way every other special
       # argument does.
       "test: the caller's specialArgs lib takes precedence" = {
         expr =
@@ -1972,8 +1972,8 @@ in
 
   # The home-manager integration as a library integration: `lib.hm` is
   # an entry of the integration, composed over the library the
-  # composition builds, and a home-manager evaluation runs on that one
-  # library. The ecosystem source is a stand-in tree with the two
+  # composition builds, and a home-manager evaluation runs on that
+  # library. The ecosystem source is a stand-in tree with the
   # files the integration reads, `modules/lib` (the function composed
   # as the `hm` entry) and `modules/modules.nix` (the module list),
   # each with the signature of the file it stands in for.
@@ -1981,7 +1981,7 @@ in
     let
       hmStub = ./home-manager-stub;
       # The same stub at a second path, the store copy of the parent
-      # flake: a tree equal in content to the declared one and
+      # flake: a tree equal in content to the declared tree and
       # different as a tree, so an evaluation can name another
       # home-manager and nothing but the refusal stands in its way.
       hmStubCopy = inputs.parent.outPath + "/tests/unit/home-manager-stub";
@@ -2018,7 +2018,7 @@ in
       undeclaredLib = mkCompositionWith { } { };
       # A nixpkgs maintainer list for a composition to merge into. The
       # nixpkgs.lib mirror these tests compose on carries none, so a
-      # composition that reads the merged name supplies one: the
+      # composition that reads the merged name supplies a list: the
       # home-manager entry imports it, which puts it in `prev` where
       # the merge reads it.
       nixpkgsMaintainers = {
@@ -2052,7 +2052,7 @@ in
           seenLib = {
             # An attribute this composition contributed and nixpkgs
             # does not have: present only if the library the modules
-            # run on is the composed one.
+            # run on is the composed library.
             marker = lib.caissonMarker or null;
             # The name home-manager's modules read.
             hm = lib.hm.reachesLib or null;
@@ -2117,7 +2117,7 @@ in
       };
 
       # With no home-manager declared there are no maintainers to
-      # merge, and the list is the one the composition had.
+      # merge, and the list is what the composition had.
       "test: a composition declaring no home-manager leaves lib.maintainers as it found it" = {
         expr = builtins.attrNames (mkMaintainersComposition { }).maintainers;
         expected = [ "a-nixpkgs-maintainer" ];
@@ -2336,7 +2336,7 @@ in
       # evaluation runs on wherever it creates a module: a submodule
       # and an evaluation run from inside a module both see the
       # composition and `lib.hm`, under a declared home-manager and
-      # under one the evaluation names.
+      # under a home-manager the evaluation names.
       "test: submodules and nested evaluations run on the same library" = {
         expr =
           let
@@ -2672,9 +2672,9 @@ in
       };
 
       # No entry point takes a `name`: a parentless configuration's name
-      # is the one declared on mkLib. The pattern of the entry point refuses the
-      # argument before the evaluation exists, so a `name` can never
-      # quietly name the configuration.
+      # is the name declared on mkLib. The pattern of the entry point
+      # refuses the argument before the evaluation exists, so a `name`
+      # can never quietly name the configuration.
       "test: a name argument is refused" = {
         expr = namespacedLib.caisson.structural.mkConfiguration {
           configModule = { };
@@ -2904,11 +2904,11 @@ in
         ];
       };
 
-      # A configuration beneath sees the one that declares it without
-      # the configurations declared beneath it. A definition that reads
-      # one of them unguarded fails once a configuration beneath reads
-      # the value it defines, and the same definition is readable from
-      # the configuration that holds them.
+      # A configuration beneath sees the configuration that declares it
+      # without the configurations declared beneath it. A definition that
+      # reads one of them unguarded fails once a configuration beneath
+      # reads the value it defines, and the same definition is readable
+      # from the configuration that holds them.
       "test: a configuration beneath cannot read a result of the configurations beside it" = {
         expr =
           let
@@ -3156,7 +3156,7 @@ in
                 };
             }
           );
-          # An owner whose pattern requires two arguments, the ones its
+          # An owner whose pattern requires two arguments, those its
           # composition destructures without a default, and an alt over
           # it that requires one.
           probe-strict = mkLibOverlay (
@@ -3305,7 +3305,7 @@ in
         };
       };
 
-      # A stand-in colmena source with the two attributes the
+      # A stand-in colmena source with the attributes the
       # integration reads, enough to evaluate a colmena configuration
       # whose module reads its node constructors.
       colmenaStub = {
@@ -3387,7 +3387,7 @@ in
       };
 
       # A pattern names the arguments the composition destructures
-      # without a default, so a missing one is Nix's function-argument
+      # without a default, so a missing argument is Nix's function-argument
       # error, named after the entry point, and never an error from
       # inside the composition. Which of two missing arguments Nix
       # names first is for Nix to decide, so the empty call admits
@@ -3561,7 +3561,7 @@ in
       };
     };
 
-  # The two evaluators of the `homeManager` class: home-manager
+  # The evaluators of the `homeManager` class: home-manager
   # imports its whole module tree or the necessary modules alone, and
   # that is a choice between evaluations, so each way is an entry
   # point. `lib.caisson.home-manager` owns the class and evaluates it
@@ -3570,7 +3570,7 @@ in
   # Both run over the composition the owner publishes, so the two
   # cannot express different profiles from the same arguments.
   #
-  # The ecosystem source is a stand-in tree with the two files the
+  # The ecosystem source is a stand-in tree with the files the
   # integrations read, `modules/lib` (the function composed as the
   # `hm` entry) and `modules/modules.nix` (the module list), each with
   # the signature of the file it stands in for, and
@@ -3588,7 +3588,7 @@ in
         };
       };
       # The arguments both entry points take, so the module list is
-      # the sole difference between the two evaluations.
+      # the sole difference between the evaluations.
       commonArgs = {
         configModule = { };
         pkgSets.pkgs = { };
@@ -3600,7 +3600,7 @@ in
     {
       # The alt exists and evaluates the class the other way. The
       # module list home-manager imports is what `minimal` selects, so
-      # that is where the two entry points part.
+      # that is where the entry points part.
       "test: the alt evaluates the class with the necessary modules alone" = {
         expr = {
           owner = {
@@ -3666,7 +3666,7 @@ in
         ];
       };
 
-      # The class is declared once, by the integration that owns it.
+      # The class is declared by the integration that owns it.
       "test: the alt declares no class" = {
         expr = myLib.caisson-core.classes.homeManager.integration;
         expected = "home-manager";
@@ -3674,7 +3674,7 @@ in
 
       # The composition destructures `pkgSets` and `configModule`
       # without a default, and the pattern of the alt names both, so a
-      # missing one is Nix's function-argument error at the entry
+      # missing argument is Nix's function-argument error at the entry
       # point and never an error from inside the composition.
       "test: the alt requires what the composition destructures" = {
         expr = myLib.caisson.home-manager-minimal.mkConfiguration { };
@@ -3682,8 +3682,7 @@ in
       };
 
       # `minimal` is not an argument of either entry point: it names
-      # the evaluation, and each entry point is the one that evaluates
-      # its way.
+      # the evaluation, and each entry point evaluates its way.
       "test: the owner refuses minimal" = {
         expr = myLib.caisson.home-manager.mkConfiguration (commonArgs // { minimal = true; });
         expectedError = unexpectedArgument "mkConfiguration" "minimal";
@@ -3704,7 +3703,7 @@ in
         expected = "whole-tree";
       };
 
-      # One composition serves both entry points, so an argument of
+      # The same composition serves both entry points, so an argument of
       # the class reaches the alt unchanged.
       "test: the alt composes through the integration that owns the class" = {
         expr =

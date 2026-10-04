@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# The option types the core module declares its options with. One
-# definition, referenced by the core module and re-exported under
+# The option types the core module declares its options with. The
+# definition is referenced by the core module and re-exported under
 # `lib.caisson.flake-parts.types` for the readers of that name.
 { lib }:
 let

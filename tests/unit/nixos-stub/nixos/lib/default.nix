@@ -5,7 +5,7 @@
 # it is given is what `evalModules` runs on, and `lib` defaults to
 # `import ../../lib`, the library of the tree this file lives in. The
 # nixos-minimal integration imports this file directly, so the library
-# it names here is the one that reaches a minimal evaluation.
+# it names here is what reaches a minimal evaluation.
 {
   lib ? import ../../lib,
   featureFlags ? { },

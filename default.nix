@@ -6,7 +6,7 @@
 # configs/structural/caisson, with `caisson.manifest` beside them.
 # flake.nix is the flake top over the same configuration.
 #
-# The pins are the ones in flake.lock, read without the flake evaluator
+# The pins are those in flake.lock, read without the flake evaluator
 # by caisson-core's flake-compat reader, so this top and the flake top
 # build from the same trees and a pin advance moves both. caisson-core
 # itself is fetched from its node in the lock first, since the reader

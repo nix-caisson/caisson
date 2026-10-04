@@ -47,7 +47,7 @@
         assert plain.sharedApplied == 1;
         # Modules and lib overlays caisson contributed through
         # `projects` (`caisson/<name>`) are not exported by default;
-        # the ones registered here are.
+        # those registered here are.
         assert
           builtins.attrNames self.modules.generic == [
             "named"

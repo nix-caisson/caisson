@@ -85,7 +85,7 @@
       };
 
       # eval-config with nixpkgs' module list passed explicitly as
-      # `baseModules`. The signature is the one of `mkConfiguration`.
+      # `baseModules`. The signature is that of `mkConfiguration`.
       mkConfigurationFull =
         {
           configModule,
@@ -134,7 +134,7 @@
             # The selection over the nixos class of the registry; every
             # entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
             # eval-config's `system`; the host platform of

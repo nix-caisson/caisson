@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The structural integration: the empty integration, wrapping
-# no ecosystem. Its class, `structural`, is one caisson defines itself,
+# no ecosystem. Its class, `structural`, is defined by caisson itself,
 # since no ecosystem owns a plain tree of configurations, and it
 # carries nothing but caisson's core module: the manifest, the
 # configurations declared beneath, the registry selectors and
@@ -103,7 +103,7 @@
 
       # What a tool reads from a top: the exports, with the manifest
       # beside them for `manifestOf` and `topside --file`. A top has no
-      # parent to declare it under an attribute, so its name is the one
+      # parent to declare it under an attribute, so its name is the name
       # the composition declares on mkLib.
       mkTopConfiguration =
         rawArgs:
@@ -137,7 +137,7 @@
             # The selection over the structural class of the registry;
             # every entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
           }@args:

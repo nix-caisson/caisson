@@ -88,9 +88,10 @@
 
           # system-manager imports selected NixOS modules from the
           # nixpkgs input pinned in its flake; current nixos-unstable
-          # restructured nixos/modules/config/nix.nix in two ways
-          # system-manager's module set (tip 48d4734) does not absorb. Both are bridged
-          # here, where every system-manager eval composes.
+          # restructured nixos/modules/config/nix.nix in ways
+          # system-manager's module set (tip 48d4734) does not absorb.
+          # They are bridged here, where every system-manager eval
+          # composes.
           # Delete the bridge when upstream absorbs the restructure: each
           # half fails loudly (duplicate declaration / unused disable)
           # when its reason disappears.
@@ -129,7 +130,7 @@
           # the same options (nix/modules/upstream/nixpkgs/nix.nix, which
           # predates them landing in the NixOS module). When the NixOS
           # module owns the options, disable the stub and re-provide the
-          # two config facts it carried: nix.conf must replace a foreign
+          # config facts it carried: nix.conf must replace a foreign
           # distro's existing file, flakes stay on by default, and
           # `nix.enable` keeps the stub's off-by-default (the NixOS
           # declaration defaults it on, which would materialize nixbld
@@ -198,7 +199,7 @@
             # The selection over the systemManager class of the
             # registry; every entry named `default` when absent.
             moduleImports ? null,
-            # Extra module arguments, merged over the ones the framework
+            # Extra module arguments, merged over those the framework
             # supplies; system-manager names these `extraSpecialArgs`.
             specialArgs ? null,
           }@args:

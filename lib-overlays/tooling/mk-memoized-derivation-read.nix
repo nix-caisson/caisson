@@ -21,7 +21,7 @@
 #     the check fails loud. This is the memo's cache-invalidation: a memo
 #     without a check is a lie you have written down.
 #
-# The memo and the check are therefore two halves of one thing, which is why
+# The memo and the check are therefore halves of the same thing, which is why
 # this helper hands back both and will not let you take one without the
 # other.
 #
@@ -33,7 +33,7 @@
 #
 # The eval-time `value` is produced by `normalize` (an arbitrary Nix
 # function, e.g. a kconfig parser) applied to the memo. `normalize` and
-# `canonicalize` describe the same equivalence at two phases (`normalize`
+# `canonicalize` describe the same equivalence across phases (`normalize`
 # in Nix for eval, `canonicalize` in shell for the build-time check) so a
 # canonical memo makes them agree by construction.
 #

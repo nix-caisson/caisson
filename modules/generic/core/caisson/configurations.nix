@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: MIT
 #
-# The configurations declared beneath this one: for each integration,
-# `caisson.<integration>.configurations.<name>` takes what that
-# integration's `mkConfiguration` returns and holds the finished
+# The configurations declared beneath this configuration: for each
+# integration, `caisson.<integration>.configurations.<name>` takes what
+# that integration's `mkConfiguration` returns and holds the finished
 # manifest. A configuration learns its name and its parent from where
-# it is declared, so the option finalizes each one when it is read,
+# it is declared, so the option finalizes each entry when it is read,
 # with the attribute it is declared under and the childless manifest
 # of this evaluation. The names are known without finalizing anything.
 #
 # Re-export: `caisson.<integration>.exported` selects, from those
-# configurations, the ones this configuration passes up, and what each
-# selected one exports is merged into `caisson.exports` here. It runs
-# in the evaluation that holds the configurations and not in the
+# configurations, those this configuration passes up, and what each
+# selected configuration exports is merged into `caisson.exports` here.
+# It runs in the evaluation that holds the configurations and not in the
 # childless view, where their results are not readable.
 { config, lib, ... }:
 let
@@ -33,7 +33,7 @@ let
         )
       ) integrations;
 
-  # One part of `caisson.exports`, as the configurations passed up
+  # A part of `caisson.exports`, as the configurations passed up
   # export it.
   passedUp = part: lib.mkMerge (builtins.map (child: child.outputs.exports.${part}) exported);
 
@@ -56,9 +56,9 @@ let
       throw ''
         The result of the ${integration} configuration `${name}` is not
         readable from the ${manifest.type} configuration it is declared in, or
-        from another configuration beneath that one; only the options of
-        the ${manifest.type} configuration are readable there. Put the value in
-        one of those options and read it there.
+        from another configuration beneath that configuration; only the
+        options of the ${manifest.type} configuration are readable there.
+        Put the value in one of those options and read it there.
       ''
     else if finalized.type != integration then
       throw ''
@@ -95,7 +95,7 @@ in
         `lib.caisson.${integration}.mkConfiguration` returns, and reads
         back as its manifest, finalized with the name it is declared
         under and this configuration as its parent. A configuration
-        beneath sees this one without the configurations declared
+        beneath sees this configuration without the configurations declared
         beneath it, so a definition that reads one of them is guarded
         with `!lib.caisson-core.evalManifest.childless`.
       '';
