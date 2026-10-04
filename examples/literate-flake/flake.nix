@@ -104,7 +104,7 @@
       the fully composed library.
 
       - The flake's top-level configuration (systems, caisson settings,
-        per-system packages, etc.) is the one registered under the name
+        per-system packages, etc.) is the configuration registered under the name
         declared above, `configs/flake/literate-flake`. `configModule`
         names another.
       - `moduleImports` returns the list of registered flake-class modules

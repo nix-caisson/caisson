@@ -111,7 +111,7 @@
           # declares on mkLib.
           name = manifest.name or null;
 
-          # The configuration's module: the one passed, else the
+          # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/flake/<name>`), else none.
           registered = lib.caisson-core.configs.flake or { };
@@ -225,7 +225,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.flake-parts.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes one at a top. What the
+        # `mkTopConfiguration` finalizes it at a top. What the
         # evaluator takes beyond these arguments comes from the
         # manifest: the flake's `inputs` (`self` among them) and its
         # `moduleLocation`, the name of the configuration.

@@ -2981,7 +2981,7 @@ in
       };
 
       # A flake-parts evaluation holds configurations beneath it as a
-      # structural one does: each is finalized under its name and the
+      # structural evaluation does: each is finalized under its name and the
       # childless manifest of the flake evaluation, and what it exports
       # is passed up into the flake outputs.
       "test: a flake-parts evaluation holds configurations beneath it" = {

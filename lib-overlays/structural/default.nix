@@ -56,7 +56,7 @@
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
 
-          # The configuration's module: the one passed, else the
+          # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/structural/<name>`), else none.
           name = manifest.name or null;
@@ -121,7 +121,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.structural.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes one at a top. The integration
+        # `mkTopConfiguration` finalizes it at a top. The integration
         # wraps no ecosystem, so there is no `ecosystemSrc` here.
         mkConfiguration =
           {

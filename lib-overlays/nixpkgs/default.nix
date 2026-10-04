@@ -225,7 +225,7 @@
           pkgOverlayRegistry = parent.pkgOverlays or { };
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
-          # The config's module: the one passed, else the configuration
+          # The config's module: the module passed, else the configuration
           # registered under the config's name
           # (`configs/nixpkgsConfig/<name>`), else none.
           configModule =

@@ -95,7 +95,7 @@ and `lib-overlays/<name>`.
 
     in lib.caisson.flake-parts.mkTopConfiguration {
 
-      # Your primary config is the one registered under the name declared
+      # Your primary config is the configuration registered under the name declared
       # above, configs/flake/my-flake. Pass `configModule` to evaluate
       # another.
 
