@@ -24,8 +24,8 @@
           caisson = parent;
           inherit producer;
         };
-        pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
-        configs = core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson-core.mkModules ./configs;
         # A package config per configuration in configs/nixpkgsConfig:
         # `default`, `withExtra` and `withAdded`.
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };

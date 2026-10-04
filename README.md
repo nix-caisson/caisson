@@ -81,15 +81,15 @@ and `lib-overlays/<name>`.
         # importable here, exportable to downstream consumers. A flake
         # with another layout writes the registration by hand
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
-        modules = core.mkModules ./modules;
+        modules = lib: lib.caisson-core.mkModules ./modules;
 
         # The configurations, read from configs/<class>/<name>/default.nix.
-        configs = core.mkModules ./configs;
+        configs = lib: lib.caisson-core.mkModules ./configs;
 
         # The library overlays this flake registers, read from
         # lib-overlays/<name>/default.nix. An already-built overlay (another
         # flake's export) registers by hand, directly.
-        libOverlays = core.mkLibOverlays ./lib-overlays;
+        libOverlays = lib: lib.caisson-core.mkLibOverlays ./lib-overlays;
 
       };
 

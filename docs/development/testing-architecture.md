@@ -148,8 +148,8 @@ core = inputs.caisson-core.lib.caisson-core;
 lib = core.mkLib {
   inherit (core.pins.flake inputs) sources root;
   defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
-  modules = core.mkModules (parent.outPath + "/modules");
-  libOverlays = core.mkLibOverlays (parent.outPath + "/lib-overlays");
+  modules = lib: lib.caisson-core.mkModules (parent.outPath + "/modules");
+  libOverlays = lib: lib.caisson-core.mkLibOverlays (parent.outPath + "/lib-overlays");
 };
 
 lib.caisson.flake-parts.mkTopConfiguration {

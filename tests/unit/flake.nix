@@ -54,8 +54,8 @@
         # registered from its file reads the registry of the
         # composition that registered it (the framework module of
         # its class, `modules.<class>.core`, among others).
-        modules = core.mkModules (parent.outPath + "/modules");
-        libOverlays = core.mkLibOverlays (parent.outPath + "/lib-overlays");
+        modules = lib: lib.caisson-core.mkModules (parent.outPath + "/modules");
+        libOverlays = lib: lib.caisson-core.mkLibOverlays (parent.outPath + "/lib-overlays");
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
