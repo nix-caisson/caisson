@@ -98,7 +98,7 @@
 
       configuration =
         variant: args:
-        final.caisson-core.mkConfiguration {
+        final.caisson.integrations.mkModuleConfiguration {
           type = "nixos";
           # A NixOS configuration is evaluated at a system: it has an
           # evaluation for every system in force where it is declared.

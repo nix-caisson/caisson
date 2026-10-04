@@ -62,7 +62,7 @@
 
       configuration =
         args:
-        final.caisson-core.mkConfiguration {
+        final.caisson.integrations.mkModuleConfiguration {
           # In the tree an evaluation of an alt is a configuration of
           # the integration that owns the class: it is declared under
           # `caisson.nixos.configurations`, published where NixOS

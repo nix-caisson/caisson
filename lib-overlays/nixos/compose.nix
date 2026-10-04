@@ -85,8 +85,8 @@ let
     };
 
   registry = lib.caisson-core.modules.nixos or { };
-  # The framework module of the class: every registered `core`, forced.
-  coreModules = selection.coreModules registry;
+  # The framework module of the class, forced.
+  coreModules = selection.frameworkModules "nixos" registry;
   moduleImports =
     if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
 

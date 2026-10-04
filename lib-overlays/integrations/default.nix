@@ -65,7 +65,22 @@
 #                        the class cannot function without; a `default`
 #                        is what the project gives every configuration
 #                        of the class unless it selects otherwise.
-{ ... }:
+#   frameworkModules     the framework module of a class, forced into
+#                        every evaluation of it: the core of caisson
+#                        itself for the class, which declares the
+#                        manifest, the configurations declared beneath
+#                        and `caisson.exports`, followed by
+#                        `coreModules` of the registry.
+#   mkModuleConfiguration
+#                        a configuration that is a module evaluation,
+#                        from the evaluator step of an integration.
+#                        Every such configuration holds configurations
+#                        of any integration beneath it, and this is
+#                        where that is written: the configurations its
+#                        modules declare are its children, and what
+#                        they export is passed up through it. An
+#                        integration writes neither.
+{ closure-lib, ... }:
 {
 
   imports = [ ];
@@ -112,6 +127,52 @@
       select =
         leaf: registry:
         builtins.map (name: registry.${name}) (builtins.filter (named leaf) (builtins.attrNames registry));
+
+      # The framework module of `class`, over the registry of the
+      # class in the composition an evaluation runs in. The core of
+      # caisson itself is read from the closure, so it is there
+      # however the integration was registered.
+      frameworkModules =
+        class: registry: [ closure-lib.caisson-core.modules.${class}.core ] ++ select "core" registry;
+
+      # A configuration that is a module evaluation. `type` is the
+      # name of the integration and `perSystem` whether it evaluates a
+      # configuration at a system, as caisson-core.mkConfiguration
+      # takes them. `evaluate` is the evaluator step of the
+      # integration: it takes the view being evaluated, `{ lib,
+      # manifest }`, and returns `value`, the evaluation as the
+      # evaluator returned it, `outputs`, the references into it that
+      # the integration declares, and `config` where the evaluated
+      # options are not `value.config`. Its module list carries
+      # `frameworkModules` of its class.
+      #
+      # What every such configuration has is added here: the
+      # configurations its modules declare under
+      # `caisson.<integration>.configurations`, of any integration,
+      # are its children, and `caisson.exports`, which carries what
+      # they pass up, is among its outputs.
+      mkModuleConfiguration =
+        {
+          type,
+          perSystem ? false,
+          evaluate,
+        }:
+        final.caisson-core.mkConfiguration {
+          inherit type perSystem;
+          evaluate =
+            view:
+            let
+              evaluated = evaluate view;
+              config = evaluated.config or evaluated.value.config;
+            in
+            {
+              inherit (evaluated) value;
+              outputs = (evaluated.outputs or { }) // {
+                exports = config.caisson.exports;
+              };
+              children = view.lib.caisson.integrations.childrenOf config;
+            };
+        };
 
       # The body of both entry points, from the caisson arguments a
       # pattern admitted: `compose` takes them and returns an attrset
@@ -420,6 +481,8 @@
             resolveEcosystemSrc
             mkIntegration
             mkAltIntegration
+            frameworkModules
+            mkModuleConfiguration
             ;
           coreModules = select "core";
           defaultModuleImports = select "default";
