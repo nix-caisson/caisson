@@ -2352,8 +2352,8 @@ in
           };
       };
 
-      # A NixOS configuration holds configurations beneath it as a
-      # structural configuration does: they are in its manifest, under
+      # The configurations beneath a NixOS configuration, in the tree
+      # and at a top: they are in its manifest, under
       # their system where they are evaluated at one, they see it as
       # the nearest NixOS configuration, and a top publishes them with
       # the others.
