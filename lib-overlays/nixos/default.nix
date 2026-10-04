@@ -103,6 +103,7 @@
           # A NixOS configuration is evaluated at a system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
+          pkgSet = args.pkgSet or null;
           evaluate = evaluate variant args;
         };
 
@@ -156,8 +157,11 @@
             # The package set the configuration runs on, selected from
             # the package sets available where it is declared, by
             # package config name, each at the system of the
-            # evaluation (`pkgSets: pkgSets.stable`). The set named
-            # `default` when absent.
+            # evaluation (`pkgSets: pkgSets.stable`). The selection
+            # holds for every configuration beneath this one that
+            # selects none. When absent, the selection of the nearest
+            # configuration above, and at a top the set named
+            # `default`.
             pkgSet ? null,
             # The selection over the nixos class of the registry. It
             # replaces the default of the class, which is every entry

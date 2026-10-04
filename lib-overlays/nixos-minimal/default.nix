@@ -70,6 +70,7 @@
           # it.
           type = "nixos";
           perSystem = true;
+          pkgSet = args.pkgSet or null;
           evaluate = evaluate args;
         };
     in

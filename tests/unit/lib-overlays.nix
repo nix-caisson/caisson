@@ -2065,9 +2065,78 @@ in
         };
       };
 
-      # A configuration that selects nothing runs on the set named
-      # `default`, and a composition that declares none says so, with
-      # the sets it does declare.
+      # A selection holds for the subtree beneath the configuration
+      # that makes it: a configuration that selects nothing runs on
+      # what the nearest configuration above it selected, through
+      # levels of any integration, and a configuration beneath selects
+      # another for itself and what is beneath it. Beside that subtree
+      # the selection of the top stands, the set named `default`.
+      "test: a package set selection holds for everything beneath the configuration that makes it" = {
+        expr =
+          let
+            machine =
+              lib: args:
+              lib.caisson.nixos.mkConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              );
+            top = myLib.caisson-core.finalizeTop (
+              myLib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.beside = machine lib { };
+                    caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      pkgSet = pkgSets: pkgSets.other;
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.nixos.configurations.inherits = machine lib {
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.nixos.configurations.image = machine lib { };
+                              };
+                          };
+                          caisson.nixos.configurations.selects = machine lib {
+                            pkgSet = pkgSets: pkgSets.default;
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.nixos.configurations.image = machine lib { };
+                              };
+                          };
+                        };
+                    };
+                  };
+              }
+            );
+            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
+            grouped = machinesOf top.children.structural.group;
+          in
+          {
+            beside = setOf (machinesOf top).beside;
+            inherits = setOf grouped.inherits;
+            beneathInherits = setOf (machinesOf grouped.inherits).image;
+            selects = setOf grouped.selects;
+            beneathSelects = setOf (machinesOf grouped.selects).image;
+          };
+        expected = {
+          beside = "the default set";
+          inherits = "the other set";
+          beneathInherits = "the other set";
+          selects = "the default set";
+          beneathSelects = "the default set";
+        };
+      };
+
+      # The top selects the set named `default`, and a composition
+      # that declares none says so, with the sets it does declare.
       "test: a configuration with no default package set and no selection is refused" = {
         expr =
           let
@@ -2087,7 +2156,7 @@ in
           }).config.nixpkgs.pkgs;
         expectedError = {
           type = "ThrownError";
-          msg = "runs on the package config named `default`,\\s+and the composition declares the package configs stable";
+          msg = "the package set named `default` is selected at the top of\\s+the tree, and the package sets available here are stable";
         };
       };
 

@@ -37,9 +37,9 @@ let
   # system of the evaluation, by package config name.
   pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
 
-  # The set the configuration runs on, selected by the `pkgSet`
-  # argument from those.
-  pkgs = selection.pkgSetOf { inherit context what; } pkgSets args;
+  # The set the configuration runs on: the selection in force at its
+  # manifest, applied to those.
+  pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
   # eval-config evaluations carry the nixpkgs module, so the set lands
   # on `nixpkgs.pkgs`; an evaluation without that module takes it as
