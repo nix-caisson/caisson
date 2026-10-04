@@ -27,7 +27,7 @@
         pkgOverlays = core.mkPkgOverlays ./pkg-overlays;
         configs = core.mkModules ./configs;
         # A package config per configuration in configs/nixpkgsConfig:
-        # `default` and `withExtra`.
+        # `default`, `withExtra` and `withAdded`.
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in

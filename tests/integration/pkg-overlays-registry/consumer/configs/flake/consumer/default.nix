@@ -34,6 +34,12 @@ in
         assert !(pkgs ? producerExtra);
         assert pkgSets.withExtra.producerExtra;
         assert !(pkgSets.withExtra ? producerDefault);
+        # `extraOverlays` adds to the default selection, which
+        # `overlays` replaces.
+        assert pkgSets.withAdded.producerExtra;
+        assert pkgSets.withAdded.producerDefault == "ok";
+        assert pkgSets.withAdded.consumerDefault == "ok";
+        assert pkgSets.withAdded.sharedApplied == 1;
         # Exports: what the consumer registers itself, and the project
         # entries a selector names; no other producer entry.
         assert
