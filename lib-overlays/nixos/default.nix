@@ -154,9 +154,13 @@
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
-            # The selection over the nixos class of the registry; every
-            # entry named `default` when absent.
+            # The selection over the nixos class of the registry. It
+            # replaces the default of the class, which is every entry
+            # named `default` followed by what the configurations
+            # above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
@@ -169,6 +173,7 @@
             configModule ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:
@@ -182,6 +187,7 @@
               configModule ? null,
               ecosystemSrc ? null,
               moduleImports ? null,
+              extraModuleImports ? null,
               specialArgs ? null,
             }@args:
             configuration { explicitBaseModules = true; } args;

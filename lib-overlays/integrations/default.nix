@@ -134,22 +134,33 @@
         class: registry: [ closure-lib.caisson-core.modules.${class}.core ] ++ select "core" registry;
 
       # The selection of an evaluation over the registry of its class,
-      # as a function of that registry: what `given`, the
-      # `moduleImports` of the configuration, selects, and with none
+      # from the arguments of the configuration, as a function of that
+      # registry: what `moduleImports` selects, and with none
       # given the default of the class, every entry named `default`
       # followed by what the levels above the evaluation added for the
       # class (`caisson.forChildren.defaultModuleImports`), each
       # applied to the lib of the evaluation.
+      #
+      # `extraModuleImports` of the configuration is appended to
+      # either: it adds to the selection where `moduleImports`
+      # replaces it, so a configuration that adds a module keeps the
+      # default of its class.
       moduleImportsOf =
         class:
         { lib, manifest }:
-        given:
-        if given != null then
-          given
-        else
-          registry:
-          select "default" registry
-          ++ builtins.concatMap (selection: selection lib) (manifest.defaultModuleImports.${class} or [ ]);
+        args: registry:
+        let
+          given = args.moduleImports or null;
+          extra = args.extraModuleImports or null;
+        in
+        (
+          if given != null then
+            given registry
+          else
+            select "default" registry
+            ++ builtins.concatMap (selection: selection lib) (manifest.defaultModuleImports.${class} or [ ])
+        )
+        ++ (if extra == null then [ ] else extra registry);
 
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a

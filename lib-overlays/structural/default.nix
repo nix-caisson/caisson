@@ -46,9 +46,7 @@
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "structural" registry;
 
-          moduleImports = selection.moduleImportsOf "structural" { inherit lib manifest; } (
-            args.moduleImports or null
-          );
+          moduleImports = selection.moduleImportsOf "structural" { inherit lib manifest; } args;
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
@@ -129,9 +127,13 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The selection over the structural class of the registry;
-            # every entry named `default` when absent.
+            # The selection over the structural class of the registry.
+            # It replaces the default of the class, which is every
+            # entry named `default` followed by what the
+            # configurations above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
@@ -144,6 +146,7 @@
             configModule ? null,
             pkgSets ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:

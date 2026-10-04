@@ -45,6 +45,7 @@
           ecosystemSrc ? null,
           configModule,
           moduleImports ? selection.defaultModuleImports,
+          extraModuleImports ? (_registry: [ ]),
           specialArgs ? { },
           pkgSets ? null,
           ...
@@ -57,7 +58,7 @@
           registry = final.caisson-core.modules.terranix or { };
           # The framework module of the class: every registered `core`, forced.
           coreModules = selection.coreModules registry;
-          selectedModules = moduleImports registry;
+          selectedModules = moduleImports registry ++ extraModuleImports registry;
         in
         {
           inherit src;
@@ -105,6 +106,7 @@
             # The selection over the terranix class of the registry;
             # every entry named `default` when absent.
             moduleImports ? null,
+            extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies; terranix names these `extraArgs`.
             specialArgs ? null,
@@ -118,6 +120,7 @@
             pkgSets ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:

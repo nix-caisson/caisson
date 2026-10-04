@@ -245,6 +245,7 @@
             ]
             ++ selection.coreModules registry
             ++ moduleImports registry
+            ++ (if (args.extraModuleImports or null) == null then [ ] else args.extraModuleImports registry)
             ++ (if configModule == null then [ ] else [ configModule ]);
           };
           caissonConfig = configEval.config.caisson.nixpkgs;
@@ -327,6 +328,7 @@
             # The selection over the nixpkgsConfig class of the
             # registry; every entry named `default` when absent.
             moduleImports ? null,
+            extraModuleImports ? null,
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -339,6 +341,7 @@
           {
             configModule ? null,
             moduleImports ? null,
+            extraModuleImports ? null,
             ecosystemSrc ? null,
             ecosystemArgs ? null,
           }@args:
