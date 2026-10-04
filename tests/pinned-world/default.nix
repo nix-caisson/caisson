@@ -40,7 +40,7 @@ let
     (core.mkLib {
       sources = { };
       defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-      libOverlays = _mkLibOverlay: inputs.caisson.libOverlays;
+      libOverlays = _lib: inputs.caisson.libOverlays;
     }).caisson-core.libManifest.libOverlays;
 
   # The registry names of caisson-core's entries.
@@ -623,7 +623,7 @@ let
           // {
             sources = { };
             defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               nixos = inputs.caisson.libOverlays.nixos;
               nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
               contrib = core.mkLibOverlay (
@@ -672,7 +672,7 @@ let
         composedWithMkLib = core.mkLib {
           sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          libOverlays = _mkLibOverlay: {
+          libOverlays = _lib: {
             flake-parts = inputs.caisson.libOverlays.flake-parts;
           };
         };
@@ -715,7 +715,7 @@ let
             "x86_64-linux"
             "aarch64-linux"
           ];
-          libOverlays = _mkLibOverlay: {
+          libOverlays = _lib: {
             flake-parts = inputs.caisson.libOverlays.flake-parts;
           };
         };
@@ -768,7 +768,7 @@ let
           // {
             sources = { };
             defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               nixos = inputs.caisson.libOverlays.nixos;
               nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
             };
@@ -815,7 +815,7 @@ let
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           defaultEcosystemSrc.flake-parts = inputs.flake-parts;
           systems = [ "x86_64-linux" ];
-          libOverlays = _mkLibOverlay: {
+          libOverlays = _lib: {
             structural = inputs.caisson.libOverlays.structural;
             flake-parts = inputs.caisson.libOverlays.flake-parts;
           };

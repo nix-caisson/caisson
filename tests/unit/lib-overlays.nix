@@ -27,7 +27,7 @@ let
   testMkLib =
     args:
     let
-      raw = args.libOverlays or (_mkLibOverlay: { });
+      raw = args.libOverlays or (_lib: { });
     in
     if !(builtins.isAttrs args) || !(builtins.isFunction raw) then
       lib.caisson-core.mkLib args
@@ -36,12 +36,12 @@ let
         args
         // {
           libOverlays =
-            mkLibOverlay':
+            coreLib:
             {
               flake-parts = flakePartsOverlay;
               structural = structuralOverlay;
             }
-            // raw mkLibOverlay';
+            // raw coreLib;
         }
       );
 
@@ -144,7 +144,7 @@ in
       namedLib = caisson.mkLib {
         sources = mockSources;
         name = "the-namespace";
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           the-namespace = mkLibOverlay (
             { ... }:
             {
@@ -641,7 +641,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               test = mkLibOverlay (
                 { ... }:
                 {
@@ -660,7 +660,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               test = mkLibOverlay (
                 { ... }:
                 {
@@ -683,7 +683,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               test = mkLibOverlay (
                 { ... }:
                 {
@@ -720,7 +720,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               test = mkLibOverlay (
                 { ... }:
                 {
@@ -762,7 +762,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               contrib = mkLibOverlay (
                 {
                   mkModule,
@@ -792,7 +792,7 @@ in
             modules = testLib: {
               nixos.local = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.local = true; });
             };
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               contrib = mkLibOverlay (
                 {
                   mkModule,
@@ -837,7 +837,7 @@ in
             }
           );
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               wrapper = mkLibOverlay (
                 { ... }:
                 {
@@ -859,7 +859,7 @@ in
             modules = testLib: {
               nixos.shared = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.origin = "local"; });
             };
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               contrib = mkLibOverlay (
                 {
                   mkModule,
@@ -886,7 +886,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               contrib = mkLibOverlay (
                 {
                   mkModule,
@@ -924,7 +924,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               test = mkLibOverlay (
                 { ... }:
                 {
@@ -944,7 +944,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               first = mkLibOverlay ({ ... }: { overlay = final: prev: { fromFirst = "a"; }; });
               second = mkLibOverlay (
                 { ... }: { overlay = final: prev: { fromSecond = prev.fromFirst or "missing"; }; }
@@ -960,7 +960,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               first = mkLibOverlay (
                 { ... }: { overlay = final: prev: { fromFirst = final.fromSecond or "missing"; }; }
               );
@@ -976,7 +976,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               kept = mkLibOverlay ({ ... }: { overlay = final: prev: { keptVal = "yes"; }; });
               dropped = mkLibOverlay ({ ... }: { overlay = final: prev: { droppedVal = "no"; }; });
             };
@@ -1049,7 +1049,7 @@ in
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               provider = mkLibOverlay (
                 { ... }:
                 {
@@ -1089,7 +1089,7 @@ in
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               marker = mkLibOverlay (
                 { ... }:
                 {
@@ -1218,7 +1218,7 @@ in
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               fromAlias = lib.caisson-core.mkLibOverlay (
                 { ... }:
                 {
@@ -1234,13 +1234,13 @@ in
       expected = true;
     };
 
-    "test: function-valued libOverlays receives mkLibOverlay" = {
+    "test: function-valued libOverlays receives the core lib" = {
       expr =
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = mkLibOverlayArg: {
-              fromFunction = mkLibOverlayArg (
+            libOverlays = coreLib: {
+              fromFunction = coreLib.caisson-core.mkLibOverlay (
                 { ... }:
                 {
                   overlay = _final: _prev: {
@@ -1260,8 +1260,8 @@ in
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = mkLibOverlayArg: {
-              marker = mkLibOverlayArg (
+            libOverlays = coreLib: {
+              marker = coreLib.caisson-core.mkLibOverlay (
                 { ... }:
                 {
                   overlay = _final: _prev: {
@@ -1310,7 +1310,7 @@ in
         let
           myLib = caisson.mkLib {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               nixpkgs-lib = mkLibOverlay (
                 { ... }:
                 {
@@ -1348,7 +1348,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               aFirst = mkLibOverlay ({ ... }: { overlay = final: prev: { orderA = "first"; }; });
               bSecond = mkLibOverlay (
                 { ... }: { overlay = final: prev: { orderB = prev.orderA or "missing"; }; }
@@ -1364,7 +1364,7 @@ in
       expr =
         let
           myLib = mkTestLib {
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               aProvider = mkLibOverlay (
                 { ... }:
                 {
@@ -1689,7 +1689,7 @@ in
 
   mkLibArgumentShapes = {
     # mkLib's registration arguments take exactly one shape: a function
-    # (`lib: { ... }` / `mkLibOverlay: { ... }`). The checks fire as soon
+    # (`lib: { ... }`). The checks fire as soon
     # as the returned lib is used.
     "test: mkLib throws when modules is an attrset" = {
       expr = builtins.tryEval (builtins.seq (mkTestLib { modules = { }; }) true);
@@ -1728,7 +1728,7 @@ in
         caisson.mkLib (
           {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
             };
           }
@@ -1847,7 +1847,7 @@ in
             };
           };
           libOverlays =
-            _mkLibOverlay:
+            _lib:
             {
               nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
               nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
@@ -1876,7 +1876,7 @@ in
         defaultEcosystemSrc.nixpkgs = nixosStub;
         systems = [ "x86_64-linux" ];
         pkgSets = stubPkgSets { default = { }; };
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
         };
         configs = callbackLib: {
@@ -2078,7 +2078,7 @@ in
                 name = "machine";
                 defaultEcosystemSrc.nixpkgs = nixosStub;
                 inherit systems;
-                libOverlays = _mkLibOverlay: {
+                libOverlays = _lib: {
                   nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
                 };
               };
@@ -2172,7 +2172,7 @@ in
               defaultEcosystemSrc.nixpkgs = nixosStub;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { default = { }; };
-              libOverlays = _mkLibOverlay: {
+              libOverlays = _lib: {
                 nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
                 nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
               };
@@ -2284,7 +2284,7 @@ in
               defaultEcosystemSrc.nixpkgs = nixosStub;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { default = { }; };
-              libOverlays = _mkLibOverlay: {
+              libOverlays = _lib: {
                 nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
                 nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
               };
@@ -2672,7 +2672,7 @@ in
                 "x86_64-linux"
                 "aarch64-linux"
               ];
-              libOverlays = _mkLibOverlay: {
+              libOverlays = _lib: {
                 nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
               };
             };
@@ -2739,7 +2739,7 @@ in
           {
             sources = mockSources;
             libOverlays =
-              _mkLibOverlay:
+              _lib:
               {
                 home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
                 # The marker this composition carries and nothing else
@@ -2780,7 +2780,7 @@ in
         caisson.mkLib (
           {
             sources = mockSources;
-            libOverlays = _mkLibOverlay: {
+            libOverlays = _lib: {
               home-manager = {
                 imports = [
                   nixpkgsMaintainers
@@ -3211,7 +3211,7 @@ in
             );
           };
         };
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           provider = mkLibOverlay (
             { ... }:
             {
@@ -3229,7 +3229,7 @@ in
       namespacedLib = caisson.mkLib {
         sources = mockSources;
         name = "named-composition";
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           named-composition = mkLibOverlay (
             { ... }:
             {
@@ -3849,7 +3849,7 @@ in
     let
       declaringLib = caisson.mkLib {
         sources = mockSources;
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           # An owner whose pattern requires nothing.
           probe = mkLibOverlay (
             { contributeClasses, ... }:
@@ -4373,7 +4373,7 @@ in
       myLib = caisson.mkLib {
         sources = mockSources;
         defaultEcosystemSrc.home-manager = hmStub;
-        libOverlays = _mkLibOverlay: {
+        libOverlays = _lib: {
           home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
           home-manager-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager-minimal");
         };
