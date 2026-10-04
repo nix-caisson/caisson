@@ -63,7 +63,12 @@
       configuration =
         args:
         final.caisson-core.mkConfiguration {
-          type = "nixos-minimal";
+          # In the tree an evaluation of an alt is a configuration of
+          # the integration that owns the class: it is declared under
+          # `caisson.nixos.configurations`, published where NixOS
+          # configurations are, and `nearest.nixos` for what is beneath
+          # it.
+          type = "nixos";
           perSystem = true;
           evaluate = evaluate args;
         };

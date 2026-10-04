@@ -2160,9 +2160,10 @@ in
         };
       };
 
-      # The minimal evaluator is for a configuration read by itself: no
-      # option takes a configuration of it.
-      "test: a nixos-minimal configuration declared beneath a configuration is refused" = {
+      # In the tree a configuration of the minimal evaluator is a NixOS
+      # configuration: it is declared where NixOS configurations are,
+      # has their type, and is published with them.
+      "test: a nixos-minimal configuration is declared and published as a nixos configuration" = {
         expr =
           let
             minimalLib = caisson.mkLib {
@@ -2176,20 +2177,28 @@ in
                 nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
               };
             };
-          in
-          (minimalLib.caisson.structural.mkTopConfiguration {
-            moduleImports = _modules: [ ];
-            configModule =
-              { lib, ... }:
-              {
-                caisson.nixos.configurations.machine = lib.caisson.nixos-minimal.mkConfiguration {
-                  configModule = { ... }: { };
+            top = minimalLib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.machine = lib.caisson.nixos-minimal.mkConfiguration {
+                    configModule = { ... }: { };
+                  };
                 };
-              };
-          }).caisson.manifest.children;
-        expectedError = {
-          type = "ThrownError";
-          msg = "a\\s+nixos-minimal configuration cannot be declared beneath another\\s+configuration";
+            };
+            machine = top.caisson.manifest.children.system.x86_64-linux.children.nixos.machine;
+          in
+          {
+            type = machine.type;
+            published = builtins.attrNames top.nixosConfigurations;
+            # The minimal evaluator ran: its result has no `system.build`.
+            minimal = !(top.nixosConfigurations.machine.config ? system);
+          };
+        expected = {
+          type = "nixos";
+          published = [ "machine" ];
+          minimal = true;
         };
       };
 
