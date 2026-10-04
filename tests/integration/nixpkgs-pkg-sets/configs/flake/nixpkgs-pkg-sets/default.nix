@@ -24,6 +24,14 @@
       upstream = import inputs.nixpkgs { inherit system; };
       same = path: (lib.getAttrFromPath path pkgs).drvPath == (lib.getAttrFromPath path upstream).drvPath;
       pkgsManifest = pkgs.lib.caisson-core.pkgsManifest;
+      # The package config as the legacy readers take it. This
+      # evaluation is pure, so the result is the functor alone.
+      top = lib.caisson.nixpkgs.mkTopPkgSet configs.default;
+      fails = value: !(builtins.tryEval value).success;
+      marked = top {
+        inherit system;
+        overlays = [ (_final: _prev: { topMarker = "ok"; }) ];
+      };
     in
     {
       checks.nixpkgs-pkg-sets =
@@ -52,6 +60,17 @@
         assert configs.default.parent.childless;
         assert !(configs.default.parent ? pkgSets);
         assert configs.default.pkgOverlays == [ "default" ];
+        assert (top { inherit system; }).hello.drvPath == pkgs.hello.drvPath;
+        assert (top { inherit system; }).lib.caisson-core.pkgsManifest.name == system;
+        assert marked.topMarker == "ok" && marked ? nixpkgs-pkg-sets;
+        assert fails (top { system = "riscv64-linux"; }).hello.drvPath;
+        assert fails
+          (top {
+            inherit system;
+            config.allowUnfree = true;
+          }).hello.drvPath;
+        assert fails (top { }).hello.drvPath;
+        assert !(top ? hello);
         pkgs.runCommand "nixpkgs-pkg-sets" { } "touch $out";
     };
 }
