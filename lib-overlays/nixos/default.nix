@@ -96,6 +96,14 @@
           };
         };
 
+      # A NixOS configuration is published as
+      # `nixosConfigurations.<name>`, the evaluated configuration,
+      # which is what `nixos-rebuild` reads.
+      exportsTo = {
+        attrset = "nixosConfigurations";
+        value = manifest: manifest.value;
+      };
+
       configuration =
         variant: args:
         final.caisson.integrations.mkModuleConfiguration {
@@ -104,6 +112,7 @@
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
+          inherit exportsTo;
           evaluate = evaluate variant args;
         };
 
@@ -124,13 +133,6 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
         class = "nixos";
-        # A top publishes NixOS configurations as
-        # `nixosConfigurations.<name>`, each the evaluated
-        # configuration, which is what `nixos-rebuild` reads.
-        exportsTo = {
-          attrset = "nixosConfigurations";
-          value = manifest: manifest.value;
-        };
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixos.configurations.<name>` finalizes it, and
@@ -205,8 +207,9 @@
               specialArgs ? null,
             }@args:
             configuration { explicitBaseModules = true; } args;
-          # The composition an alt over this class reads.
-          inherit compose;
+          # What an alt over this class reads: the composition, and
+          # how a configuration of the class is published.
+          inherit compose exportsTo;
         };
       };
     in

@@ -3554,6 +3554,57 @@ in
         };
       };
 
+      # How a configuration is published is recorded on its manifest
+      # when it is constructed, and applied where it is passed up, so
+      # an entry carries the output attribute set, the name and the
+      # value. A library that composes neither the nixos nor the
+      # home-manager integration publishes such entries: it reads
+      # nothing but the entries.
+      "test: an entry carries all a top needs to publish it" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            top = lib.caisson-core.finalizeTop (
+              lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule = treeWith { serving = false; };
+              }
+            );
+            entries = top.outputs.exports.configurations;
+            elsewhere = caisson.mkLib { sources = mockSources; };
+            published = elsewhere.caisson.integrations.publish entries;
+          in
+          {
+            composesNeither = !(elsewhere.caisson ? nixos) && !(elsewhere.caisson ? home-manager);
+            recorded = top.children.system.x86_64-linux.children.home-manager.chris.exportsTo.attrset;
+            attrsets = builtins.attrNames published;
+            homes = builtins.attrNames published.homeConfigurations;
+            user = published.homeConfigurations."chris@laptop".config.home.username;
+            described = builtins.map (entry: entry.description or null) (
+              builtins.filter (entry: entry.attrset == "homeConfigurations") entries
+            );
+          };
+        expected = {
+          composesNeither = true;
+          recorded = "homeConfigurations";
+          attrsets = [
+            "homeConfigurations"
+            "nixosConfigurations"
+          ];
+          homes = [
+            "chris"
+            "chris@laptop"
+            "dana@laptop"
+          ];
+          user = "chris";
+          described = [
+            null
+            "named chris@laptop from its name and the name of the NixOS configuration it is under"
+            "named dana@laptop from its name and the name of the NixOS configuration it is under"
+          ];
+        };
+      };
+
       # A published name may not contain `/`, which separates the
       # parts of a name, and a home whose name does is refused.
       "test: a home whose published name holds the separator is refused" = {
@@ -3572,7 +3623,7 @@ in
             }).homeConfigurations;
         expectedError = {
           type = "ThrownError";
-          msg = "`chris/work`, and a published name may\\s+not contain `/`";
+          msg = "named `chris/work`, and a published name may not contain\\s+`/`";
         };
       };
     };

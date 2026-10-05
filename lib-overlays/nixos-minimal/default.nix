@@ -71,6 +71,7 @@
           type = "nixos";
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
+          inherit (over) exportsTo;
           evaluate = evaluate args;
         };
     in

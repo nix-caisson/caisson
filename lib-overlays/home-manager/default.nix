@@ -563,6 +563,30 @@
           };
         };
 
+      # A home is published as `homeConfigurations.<name>`, the
+      # evaluated home, which is what the home-manager CLI reads. A
+      # home beneath a NixOS configuration is named `<user>@<host>`,
+      # the name it is passed up under and the name that NixOS
+      # configuration is declared under, which is where the CLI looks
+      # (`$USER@$(hostname)`); a home with no NixOS configuration above
+      # it keeps its name.
+      exportsTo = {
+        attrset = "homeConfigurations";
+        value = manifest: manifest.value;
+        name =
+          { name, manifest }:
+          let
+            host = (manifest.nearest.nixos or { }).name or null;
+          in
+          if host == null then
+            { value = name; }
+          else
+            {
+              value = "${name}@${host}";
+              description = "named ${name}@${host} from its name and the name of the NixOS configuration it is under";
+            };
+      };
+
       configuration =
         variant: args:
         selection.mkModuleConfiguration {
@@ -571,6 +595,7 @@
           # every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
+          inherit exportsTo;
           evaluate = evaluation variant args;
         };
 
@@ -910,29 +935,6 @@
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
-        # A top publishes homes as `homeConfigurations.<name>`, each
-        # the evaluated home, which is what the home-manager CLI
-        # reads. A home beneath a NixOS configuration is named
-        # `<user>@<host>`, the name it is declared under and the name
-        # that NixOS configuration is declared under, which is where
-        # the CLI looks (`$USER@$(hostname)`); a home with no NixOS
-        # configuration above it keeps its name.
-        exportsTo = {
-          attrset = "homeConfigurations";
-          value = manifest: manifest.value;
-          name =
-            { name, manifest }:
-            let
-              host = (manifest.nearest.nixos or { }).name or null;
-            in
-            if host == null then
-              { value = name; }
-            else
-              {
-                value = "${name}@${host}";
-                description = "named ${name}@${host} from its name and the name of the NixOS configuration it is under";
-              };
-        };
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.home-manager.configurations.<name>` finalizes it,
