@@ -139,12 +139,43 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
 
+          # The package set `perSystem` runs on, its `pkgs`: the
+          # selection in force at the flake, applied to the package
+          # sets available at each system. A package config that builds
+          # no set for a system is not among the sets there, and a
+          # flake with no package sets at a system keeps the `pkgs`
+          # flake-parts provides. Every available set stays reachable
+          # by name, as the `pkgSets` argument of perSystem.
+          pkgSetModule = {
+            _file = "caisson-flake-parts:pkgSet";
+            perSystem =
+              { system, lib, ... }:
+              let
+                available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
+                  lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
+                    manifest.pkgSets or { }
+                  )
+                );
+              in
+              {
+                _module.args.pkgs = lib.mkIf (available != { }) (
+                  lib.mkDefault (
+                    selection.pkgSetOf {
+                      context = "lib.caisson.flake-parts.mkConfiguration";
+                      what = "the flake at ${system}";
+                    } manifest available
+                  )
+                );
+              };
+          };
+
           module = {
             imports = [
               flakeParts.flakeModules.flakeModules
               flakeParts.flakeModules.modules
             ]
             ++ frameworkModules
+            ++ [ pkgSetModule ]
             ++ moduleImports registry
             ++ (if configModule == null then [ ] else [ configModule ]);
           };
@@ -198,6 +229,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "flake-parts";
+          defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
         };
 
@@ -233,6 +265,15 @@
             # nixpkgs integration from the package configs declared on
             # mkLib (`pkgSets`) and reach perSystem as `pkgSets`.
             pkgSets ? null,
+            # The package set perSystem runs on, its `pkgs`: a function
+            # that receives the package sets available at each system,
+            # as an attribute set by package config name, and returns
+            # the set to run on. The
+            # selection holds for every configuration beneath the
+            # flake that selects none. When absent, the selection of
+            # the nearest configuration above, and the set named
+            # `default` where none above selects.
+            defaultPkgs ? null,
             # The flake-parts source; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -254,6 +295,7 @@
           {
             configModule ? null,
             pkgSets ? null,
+            defaultPkgs ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,

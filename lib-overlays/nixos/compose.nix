@@ -33,55 +33,23 @@ let
     else
       "this NixOS configuration at ${system}";
 
-  # The package configs visible to the configuration, each projected
-  # to its set at the configuration's system, by config name.
-  configs = manifest.pkgSets or { };
-  pkgSets = builtins.mapAttrs (
-    name: config:
-    (config.children.nixpkgs.${system} or (throw ''
-      ${context}: the package config `${name}` builds no set for ${system},
-      which ${what} needs. Add the system to `caisson.nixpkgs.systems`
-      in the config's module.
-    '')
-    ).value
-  ) configs;
+  # The package sets available to the configuration, each at the
+  # system of the evaluation, by package config name.
+  pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
 
-  selected =
-    name:
-    pkgSets.${name} or (throw ''
-      ${context}: ${what} selects the package config `${name}`
-      (`caisson.nixpkgs.pkgSet`), and the composition declares ${
-        if configs == { } then
-          "no package configs"
-        else
-          "the package configs " + builtins.concatStringsSep ", " (builtins.attrNames configs)
-      }. Declare it with `pkgSets` on caisson-core.mkLib.
-    '');
+  # The set the configuration runs on: the selection in force at its
+  # manifest, applied to those.
+  pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
-  # The package set the configuration runs on is an option of the
-  # configuration, so any of its modules may define it and it merges
-  # as options do. eval-config evaluations carry the nixpkgs module,
-  # so the set lands on `nixpkgs.pkgs`; an evaluation without that
-  # module takes it as the `pkgs` module argument instead.
+  # eval-config evaluations carry the nixpkgs module, so the set lands
+  # on `nixpkgs.pkgs`; an evaluation without that module takes it as
+  # the `pkgs` module argument instead.
   pkgSetModule =
-    { config, lib, ... }:
+    { lib, ... }:
     {
       _file = "caisson-nixos:pkgSet";
-      options.caisson.nixpkgs.pkgSet = lib.mkOption {
-        type = lib.types.str;
-        default = "default";
-        description = ''
-          The package config whose set this configuration runs on, by
-          the name it is declared under in `pkgSets` on
-          caisson-core.mkLib. The set is that config's set at the
-          configuration's system.
-        '';
-      };
       config =
-        if nixpkgsModule then
-          { nixpkgs.pkgs = selected config.caisson.nixpkgs.pkgSet; }
-        else
-          { _module.args.pkgs = lib.mkDefault (selected config.caisson.nixpkgs.pkgSet); };
+        if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
     };
 
   registry = lib.caisson-core.modules.nixos or { };

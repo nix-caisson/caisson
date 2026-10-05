@@ -2019,35 +2019,38 @@ in
       };
 
       # A NixOS configuration takes its package set from the
-      # composition: the package config named `default` unless a
-      # module of the configuration selects another with
-      # `caisson.nixpkgs.pkgSet`, at the system the composition
-      # declares. The sets also reach the modules by config name, as
-      # the `pkgSets` special argument.
-      "test: a nixos configuration selects its package set by name" = {
+      # composition, at the system the composition declares: the set
+      # the `defaultPkgs` argument selects from the available sets, and
+      # the set named `default` when nothing selects. Every
+      # available set still reaches the modules by config name, as the
+      # `pkgSets` special argument, whichever is selected.
+      "test: a nixos configuration selects its package set when it is constructed" = {
         expr =
           let
             selecting =
-              pkgSet:
+              defaultPkgs:
               (myLib.caisson.nixos.mkTopConfiguration {
+                inherit defaultPkgs;
                 configModule =
                   { pkgSets, ... }:
                   {
                     imports = [ probeModule ];
-                    config = {
-                      caisson.nixpkgs.pkgSet = pkgSet;
-                      seenLib.byName = builtins.mapAttrs (_: set: set.marker) pkgSets;
-                    };
+                    config.seenLib.byName = builtins.mapAttrs (_: set: set.marker) pkgSets;
                   };
               }).config;
+            other = selecting (pkgSets: pkgSets.other);
           in
           {
             default = configuration.config.nixpkgs.pkgs.marker;
-            other = (selecting "other").nixpkgs.pkgs.marker;
-            byName = (selecting "default").seenLib.byName;
+            other = other.nixpkgs.pkgs.marker;
+            byName = other.seenLib.byName;
             system = configuration.config.stub.system;
             minimal = minimalConfiguration._module.args.pkgs.marker;
-            unknown = (builtins.tryEval (selecting "missing").nixpkgs.pkgs.marker).success;
+            minimalOther =
+              (myLib.caisson.nixos-minimal.mkTopConfiguration {
+                defaultPkgs = pkgSets: pkgSets.other;
+                configModule = { ... }: { };
+              })._module.args.pkgs.marker;
           };
         expected = {
           default = "the default set";
@@ -2058,7 +2061,191 @@ in
           };
           system = "x86_64-linux";
           minimal = "the default set";
-          unknown = false;
+          minimalOther = "the other set";
+        };
+      };
+
+      # A selection holds for the subtree beneath the configuration
+      # that makes it: a configuration that selects nothing runs on
+      # what the nearest configuration above it selected, through
+      # levels of any integration, and a configuration beneath selects
+      # another for itself and what is beneath it. Beside that subtree
+      # nothing selects, and a configuration runs on the set named
+      # `default`.
+      "test: a package set selection holds for everything beneath the configuration that makes it" = {
+        expr =
+          let
+            machine =
+              lib: args:
+              lib.caisson.nixos.mkConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              );
+            top = myLib.caisson-core.finalizeTop (
+              myLib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.beside = machine lib { };
+                    caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      defaultPkgs = pkgSets: pkgSets.other;
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.nixos.configurations.inherits = machine lib {
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.nixos.configurations.image = machine lib { };
+                              };
+                          };
+                          caisson.nixos.configurations.selects = machine lib {
+                            defaultPkgs = pkgSets: pkgSets.default;
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.nixos.configurations.image = machine lib { };
+                              };
+                          };
+                        };
+                    };
+                  };
+              }
+            );
+            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
+            grouped = machinesOf top.children.structural.group;
+          in
+          {
+            beside = setOf (machinesOf top).beside;
+            inherits = setOf grouped.inherits;
+            beneathInherits = setOf (machinesOf grouped.inherits).image;
+            selects = setOf grouped.selects;
+            beneathSelects = setOf (machinesOf grouped.selects).image;
+          };
+        expected = {
+          beside = "the default set";
+          inherits = "the other set";
+          beneathInherits = "the other set";
+          selects = "the default set";
+          beneathSelects = "the default set";
+        };
+      };
+
+      # A module of a configuration selects the package set of the
+      # configurations beneath it (`caisson.forChildren.defaultPkgs`).
+      # The configuration itself runs on the set it was constructed
+      # with, and a configuration beneath that is constructed with a
+      # selection runs on that.
+      "test: a configuration selects the package set of the configurations beneath it" = {
+        expr =
+          let
+            machine =
+              lib: args:
+              lib.caisson.nixos.mkConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              );
+            host =
+              (myLib.caisson-core.finalizeTop (
+                machine myLib {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.forChildren.defaultPkgs = pkgSets: pkgSets.other;
+                      caisson.nixos.configurations.image = machine lib {
+                        configModule =
+                          { lib, ... }:
+                          {
+                            caisson.nixos.configurations.nested = machine lib { };
+                          };
+                      };
+                      caisson.nixos.configurations.selects = machine lib {
+                        defaultPkgs = pkgSets: pkgSets.default;
+                      };
+                    };
+                }
+              )).x86_64-linux;
+            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
+          in
+          {
+            host = setOf host;
+            image = setOf (machinesOf host).image;
+            nested = setOf (machinesOf (machinesOf host).image).nested;
+            selects = setOf (machinesOf host).selects;
+          };
+        expected = {
+          host = "the default set";
+          image = "the other set";
+          nested = "the other set";
+          selects = "the default set";
+        };
+      };
+
+      # Where no configuration from the top down selects, a
+      # configuration runs on the set named `default`, and a
+      # composition that declares none says so, with the sets it does
+      # declare.
+      "test: a configuration with no default package set and no selection is refused" = {
+        expr =
+          let
+            noDefault = caisson.mkLib {
+              sources = mockSources;
+              name = "no-default";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { stable = { }; };
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+            };
+          in
+          (noDefault.caisson.nixos.mkTopConfiguration {
+            configModule = { ... }: { };
+          }).config.nixpkgs.pkgs;
+        expectedError = {
+          type = "ThrownError";
+          msg = "runs on the package set named `default`,\\s+since no configuration from the top down to it selects one, and the\\s+package sets available here are stable";
+        };
+      };
+
+      # The same argument selects what a flake's perSystem runs on.
+      "test: a flake selects the package set of perSystem when it is constructed" = {
+        expr =
+          let
+            pkgsOf =
+              args:
+              (myLib.caisson-core.finalizeTop (
+                myLib.caisson.flake-parts.mkConfiguration (
+                  args
+                  // {
+                    moduleImports = _modules: [ ];
+                    configModule = {
+                      systems = [ "x86_64-linux" ];
+                      perSystem =
+                        { pkgs, ... }:
+                        {
+                          legacyPackages.marker = pkgs.marker;
+                        };
+                    };
+                  }
+                )
+              )).outputs.flake.legacyPackages.x86_64-linux.marker;
+          in
+          {
+            default = pkgsOf { };
+            other = pkgsOf { defaultPkgs = pkgSets: pkgSets.other; };
+          };
+        expected = {
+          default = "the default set";
+          other = "the other set";
         };
       };
 

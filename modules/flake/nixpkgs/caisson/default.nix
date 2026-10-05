@@ -74,10 +74,6 @@ in
             # name, the only place a bare `pkgSets` module argument is
             # set.
             inherit pkgSets;
-            # The `default` config's set is `pkgs`. A flake that
-            # declares no `default` keeps the `pkgs` flake-parts
-            # provides.
-            pkgs = lib.mkIf (pkgSets ? default) (lib.mkDefault pkgSets.default);
           };
         legacyPackages = lib.mkIf config.caisson.nixpkgs.pkgs.export.enabled pkgs;
         packages = lib.mkIf config.caisson.nixpkgs.packages.export.enabled (

@@ -116,6 +116,7 @@
             {
               configModule,
               ecosystemSrc ? null,
+              defaultPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
@@ -125,6 +126,7 @@
             {
               configModule,
               ecosystemSrc ? null,
+              defaultPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,

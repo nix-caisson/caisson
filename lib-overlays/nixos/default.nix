@@ -103,6 +103,7 @@
           # A NixOS configuration is evaluated at a system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
+          defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate variant args;
         };
 
@@ -138,8 +139,8 @@
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
         # configuration is evaluated at every system in force where it
         # is declared, and its package sets come from the composition,
-        # through the manifest; it selects its set with the
-        # `caisson.nixpkgs.pkgSet` option.
+        # through the manifest; `defaultPkgs` selects the set it runs
+        # on.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -154,6 +155,17 @@
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
+            # The package set the configuration runs on: a function
+            # that receives the package sets available where it is
+            # declared, as an attribute set by package config name,
+            # each at the system of the evaluation, and returns the
+            # set to run on. `defaultPkgs = pkgSets: pkgSets.stable;`
+            # selects the set of the package config named `stable`.
+            # The selection holds for every configuration beneath this
+            # one that selects none. When absent, the selection of the
+            # nearest configuration above, and the set named `default`
+            # where none above selects.
+            defaultPkgs ? null,
             # The selection over the nixos class of the registry. It
             # replaces the default of the class, which is every entry
             # named `default` followed by what the configurations
@@ -172,6 +184,7 @@
           {
             configModule ? null,
             ecosystemSrc ? null,
+            defaultPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
@@ -186,6 +199,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
+              defaultPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,

@@ -162,6 +162,51 @@
         )
         ++ (if extra == null then [ ] else extra registry);
 
+      # The package sets available to an evaluation, by package config
+      # name: the package configs its manifest holds, each projected to
+      # its set at `system`. `context` names the entry point and `what`
+      # the configuration, for the message of a config that builds no
+      # set at that system.
+      pkgSetsAt =
+        { context, what }:
+        manifest: system:
+        builtins.mapAttrs (
+          name: config:
+          (config.children.nixpkgs.${system} or (throw ''
+            ${context}: the package config `${name}` builds no set for ${system},
+            which ${what} needs. Add the system to `caisson.nixpkgs.systems`
+            in the config's module.
+          '')
+          ).value
+        ) (manifest.pkgSets or { });
+
+      # The package set a configuration runs on: the selection in
+      # force at its manifest, applied to the package sets available
+      # to it. A selection is a function that receives those sets, as
+      # an attribute set by package config name, and returns the set to
+      # run on. The `defaultPkgs` argument of a constructor makes one for
+      # that configuration and everything beneath it
+      # (`mkModuleConfiguration` records it), and a configuration that
+      # passes none runs on what the nearest configuration above it
+      # selected. Where no configuration from the top down to this one
+      # selected, it runs on the set named `default`. Every integration
+      # whose configurations run on a package set selects it here.
+      pkgSetOf =
+        { context, what }:
+        manifest: pkgSets:
+        if (manifest.defaultPkgs or null) != null then
+          manifest.defaultPkgs pkgSets
+        else
+          pkgSets.default or (throw ''
+            ${context}: ${what} runs on the package set named `default`,
+            since no configuration from the top down to it selects one, and the
+            package sets available here are ${
+              if pkgSets == { } then "none" else builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
+            }. Declare a package config named `default` with `pkgSets` on mkLib,
+            or select a set where a configuration is constructed
+            (`defaultPkgs = pkgSets: pkgSets.<name>;`).
+          '');
+
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
       # configuration at a system, as caisson-core.mkConfiguration
@@ -177,14 +222,21 @@
       # `caisson.<integration>.configurations`, of any integration,
       # are its children, and `caisson.exports`, which carries what
       # they pass up, is its `exports` output.
+      #
+      # `defaultPkgs` is the selection of a package set the configuration
+      # was constructed with, null when it was given none. It is
+      # recorded on the manifest, where it is in force for the
+      # configuration and everything beneath it.
       mkModuleConfiguration =
         {
           type,
           perSystem ? false,
+          defaultPkgs ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
+          record = if defaultPkgs == null then { } else { inherit defaultPkgs; };
           evaluate =
             view:
             let
@@ -214,6 +266,7 @@
                 defaultModuleImports = builtins.mapAttrs (_: selection: [
                   selection
                 ]) config.caisson.forChildren.defaultModuleImports;
+                defaultPkgs = config.caisson.forChildren.defaultPkgs;
               };
             };
         };
@@ -528,6 +581,8 @@
             frameworkModules
             mkModuleConfiguration
             moduleImportsOf
+            pkgSetOf
+            pkgSetsAt
             ;
           coreModules = select "core";
           defaultModuleImports = select "default";
