@@ -2020,17 +2020,17 @@ in
 
       # A NixOS configuration takes its package set from the
       # composition, at the system the composition declares: the set
-      # the `pkgSet` argument selects from the available sets, and the
-      # selection of the top when the argument is absent. Every
+      # the `selectPkgs` argument selects from the available sets, and
+      # the set named `default` when nothing selects. Every
       # available set still reaches the modules by config name, as the
       # `pkgSets` special argument, whichever is selected.
       "test: a nixos configuration selects its package set when it is constructed" = {
         expr =
           let
             selecting =
-              pkgSet:
+              selectPkgs:
               (myLib.caisson.nixos.mkTopConfiguration {
-                inherit pkgSet;
+                inherit selectPkgs;
                 configModule =
                   { pkgSets, ... }:
                   {
@@ -2048,7 +2048,7 @@ in
             minimal = minimalConfiguration._module.args.pkgs.marker;
             minimalOther =
               (myLib.caisson.nixos-minimal.mkTopConfiguration {
-                pkgSet = pkgSets: pkgSets.other;
+                selectPkgs = pkgSets: pkgSets.other;
                 configModule = { ... }: { };
               })._module.args.pkgs.marker;
           };
@@ -2070,7 +2070,8 @@ in
       # what the nearest configuration above it selected, through
       # levels of any integration, and a configuration beneath selects
       # another for itself and what is beneath it. Beside that subtree
-      # the selection of the top stands, here the set named `default`.
+      # nothing selects, and a configuration runs on the set named
+      # `default`.
       "test: a package set selection holds for everything beneath the configuration that makes it" = {
         expr =
           let
@@ -2091,7 +2092,7 @@ in
                     caisson.nixos.configurations.beside = machine lib { };
                     caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
                       moduleImports = _modules: [ ];
-                      pkgSet = pkgSets: pkgSets.other;
+                      selectPkgs = pkgSets: pkgSets.other;
                       configModule =
                         { lib, ... }:
                         {
@@ -2103,7 +2104,7 @@ in
                               };
                           };
                           caisson.nixos.configurations.selects = machine lib {
-                            pkgSet = pkgSets: pkgSets.default;
+                            selectPkgs = pkgSets: pkgSets.default;
                             configModule =
                               { lib, ... }:
                               {
@@ -2135,51 +2136,10 @@ in
         };
       };
 
-      # The selection of the top is given to mkLib as `pkgSet`, and it
-      # is in force for every configuration that selects none.
-      "test: the package set selection of the top is given to mkLib" = {
-        expr =
-          let
-            stableAtTheTop = caisson.mkLib {
-              sources = mockSources;
-              name = "stable-top";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
-              systems = [ "x86_64-linux" ];
-              pkgSets = stubPkgSets {
-                default = {
-                  marker = "the default set";
-                };
-                stable = {
-                  marker = "the stable set";
-                };
-              };
-              pkgSet = pkgSets: pkgSets.stable;
-              libOverlays = _lib: {
-                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
-              };
-            };
-            setOf =
-              args:
-              (stableAtTheTop.caisson.nixos.mkTopConfiguration (
-                {
-                  configModule = { ... }: { };
-                }
-                // args
-              )).config.nixpkgs.pkgs.marker;
-          in
-          {
-            unselected = setOf { };
-            selected = setOf { pkgSet = pkgSets: pkgSets.default; };
-          };
-        expected = {
-          unselected = "the stable set";
-          selected = "the default set";
-        };
-      };
-
-      # Where mkLib is given no selection, the top selects the set
-      # named `default`, and a composition that declares none says so,
-      # with the sets it does declare.
+      # Where no configuration from the top down selects, a
+      # configuration runs on the set named `default`, and a
+      # composition that declares none says so, with the sets it does
+      # declare.
       "test: a configuration with no default package set and no selection is refused" = {
         expr =
           let
@@ -2199,7 +2159,7 @@ in
           }).config.nixpkgs.pkgs;
         expectedError = {
           type = "ThrownError";
-          msg = "the package set named `default` is selected at the top of\\s+the tree, and the package sets available here are stable";
+          msg = "runs on the package set named `default`,\\s+since no configuration from the top down to it selects one, and the\\s+package sets available here are stable";
         };
       };
 
@@ -2228,7 +2188,7 @@ in
           in
           {
             default = pkgsOf { };
-            other = pkgsOf { pkgSet = pkgSets: pkgSets.other; };
+            other = pkgsOf { selectPkgs = pkgSets: pkgSets.other; };
           };
         expected = {
           default = "the default set";

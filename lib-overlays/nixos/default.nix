@@ -103,7 +103,7 @@
           # A NixOS configuration is evaluated at a system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
-          pkgSet = args.pkgSet or null;
+          selectPkgs = args.selectPkgs or null;
           evaluate = evaluate variant args;
         };
 
@@ -139,7 +139,8 @@
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
         # configuration is evaluated at every system in force where it
         # is declared, and its package sets come from the composition,
-        # through the manifest; `pkgSet` selects the set it runs on.
+        # through the manifest; `selectPkgs` selects the set it runs
+        # on.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -158,14 +159,13 @@
             # that receives the package sets available where it is
             # declared, as an attribute set by package config name,
             # each at the system of the evaluation, and returns the
-            # set to run on. `pkgSet = pkgSets: pkgSets.stable;`
+            # set to run on. `selectPkgs = pkgSets: pkgSets.stable;`
             # selects the set of the package config named `stable`.
-            # The selection
-            # holds for every configuration beneath this one that
-            # selects none. When absent, the selection of the nearest
-            # configuration above, and at a top the selection given to
-            # mkLib (`default` unless it is given another).
-            pkgSet ? null,
+            # The selection holds for every configuration beneath this
+            # one that selects none. When absent, the selection of the
+            # nearest configuration above, and the set named `default`
+            # where none above selects.
+            selectPkgs ? null,
             # The selection over the nixos class of the registry. It
             # replaces the default of the class, which is every entry
             # named `default` followed by what the configurations
@@ -184,7 +184,7 @@
           {
             configModule ? null,
             ecosystemSrc ? null,
-            pkgSet ? null,
+            selectPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
@@ -199,7 +199,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
-              pkgSet ? null,
+              selectPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,

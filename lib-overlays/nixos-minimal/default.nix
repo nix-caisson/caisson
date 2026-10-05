@@ -70,7 +70,7 @@
           # it.
           type = "nixos";
           perSystem = true;
-          pkgSet = args.pkgSet or null;
+          selectPkgs = args.selectPkgs or null;
           evaluate = evaluate args;
         };
     in
@@ -88,7 +88,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
-              pkgSet ? null,
+              selectPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
@@ -101,7 +101,7 @@
             {
               configModule ? null,
               ecosystemSrc ? null,
-              pkgSet ? null,
+              selectPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,

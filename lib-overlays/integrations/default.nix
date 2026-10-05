@@ -182,26 +182,30 @@
 
       # The package set a configuration runs on: the selection in
       # force at its manifest, applied to the package sets available
-      # to it. A selection is a function of those sets (`pkgSets:
-      # pkgSets.stable`). The top of the tree holds the selection given
-      # to caisson-core.mkLib as `pkgSet`, the set named `default` when
-      # it is given none; the `pkgSet` argument of a constructor selects
-      # another for that configuration and everything beneath it
-      # (`mkModuleConfiguration` records it), and a configuration
-      # that passes none runs on what the nearest configuration above
-      # it selected. Every integration whose configurations run on a
-      # package set selects it here.
+      # to it. A selection is a function that receives those sets, as
+      # an attribute set by package config name, and returns the set to
+      # run on. The `selectPkgs` argument of a constructor makes one for
+      # that configuration and everything beneath it
+      # (`mkModuleConfiguration` records it), and a configuration that
+      # passes none runs on what the nearest configuration above it
+      # selected. Where no configuration from the top down to this one
+      # selected, it runs on the set named `default`. Every integration
+      # whose configurations run on a package set selects it here.
       pkgSetOf =
         { context, what }:
         manifest: pkgSets:
-        (manifest.pkgSet or (throw ''
-          ${context}: ${what} is evaluated on a manifest that carries no
-          package set selection, so no package set is chosen for it. Build
-          the library with caisson-core.mkLib, which holds the selection of
-          the top.
-        '')
-        )
-          pkgSets;
+        if (manifest.selectPkgs or null) != null then
+          manifest.selectPkgs pkgSets
+        else
+          pkgSets.default or (throw ''
+            ${context}: ${what} runs on the package set named `default`,
+            since no configuration from the top down to it selects one, and the
+            package sets available here are ${
+              if pkgSets == { } then "none" else builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
+            }. Declare a package config named `default` with `pkgSets` on mkLib,
+            or select a set where a configuration is constructed
+            (`selectPkgs = pkgSets: pkgSets.<name>;`).
+          '');
 
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
@@ -219,7 +223,7 @@
       # are its children, and `caisson.exports`, which carries what
       # they pass up, is its `exports` output.
       #
-      # `pkgSet` is the selection of a package set the configuration
+      # `selectPkgs` is the selection of a package set the configuration
       # was constructed with, null when it was given none. It is
       # recorded on the manifest, where it is in force for the
       # configuration and everything beneath it.
@@ -227,12 +231,12 @@
         {
           type,
           perSystem ? false,
-          pkgSet ? null,
+          selectPkgs ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          record = if pkgSet == null then { } else { inherit pkgSet; };
+          record = if selectPkgs == null then { } else { inherit selectPkgs; };
           evaluate =
             view:
             let
