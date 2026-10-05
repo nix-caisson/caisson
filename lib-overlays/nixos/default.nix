@@ -154,10 +154,13 @@
             # The nixpkgs source tree; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
-            # The package set the configuration runs on, selected from
-            # the package sets available where it is declared, by
-            # package config name, each at the system of the
-            # evaluation (`pkgSets: pkgSets.stable`). The selection
+            # The package set the configuration runs on: a function
+            # that receives the package sets available where it is
+            # declared, as an attribute set by package config name,
+            # each at the system of the evaluation, and returns the
+            # set to run on. `pkgSet = pkgSets: pkgSets.stable;`
+            # selects the set of the package config named `stable`.
+            # The selection
             # holds for every configuration beneath this one that
             # selects none. When absent, the selection of the nearest
             # configuration above, and at a top the selection given to

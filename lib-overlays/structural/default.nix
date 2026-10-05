@@ -129,9 +129,10 @@
             # special argument.
             pkgSets ? null,
             # The package set the configurations beneath this one run
-            # on, selected from the package sets available to each
-            # (`pkgSets: pkgSets.stable`). It holds for every
-            # configuration beneath that selects none.
+            # on: a function that receives the package sets available
+            # to each, by package config name, and returns the set to
+            # run on. It holds for every configuration beneath that
+            # selects none.
             pkgSet ? null,
             # The selection over the structural class of the registry.
             # It replaces the default of the class, which is every

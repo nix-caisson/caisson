@@ -265,9 +265,10 @@
             # nixpkgs integration from the package configs declared on
             # mkLib (`pkgSets`) and reach perSystem as `pkgSets`.
             pkgSets ? null,
-            # The package set perSystem runs on, its `pkgs`, selected
-            # from the package sets available at each system, by
-            # package config name (`pkgSets: pkgSets.stable`). The
+            # The package set perSystem runs on, its `pkgs`: a function
+            # that receives the package sets available at each system,
+            # as an attribute set by package config name, and returns
+            # the set to run on. The
             # selection holds for every configuration beneath the
             # flake that selects none. When absent, the selection of
             # the nearest configuration above, and at a top the
