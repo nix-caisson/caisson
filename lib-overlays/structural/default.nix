@@ -86,7 +86,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "structural";
-          selectPkgs = args.selectPkgs or null;
+          defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
         };
 
@@ -133,7 +133,7 @@
             # to each, by package config name, and returns the set to
             # run on. It holds for every configuration beneath that
             # selects none.
-            selectPkgs ? null,
+            defaultPkgs ? null,
             # The selection over the structural class of the registry.
             # It replaces the default of the class, which is every
             # entry named `default` followed by what the
@@ -152,7 +152,7 @@
           {
             configModule ? null,
             pkgSets ? null,
-            selectPkgs ? null,
+            defaultPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,

@@ -2020,7 +2020,7 @@ in
 
       # A NixOS configuration takes its package set from the
       # composition, at the system the composition declares: the set
-      # the `selectPkgs` argument selects from the available sets, and
+      # the `defaultPkgs` argument selects from the available sets, and
       # the set named `default` when nothing selects. Every
       # available set still reaches the modules by config name, as the
       # `pkgSets` special argument, whichever is selected.
@@ -2028,9 +2028,9 @@ in
         expr =
           let
             selecting =
-              selectPkgs:
+              defaultPkgs:
               (myLib.caisson.nixos.mkTopConfiguration {
-                inherit selectPkgs;
+                inherit defaultPkgs;
                 configModule =
                   { pkgSets, ... }:
                   {
@@ -2048,7 +2048,7 @@ in
             minimal = minimalConfiguration._module.args.pkgs.marker;
             minimalOther =
               (myLib.caisson.nixos-minimal.mkTopConfiguration {
-                selectPkgs = pkgSets: pkgSets.other;
+                defaultPkgs = pkgSets: pkgSets.other;
                 configModule = { ... }: { };
               })._module.args.pkgs.marker;
           };
@@ -2092,7 +2092,7 @@ in
                     caisson.nixos.configurations.beside = machine lib { };
                     caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
                       moduleImports = _modules: [ ];
-                      selectPkgs = pkgSets: pkgSets.other;
+                      defaultPkgs = pkgSets: pkgSets.other;
                       configModule =
                         { lib, ... }:
                         {
@@ -2104,7 +2104,7 @@ in
                               };
                           };
                           caisson.nixos.configurations.selects = machine lib {
-                            selectPkgs = pkgSets: pkgSets.default;
+                            defaultPkgs = pkgSets: pkgSets.default;
                             configModule =
                               { lib, ... }:
                               {
@@ -2188,7 +2188,7 @@ in
           in
           {
             default = pkgsOf { };
-            other = pkgsOf { selectPkgs = pkgSets: pkgSets.other; };
+            other = pkgsOf { defaultPkgs = pkgSets: pkgSets.other; };
           };
         expected = {
           default = "the default set";

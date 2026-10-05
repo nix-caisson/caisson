@@ -184,7 +184,7 @@
       # force at its manifest, applied to the package sets available
       # to it. A selection is a function that receives those sets, as
       # an attribute set by package config name, and returns the set to
-      # run on. The `selectPkgs` argument of a constructor makes one for
+      # run on. The `defaultPkgs` argument of a constructor makes one for
       # that configuration and everything beneath it
       # (`mkModuleConfiguration` records it), and a configuration that
       # passes none runs on what the nearest configuration above it
@@ -194,8 +194,8 @@
       pkgSetOf =
         { context, what }:
         manifest: pkgSets:
-        if (manifest.selectPkgs or null) != null then
-          manifest.selectPkgs pkgSets
+        if (manifest.defaultPkgs or null) != null then
+          manifest.defaultPkgs pkgSets
         else
           pkgSets.default or (throw ''
             ${context}: ${what} runs on the package set named `default`,
@@ -204,7 +204,7 @@
               if pkgSets == { } then "none" else builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
             }. Declare a package config named `default` with `pkgSets` on mkLib,
             or select a set where a configuration is constructed
-            (`selectPkgs = pkgSets: pkgSets.<name>;`).
+            (`defaultPkgs = pkgSets: pkgSets.<name>;`).
           '');
 
       # A configuration that is a module evaluation. `type` is the
@@ -223,7 +223,7 @@
       # are its children, and `caisson.exports`, which carries what
       # they pass up, is its `exports` output.
       #
-      # `selectPkgs` is the selection of a package set the configuration
+      # `defaultPkgs` is the selection of a package set the configuration
       # was constructed with, null when it was given none. It is
       # recorded on the manifest, where it is in force for the
       # configuration and everything beneath it.
@@ -231,12 +231,12 @@
         {
           type,
           perSystem ? false,
-          selectPkgs ? null,
+          defaultPkgs ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          record = if selectPkgs == null then { } else { inherit selectPkgs; };
+          record = if defaultPkgs == null then { } else { inherit defaultPkgs; };
           evaluate =
             view:
             let

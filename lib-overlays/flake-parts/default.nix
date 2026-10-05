@@ -229,7 +229,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "flake-parts";
-          selectPkgs = args.selectPkgs or null;
+          defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
         };
 
@@ -273,7 +273,7 @@
             # flake that selects none. When absent, the selection of
             # the nearest configuration above, and the set named
             # `default` where none above selects.
-            selectPkgs ? null,
+            defaultPkgs ? null,
             # The flake-parts source; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
@@ -295,7 +295,7 @@
           {
             configModule ? null,
             pkgSets ? null,
-            selectPkgs ? null,
+            defaultPkgs ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,
