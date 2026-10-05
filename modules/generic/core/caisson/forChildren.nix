@@ -3,9 +3,10 @@
 # What this configuration registers for the configurations beneath it:
 # modules, into the registries those configurations select from,
 # additions to the default selection of a class, and the package set
-# they get by default. Each reaches every configuration beneath this
-# one, at any depth, and nothing at this configuration. They are read from the childless view, which the
-# configurations beneath are built against.
+# they get by default. They apply to the configurations beneath this
+# one, nested ones included, and not to this configuration. They are
+# read from the childless view, which the configurations beneath are
+# built against.
 { lib, ... }:
 {
   options.caisson.forChildren = {
