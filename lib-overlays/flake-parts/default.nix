@@ -270,8 +270,9 @@
             # package config name (`pkgSets: pkgSets.stable`). The
             # selection holds for every configuration beneath the
             # flake that selects none. When absent, the selection of
-            # the nearest configuration above, and at a top the set
-            # named `default`.
+            # the nearest configuration above, and at a top the
+            # selection given to mkLib (`default` unless it is given
+            # another).
             pkgSet ? null,
             # The flake-parts source; resolved from the composition's
             # declarations when absent.

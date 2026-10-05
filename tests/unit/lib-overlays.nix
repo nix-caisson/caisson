@@ -2021,7 +2021,7 @@ in
       # A NixOS configuration takes its package set from the
       # composition, at the system the composition declares: the set
       # the `pkgSet` argument selects from the available sets, and the
-      # set named `default` when the argument is absent. Every
+      # selection of the top when the argument is absent. Every
       # available set still reaches the modules by config name, as the
       # `pkgSets` special argument, whichever is selected.
       "test: a nixos configuration selects its package set when it is constructed" = {
@@ -2070,7 +2070,7 @@ in
       # what the nearest configuration above it selected, through
       # levels of any integration, and a configuration beneath selects
       # another for itself and what is beneath it. Beside that subtree
-      # the selection of the top stands, the set named `default`.
+      # the selection of the top stands, here the set named `default`.
       "test: a package set selection holds for everything beneath the configuration that makes it" = {
         expr =
           let
@@ -2135,8 +2135,51 @@ in
         };
       };
 
-      # The top selects the set named `default`, and a composition
-      # that declares none says so, with the sets it does declare.
+      # The selection of the top is given to mkLib as `pkgSet`, and it
+      # is in force for every configuration that selects none.
+      "test: the package set selection of the top is given to mkLib" = {
+        expr =
+          let
+            stableAtTheTop = caisson.mkLib {
+              sources = mockSources;
+              name = "stable-top";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets {
+                default = {
+                  marker = "the default set";
+                };
+                stable = {
+                  marker = "the stable set";
+                };
+              };
+              pkgSet = pkgSets: pkgSets.stable;
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+            };
+            setOf =
+              args:
+              (stableAtTheTop.caisson.nixos.mkTopConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              )).config.nixpkgs.pkgs.marker;
+          in
+          {
+            unselected = setOf { };
+            selected = setOf { pkgSet = pkgSets: pkgSets.default; };
+          };
+        expected = {
+          unselected = "the stable set";
+          selected = "the default set";
+        };
+      };
+
+      # Where mkLib is given no selection, the top selects the set
+      # named `default`, and a composition that declares none says so,
+      # with the sets it does declare.
       "test: a configuration with no default package set and no selection is refused" = {
         expr =
           let

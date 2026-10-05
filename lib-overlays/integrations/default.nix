@@ -183,8 +183,9 @@
       # The package set a configuration runs on: the selection in
       # force at its manifest, applied to the package sets available
       # to it. A selection is a function of those sets (`pkgSets:
-      # pkgSets.stable`). The top of the tree selects the set named
-      # `default`; the `pkgSet` argument of a constructor selects
+      # pkgSets.stable`). The top of the tree holds the selection given
+      # to caisson-core.mkLib as `pkgSet`, the set named `default` when
+      # it is given none; the `pkgSet` argument of a constructor selects
       # another for that configuration and everything beneath it
       # (`mkModuleConfiguration` records it), and a configuration
       # that passes none runs on what the nearest configuration above
@@ -196,7 +197,7 @@
         (manifest.pkgSet or (throw ''
           ${context}: ${what} is evaluated on a manifest that carries no
           package set selection, so no package set is chosen for it. Build
-          the library with caisson-core.mkLib, which selects `default` at
+          the library with caisson-core.mkLib, which holds the selection of
           the top.
         '')
         )

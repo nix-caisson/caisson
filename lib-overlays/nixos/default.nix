@@ -160,8 +160,8 @@
             # evaluation (`pkgSets: pkgSets.stable`). The selection
             # holds for every configuration beneath this one that
             # selects none. When absent, the selection of the nearest
-            # configuration above, and at a top the set named
-            # `default`.
+            # configuration above, and at a top the selection given to
+            # mkLib (`default` unless it is given another).
             pkgSet ? null,
             # The selection over the nixos class of the registry. It
             # replaces the default of the class, which is every entry
