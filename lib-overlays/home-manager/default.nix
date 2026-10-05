@@ -3,10 +3,12 @@
 # The home-manager integration: it owns the `homeManager` class,
 # contributes the declared home-manager's library to the composition
 # as `lib.hm`, and evaluates the class over the composed library with
-# home-manager's module list. Beside the entry points it carries the
-# adapters that place a home-manager configuration inside a NixOS
-# configuration, and the source metadata the activation coherence
-# check compares.
+# home-manager's module list. A home is a configuration: it is
+# evaluated at every system in force where it is declared, on the
+# package set in force there, and a top publishes it under
+# `homeConfigurations`. Beside the entry points the integration
+# carries the adapters that place a home inside a NixOS configuration,
+# and the source metadata the activation coherence check compares.
 {
   contributeClasses,
   entries,
@@ -29,9 +31,9 @@
       mkNixosModule = final.caisson-core.mkModule "nixos";
 
       selection = final.caisson.integrations;
+      # What the adapters share out of the registry of the class, as
+      # the composition holds it: every registered `core`.
       registry = final.caisson-core.modules.homeManager or { };
-      # The framework module of the class: every registered `core`,
-      # forced into every home-manager evaluation.
       coreModules = selection.coreModules registry;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
@@ -44,11 +46,6 @@
           inherit explicit;
           manifest = final.caisson-core.libManifest or { };
         };
-
-      assertPkgSets = assertPkgSetsFor "lib.caisson.home-manager.mkConfiguration";
-      assertPkgSetsFor =
-        context: pkgSets:
-        if pkgSets ? pkgs then pkgSets else throw "${context} requires `pkgSets.pkgs` to be defined.";
 
       resolveOutPath =
         value:
@@ -118,6 +115,9 @@
       # (which the `docs/default.nix` of home-manager applies) keeps all
       # of it.
       #
+      # `base` is the library of the view being evaluated, the
+      # composed library carrying the manifest of the evaluation.
+      #
       # `hmSrc` names the tree `hm` comes from when the composition
       # declares none: `hm` and the home-manager maintainers merged
       # into the nixpkgs list are then built over this library, the
@@ -125,10 +125,10 @@
       # the `lib.hm` calls inside `hm` resolve to this `hm`. With null
       # the composed library carries `hm` already, as the entry.
       mkEvaluationLib =
-        hmSrc:
-        final.extend (
+        base: hmSrc:
+        base.extend (
           self: super:
-          final
+          base
           // {
             inherit (super) modules types evalModules;
           }
@@ -146,14 +146,14 @@
       # that composes an `hm` for it. With none declared, the tree the
       # evaluation names supplies both.
       libFor =
-        explicit:
+        base: explicit:
         let
           named = resolveOutPath (resolveSrc explicit);
         in
         if declaredSrc == null then
-          mkEvaluationLib named
+          mkEvaluationLib base named
         else if explicit == null || named == declaredSrc then
-          mkEvaluationLib null
+          mkEvaluationLib base null
         else
           throw ''
             caisson.home-manager: this evaluation names
@@ -286,68 +286,108 @@
       # rather than to the caller: the full list is
       # `lib.caisson.home-manager`, the necessary modules alone are
       # `lib.caisson.home-manager-minimal`.
+      #
+      # It is a function of the view being evaluated: `lib`, the
+      # library of that view, and `manifest`, the manifest of the
+      # evaluation. A home has an evaluation for every system in force
+      # where it is declared, so the manifest is that of an evaluation
+      # at a system: the name, the system and the package sets come
+      # from it.
       mkCommonArgs =
         {
           context,
           minimal,
         }:
-        {
-          ecosystemSrc ? null,
-          pkgSets,
-          configModule,
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          specialArgs ? { },
-          osConfig ? null,
-          check ? true,
-          sourceMeta ? null,
-          ...
-        }:
+        { lib, manifest }:
+        args:
         let
-          checkedPkgSets = assertPkgSetsFor context pkgSets;
-          selectedModules = moduleImports registry ++ extraModuleImports registry;
-          hmSource = resolveOutPath (resolveSrc ecosystemSrc);
+          integrations = lib.caisson.integrations;
+
+          # The name of the configuration this is an evaluation of.
+          name = manifest.name or null;
+
+          # The system of this evaluation.
+          inherit (manifest) system;
+
+          what = if name != null then "the home `${name}` at ${system}" else "this home at ${system}";
+
+          # The package sets available to the home, each at the system
+          # of the evaluation, by package config name.
+          pkgSets = integrations.pkgSetsAt { inherit context what; } manifest system;
+
+          # The set the home runs on: the selection in force at its
+          # manifest, applied to those.
+          pkgs = integrations.pkgSetOf { inherit context what; } manifest pkgSets;
+
+          classRegistry = lib.caisson-core.modules.homeManager or { };
+          # The framework module of the class, forced.
+          frameworkModules = integrations.frameworkModules "homeManager" classRegistry;
+          moduleImports = integrations.moduleImportsOf "homeManager" { inherit lib manifest; } args;
+
+          # The configuration's module: the module passed, else the
+          # configuration registered under the home's name
+          # (`configs/homeManager/<name>`), else none.
+          registered = lib.caisson-core.configs.homeManager or { };
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else if name != null then
+              registered.${name} or null
+            else
+              null;
+
+          # The user of a home is the name it is declared under,
+          # unless a module of the home names another. A top is
+          # declared under no name: the name it holds is the name of
+          # the composition.
+          declaredUnderAName = name != null && (manifest.parent.parent.type or "lib") != "lib";
+          usernameModule = {
+            _file = "caisson-home-manager:username";
+            home.username = lib.mkDefault name;
+          };
+
+          hmSource = resolveOutPath (resolveSrc (args.ecosystemSrc or null));
           resolvedSourceMeta =
-            if sourceMeta != null then
-              sourceMeta
+            if (args.sourceMeta or null) != null then
+              args.sourceMeta
             else
               mkSourceMeta {
                 profileName = "default";
                 homeManagerOutPath = hmSource;
-                nixpkgsOutPath = resolveOutPath (checkedPkgSets.pkgs.path or null);
+                nixpkgsOutPath = resolveOutPath (pkgs.path or null);
               };
         in
         {
-          inherit
-            check
-            minimal
-            ;
+          inherit minimal pkgs;
+          check = if (args.check or null) == null then true else args.check;
           sourceMeta = resolvedSourceMeta;
           configuration = {
             imports =
-              coreModules
-              ++ selectedModules
+              frameworkModules
+              ++ moduleImports classRegistry
+              ++ (if configModule == null then [ ] else [ configModule ])
               ++ [
-                configModule
                 (mkSourceMetaModule resolvedSourceMeta)
                 { programs.home-manager.path = final.mkDefault hmSource; }
-              ];
+              ]
+              ++ (if declaredUnderAName then [ usernameModule ] else [ ]);
           };
-          pkgs = checkedPkgSets.pkgs;
-          # The composed library, with the module system tied over it,
-          # is what the evaluation runs on, and it carries `lib.hm`, so
-          # the modules see one library with the home-manager namespace
-          # under the name home-manager reads.
-          lib = libFor ecosystemSrc;
+          # The library of the view, with the module system tied over
+          # it, is what the evaluation runs on, and it carries
+          # `lib.hm`, so the modules see one library with the
+          # home-manager namespace under the name home-manager reads.
+          lib = libFor lib (args.ecosystemSrc or null);
           # Framework defaults first; the values the caller passed win on
           # conflict. home-manager names these extraSpecialArgs; the
           # caisson name is specialArgs.
           extraSpecialArgs = {
-            pkgSets = checkedPkgSets;
-            inherit osConfig;
+            # The package sets at the system of the home, by config
+            # name.
+            inherit pkgSets;
+            osConfig = args.osConfig or null;
             sourceMeta = resolvedSourceMeta;
           }
-          // specialArgs;
+          // (if (args.specialArgs or null) != null then args.specialArgs else { });
           # The module tree the evaluation reads: home-manager's
           # module list, its module files and the `modulesPath` special
           # argument its news entries interpolate.
@@ -367,9 +407,9 @@
           # modules alone instead of its whole module tree.
           minimal ? false,
         }:
-        args:
+        view: args:
         let
-          common = mkCommonArgs { inherit context minimal; } args;
+          common = mkCommonArgs { inherit context minimal; } view args;
         in
         common
         // {
@@ -492,6 +532,50 @@
 
       mkConfiguration = final.caisson.home-manager.mkConfiguration;
 
+      # The evaluator step of a home, on the view being evaluated: the
+      # evaluation over the composition, with the twin's
+      # `ecosystemArgs` merged over the composed call last. `variant`
+      # is what `compose` takes, the entry point and its module list.
+      # An integration that evaluates the class the other way builds
+      # its configurations from this.
+      evaluation =
+        variant: args: view:
+        let
+          composed = compose variant view args;
+          value = evaluate composed (
+            composed.ecosystemArgs // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
+          );
+        in
+        {
+          inherit value;
+          # What `home-manager switch` builds and runs.
+          outputs = {
+            inherit (value) activationPackage;
+          };
+        };
+
+      configuration =
+        variant: args:
+        selection.mkModuleConfiguration {
+          type = "home-manager";
+          # A home is evaluated at a system: it has an evaluation for
+          # every system in force where it is declared.
+          perSystem = true;
+          defaultPkgs = args.defaultPkgs or null;
+          evaluate = evaluation variant args;
+        };
+
+      # A home that is a top, as the home-manager CLI reads it: the
+      # evaluated home, with its `activationPackage`. Where the
+      # composition has several systems in force, it is the evaluated
+      # homes by system, and where it has none, the empty set
+      # (`integrations.topValue`).
+      mkTopConfiguration =
+        rawArgs:
+        selection.topValue (
+          final.caisson-core.finalizeTop (final.caisson.home-manager.mkConfiguration rawArgs)
+        );
+
       mkStandaloneAdapter =
         args@{
           moduleImports ? selection.defaultModuleImports,
@@ -503,6 +587,10 @@
         in
         {
           homeModules = coreModules ++ selectedModules;
+          # A home over the adapter's arguments, as `mkConfiguration`
+          # returns it: a configuration, declared under
+          # `caisson.home-manager.configurations` or finalized as a
+          # top.
           buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
         };
 
@@ -514,10 +602,12 @@
         rawArgs:
         if rawArgs ? extraSpecialArgs then
           throw "lib.caisson.home-manager.mkNixosAdapter does not accept `extraSpecialArgs`: pass extra module arguments as `specialArgs`."
+        else if rawArgs ? pkgSets then
+          throw "lib.caisson.home-manager.mkNixosAdapter does not accept `pkgSets`: the homes run on the package set in force where the NixOS configuration is declared, and `defaultPkgs` selects another."
         else
           mkNixosAdapterChecked rawArgs;
       mkNixosAdapterChecked =
-        args@{
+        {
           users,
           ecosystemSrc ? null,
           hostName ? null,
@@ -528,6 +618,11 @@
           # marker cannot vouch for coherence.
           baseSystem ? null,
           sourceMeta ? null,
+          # The package set the homes run on, as the `defaultPkgs` of
+          # `mkConfiguration` selects it; the set in force at the
+          # NixOS configuration when absent. It applies to the
+          # "user-service" mode, where each home is a configuration.
+          defaultPkgs ? null,
           moduleImports ? selection.defaultModuleImports,
           extraModuleImports ? (_registry: [ ]),
           sharedModules ? [ ],
@@ -566,7 +661,21 @@
             ...
           }:
           let
-            checkedPkgSets = assertPkgSets (if args ? pkgSets then args.pkgSets else { inherit pkgs; });
+            # The manifest of the NixOS evaluation this module is in,
+            # where caisson performs that evaluation; null in a NixOS
+            # evaluation made another way, a test node for one.
+            nixosManifest = lib.caisson-core.evalManifest or null;
+            system = pkgs.stdenv.hostPlatform.system;
+            # The package sets at the system of the machine, by config
+            # name, as its modules receive them.
+            pkgSetsHere =
+              if nixosManifest == null then
+                { default = pkgs; }
+              else
+                selection.pkgSetsAt {
+                  context = "lib.caisson.home-manager.mkNixosAdapter";
+                  what = "the NixOS configuration at ${system}";
+                } nixosManifest system;
             sharedClassModules = coreModules ++ moduleImports registry ++ extraModuleImports registry;
             hmSource = resolveOutPath (resolveSrc ecosystemSrc);
             resolvedSourceMeta =
@@ -581,7 +690,7 @@
                     hostName
                     ;
                   homeManagerOutPath = hmSource;
-                  nixpkgsOutPath = resolveOutPath (checkedPkgSets.pkgs.path or null);
+                  nixpkgsOutPath = resolveOutPath (pkgs.path or null);
                 };
             sourceMetaModule = mkSourceMetaModule resolvedSourceMeta;
 
@@ -605,27 +714,53 @@
             # a `users.users.<name>` entry (its injected defs dereference the
             # user record), and creating the entry would conflict with
             # systemd-homed's ownership of the account.  Instead each user is
-            # evaluated with the same standalone evaluator (mkConfiguration)
-            # that `home-manager switch` uses (the embedded generation is the
+            # a home as `mkConfiguration` builds it, the configuration
+            # `home-manager switch` evaluates (the embedded generation is the
             # standalone generation by construction), and a complete /etc
             # user unit runs its activation when the user's service manager
             # starts.
+            #
+            # Each home is finalized here, under the user's name:
+            # beneath the NixOS evaluation where caisson performs it,
+            # so the home runs at the system of the machine and on the
+            # package set in force there, and beneath the composition
+            # otherwise, read at the system of the machine.
             (
               let
                 username = builtins.head (builtins.attrNames users);
+                homesParent = if nixosManifest == null then final.caisson-core.libManifest else nixosManifest;
                 userActivations = builtins.mapAttrs (
-                  _username: userArgs:
-                  (mkConfiguration {
-                    inherit ecosystemSrc specialArgs;
-                    pkgSets = checkedPkgSets;
-                    configModule =
-                      if userArgs ? configModule then
-                        userArgs.configModule
+                  username: userArgs:
+                  let
+                    evaluations =
+                      final.caisson-core.finalizeChild
+                        {
+                          name = username;
+                          parent = homesParent;
+                          what = "the home of `${username}`";
+                        }
+                        (mkConfiguration {
+                          inherit ecosystemSrc specialArgs defaultPkgs;
+                          configModule =
+                            if userArgs ? configModule then
+                              userArgs.configModule
+                            else
+                              throw "mkNixosAdapter requires `users.<name>.configModule`.";
+                          moduleImports = userArgs.moduleImports or moduleImports;
+                          sourceMeta = userArgs.sourceMeta or resolvedSourceMeta;
+                        });
+                  in
+                  (evaluations.${system} or (throw ''
+                    lib.caisson.home-manager.mkNixosAdapter: the home of `${username}` has
+                    no evaluation at ${system}, the system of this machine. The systems
+                    in force for it are ${
+                      if evaluations == { } then
+                        "none"
                       else
-                        throw "mkNixosAdapter requires `users.<name>.configModule`.";
-                    moduleImports = userArgs.moduleImports or moduleImports;
-                    sourceMeta = userArgs.sourceMeta or resolvedSourceMeta;
-                  }).activationPackage
+                        builtins.concatStringsSep ", " (builtins.attrNames evaluations)
+                    }.
+                  '')
+                  ).value.activationPackage
                 ) users;
               in
               {
@@ -697,7 +832,7 @@
                 # integration that delivers the composed library to a
                 # NixOS evaluation.
                 extraSpecialArgs = {
-                  pkgSets = checkedPkgSets;
+                  pkgSets = pkgSetsHere;
                   sourceMeta = resolvedSourceMeta;
                 }
                 // specialArgs;
@@ -763,39 +898,71 @@
             host fingerprint: ${hostFp}
             target fingerprint: ${targetFp}
           '';
-      evaluation = selection.mkEvaluation {
-        compose = compose { };
-        inherit evaluate;
-      };
-
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
-        # The signature of the entry points over the homeManager class,
-        # those of `lib.caisson.home-manager-minimal` included.
-        # `mkCommonArgs` destructures `pkgSets` and `configModule`
-        # without a default and supplies the value of every optional
-        # argument left out. The package set is checked twice, for
-        # different mistakes: the pattern reports `pkgSets` absent,
-        # `assertPkgSets` reports a `pkgSets` that carries no `pkgs`.
+        # A top publishes homes as `homeConfigurations.<name>`, each
+        # the evaluated home, which is what the home-manager CLI
+        # reads. A home beneath a NixOS configuration is named
+        # `<user>@<host>`, the name it is declared under and the name
+        # that NixOS configuration is declared under, which is where
+        # the CLI looks (`$USER@$(hostname)`); a home with no NixOS
+        # configuration above it keeps its name.
+        exportsTo = {
+          attrset = "homeConfigurations";
+          value = manifest: manifest.value;
+          name =
+            { name, manifest }:
+            let
+              host = (manifest.nearest.nixos or { }).name or null;
+            in
+            if host == null then
+              { value = name; }
+            else
+              {
+                value = "${name}@${host}";
+                description = "named ${name}@${host} from its name and the name of the NixOS configuration it is under";
+              };
+        };
+        # What these return is a configuration, a function of
+        # `{ name, parent }`: a parent that declares it under
+        # `caisson.home-manager.configurations.<name>` finalizes it,
+        # and `mkTopConfiguration` finalizes it at a top.
+        # `lib.caisson.home-manager-minimal` takes the same arguments.
+        # The home is evaluated at every system in force where it is
+        # declared, and its package sets come from the composition,
+        # through the manifest; `defaultPkgs` selects the set it runs
+        # on.
         mkConfiguration =
           {
-            # The configuration's module. Further modules of the class
-            # are selected with `moduleImports`, from the registry.
-            # home-manager's module list belongs to the entry point:
-            # mkConfiguration evaluates with the whole module tree,
+            # The home's module. When absent, the configuration
+            # registered under the home's name
+            # (`lib.caisson-core.configs.homeManager.<name>`), if any.
+            # Further modules of the class are selected with
+            # `moduleImports`, from the registry. home-manager's module
+            # list belongs to the entry point: mkConfiguration
+            # evaluates with the whole module tree,
             # lib.caisson.home-manager-minimal.mkConfiguration with the
             # necessary modules alone.
-            configModule,
-            # The package sets; `pkgSets.pkgs` is the set the evaluation
-            # runs on.
-            pkgSets,
+            configModule ? null,
             # The home-manager source tree; resolved from the
             # composition's declarations when absent.
             ecosystemSrc ? null,
-            # The selection over the homeManager class of the registry;
-            # every entry named `default` when absent.
+            # The package set the home runs on: a function that
+            # receives the package sets available where it is
+            # declared, as an attribute set by package config name,
+            # each at the system of the evaluation, and returns the
+            # set to run on. When absent, the selection of the nearest
+            # configuration above, which beneath a NixOS configuration
+            # is the set of that configuration, and the set named
+            # `default` where none above selects.
+            defaultPkgs ? null,
+            # The selection over the homeManager class of the registry.
+            # It replaces the default of the class, which is every
+            # entry named `default` followed by what the configurations
+            # above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
             extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies; home-manager names these `extraSpecialArgs`.
@@ -809,14 +976,14 @@
             # compares; derived from the sources when absent.
             sourceMeta ? null,
           }@args:
-          evaluation args;
+          configuration { } args;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
           {
-            configModule,
-            pkgSets,
+            configModule ? null,
             ecosystemSrc ? null,
+            defaultPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
@@ -825,20 +992,23 @@
             sourceMeta ? null,
             ecosystemArgs ? null,
           }@args:
-          evaluation args;
+          configuration { } args;
         extra = {
           inherit
             assertSourceCoherence
             mkNixosAdapter
             mkSourceMeta
             mkStandaloneAdapter
+            mkTopConfiguration
             ;
-          # The two-stage composition an alt over this class reads,
-          # and the evaluation it composes for: both module lists come
-          # out of the same home-manager source and run through the
-          # same evaluation, so the entry points differ in the module
-          # list alone.
-          inherit compose evaluate;
+          # What an alt over this class builds on: the composition,
+          # the evaluator's call, and the two put together as a
+          # configuration of this integration (`configuration`, given
+          # what `compose` takes and the arguments of the entry
+          # point). Both module lists come out of the same
+          # home-manager source and run through the same evaluation,
+          # so the entry points differ in the module list alone.
+          inherit compose evaluate configuration;
         };
       };
     in

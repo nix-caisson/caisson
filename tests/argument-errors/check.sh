@@ -21,11 +21,12 @@ shift
 flags=("$@")
 
 # Every entry point takes `configModule`. The structural, flake-parts,
-# nixos and nixos-minimal entry points require nothing: each finds the
-# configuration registered under the name of the configuration. The
-# others require `configModule`, and take `pkgSets`, which the nixos
-# entry points do not: a NixOS configuration takes its package sets
-# from the composition.
+# nixos, nixos-minimal, home-manager and home-manager-minimal entry
+# points require nothing: each finds the configuration registered
+# under the name of the configuration. The others require
+# `configModule`, and take `pkgSets`, which the nixos and home-manager
+# entry points do not: a NixOS configuration and a home take their
+# package sets from the composition.
 namespaces=(
   nixos
   nixos-minimal
@@ -112,13 +113,13 @@ missing="function '[^']*%s' called without required argument '(configModule|pkgS
 # The arguments a call passes beside the wrong argument.
 given_for() {
   case "$1" in
-    nixos | nixos-minimal) printf 'configModule = { };' ;;
+    nixos | nixos-minimal | home-manager | home-manager-minimal) printf 'configModule = { };' ;;
     *) printf 'configModule = { }; pkgSets.pkgs = { };' ;;
   esac
 }
 requires_nothing() {
   case "$1" in
-    structural | flake-parts | nixos | nixos-minimal) return 0 ;;
+    structural | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -153,6 +154,10 @@ check "nixos.mkConfigurationFull { bogus, configModule }" \
 # A nixos entry point takes no package sets.
 check "nixos.mkConfiguration { pkgSets, ... }" \
   "lib.caisson.nixos.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
+  "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
+# Nor does a home-manager entry point.
+check "home-manager.mkConfiguration { pkgSets, ... }" \
+  "lib.caisson.home-manager.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
   "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
 
 # The colmena node constructors, module arguments of a colmena

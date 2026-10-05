@@ -25,12 +25,13 @@
         final.caisson.home-manager
           or (throw "lib.caisson.home-manager-minimal evaluates the homeManager class and needs the home-manager integration composed beside it.");
 
-      evaluation = final.caisson.integrations.mkEvaluation {
-        compose = over.compose {
-          context = "lib.caisson.home-manager-minimal.mkConfiguration";
-          minimal = true;
-        };
-        inherit (over) evaluate;
+      # In the tree an evaluation of an alt is a configuration of the
+      # integration that owns the class: it is declared under
+      # `caisson.home-manager.configurations` and published where
+      # homes are.
+      configuration = over.configuration {
+        context = "lib.caisson.home-manager-minimal.mkConfiguration";
+        minimal = true;
       };
     in
     {
@@ -38,16 +39,16 @@
         home-manager-minimal = final.caisson.integrations.mkAltIntegration {
           inherit over;
           # The arguments of `lib.caisson.home-manager.mkConfiguration`,
-          # documented there. The composition of the homeManager class
-          # destructures `pkgSets` and `configModule` without a
-          # default. This entry point evaluates with the necessary
-          # modules alone; lib.caisson.home-manager.mkConfiguration
-          # evaluates with home-manager's whole module tree.
+          # documented there, and the same result: a configuration, a
+          # function of `{ name, parent }`. This entry point evaluates
+          # with the necessary modules alone;
+          # lib.caisson.home-manager.mkConfiguration evaluates with
+          # home-manager's whole module tree.
           mkConfiguration =
             {
-              configModule,
-              pkgSets,
+              configModule ? null,
               ecosystemSrc ? null,
+              defaultPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
@@ -55,12 +56,12 @@
               check ? null,
               sourceMeta ? null,
             }@args:
-            evaluation args;
+            configuration args;
           mkConfigurationWithEcosystemArgs =
             {
-              configModule,
-              pkgSets,
+              configModule ? null,
               ecosystemSrc ? null,
+              defaultPkgs ? null,
               moduleImports ? null,
               extraModuleImports ? null,
               specialArgs ? null,
@@ -69,7 +70,16 @@
               sourceMeta ? null,
               ecosystemArgs ? null,
             }@args:
-            evaluation args;
+            configuration args;
+          extra = {
+            # A minimal home that is a top, as
+            # `lib.caisson.home-manager.mkTopConfiguration` returns it.
+            mkTopConfiguration =
+              rawArgs:
+              final.caisson.integrations.topValue (
+                final.caisson-core.finalizeTop (final.caisson.home-manager-minimal.mkConfiguration rawArgs)
+              );
+          };
         };
       };
     };

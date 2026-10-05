@@ -43,6 +43,12 @@ let
           type = lib.types.str;
           default = "activation-package";
         };
+        # The user of the home, which the integration defaults to the
+        # name the home is declared under.
+        home.username = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+        };
         # The activation entries, which the integration's source
         # metadata module defines into.
         home.activation = lib.mkOption {

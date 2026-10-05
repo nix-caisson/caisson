@@ -4,8 +4,10 @@
 # ones included: modules, which join the registries those
 # configurations select from; additions to the default selection of a
 # class, which a configuration gets when it passes no `moduleImports`;
-# and a default package set, which a configuration runs on when
-# neither it nor a configuration between selects another. This
+# a default package set, which a configuration runs on when neither it
+# nor a configuration between selects another; and the systems in
+# force beneath, which decide the evaluations of a configuration that
+# is evaluated at a system. This
 # configuration is not among those they are offered to. They are read
 # from the childless view, which the configurations beneath are built
 # against.
@@ -66,6 +68,26 @@
         `defaultPkgs` or sets this option. This configuration runs on
         the set it was constructed with. When null, the default
         beneath is the selection in force at this configuration.
+      '';
+    };
+
+    systems = lib.mkOption {
+      type = lib.types.nullOr (lib.types.listOf lib.types.str);
+      default = null;
+      example = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      description = ''
+        The systems in force for the configurations beneath this
+        configuration: a configuration evaluated at a system has an
+        evaluation for each. The list is taken from the systems in
+        force where this configuration is declared, and a system
+        outside them is refused. When null, the list beneath is the
+        system of this configuration where it is evaluated at a
+        system, and otherwise the list in force at it. A NixOS
+        configuration that holds a configuration for another system,
+        such as an image, states that system here.
       '';
     };
 

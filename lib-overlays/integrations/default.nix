@@ -267,6 +267,7 @@
                   selection
                 ]) config.caisson.forChildren.defaultModuleImports;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
+                systems = config.caisson.forChildren.systems;
               };
             };
         };
@@ -312,8 +313,13 @@
           # integration, and what of each: `attrset`, the output
           # attribute set (`nixosConfigurations`), and `value`, the
           # function from a configuration's manifest to what is
-          # published. Absent for an integration whose configurations
-          # are not published under a name.
+          # published. It may carry `name`, for an integration whose
+          # configurations are known by a name other than the one
+          # they are declared under: a function of `{ name, manifest }`
+          # returning `value`, the name the entry carries into naming,
+          # and optionally `description`, a sentence saying what it
+          # did. Absent for an integration whose configurations are
+          # not published under a name.
           exportsTo ? null,
           extra ? { },
         }:
@@ -473,13 +479,39 @@
           showPath =
             path:
             builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
+          # The path an entry carries into naming. An integration
+          # whose configurations are known by a name other than the
+          # one they are declared under declares `name` in its
+          # `exportsTo`: a function of `{ name, manifest }`, the name
+          # the entry carries and its manifest, returning `value`, the
+          # name to carry instead, and optionally `description`, a
+          # sentence saying what it did. That name stands as the last
+          # segment of the path.
+          namedPath =
+            entry:
+            let
+              hook = (exportsToOf entry.manifest).name or null;
+              leaf = final.last entry.path;
+              given = hook {
+                inherit (leaf) name;
+                inherit (entry) manifest;
+              };
+            in
+            if hook == null then
+              entry.path
+            else if final.hasInfix "/" given.value then
+              throw ''
+                ${attrsetOf entry}: the ${leaf.type} integration names the configuration
+                at ${showPath entry.path} `${given.value}`, and a published name may
+                not contain `/`, which separates the parts of a name.
+              ''
+            else
+              final.init entry.path ++ [ (leaf // { name = given.value; }) ];
           publishIn =
             attrset:
             let
               members = builtins.filter (entry: attrsetOf entry == attrset) entries;
-              names = builtins.map displayName (
-                final.caisson-core.elide (builtins.map (entry: entry.path) members)
-              );
+              names = builtins.map displayName (final.caisson-core.elide (builtins.map namedPath members));
               named = final.zipListsWith (name: entry: { inherit name entry; }) names members;
               clashing = builtins.filter (
                 name: builtins.length (builtins.filter (other: other == name) names) > 1

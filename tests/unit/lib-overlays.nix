@@ -2920,10 +2920,17 @@ in
       # different as a tree, so an evaluation can name another
       # home-manager and nothing but the refusal stands in its way.
       hmStubCopy = inputs.parent.outPath + "/tests/unit/home-manager-stub";
+      # A home takes its system and its package set from the
+      # composition: one system, and a stand-in set named `default`.
+      homeComposition = {
+        systems = [ "x86_64-linux" ];
+        pkgSets = stubPkgSets { default = { }; };
+      };
       mkCompositionWith =
         declaration: extraOverlays:
         caisson.mkLib (
-          {
+          homeComposition
+          // {
             sources = mockSources;
             libOverlays =
               _lib:
@@ -2965,7 +2972,8 @@ in
       mkMaintainersComposition =
         declaration:
         caisson.mkLib (
-          {
+          homeComposition
+          // {
             sources = mockSources;
             libOverlays = _lib: {
               home-manager = {
@@ -3005,11 +3013,106 @@ in
             nixpkgs = lib.isFunction lib.id;
           };
         };
-      configuration = myLib.caisson.home-manager.mkConfiguration {
+      # A composition for homes in a tree: the systems given, the
+      # package configs `default` and `other`, whose set at a system
+      # says which it is, NixOS configurations over the stand-in
+      # nixpkgs tree, and a home registered under the name `chris`.
+      treeLibWith =
+        systems:
+        caisson.mkLib {
+          sources = mockSources;
+          name = "homes";
+          defaultEcosystemSrc = {
+            nixpkgs = ./nixos-stub;
+            home-manager = hmStub;
+          };
+          inherit systems;
+          pkgSets =
+            _lib:
+            lib.genAttrs
+              [
+                "default"
+                "other"
+              ]
+              (
+                config:
+                { name, parent }:
+                {
+                  _type = "caisson-manifest";
+                  type = "nixpkgs";
+                  inherit name parent;
+                  children.nixpkgs = lib.genAttrs systems (system: {
+                    _type = "caisson-manifest";
+                    type = "nixpkgs";
+                    name = system;
+                    value.marker = "${config} at ${system}";
+                  });
+                }
+              );
+          libOverlays = _lib: {
+            home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+            nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+          };
+          configs = callbackLib: {
+            homeManager.chris = callbackLib.caisson.home-manager.mkModule (
+              { ... }:
+              { ... }:
+              {
+                seenLib.registered = true;
+              }
+            );
+          };
+        };
+      # A tree with a home alone and a machine `laptop` on the set
+      # `other` with two homes, the second naming another user and
+      # selecting `default`. `serving` adds a machine `server` that
+      # holds a configuration for another system.
+      home = lib: args: lib.caisson.home-manager.mkConfiguration ({ check = false; } // args);
+      treeWith =
+        { serving }:
+        { lib, ... }:
+        {
+          caisson.home-manager.configurations.chris = home lib { };
+          caisson.nixos.configurations = {
+            laptop = lib.caisson.nixos.mkConfiguration {
+              defaultPkgs = pkgSets: pkgSets.other;
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.home-manager.configurations.chris = home lib { };
+                  caisson.home-manager.configurations.dana = home lib {
+                    defaultPkgs = pkgSets: pkgSets.default;
+                    configModule = {
+                      home.username = "someone-else";
+                    };
+                  };
+                };
+            };
+          }
+          // lib.optionalAttrs serving {
+            server = lib.caisson.nixos.mkConfiguration {
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.forChildren.systems = [ "aarch64-linux" ];
+                  caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                    configModule = { };
+                  };
+                };
+            };
+          };
+        };
+      # A home finalized as a top, read as the home-manager CLI reads
+      # it: the evaluated home.
+      configuration = myLib.caisson.home-manager.mkTopConfiguration {
         configModule = probeModule;
-        pkgSets.pkgs = { };
         check = false;
       };
+      # The same for a configuration an entry point with no top form
+      # returned.
+      topOf =
+        composition: declared:
+        composition.caisson.integrations.topValue (composition.caisson-core.finalizeTop declared);
     in
     {
       # The proof that the composition reaches the modules: a module
@@ -3063,14 +3166,13 @@ in
       # tree.
       "test: an evaluation naming its home-manager merges its maintainers" = {
         expr =
-          ((mkMaintainersComposition { }).caisson.home-manager.mkConfiguration {
+          ((mkMaintainersComposition { }).caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = hmStub;
             configModule =
               { lib, ... }:
               {
                 seenLib.maintainers = builtins.attrNames lib.maintainers;
               };
-            pkgSets.pkgs = { };
             check = false;
           }).config.seenLib.maintainers;
         expected = [
@@ -3149,7 +3251,7 @@ in
       "test: a failed assertion stops the evaluation" = {
         expr =
           (builtins.tryEval
-            (myLib.caisson.home-manager.mkConfiguration {
+            (myLib.caisson.home-manager.mkTopConfiguration {
               configModule = {
                 assertions = [
                   {
@@ -3158,7 +3260,6 @@ in
                   }
                 ];
               };
-              pkgSets.pkgs = { };
               check = false;
             }).activationPackage
           ).success;
@@ -3167,14 +3268,15 @@ in
 
       "test: the twin replaces the library like any evaluator argument" = {
         expr =
-          (myLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
-            configModule = probeModule;
-            pkgSets.pkgs = { };
-            check = false;
-            ecosystemArgs.lib = myLib // {
-              caissonMarker = "from-ecosystemArgs";
-            };
-          }).config.seenLib.marker;
+          (topOf myLib (
+            myLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+              configModule = probeModule;
+              check = false;
+              ecosystemArgs.lib = myLib // {
+                caissonMarker = "from-ecosystemArgs";
+              };
+            }
+          )).config.seenLib.marker;
         expected = "from-ecosystemArgs";
       };
 
@@ -3183,10 +3285,9 @@ in
       # composed library.
       "test: an evaluation naming the declared tree runs on the composed library" = {
         expr =
-          (myLib.caisson.home-manager.mkConfiguration {
+          (myLib.caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = hmStub;
             configModule = probeModule;
-            pkgSets.pkgs = { };
             check = false;
           }).config.seenLib;
         expected = {
@@ -3205,10 +3306,9 @@ in
       "test: an evaluation naming a second tree beside the declared one is refused" = {
         expr =
           builtins.deepSeq
-            (myLib.caisson.home-manager.mkConfiguration {
+            (myLib.caisson.home-manager.mkTopConfiguration {
               ecosystemSrc = hmStubCopy;
               configModule = probeModule;
-              pkgSets.pkgs = { };
               check = false;
             }).config.seenLib
             true;
@@ -3225,10 +3325,9 @@ in
       # home-manager maintainers are there under `hm`.
       "test: an evaluation names its home-manager when the composition declares none" = {
         expr =
-          (undeclaredLib.caisson.home-manager.mkConfiguration {
+          (undeclaredLib.caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = hmStub;
             configModule = probeModule;
-            pkgSets.pkgs = { };
             check = false;
           }).config.seenLib;
         expected = {
@@ -3246,7 +3345,7 @@ in
       "test: the modules of an evaluation naming its home-manager read lib.hm" = {
         expr =
           let
-            evaluated = undeclaredLib.caisson.home-manager.mkConfiguration {
+            evaluated = undeclaredLib.caisson.home-manager.mkTopConfiguration {
               ecosystemSrc = hmStub;
               configModule =
                 { config, lib, ... }:
@@ -3256,7 +3355,6 @@ in
                     libOption = config.lib.reachesLib;
                   };
                 };
-              pkgSets.pkgs = { };
               check = false;
             };
           in
@@ -3300,10 +3398,9 @@ in
               };
             seenUnder =
               composition: args:
-              (composition.caisson.home-manager.mkConfiguration (
+              (composition.caisson.home-manager.mkTopConfiguration (
                 {
                   configModule = probe;
-                  pkgSets.pkgs = { };
                   check = false;
                 }
                 // args
@@ -3343,15 +3440,137 @@ in
       "test: an evaluation naming no home-manager under no declaration is refused" = {
         expr =
           builtins.deepSeq
-            (undeclaredLib.caisson.home-manager.mkConfiguration {
+            (undeclaredLib.caisson.home-manager.mkTopConfiguration {
               configModule = probeModule;
-              pkgSets.pkgs = { };
               check = false;
             }).config.seenLib
             true;
         expectedError = {
           type = "ThrownError";
           msg = "caisson\\.home-manager: no home-manager ecosystem source\\.";
+        };
+      };
+
+      # A home is a configuration. Declared beneath another
+      # configuration it takes the module registered under its name,
+      # its user is the name it is declared under unless a module of
+      # the home names another, and it runs on the package set in
+      # force where it is declared: beneath a NixOS configuration the
+      # set of that configuration, unless the home selects. A top
+      # publishes it under `homeConfigurations`, named `<user>@<host>`
+      # beneath a NixOS configuration and by its name otherwise.
+      "test: a home declared beneath a configuration is named, published and given its package set" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = treeWith { serving = false; };
+            };
+            homes = top.homeConfigurations;
+            seen = home: {
+              user = home.config.home.username;
+              set = home.pkgs.marker;
+            };
+          in
+          {
+            names = builtins.attrNames homes;
+            alone = seen homes.chris // {
+              registered = homes.chris.config.seenLib.registered;
+            };
+            beneathAMachine = seen homes."chris@laptop";
+            selecting = seen homes."dana@laptop";
+            aTopHasNoDeclaredName =
+              (lib.caisson.home-manager.mkTopConfiguration {
+                configModule = { };
+                check = false;
+              }).config.home.username;
+          };
+        expected = {
+          names = [
+            "chris"
+            "chris@laptop"
+            "dana@laptop"
+          ];
+          alone = {
+            user = "chris";
+            set = "default at x86_64-linux";
+            registered = true;
+          };
+          beneathAMachine = {
+            user = "chris";
+            set = "other at x86_64-linux";
+          };
+          selecting = {
+            user = "someone-else";
+            set = "default at x86_64-linux";
+          };
+          aTopHasNoDeclaredName = "";
+        };
+      };
+
+      # Beneath a NixOS configuration at a system, that system is the
+      # one in force, so a home declared there has that evaluation
+      # alone, and each evaluation of the machine publishes its home.
+      # A machine that states other systems for what is beneath it
+      # (`caisson.forChildren.systems`) holds its configurations at
+      # those.
+      "test: a home beneath a machine is evaluated at the system of the machine" = {
+        expr =
+          let
+            lib = treeLibWith [
+              "x86_64-linux"
+              "aarch64-linux"
+            ];
+            declared = lib.caisson.structural.mkConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = treeWith { serving = true; };
+            };
+            top = lib.caisson-core.finalizeTop declared;
+            machines = top.children.system.x86_64-linux.children.nixos;
+          in
+          {
+            homeOfTheMachine = builtins.attrNames machines.laptop.children.system;
+            homeAt = machines.laptop.children.system.x86_64-linux.children.home-manager.chris.system;
+            imagesOfTheServer = builtins.attrNames machines.server.children.system;
+            published = builtins.filter (name: lib.hasSuffix "chris@laptop" name) (
+              builtins.attrNames
+                (lib.caisson.structural.mkTopConfiguration {
+                  moduleImports = _modules: [ ];
+                  configModule = treeWith { serving = true; };
+                }).homeConfigurations
+            );
+          };
+        expected = {
+          homeOfTheMachine = [ "x86_64-linux" ];
+          homeAt = "x86_64-linux";
+          imagesOfTheServer = [ "aarch64-linux" ];
+          published = [
+            "aarch64-linux/chris@laptop"
+            "x86_64-linux/chris@laptop"
+          ];
+        };
+      };
+
+      # A published name may not contain `/`, which separates the
+      # parts of a name, and a home whose name does is refused.
+      "test: a home whose published name holds the separator is refused" = {
+        expr =
+          builtins.attrNames
+            ((treeLibWith [ "x86_64-linux" ]).caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.home-manager.configurations."chris/work" = lib.caisson.home-manager.mkConfiguration {
+                    configModule = { };
+                    check = false;
+                  };
+                };
+            }).homeConfigurations;
+        expectedError = {
+          type = "ThrownError";
+          msg = "`chris/work`, and a published name may\\s+not contain `/`";
         };
       };
     };
@@ -4455,10 +4674,11 @@ in
 
       # The entry points whose constructor returns a configuration take
       # `configModule` as optional: each finds the configuration
-      # registered under the name of the configuration. The nixos
-      # entry points take no `pkgSets`: a NixOS configuration takes
-      # its package sets from the composition.
-      "test: every entry point takes configModule, optional where it is found by name, and pkgSets except on nixos" =
+      # registered under the name of the configuration. The nixos and
+      # home-manager entry points take no `pkgSets`: a NixOS
+      # configuration and a home take their package sets from the
+      # composition.
+      "test: every entry point takes configModule, optional where it is found by name, and pkgSets except on nixos and home-manager" =
         {
           expr = builtins.listToAttrs (
             builtins.map (name: {
@@ -4471,12 +4691,19 @@ in
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"
+                    "home-manager"
+                    "home-manager-minimal"
                   ];
-                  nixosClass = name == "nixos" || name == "nixos-minimal";
+                  setsFromTheComposition = builtins.elem name [
+                    "nixos"
+                    "nixos-minimal"
+                    "home-manager"
+                    "home-manager-minimal"
+                  ];
                 in
                 signature ? configModule
                 && signature.configModule == byName
-                && (signature ? pkgSets) == !nixosClass;
+                && (signature ? pkgSets) == !setsFromTheComposition;
             }) integrationNames
           );
           expected = builtins.listToAttrs (
@@ -4557,23 +4784,30 @@ in
   homeManagerMinimal =
     let
       hmStub = ./home-manager-stub;
-      myLib = caisson.mkLib {
-        sources = mockSources;
-        defaultEcosystemSrc.home-manager = hmStub;
-        libOverlays = _lib: {
-          home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
-          home-manager-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager-minimal");
+      mkCompositionWith =
+        sets:
+        caisson.mkLib {
+          sources = mockSources;
+          defaultEcosystemSrc.home-manager = hmStub;
+          # A home takes its system and its package set from the
+          # composition.
+          systems = [ "x86_64-linux" ];
+          pkgSets = stubPkgSets sets;
+          libOverlays = _lib: {
+            home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+            home-manager-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager-minimal");
+          };
         };
-      };
+      myLib = mkCompositionWith { default = { }; };
       # The arguments both entry points take, so the module list is
       # the sole difference between the evaluations.
       commonArgs = {
         configModule = { };
-        pkgSets.pkgs = { };
         check = false;
       };
-      whole = myLib.caisson.home-manager.mkConfiguration commonArgs;
-      necessary = myLib.caisson.home-manager-minimal.mkConfiguration commonArgs;
+      whole = myLib.caisson.home-manager.mkTopConfiguration commonArgs;
+      necessary = myLib.caisson.home-manager-minimal.mkTopConfiguration commonArgs;
+      topOf = declared: myLib.caisson.integrations.topValue (myLib.caisson-core.finalizeTop declared);
     in
     {
       # The alt exists and evaluates the class the other way. The
@@ -4619,7 +4853,7 @@ in
       # `modulesPath`, the special argument the evaluation supplies.
       "test: the alt supplies modulesPath so a configuration imports for itself" = {
         expr =
-          (myLib.caisson.home-manager-minimal.mkConfiguration (
+          (myLib.caisson.home-manager-minimal.mkTopConfiguration (
             commonArgs
             // {
               configModule =
@@ -4641,6 +4875,7 @@ in
         expected = [
           "mkConfiguration"
           "mkConfigurationWithEcosystemArgs"
+          "mkTopConfiguration"
         ];
       };
 
@@ -4650,13 +4885,22 @@ in
         expected = "home-manager";
       };
 
-      # The composition destructures `pkgSets` and `configModule`
-      # without a default, and the pattern of the alt names both, so a
-      # missing argument is Nix's function-argument error at the entry
-      # point and never an error from inside the composition.
-      "test: the alt requires what the composition destructures" = {
-        expr = myLib.caisson.home-manager-minimal.mkConfiguration { };
-        expectedError = missingArgument "mkConfiguration" "(configModule|pkgSets)";
+      # The alt takes the arguments of the integration that owns the
+      # class, and what it returns is a configuration of that
+      # integration: a home, published where homes are.
+      "test: the alt takes the arguments of the owner and returns a home" = {
+        expr = {
+          sameArguments =
+            builtins.functionArgs myLib.caisson.home-manager-minimal.mkConfiguration
+            == builtins.functionArgs myLib.caisson.home-manager.mkConfiguration;
+          type =
+            (myLib.caisson-core.finalizeTop (myLib.caisson.home-manager-minimal.mkConfiguration commonArgs))
+            .x86_64-linux.type;
+        };
+        expected = {
+          sameArguments = true;
+          type = "home-manager";
+        };
       };
 
       # `minimal` is not an argument of either entry point: it names
@@ -4675,8 +4919,10 @@ in
       # the module list can still be replaced outright.
       "test: the twin of the alt merges ecosystemArgs last" = {
         expr =
-          (myLib.caisson.home-manager-minimal.mkConfigurationWithEcosystemArgs (
-            commonArgs // { ecosystemArgs.minimal = false; }
+          (topOf (
+            myLib.caisson.home-manager-minimal.mkConfigurationWithEcosystemArgs (
+              commonArgs // { ecosystemArgs.minimal = false; }
+            )
           )).config.stub.moduleList;
         expected = "whole-tree";
       };
@@ -4685,7 +4931,7 @@ in
       # the class reaches the alt unchanged.
       "test: the alt composes through the integration that owns the class" = {
         expr =
-          (myLib.caisson.home-manager-minimal.mkConfiguration (
+          (myLib.caisson.home-manager-minimal.mkTopConfiguration (
             commonArgs
             // {
               specialArgs.marker = "from-specialArgs";
@@ -4699,21 +4945,20 @@ in
         expected = "from-specialArgs";
       };
 
-      # The composition checks the package set against the entry
-      # point that called it, so the narrower mistake is reported
-      # under the name the caller used. The package set is read back
-      # from the evaluation, which is where the check runs.
-      "test: a pkgSets without pkgs is reported against the alt" = {
+      # The composition reports a package set it cannot find against
+      # the entry point that called it. Here nothing selects, and the
+      # composition declares no set named `default`. The package set
+      # is read back from the evaluation, which is where it is
+      # selected.
+      "test: a missing default package set is reported against the alt" = {
         expr =
           builtins.seq
-            (myLib.caisson.home-manager-minimal.mkConfiguration {
-              configModule = { };
-              pkgSets = { };
-            }).pkgs
+            ((mkCompositionWith { stable = { }; }).caisson.home-manager-minimal.mkTopConfiguration commonArgs)
+            .pkgs
             true;
         expectedError = {
           type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration requires `pkgSets\\.pkgs` to be defined\\.";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration: this home at x86_64-linux runs on the package set named `default`";
         };
       };
     };

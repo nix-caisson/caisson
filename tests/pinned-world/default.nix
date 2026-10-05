@@ -334,9 +334,11 @@ let
 
     homeConfigurationEvaluatesEndToEnd =
       let
-        home = composed.lib.caisson.home-manager.mkConfiguration {
+        # A home takes its system and its package set from the
+        # composition, and a top is read as the home-manager CLI
+        # reads it: the evaluated home.
+        home = hiveLib.caisson.home-manager.mkTopConfiguration {
           ecosystemSrc = inputs.home-manager;
-          pkgSets.pkgs = pkgs;
           configModule =
             { ... }:
             {
@@ -362,7 +364,7 @@ let
             {
               imports = [
                 minimalNixosBase
-                (composed.lib.caisson.home-manager.mkNixosAdapter {
+                (hiveLib.caisson.home-manager.mkNixosAdapter {
                   ecosystemSrc = inputs.home-manager;
                   hostName = "pinned-world-probe";
                   users.probe.configModule =
@@ -399,7 +401,7 @@ let
             {
               imports = [
                 minimalNixosBase
-                (composed.lib.caisson.home-manager.mkNixosAdapter {
+                (hiveLib.caisson.home-manager.mkNixosAdapter {
                   ecosystemSrc = inputs.home-manager;
                   activationMode = "user-service";
                   hostName = "pinned-world-probe-homed";
@@ -601,16 +603,19 @@ let
             strip_nulls = false;
           };
         };
-        home = composed.lib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
-          ecosystemSrc = inputs.home-manager;
-          pkgSets.pkgs = pkgs;
-          configModule = {
-            home.username = "probe";
-            home.homeDirectory = "/home/probe";
-            home.stateVersion = "24.05";
-          };
-          ecosystemArgs.check = false;
-        };
+        home = hiveLib.caisson.integrations.topValue (
+          hiveLib.caisson-core.finalizeTop (
+            hiveLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+              ecosystemSrc = inputs.home-manager;
+              configModule = {
+                home.username = "probe";
+                home.homeDirectory = "/home/probe";
+                home.stateVersion = "24.05";
+              };
+              ecosystemArgs.check = false;
+            }
+          )
+        );
       in
       minimal.config.probe == "minimal"
       && builtins.isString terraform.drvPath
