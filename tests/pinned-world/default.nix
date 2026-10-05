@@ -122,9 +122,10 @@ let
 
   pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
 
-  # What a composition declares for the NixOS configurations evaluated
-  # on it: the system, and a package config whose set at that system is
-  # `pkgs`.
+  # What a composition declares for the configurations evaluated on
+  # it: the system, and a package config whose set at that system is
+  # `pkgs`, marked so a configuration can show it runs on this set and
+  # not on nixpkgs imported again.
   declaresPkgs = {
     systems = [ "x86_64-linux" ];
     pkgSets = _lib: {
@@ -138,7 +139,9 @@ let
             _type = "caisson-manifest";
             type = "nixpkgs";
             name = "x86_64-linux";
-            value = pkgs;
+            value = pkgs // {
+              pinnedWorldProbe = "the set the composition declares";
+            };
           };
         };
     };
@@ -351,6 +354,8 @@ let
       in
       builtins.isString home.activationPackage.drvPath
       && home.config.home.username == "probe"
+      # The home runs on the package set the composition declares.
+      && home.pkgs.pinnedWorldProbe == "the set the composition declares"
       && meta.schemaVersion == 3
       && meta.homeManagerOutPath == builtins.toString inputs.home-manager
       && meta.nixpkgsOutPath == builtins.toString pkgs.path;

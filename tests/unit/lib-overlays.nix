@@ -3210,7 +3210,9 @@ in
 
       # The evaluation composes home-manager's module list from the
       # declared source and hands it `modulesPath`, the special
-      # argument home-manager's news entries interpolate.
+      # argument home-manager's news entries interpolate. It asks for
+      # the list without home-manager's nixpkgs module, so the home
+      # runs on the package set it is given.
       "test: the evaluation reads the module list of the declared source" = {
         expr = {
           inherit (configuration.config.stub) minimal useNixpkgsModule;
@@ -3221,7 +3223,7 @@ in
         expected = {
           modulesPath = true;
           minimal = false;
-          useNixpkgsModule = true;
+          useNixpkgsModule = false;
         };
       };
 

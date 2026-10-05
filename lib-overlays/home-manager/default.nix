@@ -438,9 +438,16 @@
       #
       # The module list, the module files, the class name and
       # `modulesPath` all come from the tree `modulesPath` names, so
-      # home-manager decides what is evaluated, and the library the
-      # evaluation runs on is the sole difference from the upstream
-      # entry point.
+      # home-manager decides what is evaluated. Beside the library
+      # the evaluation runs on, it differs from the upstream entry
+      # point in the package set: `useNixpkgsModule` is false, so
+      # `pkgs` is the set the home is given, as it is where
+      # home-manager's NixOS module sets `useGlobalPkgs`. With
+      # home-manager's nixpkgs module, `pkgs` would be nixpkgs
+      # imported again from the path of that set under the
+      # `nixpkgs.config` and `nixpkgs.overlays` of the home, and the
+      # config and the overlays of the package config would be left
+      # out.
       evaluate =
         _composed:
         {
@@ -450,6 +457,7 @@
           modulesPath,
           minimal ? false,
           check ? true,
+          useNixpkgsModule ? false,
           extraSpecialArgs ? { },
         }:
         let
@@ -468,6 +476,7 @@
               pkgs
               minimal
               lib
+              useNixpkgsModule
               ;
           };
 
