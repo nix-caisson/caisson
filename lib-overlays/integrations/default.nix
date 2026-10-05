@@ -266,6 +266,7 @@
                 defaultModuleImports = builtins.mapAttrs (_: selection: [
                   selection
                 ]) config.caisson.forChildren.defaultModuleImports;
+                defaultPkgs = config.caisson.forChildren.defaultPkgs;
               };
             };
         };

@@ -2136,6 +2136,59 @@ in
         };
       };
 
+      # A module of a configuration selects the package set of the
+      # configurations beneath it (`caisson.forChildren.defaultPkgs`).
+      # The configuration itself runs on the set it was constructed
+      # with, and a configuration beneath that is constructed with a
+      # selection runs on that.
+      "test: a configuration selects the package set of the configurations beneath it" = {
+        expr =
+          let
+            machine =
+              lib: args:
+              lib.caisson.nixos.mkConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              );
+            host =
+              (myLib.caisson-core.finalizeTop (
+                machine myLib {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.forChildren.defaultPkgs = pkgSets: pkgSets.other;
+                      caisson.nixos.configurations.image = machine lib {
+                        configModule =
+                          { lib, ... }:
+                          {
+                            caisson.nixos.configurations.nested = machine lib { };
+                          };
+                      };
+                      caisson.nixos.configurations.selects = machine lib {
+                        defaultPkgs = pkgSets: pkgSets.default;
+                      };
+                    };
+                }
+              )).x86_64-linux;
+            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
+          in
+          {
+            host = setOf host;
+            image = setOf (machinesOf host).image;
+            nested = setOf (machinesOf (machinesOf host).image).nested;
+            selects = setOf (machinesOf host).selects;
+          };
+        expected = {
+          host = "the default set";
+          image = "the other set";
+          nested = "the other set";
+          selects = "the default set";
+        };
+      };
+
       # Where no configuration from the top down selects, a
       # configuration runs on the set named `default`, and a
       # composition that declares none says so, with the sets it does

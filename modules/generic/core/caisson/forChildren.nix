@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
 # What this configuration registers for the configurations beneath it:
-# modules, into the registries those configurations select from, and
-# additions to the default selection of a class. Both reach every
-# configuration beneath this one, at any depth, and nothing at this
-# configuration. They are read from the childless view, which the
+# modules, into the registries those configurations select from,
+# additions to the default selection of a class, and the package set
+# they get by default. Each reaches every configuration beneath this
+# one, at any depth, and nothing at this configuration. They are read from the childless view, which the
 # configurations beneath are built against.
 { lib, ... }:
 {
@@ -46,6 +46,24 @@
         `moduleImports` gets every entry named `default` followed by
         these, those of the levels above it first. Definitions from
         several modules are concatenated.
+      '';
+    };
+
+    defaultPkgs = lib.mkOption {
+      type = lib.types.nullOr (lib.types.functionTo lib.types.raw);
+      default = null;
+      example = lib.literalExpression "pkgSets: pkgSets.stable";
+      description = ''
+        The package set the configurations beneath this configuration
+        get by default: a function that receives the package sets
+        available to such a configuration, as an attribute set by
+        package config name, and returns the set to run on. It
+        replaces the selection in force at this configuration for
+        everything beneath it, and a configuration beneath that is
+        constructed with `defaultPkgs` selects for itself and what is
+        beneath it in turn. This configuration runs on the set it was
+        constructed with. When null, the configurations beneath run on
+        the selection in force at this configuration.
       '';
     };
 
