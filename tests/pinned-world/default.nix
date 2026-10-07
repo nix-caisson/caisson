@@ -46,9 +46,7 @@ let
   # The registry names of caisson-core's entries.
   coreNames = [
     "caisson-core/compose"
-    "caisson-core/kernel"
     "caisson-core/lifecycle"
-    "caisson-core/pins"
     "caisson-core/readers"
     "caisson-core/resolve"
     "caisson-core/util"
@@ -117,8 +115,6 @@ let
   ];
 
   expectedCoreNames = [
-    "callConsumerFlake"
-    "callFlake"
     "classes"
     "compose"
     "configs"
@@ -137,7 +133,6 @@ let
     "mkModule"
     "mkModules"
     "modules"
-    "pins"
     "pkgOverlays"
     "pkgsManifest"
     "resolve"
