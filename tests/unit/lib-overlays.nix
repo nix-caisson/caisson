@@ -1302,10 +1302,11 @@ in
       };
     };
 
-    "test: a registration named nixpkgs-lib replaces the published entry" = {
-      # The upstream lib is the published `nixpkgs-lib` entry; a
-      # registration under that name replaces it for every overlay
-      # that imports it, caisson's integrations included.
+    "test: a registration named nixpkgs-lib replaces the nixpkgs-lib entry" = {
+      # The upstream lib is the entry of the `nixpkgs-lib` integration,
+      # imported by the key `nixpkgs-lib`; a registration under that
+      # name replaces it for every overlay that imports it, the
+      # integrations of caisson included.
       expr =
         let
           myLib = caisson.mkLib {
@@ -1318,9 +1319,11 @@ in
                 }
               );
               test = mkLibOverlay (
-                { entries, ... }:
+                { mkLibOverlay, ... }:
                 {
-                  imports = [ entries.nixpkgs-lib ];
+                  imports = [
+                    (mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixpkgs-lib") // { key = "nixpkgs-lib"; })
+                  ];
                   overlay = final: prev: {
                     sawBase = final.customBaseMarker or "missing";
                   };
