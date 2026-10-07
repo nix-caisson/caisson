@@ -29,10 +29,14 @@
 
       core = caisson-core.lib.caisson-core;
 
+      # The pin readers live in this tree and are read by path: no
+      # library exists yet at this point.
+      pins = import ./lib-overlays/framework/pins;
+
       lib = core.mkLib {
         # The flake pin reader: the inputs as the pinned sources, and
         # the root from `self`.
-        inherit (core.pins.flake inputs) sources root;
+        inherit (pins.flake inputs) sources root;
         name = "caisson";
         systems = import ./systems.nix;
         modules = lib: lib.caisson-core.mkModules ./modules;

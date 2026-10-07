@@ -19,9 +19,11 @@ let
 
   core = import (builtins.fetchTree coreNode.locked);
 
+  pins = import ./lib-overlays/framework/pins;
+
   lib = core.mkLib {
-    inherit (core.pins.flake-compat ./.) sources;
-    root = core.pins.gitRoot ./.;
+    inherit (pins.flake-compat ./.) sources;
+    root = pins.gitRoot ./.;
     name = "caisson";
     systems = import ./systems.nix;
     modules = lib: lib.caisson-core.mkModules ./modules;

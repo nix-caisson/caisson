@@ -77,6 +77,8 @@ let
   # tooling, and the names of the framework a tree writes, which the
   # `framework` overlay publishes from `caisson-core`.
   expectedCaissonNames = [
+    "callConsumerFlake"
+    "callFlake"
     "classes"
     "colmena"
     "configs"
