@@ -1302,6 +1302,35 @@ in
       };
     };
 
+    "test: the builder composes in a library with no nixpkgs library" = {
+      # The functions every integration is written from use builtins
+      # and the helpers of caisson-core, so composing them alone
+      # brings no upstream library and needs no source for one.
+      expr =
+        let
+          myLib = lib.caisson-core.mkLib {
+            sources = { };
+            libOverlays = coreLib: {
+              integrations = coreLib.caisson-core.mkLibOverlay (
+                inputs.parent.outPath + "/lib-overlays/integrations"
+              );
+            };
+          };
+        in
+        {
+          builder = myLib.caisson.integrations ? mkModuleConfiguration;
+          upstream = myLib ? evalModules;
+          composed = builtins.filter (key: builtins.match "caisson-core/.*" key == null) (
+            builtins.map (entry: entry.key) myLib.caisson-core.libManifest.entries
+          );
+        };
+      expected = {
+        builder = true;
+        upstream = false;
+        composed = [ "integrations" ];
+      };
+    };
+
     "test: a registration named nixpkgs-lib replaces the nixpkgs-lib entry" = {
       # The upstream lib is the entry of the `nixpkgs-lib` integration,
       # imported by the key `nixpkgs-lib`; a registration under that

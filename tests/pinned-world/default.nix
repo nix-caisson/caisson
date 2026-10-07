@@ -51,6 +51,7 @@ let
     "caisson-core/pins"
     "caisson-core/readers"
     "caisson-core/resolve"
+    "caisson-core/util"
   ];
 
   composed = compose {
@@ -184,8 +185,8 @@ let
       &&
         composed.meta.order == coreNames
         ++ [
-          "nixpkgs-lib"
           "integrations"
+          "nixpkgs-lib"
           "flake-parts"
           "tooling"
           "nixpkgs"
