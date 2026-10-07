@@ -5,7 +5,7 @@
 # both defaults applies the shared entry once.
 { closure-lib, ... }:
 {
-  imports = [ closure-lib.caisson-core.libManifest.pkgOverlays."producer/shared" ];
+  imports = [ closure-lib.caisson.libManifest.pkgOverlays."producer/shared" ];
   overlay = _final: _prev: {
     consumerDefault = "ok";
   };

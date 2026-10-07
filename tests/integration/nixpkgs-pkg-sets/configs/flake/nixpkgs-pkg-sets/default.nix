@@ -23,7 +23,7 @@
       unfree = setOf configs.unfree;
       upstream = import inputs.nixpkgs { inherit system; };
       same = path: (lib.getAttrFromPath path pkgs).drvPath == (lib.getAttrFromPath path upstream).drvPath;
-      pkgsManifest = pkgs.lib.caisson-core.pkgsManifest;
+      pkgsManifest = pkgs.lib.caisson.pkgsManifest;
       # The package config as the legacy readers take it. This
       # evaluation is pure, so the result is the functor alone.
       top = lib.caisson.nixpkgs.mkTopPkgSet configs.default;
@@ -56,12 +56,12 @@
         assert !(pkgs.config.allowUnfree or false);
         assert pkgsManifest.name == system;
         assert pkgsManifest.parent.name == "default";
-        assert (lib.caisson-core.manifestOf pkgs).type == "nixpkgs";
+        assert (lib.caisson.manifestOf pkgs).type == "nixpkgs";
         assert configs.default.parent.childless;
         assert !(configs.default.parent ? pkgSets);
         assert configs.default.pkgOverlays == [ "default" ];
         assert (top { inherit system; }).hello.drvPath == pkgs.hello.drvPath;
-        assert (top { inherit system; }).lib.caisson-core.pkgsManifest.name == system;
+        assert (top { inherit system; }).lib.caisson.pkgsManifest.name == system;
         assert marked.topMarker == "ok" && marked ? nixpkgs-pkg-sets;
         assert fails (top { system = "riscv64-linux"; }).hello.drvPath;
         assert fails

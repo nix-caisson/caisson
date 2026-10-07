@@ -19,15 +19,15 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
         name = "nixpkgs-overlay-export";
         systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
         };
-        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        configs = lib: lib.caisson-core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson.mkModules ./configs;
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in

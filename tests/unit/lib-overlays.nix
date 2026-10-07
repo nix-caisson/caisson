@@ -1327,7 +1327,75 @@ in
       expected = {
         builder = true;
         upstream = false;
-        composed = [ "integrations" ];
+        composed = [
+          "framework"
+          "integrations"
+        ];
+      };
+    };
+
+    "test: lib.caisson.mkLib hands every function argument the framework names" = {
+      # `libOverlays` and `libOverlayImports` receive a library that
+      # holds caisson-core alone; `modules` receives the next stage.
+      # Each finds the names of the framework under `lib.caisson`,
+      # reading the same registry as `lib.caisson-core` of the same
+      # library, and the composed library carries them too.
+      expr =
+        let
+          seen = stage: given: {
+            ${stage} =
+              given.caisson ? mkLib
+              && builtins.isFunction given.caisson.mkModules
+              &&
+                builtins.attrNames given.caisson.libOverlays == builtins.attrNames given.caisson-core.libOverlays;
+          };
+          myLib = lib.caisson.mkLib {
+            sources = mockSources;
+            libOverlays = given: {
+              probe = given.caisson.mkLibOverlay (
+                { ... }:
+                {
+                  overlay = _final: _prev: seen "libOverlays" given;
+                }
+              );
+              integrations = given.caisson.mkLibOverlay (inputs.parent.outPath + "/lib-overlays/integrations");
+            };
+            extraLibOverlayImports = given: [
+              {
+                imports = [ ];
+                overlay = _final: _prev: seen "extraLibOverlayImports" given;
+              }
+            ];
+            modules = given: {
+              generic.probe = given.caisson.mkModule "generic" (
+                { ... }:
+                {
+                  config = seen "modules" given;
+                }
+              );
+            };
+          };
+        in
+        {
+          inherit (myLib) libOverlays extraLibOverlayImports;
+          inherit (myLib.caisson.modules.generic.probe.config) modules;
+          composed =
+            builtins.attrNames myLib.caisson.libOverlays == builtins.attrNames myLib.caisson-core.libOverlays
+            && myLib.caisson.libOverlays ? probe;
+          malformed =
+            (builtins.tryEval (
+              lib.caisson.mkLib {
+                sources = mockSources;
+                modules = 42;
+              }
+            )).success;
+        };
+      expected = {
+        libOverlays = true;
+        extraLibOverlayImports = true;
+        modules = true;
+        composed = true;
+        malformed = false;
       };
     };
 

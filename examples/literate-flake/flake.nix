@@ -45,10 +45,10 @@
       /*
         Step 1: Bootstrap a composed library.
 
-        `caisson-core.mkLib` composes a library from registered overlays and
-        injects the machinery, the module registry, and the manifest under
-        `lib.caisson-core`. Your overlays contribute your extensions
-        (here, `lib.literate-flake`).
+        `caisson.mkLib` composes a library from registered overlays. The
+        names a flake writes (`mkLib`, `mkModules`, the registries, the
+        manifest) are under `lib.caisson`, beside the integrations. Your
+        overlays contribute your extensions (here, `lib.literate-flake`).
 
         - `inputs` are closed over so that modules and overlays can reference
           them without threading inputs explicitly through every call site.
@@ -62,7 +62,7 @@
           class-keyed registration. `mkModules` derives it from the
           conventional layout, `modules/<class>/<name>/default.nix`:
           each entry directory becomes `modules.<class>.<name>`, built
-          with `caisson-core.mkModule <class>`. Everything passed to
+          with `caisson.mkModule <class>`. Everything passed to
           mkModule takes the closure attrset ({ closure-inputs,
           closure-lib, mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
@@ -74,12 +74,10 @@
           by hand stays useful for cherry-picking or renaming an
           overlay from elsewhere.
       */
-      core = caisson.lib.caisson-core;
-
-      lib = core.mkLib {
+      lib = caisson.lib.caisson.mkLib {
         # The flake pin reader: the inputs as the pinned sources the
         # composition closes over, and the root from `self`.
-        inherit (core.pins.flake inputs) sources root;
+        inherit (caisson.lib.caisson.pins.flake inputs) sources root;
 
         # The project's name, which this flake holds and which is the
         # namespace it contributes to the composed library:
@@ -92,9 +90,9 @@
           inherit caisson;
         };
 
-        modules = lib: lib.caisson-core.mkModules ./modules;
-        configs = lib: lib.caisson-core.mkModules ./configs;
-        libOverlays = lib: lib.caisson-core.mkLibOverlays ./lib-overlays;
+        modules = lib: lib.caisson.mkModules ./modules;
+        configs = lib: lib.caisson.mkModules ./configs;
+        libOverlays = lib: lib.caisson.mkLibOverlays ./lib-overlays;
       };
     in
     /*

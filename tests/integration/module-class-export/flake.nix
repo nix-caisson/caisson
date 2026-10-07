@@ -14,8 +14,8 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
         libOverlays = _lib: {
           flake-parts = parent.libOverlays.flake-parts;
@@ -23,7 +23,7 @@
 
         modules = lib: {
           "test-class" = {
-            exported = lib.caisson-core.mkModule "test-class" (
+            exported = lib.caisson.mkModule "test-class" (
               { ... }:
               {
                 exports.testClass.usable = true;
@@ -31,7 +31,7 @@
             );
           };
           "disabled-class" = {
-            hidden = lib.caisson-core.mkModule "disabled-class" (
+            hidden = lib.caisson.mkModule "disabled-class" (
               { ... }:
               {
                 exports.disabledClass.shouldBeHidden = true;

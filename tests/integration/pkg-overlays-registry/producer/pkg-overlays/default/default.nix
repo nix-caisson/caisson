@@ -5,7 +5,7 @@
 # the composition that registered it.
 { closure-lib, ... }:
 {
-  imports = [ closure-lib.caisson-core.libManifest.pkgOverlays.shared ];
+  imports = [ closure-lib.caisson.libManifest.pkgOverlays.shared ];
   overlay = _final: _prev: {
     producerDefault = "ok";
   };

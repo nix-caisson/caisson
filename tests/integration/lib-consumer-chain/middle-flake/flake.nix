@@ -14,8 +14,8 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
         # The name this flake holds, deliberately not the directory
         # name: the final consumer registers this composition's exported
@@ -31,7 +31,7 @@
 
         libOverlays = coreLib: {
           flake-parts = parent.libOverlays.flake-parts;
-          default = coreLib.caisson-core.mkLibOverlay ./lib-overlays/default;
+          default = coreLib.caisson.mkLibOverlay ./lib-overlays/default;
         };
       };
     in

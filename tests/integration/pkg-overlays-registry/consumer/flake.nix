@@ -15,7 +15,7 @@
   outputs =
     inputs@{ parent, producer, ... }:
     let
-      core = parent.lib.caisson-core;
+      core = parent.lib.caisson;
       lib = core.mkLib {
         inherit (core.pins.flake inputs) sources root;
         name = "consumer";
@@ -24,14 +24,14 @@
           caisson = parent;
           inherit producer;
         };
-        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        configs = lib: lib.caisson-core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson.mkModules ./configs;
         # A package config per configuration in configs/nixpkgsConfig:
         # `default`, `withExtra` and `withAdded`.
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson-core.configs.flake.consumer;
+      configModule = lib.caisson.configs.flake.consumer;
     };
 }

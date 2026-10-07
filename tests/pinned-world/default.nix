@@ -73,18 +73,42 @@ let
     ];
   };
 
-  # The integrations plus the pkgs-dependent tooling live under
-  # `caisson`; the machinery lives under `caisson-core`.
+  # What lives under `caisson`: the integrations, the pkgs-dependent
+  # tooling, and the names of the framework a tree writes, which the
+  # `framework` overlay publishes from `caisson-core`.
   expectedCaissonNames = [
+    "classes"
     "colmena"
+    "configs"
+    "contributeClasses"
+    "contributeModules"
+    "ecosystemSrc"
+    "elide"
     "eval-weight"
+    "evalManifest"
+    "finalizeTop"
     "flake-parts"
     "home-manager"
     "integrations"
+    "libManifest"
+    "libOverlays"
+    "manifestOf"
+    "mkLib"
+    "mkLibOverlay"
+    "mkLibOverlays"
     "mkMemoizedDerivationRead"
+    "mkModule"
+    "mkModules"
+    "mkPkgOverlay"
+    "mkPkgOverlays"
+    "modules"
     "nixos"
     "nixos-minimal"
     "nixpkgs"
+    "pins"
+    "pkgOverlays"
+    "pkgOverlaysFor"
+    "pkgsManifest"
     "structural"
     "system-manager"
     "terranix"
@@ -185,6 +209,7 @@ let
       &&
         composed.meta.order == coreNames
         ++ [
+          "framework"
           "integrations"
           "nixpkgs-lib"
           "flake-parts"
@@ -256,6 +281,7 @@ let
         r.meta.order == coreNames
         ++ [
           "nixpkgs-lib"
+          "framework"
           "integrations"
           "flake-parts"
         ];
