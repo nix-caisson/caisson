@@ -89,6 +89,7 @@ let
     "finalizeTop"
     "flake-parts"
     "home-manager"
+    "importApply"
     "integrations"
     "libManifest"
     "libOverlays"
