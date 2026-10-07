@@ -98,6 +98,7 @@ let
     "contributeClasses"
     "contributeModules"
     "coreEntries"
+    "ecosystemSrc"
     "evalManifest"
     "importApply"
     "libManifest"
@@ -107,7 +108,6 @@ let
     "mkLibOverlays"
     "mkModule"
     "mkModules"
-    "mkNixpkgsLibEntry"
     "modules"
     "pins"
     "pkgsManifest"
@@ -182,8 +182,8 @@ let
       &&
         composed.meta.order == coreNames
         ++ [
-          "integrations"
           "nixpkgs-lib"
+          "integrations"
           "flake-parts"
           "tooling"
           "nixpkgs"
