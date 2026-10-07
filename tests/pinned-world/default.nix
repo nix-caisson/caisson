@@ -703,13 +703,10 @@ let
       && manifest.systems == null
       && composedWithMkLib.caisson-core.pkgsManifest == null
       && composedWithMkLib.caisson-core.evalManifest == null
-      && includesAll (
-        coreNames
-        ++ [
-          "flake-parts"
-          "nixpkgs-lib"
-        ]
-      ) (builtins.attrNames manifest.libOverlays)
+      && includesAll (coreNames ++ [ "flake-parts" ]) (builtins.attrNames manifest.libOverlays)
+      # The library of nixpkgs came in through the entry flake-parts
+      # imports, from the source this composition declares.
+      && composedWithMkLib ? evalModules
       && composedWithMkLib.caisson.flake-parts ? mkConfiguration;
 
     # A tree declares its platforms on mkLib; the flake-parts
