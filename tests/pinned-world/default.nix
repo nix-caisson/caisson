@@ -89,6 +89,7 @@ let
     "finalizeTop"
     "flake-parts"
     "home-manager"
+    "importApply"
     "integrations"
     "libManifest"
     "libOverlays"
@@ -734,6 +735,20 @@ let
       # imports, from the source this composition declares.
       && composedWithMkLib ? evalModules
       && composedWithMkLib.caisson.flake-parts ? mkConfiguration;
+
+    # A flake that takes caisson as a project composes each overlay of
+    # caisson once. An integration imports the builder, the `framework`
+    # entry and the nixpkgs library under the keys they have in
+    # caisson. When caisson is consumed, those keys become
+    # `caisson/<name>`, so each import resolves to the entry the
+    # consumer registers under `caisson/<name>` and nothing is composed
+    # under the bare key.
+    integrationsComposeOnceInAConsumer =
+      let
+        keys = builtins.map (entry: entry.key) hiveLib.caisson-core.libManifest.entries;
+        once = name: builtins.elem "caisson/${name}" keys && !(builtins.elem name keys);
+      in
+      once "integrations" && once "framework" && once "nixpkgs-lib" && once "nixos";
 
     # A tree declares its platforms on mkLib; the flake-parts
     # integration reads them from the manifest, so a flake module that

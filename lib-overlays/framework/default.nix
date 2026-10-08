@@ -53,6 +53,7 @@ let
       mkLibOverlays
       mkPkgOverlay
       mkPkgOverlays
+      importApply
       # the registries
       modules
       configs
