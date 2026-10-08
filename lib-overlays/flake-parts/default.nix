@@ -59,7 +59,7 @@
       # inside it.
       flakePartsFor =
         explicit:
-        final.caisson-core.callFlake {
+        final.caisson.callFlake {
           src = resolveOutPath (resolveSrc explicit);
           inputs.nixpkgs-lib = {
             lib = final;
@@ -208,8 +208,8 @@
                 if root == null then
                   throw ''
                     caisson.flake-parts.mkConfiguration: `self.outPath` was read, but the
-                    composition names no root. Pass `root` to caisson-core.mkLib
-                    (`inherit (caisson-core.lib.caisson-core.pins.flake inputs) sources root;`
+                    composition names no root. Pass `root` to mkLib
+                    (`inherit (caisson.lib.caisson.pins.flake inputs) sources root;`
                     at a flake top).
                   ''
                 else

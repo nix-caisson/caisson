@@ -43,19 +43,14 @@ let
       libOverlays = _lib: inputs.caisson.libOverlays;
     }).caisson-core.libManifest.libOverlays;
 
-  # The registry names of caisson-core's entries.
-  coreNames = [
-    "caisson-core/attrsets"
-    "caisson-core/compose"
-    "caisson-core/functions"
-    "caisson-core/kernel"
-    "caisson-core/lifecycle"
-    "caisson-core/lists"
-    "caisson-core/pins"
-    "caisson-core/readers"
-    "caisson-core/resolve"
-    "caisson-core/strings"
-  ];
+  # The registry names of caisson-core's entries, read from the
+  # registry: which entries caisson-core is made of is not something
+  # caisson relies on, so the suite does not list them. caisson-core
+  # runs this suite against its own branches, and a branch that adds
+  # or removes an entry must not fail here for that alone.
+  coreNames = builtins.filter (name: builtins.match "caisson-core/.*" name != null) (
+    builtins.attrNames registered
+  );
 
   composed = compose {
     entries = builtins.map (name: registered.${name}) coreNames ++ [
@@ -80,6 +75,8 @@ let
   # tooling, and the names of the framework a tree writes, which the
   # `framework` overlay publishes from `caisson-core`.
   expectedCaissonNames = [
+    "callConsumerFlake"
+    "callFlake"
     "classes"
     "colmena"
     "configs"
@@ -118,8 +115,6 @@ let
   ];
 
   expectedCoreNames = [
-    "callConsumerFlake"
-    "callFlake"
     "classes"
     "compose"
     "configs"
@@ -138,7 +133,6 @@ let
     "mkModule"
     "mkModules"
     "modules"
-    "pins"
     "pkgOverlays"
     "pkgsManifest"
     "resolve"
