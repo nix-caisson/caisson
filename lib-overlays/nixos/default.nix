@@ -7,14 +7,16 @@
 # the class another way.
 {
   contributeClasses,
-  entries,
   mkLibOverlay,
   ...
 }:
 {
 
   imports = [
-    entries.nixpkgs-lib
+    # The library of nixpkgs, which this overlay calls through the
+    # composed library, imported by key so it is composed wherever
+    # this is.
+    ((mkLibOverlay ../nixpkgs-lib) // { key = "nixpkgs-lib"; })
     # What an integration is written from, imported by key so it is
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })

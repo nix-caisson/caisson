@@ -4,11 +4,14 @@
 # time. The composition machinery lives in caisson-core (the
 # caisson-core input) and reaches composed libraries as the
 # `caisson-core` namespace mkLib composes in.
-{ entries, ... }:
+{ mkLibOverlay, ... }:
 
 {
 
-  imports = [ entries.nixpkgs-lib ];
+  # The library of nixpkgs, which this overlay calls through the
+  # composed library, imported by key so it is composed wherever
+  # this is.
+  imports = [ ((mkLibOverlay ../nixpkgs-lib) // { key = "nixpkgs-lib"; }) ];
 
   overlay = final: prev: {
 

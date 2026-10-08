@@ -78,10 +78,14 @@
 #                        beneath it: the configurations its modules
 #                        declare are its children, and what they
 #                        export is passed up through it.
-{ closure-lib, ... }:
+{ closure-lib, mkLibOverlay, ... }:
 {
 
-  imports = [ ];
+  # The library of nixpkgs, which these functions call through the
+  # composed library (`final.unique`, `final.genAttrs`,
+  # `final.functionArgs` and a few more), imported by key so it is
+  # composed wherever this is.
+  imports = [ ((mkLibOverlay ../nixpkgs-lib) // { key = "nixpkgs-lib"; }) ];
 
   overlay =
     final: prev:
