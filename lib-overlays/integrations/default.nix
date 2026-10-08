@@ -81,19 +81,28 @@
 { closure-lib, mkLibOverlay, ... }:
 {
 
-  # These functions use `builtins` and the helpers of caisson-core
-  # (`caisson-core.util`), so this overlay composes in a library that
-  # holds no library of nixpkgs. An integration that evaluates modules
-  # imports that library itself. The one import is the names of the
-  # framework under `lib.caisson`, so a library that holds an
-  # integration holds those names.
+  # These functions use `builtins` and the list, attribute set, string
+  # and function helpers of caisson-core (`caisson-core.lists` and its
+  # neighbours), so this overlay composes in a library that holds no
+  # library of nixpkgs. An integration that evaluates modules imports
+  # that library itself. The one import is the names of the framework
+  # under `lib.caisson`, so a library that holds an integration holds
+  # those names.
   imports = [ ((mkLibOverlay ../framework) // { key = "framework"; }) ];
 
   overlay =
     final: prev:
     let
 
-      util = final.caisson-core.util;
+      inherit (final.caisson-core.lists)
+        unique
+        zipListsWith
+        init
+        last
+        ;
+      inherit (final.caisson-core.attrsets) genAttrs filterAttrs;
+      inherit (final.caisson-core.strings) hasInfix;
+      inherit (final.caisson-core.functions) functionArgs setFunctionArgs;
 
       resolveEcosystemSrc =
         {
@@ -347,8 +356,8 @@
           # It exists for an integration whose `mkConfiguration` takes
           # `configModule` as optional, which is the mark that it finds
           # the module registered under the configuration's name.
-          findsModuleByName = (util.functionArgs mkConfiguration).configModule or false;
-          mkConfigurations = util.setFunctionArgs (
+          findsModuleByName = (functionArgs mkConfiguration).configModule or false;
+          mkConfigurations = setFunctionArgs (
             args:
             if args ? configModule then
               throw ''
@@ -359,7 +368,7 @@
               ''
             else
               builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson-core.configs.${class} or { })
-          ) (builtins.removeAttrs (util.functionArgs mkConfiguration) [ "configModule" ]);
+          ) (builtins.removeAttrs (functionArgs mkConfiguration) [ "configModule" ]);
         in
         {
           namespace = {
@@ -386,7 +395,7 @@
         let
           owners = builtins.map (class: class.integration) (builtins.attrValues final.caisson-core.classes);
         in
-        builtins.filter (name: name != "caisson-core") (util.unique owners);
+        builtins.filter (name: name != "caisson-core") (unique owners);
 
       # The configurations an evaluated configuration declares beneath
       # it, by integration and then name, as the `children` an
@@ -396,8 +405,8 @@
       # out.
       childrenOf =
         config:
-        util.filterAttrs (_: declared: declared != { }) (
-          util.genAttrs names (name: config.caisson.${name}.configurations)
+        filterAttrs (_: declared: declared != { }) (
+          genAttrs names (name: config.caisson.${name}.configurations)
         );
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
@@ -420,7 +429,7 @@
         prefix: manifest:
         let
           exportsTo = exportsToOf manifest;
-          leaf = util.last prefix;
+          leaf = last prefix;
           named =
             if exportsTo ? name then
               exportsTo.name {
@@ -434,12 +443,12 @@
           inherit manifest;
           inherit (exportsTo) attrset;
           value = exportsTo.value manifest;
-          path = util.init prefix ++ [
+          path = init prefix ++ [
             (
               leaf
               // {
                 name =
-                  if util.hasInfix "/" named.value then
+                  if hasInfix "/" named.value then
                     throw ''
                       ${exportsTo.attrset}: the configuration at ${showPath prefix} is
                       named `${named.value}`, and a published name may not contain
@@ -524,7 +533,7 @@
       publish =
         entries:
         let
-          attrsets = util.unique (builtins.map (entry: entry.attrset) entries);
+          attrsets = unique (builtins.map (entry: entry.attrset) entries);
           publishIn =
             attrset:
             let
@@ -532,10 +541,10 @@
               names = builtins.map displayName (
                 final.caisson-core.elide (builtins.map (entry: entry.path) members)
               );
-              named = util.zipListsWith (name: entry: { inherit name entry; }) names members;
+              named = zipListsWith (name: entry: { inherit name entry; }) names members;
               clashing = builtins.filter (
                 name: builtins.length (builtins.filter (other: other == name) names) > 1
-              ) (util.unique names);
+              ) (unique names);
             in
             if clashing != [ ] then
               throw ''
@@ -555,7 +564,7 @@
                 }) named
               );
         in
-        util.genAttrs attrsets publishIn;
+        genAttrs attrsets publishIn;
 
       # What a tool reads from a top that is a configuration evaluated
       # at a system, given its evaluations by system. They are named
@@ -581,13 +590,13 @@
               }
             ]) systems
           );
-          names = builtins.map (segments: displayName (util.init segments)) kept;
+          names = builtins.map (segments: displayName (init segments)) kept;
         in
         if names == [ "" ] then
           evaluations.${builtins.head systems}.value
         else
           builtins.listToAttrs (
-            util.zipListsWith (name: system: {
+            zipListsWith (name: system: {
               inherit name;
               inherit (evaluations.${system}) value;
             }) names systems
