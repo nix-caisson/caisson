@@ -43,14 +43,14 @@ let
       libOverlays = _lib: inputs.caisson.libOverlays;
     }).caisson-core.libManifest.libOverlays;
 
-  # The registry names of caisson-core's entries.
-  coreNames = [
-    "caisson-core/compose"
-    "caisson-core/lifecycle"
-    "caisson-core/readers"
-    "caisson-core/resolve"
-    "caisson-core/util"
-  ];
+  # The registry names of caisson-core's entries, read from the
+  # registry: which entries caisson-core is made of is not something
+  # caisson relies on, so the suite does not list them. caisson-core
+  # runs this suite against its own branches, and a branch that adds
+  # or removes an entry must not fail here for that alone.
+  coreNames = builtins.filter (name: builtins.match "caisson-core/.*" name != null) (
+    builtins.attrNames registered
+  );
 
   composed = compose {
     entries = builtins.map (name: registered.${name}) coreNames ++ [
