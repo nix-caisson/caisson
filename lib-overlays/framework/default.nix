@@ -31,17 +31,18 @@
 { ... }:
 let
 
-  # The names, read from `lib.caisson-core`. Each is read when it is
-  # used, so a library that lacks one (an earlier stage has no
-  # configurations yet) fails for that name alone.
   # What caisson holds itself, bound to no library: the readers of pin
   # files, which hand `mkLib` its `sources` and `root`, and the
   # functions that evaluate a flake from source over inputs supplied
-  # by hand, which a tree uses to check consumer-style flakes.
+  # by hand, which a flake uses to check consumer-style flakes.
   pins = builtins.import ./pins;
   callFlake = builtins.import ./call-flake.nix;
   callConsumerFlake = builtins.import ./call-consumer-flake.nix;
 
+  # The names under `lib.caisson`: the three above, and the rest read
+  # from `lib.caisson-core`. Each is read when it is used, so a library
+  # that lacks one (an earlier stage has no configurations yet) fails
+  # for that name alone.
   namesIn = lib: {
     inherit pins callFlake callConsumerFlake;
     inherit (lib.caisson-core)

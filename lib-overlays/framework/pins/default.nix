@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The pin readers: a function per pin system that reads its files into
-# `sources`, the pinned trees a tree is built from, each carrying the
+# `sources`, the pinned source trees a project is built from, each carrying the
 # identity its pin files record. Everything caisson does with a source
 # is the same under every pin system; a reader is the whole of what a
 # pin system contributes.
