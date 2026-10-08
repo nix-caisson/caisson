@@ -45,12 +45,16 @@ let
 
   # The registry names of caisson-core's entries.
   coreNames = [
+    "caisson-core/attrsets"
     "caisson-core/compose"
+    "caisson-core/functions"
     "caisson-core/kernel"
     "caisson-core/lifecycle"
+    "caisson-core/lists"
     "caisson-core/pins"
     "caisson-core/readers"
     "caisson-core/resolve"
+    "caisson-core/strings"
   ];
 
   composed = compose {
@@ -184,8 +188,8 @@ let
       &&
         composed.meta.order == coreNames
         ++ [
-          "nixpkgs-lib"
           "integrations"
+          "nixpkgs-lib"
           "flake-parts"
           "tooling"
           "nixpkgs"
