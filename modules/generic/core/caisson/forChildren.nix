@@ -4,8 +4,9 @@
 # ones included: modules, which join the registries those
 # configurations select from; additions to the default selection of a
 # class, which a configuration gets when it passes no `moduleImports`;
-# and a default package set, which a configuration runs on when
-# neither it nor a configuration between selects another. This
+# a default package set, which a configuration runs on when neither it
+# nor a configuration between selects another; and the systems that
+# configurations evaluated per system are evaluated for. This
 # configuration is not among those they are offered to. They are read
 # from the childless view, which the configurations beneath are built
 # against.
@@ -66,6 +67,33 @@
         `defaultPkgs` or sets this option. This configuration runs on
         the set it was constructed with. When null, the default
         beneath is the selection in force at this configuration.
+      '';
+    };
+
+    systems = lib.mkOption {
+      type = lib.types.nullOr (lib.types.listOf lib.types.str);
+      default = null;
+      example = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      description = ''
+        The systems the configurations declared inside this one are
+        evaluated for. It applies to configurations that are
+        evaluated per system, such as a NixOS configuration or a
+        home: each gets one evaluation per system listed.
+
+        When null, a configuration that is itself evaluated per
+        system has its children evaluated for its system only, so a
+        home inside a NixOS configuration for x86_64-linux is
+        evaluated for x86_64-linux. Any other configuration passes
+        on the list it was given.
+
+        Set it on a NixOS configuration that holds a configuration
+        for another architecture, such as an image, or on a
+        structural or flake level to narrow what is inside it. The
+        systems have to be among those allowed where this
+        configuration is declared, and one that is not is refused.
       '';
     };
 

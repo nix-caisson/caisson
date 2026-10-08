@@ -122,9 +122,10 @@ let
 
   pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
 
-  # What a composition declares for the NixOS configurations evaluated
-  # on it: the system, and a package config whose set at that system is
-  # `pkgs`.
+  # What a composition declares for the configurations evaluated on
+  # it: the system, and a package config whose set at that system is
+  # `pkgs`, marked so a configuration can show it runs on this set and
+  # not on nixpkgs imported again.
   declaresPkgs = {
     systems = [ "x86_64-linux" ];
     pkgSets = _lib: {
@@ -138,7 +139,9 @@ let
             _type = "caisson-manifest";
             type = "nixpkgs";
             name = "x86_64-linux";
-            value = pkgs;
+            value = pkgs // {
+              pinnedWorldProbe = "the set the composition declares";
+            };
           };
         };
     };
@@ -334,9 +337,11 @@ let
 
     homeConfigurationEvaluatesEndToEnd =
       let
-        home = composed.lib.caisson.home-manager.mkConfiguration {
+        # A home takes its system and its package set from the
+        # composition, and a top is read as the home-manager CLI
+        # reads it: the evaluated home.
+        home = hiveLib.caisson.home-manager.mkTopConfiguration {
           ecosystemSrc = inputs.home-manager;
-          pkgSets.pkgs = pkgs;
           configModule =
             { ... }:
             {
@@ -349,6 +354,8 @@ let
       in
       builtins.isString home.activationPackage.drvPath
       && home.config.home.username == "probe"
+      # The home runs on the package set the composition declares.
+      && home.pkgs.pinnedWorldProbe == "the set the composition declares"
       && meta.schemaVersion == 3
       && meta.homeManagerOutPath == builtins.toString inputs.home-manager
       && meta.nixpkgsOutPath == builtins.toString pkgs.path;
@@ -362,7 +369,7 @@ let
             {
               imports = [
                 minimalNixosBase
-                (composed.lib.caisson.home-manager.mkNixosAdapter {
+                (hiveLib.caisson.home-manager.mkNixosAdapter {
                   ecosystemSrc = inputs.home-manager;
                   hostName = "pinned-world-probe";
                   users.probe.configModule =
@@ -399,7 +406,7 @@ let
             {
               imports = [
                 minimalNixosBase
-                (composed.lib.caisson.home-manager.mkNixosAdapter {
+                (hiveLib.caisson.home-manager.mkNixosAdapter {
                   ecosystemSrc = inputs.home-manager;
                   activationMode = "user-service";
                   hostName = "pinned-world-probe-homed";
@@ -601,16 +608,19 @@ let
             strip_nulls = false;
           };
         };
-        home = composed.lib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
-          ecosystemSrc = inputs.home-manager;
-          pkgSets.pkgs = pkgs;
-          configModule = {
-            home.username = "probe";
-            home.homeDirectory = "/home/probe";
-            home.stateVersion = "24.05";
-          };
-          ecosystemArgs.check = false;
-        };
+        home = hiveLib.caisson.integrations.topValue (
+          hiveLib.caisson-core.finalizeTop (
+            hiveLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+              ecosystemSrc = inputs.home-manager;
+              configModule = {
+                home.username = "probe";
+                home.homeDirectory = "/home/probe";
+                home.stateVersion = "24.05";
+              };
+              ecosystemArgs.check = false;
+            }
+          )
+        );
       in
       minimal.config.probe == "minimal"
       && builtins.isString terraform.drvPath

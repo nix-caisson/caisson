@@ -227,16 +227,32 @@
       # was constructed with, null when it was given none. It is
       # recorded on the manifest, where it is in force for the
       # configuration and everything beneath it.
+      #
+      # `exportsTo` says how the configuration is published: `attrset`,
+      # the output attribute set (`nixosConfigurations`), and `value`,
+      # the function from the manifest of the configuration to what is
+      # published. It may carry `name`, for an integration whose
+      # configurations are known by a name other than the one they are
+      # declared under: a function of `{ name, manifest }`, the name
+      # the configuration is passed up under and its manifest,
+      # returning `value`, the name to publish it under, and
+      # optionally `description`, a sentence saying what it did. It is
+      # recorded on the manifest, and applied where the configuration
+      # is passed up (`entriesOf`). Null for a configuration that is
+      # not published under a name.
       mkModuleConfiguration =
         {
           type,
           perSystem ? false,
           defaultPkgs ? null,
+          exportsTo ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          record = if defaultPkgs == null then { } else { inherit defaultPkgs; };
+          record =
+            (if defaultPkgs == null then { } else { inherit defaultPkgs; })
+            // (if exportsTo == null then { } else { inherit exportsTo; });
           evaluate =
             view:
             let
@@ -267,6 +283,7 @@
                   selection
                 ]) config.caisson.forChildren.defaultModuleImports;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
+                systems = config.caisson.forChildren.systems;
               };
             };
         };
@@ -308,13 +325,6 @@
           class,
           mkConfiguration,
           mkConfigurationWithEcosystemArgs,
-          # Where a top publishes the configurations of this
-          # integration, and what of each: `attrset`, the output
-          # attribute set (`nixosConfigurations`), and `value`, the
-          # function from a configuration's manifest to what is
-          # published. Absent for an integration whose configurations
-          # are not published under a name.
-          exportsTo ? null,
           extra ? { },
         }:
         let
@@ -352,7 +362,6 @@
               ;
           }
           // (if findsModuleByName then { inherit mkConfigurations; } else { })
-          // (if exportsTo == null then { } else { inherit exportsTo; })
           // extra;
           classes = {
             ${class} = {
@@ -385,11 +394,56 @@
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
-      # Where the configurations of an integration are published, and
-      # what of each: the `exportsTo` the integration declares, or null
-      # for an integration whose configurations are not published
-      # under a name (structural, flake-parts).
-      exportsToOf = manifest: (final.caisson.${manifest.type} or { }).exportsTo or null;
+      # How a configuration is published: the `exportsTo` its
+      # manifest records, or null for a configuration that is not
+      # published under a name (structural, flake-parts).
+      exportsToOf = manifest: manifest.exportsTo or null;
+
+      showPath =
+        path:
+        builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
+
+      # The entry of a configuration that is passed up under `prefix`,
+      # whose last segment holds the name it is passed up under: the
+      # output attribute set and the value its `exportsTo` gives, and
+      # its path, on which the name its `exportsTo` gives, where it
+      # gives one, stands in place of that name.
+      entryOf =
+        prefix: manifest:
+        let
+          exportsTo = exportsToOf manifest;
+          leaf = final.last prefix;
+          named =
+            if exportsTo ? name then
+              exportsTo.name {
+                inherit (leaf) name;
+                inherit manifest;
+              }
+            else
+              { value = leaf.name; };
+        in
+        {
+          inherit manifest;
+          inherit (exportsTo) attrset;
+          value = exportsTo.value manifest;
+          path = final.init prefix ++ [
+            (
+              leaf
+              // {
+                name =
+                  if final.hasInfix "/" named.value then
+                    throw ''
+                      ${exportsTo.attrset}: the configuration at ${showPath prefix} is
+                      named `${named.value}`, and a published name may not contain
+                      `/`, which separates the parts of a name.
+                    ''
+                  else
+                    named.value;
+              }
+            )
+          ];
+        }
+        // (if named ? description then { inherit (named) description; } else { });
 
       # A published name, from the segments `caisson-core.elide` keeps
       # of a path: the segments in path order, separated by `/`. Every
@@ -397,15 +451,19 @@
       displayName = builtins.concatStringsSep "/";
 
       # The entries a configuration passes up for the configurations
-      # declared beneath it at any depth: for each, its manifest and
-      # its path from here, a list of `{ type, name }` segments. A
-      # configuration evaluated at a system has that system above its
-      # name on the path. `selected` is what each integration's
-      # `exported` selected, by integration and then name, each value a
-      # manifest or the evaluations of a configuration by system. A
-      # configuration whose integration declares `exportsTo` is an
-      # entry, and every configuration contributes the entries it
-      # passes up in turn, with its segments in front.
+      # declared beneath it, nested ones included: for each, its
+      # manifest, the output attribute set it is published under, the
+      # value published, and its path from here, a list of
+      # `{ type, name }` segments. A configuration evaluated at a
+      # system has that system above its name on the path. `selected`
+      # is what each integration's `exported` selected, by integration
+      # and then name, each value a manifest or the evaluations of a
+      # configuration by system. A configuration whose manifest
+      # records `exportsTo` is an entry, made here, where the name it
+      # is passed up under is known, from what the manifest records;
+      # and every configuration contributes the entries it passes up
+      # in turn, with its segments in front. An entry carries all a
+      # top needs to publish it.
       entriesOf =
         selected:
         builtins.concatMap (
@@ -440,17 +498,7 @@
             in
             builtins.concatMap (
               { prefix, manifest }:
-              (
-                if exportsToOf manifest == null then
-                  [ ]
-                else
-                  [
-                    {
-                      path = prefix;
-                      inherit manifest;
-                    }
-                  ]
-              )
+              (if exportsToOf manifest == null then [ ] else [ (entryOf prefix manifest) ])
               ++ builtins.map (entry: entry // { path = prefix ++ entry.path; }) (
                 manifest.outputs.exports.configurations or [ ]
               )
@@ -459,8 +507,8 @@
         ) (builtins.attrNames selected);
 
       # What a top publishes of the entries passed up to it, by the
-      # output attribute set each entry's integration declares and
-      # then name. Within an attribute set the names come from
+      # output attribute set each entry carries and then name. The
+      # top reads nothing but the entries. Within an attribute set the names come from
       # `caisson-core.elide` over the paths: a name that is alone stays
       # bare, and names that collide gain the segments that tell them
       # apart. Entries that still share a name are refused, with their
@@ -468,15 +516,11 @@
       publish =
         entries:
         let
-          attrsetOf = entry: (exportsToOf entry.manifest).attrset;
-          attrsets = final.unique (builtins.map attrsetOf entries);
-          showPath =
-            path:
-            builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
+          attrsets = final.unique (builtins.map (entry: entry.attrset) entries);
           publishIn =
             attrset:
             let
-              members = builtins.filter (entry: attrsetOf entry == attrset) entries;
+              members = builtins.filter (entry: entry.attrset == attrset) entries;
               names = builtins.map displayName (
                 final.caisson-core.elide (builtins.map (entry: entry.path) members)
               );
@@ -499,7 +543,7 @@
               builtins.listToAttrs (
                 builtins.map (item: {
                   inherit (item) name;
-                  value = (exportsToOf item.entry.manifest).value item.entry.manifest;
+                  inherit (item.entry) value;
                 }) named
               );
         in

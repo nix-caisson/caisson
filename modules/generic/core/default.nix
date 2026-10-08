@@ -12,8 +12,13 @@
 # imports this entry and adds the flake mechanics. Everything the
 # modules beneath need comes through `lib`, the composed library in
 # specialArgs.
+#
+# In an evaluation whose library is not a caisson composition the
+# module declares nothing: a module list that carries it can be handed
+# to an evaluator that runs on a library of its making, as
+# home-manager's NixOS module does for the homes it embeds.
 { ... }:
-{ ... }:
+{ lib, ... }:
 {
-  imports = [ ./caisson ];
+  imports = if lib ? caisson && lib ? caisson-core then [ ./caisson ] else [ ];
 }
