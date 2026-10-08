@@ -102,6 +102,7 @@ let
     "evalManifest"
     "importApply"
     "libManifest"
+    "libOverlays"
     "mkExtendedLib"
     "mkLib"
     "mkLibOverlay"
@@ -110,6 +111,7 @@ let
     "mkModules"
     "modules"
     "pins"
+    "pkgOverlays"
     "pkgsManifest"
     "resolve"
   ];

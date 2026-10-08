@@ -243,7 +243,7 @@
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
             # The composed lib, so a config module reads
-            # `lib.caisson.nixpkgs.overlays` and the rest of the lib the
+            # `lib.caisson-core.pkgOverlays` and the rest of the lib the
             # config is declared under.
             specialArgs.lib = lib;
             modules = [
@@ -362,11 +362,6 @@
           # `children.nixpkgs.<system>`. Empty until the full lib, where
           # mkLib has recorded them.
           pkgSets = final.caisson-core.libManifest.pkgSets or { };
-
-          # The package overlay registry visible here, by registry
-          # name, for a package config module's overlay selection
-          # (`caisson.nixpkgs.overlays = [ lib.caisson.nixpkgs.overlays.<name> ];`).
-          overlays = final.caisson-core.libManifest.pkgOverlays or { };
 
           # A package config as what the legacy readers take (`import
           # ./. { }`, `nix-build -A`, `nix-shell -p`, `nix-env -f`,
