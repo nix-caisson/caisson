@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: MIT
 #
-# The names of the framework under `lib.caisson`: what a tree built
-# with caisson writes to compose its library and register its modules,
-# overlays and configurations. A user of caisson names `caisson` and
-# nothing else.
+# What a flake that uses caisson calls to compose its library and to
+# register its modules, overlays and configurations, under
+# `lib.caisson`: `mkLib`, `mkModules`, `mkLibOverlays`, the registries,
+# the manifests. With these a flake writes `lib.caisson.<name>` for
+# everything it calls and does not have to write `caisson-core`.
 #
 # caisson-core supplies the machinery. This overlay publishes the part
-# of it that a tree writes, under `lib.caisson`, each name being the
+# of it that a flake calls, under `lib.caisson`, each name being the
 # value of the same name under `lib.caisson-core` in the same library.
 # The rest of `lib.caisson-core` is what integrations and caisson
 # itself are written on.
@@ -30,17 +31,18 @@
 { ... }:
 let
 
-  # The names, read from `lib.caisson-core`. Each is read when it is
-  # used, so a library that lacks one (an earlier stage has no
-  # configurations yet) fails for that name alone.
   # What caisson holds itself, bound to no library: the readers of pin
   # files, which hand `mkLib` its `sources` and `root`, and the
   # functions that evaluate a flake from source over inputs supplied
-  # by hand, which a tree uses to check consumer-style flakes.
+  # by hand, which a flake uses to check consumer-style flakes.
   pins = builtins.import ./pins;
   callFlake = builtins.import ./call-flake.nix;
   callConsumerFlake = builtins.import ./call-consumer-flake.nix;
 
+  # The names under `lib.caisson`: the three above, and the rest read
+  # from `lib.caisson-core`. Each is read when it is used, so a library
+  # that lacks one (an earlier stage has no configurations yet) fails
+  # for that name alone.
   namesIn = lib: {
     inherit pins callFlake callConsumerFlake;
     inherit (lib.caisson-core)
