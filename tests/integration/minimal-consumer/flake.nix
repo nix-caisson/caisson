@@ -22,8 +22,8 @@
       # The flake-parts integration alone, registered by hand: its core
       # module reaches the evaluation through the closure of the
       # overlay, so nothing else is registered or selected.
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
         # The project's name, also the namespace this composition
         # contributes to the composed library.
@@ -34,7 +34,7 @@
 
         libOverlays = coreLib: {
           flake-parts = parent.libOverlays.flake-parts;
-          default = coreLib.caisson-core.mkLibOverlay ./lib-overlays/default;
+          default = coreLib.caisson.mkLibOverlay ./lib-overlays/default;
         };
       };
     in

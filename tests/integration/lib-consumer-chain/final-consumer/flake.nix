@@ -19,8 +19,8 @@
       ...
     }:
     let
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
         name = "final-consumer";
         libOverlays = _lib: {
           flake-parts = parent.libOverlays.flake-parts;

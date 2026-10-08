@@ -19,8 +19,8 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      lib = parent.lib.caisson-core.mkLib {
-        inherit (parent.lib.caisson-core.pins.flake inputs) sources root;
+      lib = parent.lib.caisson.mkLib {
+        inherit (parent.lib.caisson.pins.flake inputs) sources root;
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
@@ -28,8 +28,8 @@
         projects = {
           caisson = parent;
         };
-        pkgOverlays = lib: lib.caisson-core.mkPkgOverlays ./pkg-overlays;
-        configs = lib: lib.caisson-core.mkModules ./configs;
+        pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
+        configs = lib: lib.caisson.mkModules ./configs;
         # `default` finds its module by name, configs/nixpkgsConfig/default;
         # `slim` has none registered and applies the default selection
         # alone; `explicit` names the `default` configuration as its
@@ -38,7 +38,7 @@
           default = lib.caisson.nixpkgs.mkConfiguration { };
           slim = lib.caisson.nixpkgs.mkConfiguration { };
           explicit = lib.caisson.nixpkgs.mkConfiguration {
-            configModule = lib.caisson-core.configs.nixpkgsConfig.default;
+            configModule = lib.caisson.configs.nixpkgsConfig.default;
           };
         };
       };

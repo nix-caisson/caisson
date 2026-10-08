@@ -36,7 +36,7 @@ fit together instead of colliding.
 
 ## Quick start
 
-Use `caisson-core.mkLib` to compose your library, then
+Use `lib.caisson.mkLib` to compose your library, then
 `lib.caisson.flake-parts.mkTopConfiguration` to produce the flake outputs. By convention, your primary configuration
 lives in `configs/flake/<flake-name>`, and the registrations are read
 from the directories: `modules/<class>/<name>`, `configs/<class>/<name>`
@@ -57,15 +57,14 @@ and `lib-overlays/<name>`.
   outputs = inputs@{ self, caisson, ... }:
     let
 
-      # Compose a library: the machinery lands under lib.caisson-core,
-      # and caisson's flake-parts integration overlay contributes
-      # lib.caisson (one namespace per integration target).
-      core = caisson.lib.caisson-core;
-
-      lib = core.mkLib {
+      # Compose a library. Everything a flake writes is under
+      # lib.caisson: the names that compose and register (mkLib,
+      # mkModules, the registries, the manifest) and one namespace
+      # per integration (lib.caisson.flake-parts, lib.caisson.nixos).
+      lib = caisson.lib.caisson.mkLib {
         # The flake pin reader: your inputs as the pinned sources the
         # composition closes over, and the root from `self`.
-        inherit (core.pins.flake inputs) sources root;
+        inherit (caisson.lib.caisson.pins.flake inputs) sources root;
 
         # The project's name: the name of the configuration below,
         # which no parent declares, and the namespace this flake
@@ -81,15 +80,15 @@ and `lib-overlays/<name>`.
         # importable here, exportable to downstream consumers. A flake
         # with another layout writes the registration by hand
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
-        modules = lib: lib.caisson-core.mkModules ./modules;
+        modules = lib: lib.caisson.mkModules ./modules;
 
         # The configurations, read from configs/<class>/<name>/default.nix.
-        configs = lib: lib.caisson-core.mkModules ./configs;
+        configs = lib: lib.caisson.mkModules ./configs;
 
         # The library overlays this flake registers, read from
         # lib-overlays/<name>/default.nix. An already-built overlay (another
         # flake's export) registers by hand, directly.
-        libOverlays = lib: lib.caisson-core.mkLibOverlays ./lib-overlays;
+        libOverlays = lib: lib.caisson.mkLibOverlays ./lib-overlays;
 
       };
 

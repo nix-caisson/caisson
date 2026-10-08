@@ -78,15 +78,17 @@
 #                        beneath it: the configurations its modules
 #                        declare are its children, and what they
 #                        export is passed up through it.
-{ closure-lib, ... }:
+{ closure-lib, mkLibOverlay, ... }:
 {
 
-  # Nothing is imported: these functions use `builtins` and the list,
-  # attribute set, string and function helpers of caisson-core
-  # (`caisson-core.lists` and its neighbours), so this overlay
-  # composes in a library that holds no library of nixpkgs. An
-  # integration that evaluates modules imports that library itself.
-  imports = [ ];
+  # These functions use `builtins` and the list, attribute set, string
+  # and function helpers of caisson-core (`caisson-core.lists` and its
+  # neighbours), so this overlay composes in a library that holds no
+  # library of nixpkgs. An integration that evaluates modules imports
+  # that library itself. The one import is the names of the framework
+  # under `lib.caisson`, so a library that holds an integration holds
+  # those names.
+  imports = [ ((mkLibOverlay ../framework) // { key = "framework"; }) ];
 
   overlay =
     final: prev:

@@ -7,7 +7,7 @@
 {
   allowUnfree = true;
   caisson.nixpkgs.overlays = [
-    lib.caisson-core.pkgOverlays.default
-    lib.caisson-core.pkgOverlays.polyfill
+    lib.caisson.pkgOverlays.default
+    lib.caisson.pkgOverlays.polyfill
   ];
 }

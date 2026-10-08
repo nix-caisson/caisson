@@ -5,5 +5,5 @@
 { ... }:
 { lib, ... }:
 {
-  caisson.nixpkgs.overlays = [ lib.caisson-core.pkgOverlays."producer/extra" ];
+  caisson.nixpkgs.overlays = [ lib.caisson.pkgOverlays."producer/extra" ];
 }
