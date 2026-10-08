@@ -45,13 +45,16 @@ let
 
   # The registry names of caisson-core's entries.
   coreNames = [
+    "caisson-core/attrsets"
     "caisson-core/compose"
+    "caisson-core/functions"
     "caisson-core/kernel"
     "caisson-core/lifecycle"
+    "caisson-core/lists"
     "caisson-core/pins"
     "caisson-core/readers"
     "caisson-core/resolve"
-    "caisson-core/util"
+    "caisson-core/strings"
   ];
 
   composed = compose {
