@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: MIT
 #
-# The names of the framework under `lib.caisson`: what a tree built
-# with caisson writes to compose its library and register its modules,
-# overlays and configurations. A user of caisson names `caisson` and
-# nothing else.
+# What a flake that uses caisson calls to compose its library and to
+# register its modules, overlays and configurations, under
+# `lib.caisson`: `mkLib`, `mkModules`, `mkLibOverlays`, the registries,
+# the manifests. With these a flake writes `lib.caisson.<name>` for
+# everything it calls and does not have to write `caisson-core`.
 #
 # caisson-core supplies the machinery. This overlay publishes the part
-# of it that a tree writes, under `lib.caisson`, each name being the
+# of it that a flake calls, under `lib.caisson`, each name being the
 # value of the same name under `lib.caisson-core` in the same library.
 # The rest of `lib.caisson-core` is what integrations and caisson
 # itself are written on.
