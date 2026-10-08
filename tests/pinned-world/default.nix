@@ -736,12 +736,13 @@ let
       && composedWithMkLib ? evalModules
       && composedWithMkLib.caisson.flake-parts ? mkConfiguration;
 
-    # A tree that takes caisson as a project composes each of its
-    # overlays once. An integration imports the builder, the framework
-    # names and the nixpkgs library by the keys they have in caisson;
-    # consumed, those keys are renamed with the project, so each import
-    # meets the entry the consumer registers under `caisson/<name>`,
-    # and no second copy is composed under the bare key.
+    # A flake that takes caisson as a project composes each overlay of
+    # caisson once. An integration imports the builder, the `framework`
+    # entry and the nixpkgs library under the keys they have in
+    # caisson. When caisson is consumed, those keys become
+    # `caisson/<name>`, so each import resolves to the entry the
+    # consumer registers under `caisson/<name>` and nothing is composed
+    # under the bare key.
     integrationsComposeOnceInAConsumer =
       let
         keys = builtins.map (entry: entry.key) hiveLib.caisson-core.libManifest.entries;
