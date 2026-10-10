@@ -85,10 +85,6 @@
       # `utils`. The module that activates homes uses the function
       # that makes a string safe as part of a unit name.
       config._module.args.utils.escapeSystemdPath = name: name;
-      # NixOS hands its modules the package set as the argument
-      # `pkgs`. The record a machine writes names the nixpkgs of the
-      # set, which the set holds as `path`.
-      config._module.args.pkgs = lib.mkDefault { path = "/nix/store/stub-nixpkgs"; };
     }
   )
 ]

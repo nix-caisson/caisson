@@ -24,8 +24,8 @@
 #
 # What the file holds
 #
-# The file is `/etc/caisson-home-manager/source.json`. The field
-# `baseSystemOutPath` of the file is a store path. The store path is
+# The file is `/etc/caisson-home-manager/source.json`. It has one
+# field, `baseSystemOutPath`, which is a store path. The store path is
 # the system that the childless evaluation of this NixOS configuration
 # builds.
 #
@@ -41,10 +41,6 @@
 # therefore computes the same store path from the same source. The
 # home-manager module `nixos-source-marker` compares the store path
 # the home computed with the store path in the file.
-#
-# The other fields of the file say where the file came from. They are
-# the name of the NixOS configuration, the source tree of the flake,
-# and the nixpkgs of the package set.
 #
 # Cost
 #
@@ -68,11 +64,10 @@
   config,
   lib,
   options,
-  pkgs,
   ...
 }:
 let
-  inherit (lib.caisson) evalManifest libManifest;
+  inherit (lib.caisson) evalManifest;
 
   hasEtc = options ? environment && options.environment ? etc;
 
@@ -90,31 +85,11 @@ let
 
   hasHomes = builtins.any isHomeOfThisMachine config.caisson.exports.configurations;
 
-  outPathOf =
-    value:
-    if value == null then
-      null
-    else if builtins.isAttrs value && value ? outPath then
-      value.outPath
-    else
-      toString value;
-
   # The store path is written as a plain string. A string that refers
   # to the system would make the file depend on the system. The
   # machine would then have to build the system of the childless
   # evaluation, only to write the name of that system into the file.
   baseSystemOutPath = builtins.unsafeDiscardStringContext evalManifest.childlessManifest.outputs.toplevel.outPath;
-
-  record = {
-    schemaVersion = 3;
-    hostKind = "nixos";
-    hostName = evalManifest.name;
-    profileName = "hosted";
-    selfOutPath = outPathOf (libManifest.root or null);
-    nixpkgsOutPath = outPathOf (pkgs.path or null);
-    homeManagerOutPath = null;
-    inherit baseSystemOutPath;
-  };
 in
 {
   # `optionalAttrs` and not `mkIf` decides whether the option is
@@ -123,9 +98,9 @@ in
   # module declares.
   config = lib.optionalAttrs hasEtc (
     lib.mkIf (!evalManifest.childless && hasHomes) {
-      environment.etc."caisson-home-manager/source.json".text = builtins.toJSON (
-        record // { fingerprint = builtins.hashString "sha256" (builtins.toJSON record); }
-      );
+      environment.etc."caisson-home-manager/source.json".text = builtins.toJSON {
+        inherit baseSystemOutPath;
+      };
     }
   );
 }

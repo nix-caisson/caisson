@@ -514,8 +514,7 @@ let
             builtins.unsafeDiscardStringContext home.config.home.activation.caissonMachineDrift.data
           );
       in
-      record.hostName == "probe"
-      && record.schemaVersion == 3
+      builtins.attrNames record == [ "baseSystemOutPath" ]
       && pkgs.lib.hasPrefix builtins.storeDir base
       && base != builtins.unsafeDiscardStringContext machine.system.build.toplevel.outPath
       && builtins.all comparesAgainstIt homes;
