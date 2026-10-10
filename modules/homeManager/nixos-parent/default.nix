@@ -12,9 +12,10 @@
 # configuration is a caisson configuration, and this module gives it
 # the same settings.
 #
-# The home-manager integration adds this module to the modules such a
-# home imports by default. A home that passes `moduleImports` selects
-# its modules itself, and gets this module only if it lists it.
+# caisson's `default` home-manager module imports this module in a
+# home that is declared inside a NixOS configuration. A home that
+# passes `moduleImports` selects its modules itself, and gets this
+# module only if it lists it.
 #
 # The module reads the machine through the manifest of the home, so it
 # can only be imported by a home that has a NixOS configuration above

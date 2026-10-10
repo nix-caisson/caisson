@@ -10,7 +10,6 @@
 # carries the adapters that place a home inside a NixOS configuration,
 # and the source metadata the activation coherence check compares.
 {
-  closure-lib,
   contributeClasses,
   mkLibOverlay,
   ...
@@ -371,22 +370,6 @@
             else
               null;
 
-          # A home inside a machine imports the module `nixos-parent`
-          # by default. The module sets the options of the home that
-          # come from the machine: the home directory and the user ID
-          # of the account, and the Nix of the machine. It is the
-          # entry caisson registers as `modules/homeManager/nixos-parent`,
-          # read here from the registry of caisson.
-          #
-          # A home that passes `moduleImports` selects its modules
-          # itself, as for every default, and gets the module only if
-          # it lists it.
-          machineModules =
-            if machine != null && (args.moduleImports or null) == null then
-              [ closure-lib.caisson-core.modules.homeManager.nixos-parent ]
-            else
-              [ ];
-
           hmSource = resolveOutPath (resolveSrc (args.ecosystemSrc or null));
           resolvedSourceMeta =
             if (args.sourceMeta or null) != null then
@@ -405,7 +388,6 @@
           configuration = {
             imports =
               frameworkModules
-              ++ machineModules
               ++ moduleImports classRegistry
               ++ (if configModule == null then [ ] else [ configModule ])
               ++ [

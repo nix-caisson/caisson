@@ -3153,6 +3153,14 @@ in
             home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
             nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
           };
+          # caisson's `default` home-manager module, which a flake that
+          # takes caisson as a project has in its registry. A home
+          # imports it unless the home passes `moduleImports`.
+          modules = _lib: {
+            homeManager = {
+              inherit (lib.caisson-core.modules.homeManager) default;
+            };
+          };
           configs = callbackLib: {
             homeManager.chris = callbackLib.caisson.home-manager.mkModule (
               { ... }:
