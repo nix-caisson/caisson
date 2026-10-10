@@ -29,20 +29,27 @@
 #
 # Which unit
 #
-# The unit depends on whether the machine declares the account of the
-# user of the home in `users.users`.
+# The module expects the machine to declare the account of the user
+# of each home in `users.users`. For such an account, the unit is a
+# system unit named `home-manager-<user>`. It runs as that user during
+# boot, before users can log in. This is the unit home-manager's NixOS
+# module writes.
 #
-# For an account the machine declares, the unit is a system unit named
-# `home-manager-<user>`. It runs as that user during boot, before
-# users can log in. This is the unit home-manager's NixOS module
-# writes.
+# A home whose user has no account in `users.users` is refused, with
+# an assertion that names the home and the user. On most machines such
+# a home is a mistake: a misspelled user name, or a home declared on
+# the wrong machine.
 #
-# For an account the machine does not declare, the unit is a user unit
-# named `home-manager-<user>`, with `ConditionUser=<user>`. It runs
-# when the service manager of that user starts, which is at login. An
-# account that systemd-homed manages is the case this is for: the
-# machine must not declare such an account, and its home directory is
-# mounted only at login.
+# Some accounts are provided by something other than `users.users`. An
+# account that systemd-homed manages is one. The machine must not
+# declare such an account, because systemd-homed keeps the record of
+# it, and its home directory is mounted only at login. The option
+# `caisson.home-manager.activation.usersDeclaredElsewhere` lists the
+# users that have such an account on this machine.
+#
+# For a user in that list, the unit is a user unit named
+# `home-manager-<user>`, with `ConditionUser=<user>`. It runs when the
+# service manager of that user starts, which is at login.
 #
 # The profile of the home
 #
@@ -104,7 +111,23 @@ let
     inherit (entry.value) activationPackage;
   }) (builtins.filter isActivatedHere config.caisson.exports.configurations);
 
+  # True when the machine declares the account of the user of the home
+  # in `users.users`.
   isDeclared = home: config.users.users ? ${home.username};
+
+  # The users that have an account on this machine although
+  # `users.users` does not declare it.
+  elsewhere = config.caisson.home-manager.activation.usersDeclaredElsewhere;
+  isElsewhere = home: builtins.elem home.username elsewhere;
+
+  # The homes whose user has no account the machine knows of: not in
+  # `users.users`, and not listed as declared elsewhere. The module
+  # refuses these.
+  withoutAccount = builtins.filter (home: !(isDeclared home) && !(isElsewhere home)) homes;
+
+  # The users that are listed as declared elsewhere and are also in
+  # `users.users`. The two statements contradict each other.
+  inBoth = builtins.filter (username: config.users.users ? ${username}) elsewhere;
 
   unitName = home: "home-manager-${utils.escapeSystemdPath home.username}";
 
@@ -167,7 +190,7 @@ let
         '';
     };
 
-  # The unit for an account the machine does not declare.
+  # The unit for a user listed as declared elsewhere.
   userUnit =
     home:
     lib.attrsets.recursiveUpdate (baseUnit home) {
@@ -202,6 +225,32 @@ let
   );
 in
 {
+  options.caisson.home-manager.activation.usersDeclaredElsewhere = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    example = [ "chris" ];
+    description = ''
+      The users that have an account on this machine although
+      `users.users` does not declare it.
+
+      A NixOS configuration activates the homes declared inside it.
+      It expects the account of the user of each home in
+      `users.users`, and it refuses a home whose user has no account
+      there, because such a home is usually a mistake: a misspelled
+      user name, or a home declared on the wrong machine.
+
+      An account that systemd-homed manages is not in `users.users`.
+      systemd-homed keeps the record of the account, and the machine
+      must not declare it a second time. List the user here. The home
+      of a listed user is not refused. It is activated by a user unit
+      that runs when the user logs in, which is when systemd-homed
+      mounts the home directory.
+
+      A user that is listed here and also declared in `users.users`
+      is refused, because the two statements contradict each other.
+    '';
+  };
+
   # `optionalAttrs` and not `mkIf` decides whether the options are
   # defined at all. A definition under `mkIf false` is still a
   # definition, and NixOS refuses a definition of an option that no
@@ -209,6 +258,24 @@ in
   config = lib.optionalAttrs hasUnits (
     lib.mkIf (!evalManifest.childless) {
       assertions = [
+        {
+          assertion = withoutAccount == [ ];
+          message = ''
+            caisson: this NixOS configuration has a home whose user has no account in `users.users`.
+            ${lib.concatMapStringsSep "\n" (
+              home: "  the home `${home.name}` is for the user `${home.username}`"
+            ) withoutAccount}
+            Check `home.username` of the home, and that the home is declared inside the right NixOS configuration.
+            If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
+          '';
+        }
+        {
+          assertion = inBoth == [ ];
+          message = ''
+            caisson: `caisson.home-manager.activation.usersDeclaredElsewhere` lists a user that `users.users` also declares: ${lib.concatStringsSep ", " inBoth}.
+            Remove the user from one of the two.
+          '';
+        }
         {
           assertion = repeated == [ ];
           message = ''
@@ -227,7 +294,9 @@ in
       ];
 
       systemd.services = unitsOf systemUnit (builtins.filter isDeclared homes);
-      systemd.user.services = unitsOf userUnit (builtins.filter (home: !(isDeclared home)) homes);
+      systemd.user.services = unitsOf userUnit (
+        builtins.filter (home: !(isDeclared home) && isElsewhere home) homes
+      );
     }
   );
 }

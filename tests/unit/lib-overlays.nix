@@ -3772,18 +3772,23 @@ in
       # The `default` NixOS module of caisson imports a module that
       # writes a systemd unit for each such home. The unit is a system
       # unit when the machine declares the account of the user of the
-      # home, and a user unit when it does not.
+      # home in `users.users`. A home whose user has no account there
+      # is refused, unless the machine lists the user in
+      # `caisson.home-manager.activation.usersDeclaredElsewhere`, and
+      # then the unit is a user unit.
       #
       # The machine `laptop` below has four homes. It declares the
-      # account of the first and not of the second. The third is
-      # declared inside a structural configuration inside the
-      # machine, and the machine activates it too. The fourth is
-      # declared inside a second NixOS configuration, `image`, that
-      # is itself inside `laptop`. That home belongs to `image`, and
-      # `laptop` writes no unit for it.
+      # account of the first. It lists the users of the second and
+      # the third as declared elsewhere. The third is declared inside
+      # a structural configuration inside the machine, and the machine
+      # activates it too. The fourth is declared inside a second NixOS
+      # configuration, `image`, that is itself inside `laptop`. That
+      # home belongs to `image`, and `laptop` writes no unit for it.
       #
-      # The machine `clash` has two homes for one user, which the
-      # module refuses with an assertion that names both homes.
+      # Three more machines are each refused with one assertion.
+      # `clash` has two homes for one user. `stray` has a home whose
+      # user has no account and is not listed. `both` lists a user
+      # that it also declares.
       "test: a NixOS configuration writes a unit for each home declared inside it" = {
         expr =
           let
@@ -3798,9 +3803,13 @@ in
                       { lib, ... }:
                       {
                         users.users.declared.home = "/home/declared";
+                        caisson.home-manager.activation.usersDeclaredElsewhere = [
+                          "elsewhere"
+                          "layered"
+                        ];
                         caisson.home-manager.configurations = {
                           declared = home lib { };
-                          undeclared = home lib { };
+                          elsewhere = home lib { };
                         };
                         caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
                           moduleImports = _modules: [ ];
@@ -3814,6 +3823,7 @@ in
                           configModule =
                             { lib, ... }:
                             {
+                              users.users.inner.home = "/home/inner";
                               caisson.home-manager.configurations.inner = home lib { };
                             };
                         };
@@ -3823,10 +3833,29 @@ in
                     configModule =
                       { lib, ... }:
                       {
+                        users.users.shared.home = "/home/shared";
                         caisson.home-manager.configurations = {
                           first = home lib { configModule.home.username = "shared"; };
                           second = home lib { configModule.home.username = "shared"; };
                         };
+                      };
+                  };
+                  caisson.nixos.configurations.stray = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        caisson.home-manager.configurations.typo = home lib {
+                          configModule.home.username = "nobody";
+                        };
+                      };
+                  };
+                  caisson.nixos.configurations.both = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.twice.home = "/home/twice";
+                        caisson.home-manager.activation.usersDeclaredElsewhere = [ "twice" ];
+                        caisson.home-manager.configurations.twice = home lib { };
                       };
                   };
                 };
@@ -3840,33 +3869,66 @@ in
             };
             laptop = units top.nixosConfigurations.laptop;
             image = units top.nixosConfigurations.image;
-            clash = units top.nixosConfigurations.clash;
+            # How many assertions of a machine fail, and whether the
+            # message of the first names each of the words given.
+            refusal =
+              name: words:
+              let
+                inherit (units top.nixosConfigurations.${name}) refused;
+              in
+              {
+                count = builtins.length refused;
+                names = builtins.all (word: lib.hasInfix word (builtins.head refused)) words;
+              };
           in
           {
             inherit laptop image;
-            clashRefused = builtins.length clash.refused;
-            clashNamesBothHomes = builtins.all (name: lib.hasInfix name (builtins.head clash.refused)) [
+            clash = refusal "clash" [
               "shared"
               "first"
               "second"
             ];
+            stray = refusal "stray" [
+              "typo"
+              "nobody"
+              "usersDeclaredElsewhere"
+            ];
+            both = refusal "both" [ "twice" ];
+            # A home that is refused gets no unit of either kind.
+            strayUnits = {
+              inherit (units top.nixosConfigurations.stray) system user;
+            };
           };
         expected = {
           laptop = {
             system = [ "home-manager-declared" ];
             user = [
+              "home-manager-elsewhere"
               "home-manager-layered"
-              "home-manager-undeclared"
             ];
             refused = [ ];
           };
           image = {
-            system = [ ];
-            user = [ "home-manager-inner" ];
+            system = [ "home-manager-inner" ];
+            user = [ ];
             refused = [ ];
           };
-          clashRefused = 1;
-          clashNamesBothHomes = true;
+          clash = {
+            count = 1;
+            names = true;
+          };
+          stray = {
+            count = 1;
+            names = true;
+          };
+          both = {
+            count = 1;
+            names = true;
+          };
+          strayUnits = {
+            system = [ ];
+            user = [ ];
+          };
         };
       };
 

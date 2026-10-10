@@ -202,8 +202,9 @@ let
 
   # A NixOS configuration with two homes declared inside it, evaluated
   # with the real home-manager over the real NixOS. The machine
-  # declares the account of the first home and not the account of the
-  # second, as with an account that systemd-homed manages.
+  # declares the account of the first home. It does not declare the
+  # account of the second, and lists that user as declared elsewhere,
+  # as for an account that systemd-homed manages.
   machineWithHomes = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
@@ -232,6 +233,7 @@ let
                 home = "/home/declared";
                 uid = 1001;
               };
+              caisson.home-manager.activation.usersDeclaredElsewhere = [ "undeclared" ];
               caisson.home-manager.configurations = {
                 declared = home { };
                 undeclared = home { home.homeDirectory = "/home/undeclared"; };
