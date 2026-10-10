@@ -3932,6 +3932,93 @@ in
         };
       };
 
+      # A NixOS configuration with a home declared inside it writes the
+      # file `caisson-home-manager/source.json` under `/etc`. The file
+      # holds a store path. The store path is the system of the
+      # machine with the homes left out.
+      #
+      # The stub of NixOS puts the number of system units into the
+      # store path of a system. The machine `laptop` has one home, and
+      # `laptop` declares the account of that home. The system of
+      # `laptop` therefore has one unit. The store path in the file
+      # must be the system with no units.
+      #
+      # The machine `bare` has no home, and writes no file.
+      #
+      # The machine `outer` has a machine `image` declared inside it,
+      # and `image` has a home. That home belongs to `image`. So
+      # `image` writes the file, and `outer` does not.
+      "test: a NixOS configuration with homes records the system it runs without them" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            withHome =
+              lib:
+              { ... }:
+              {
+                users.users.chris.home = "/home/chris";
+                caisson.home-manager.configurations.chris = home lib { };
+              };
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                    configModule = { lib, ... }: withHome lib { };
+                  };
+                  caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
+                    configModule = { };
+                  };
+                  caisson.nixos.configurations.outer = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                          configModule = { lib, ... }: withHome lib { };
+                        };
+                      };
+                  };
+                };
+            };
+            file = "caisson-home-manager/source.json";
+            recordOf =
+              name:
+              let
+                inherit (top.nixosConfigurations.${name}.config.environment) etc;
+              in
+              if etc ? ${file} then
+                let
+                  record = builtins.fromJSON etc.${file}.text;
+                in
+                {
+                  inherit (record) hostName baseSystemOutPath;
+                }
+              else
+                null;
+          in
+          {
+            laptop = recordOf "laptop";
+            laptopBuilds = top.nixosConfigurations.laptop.config.system.build.toplevel.outPath;
+            bare = recordOf "bare";
+            outer = recordOf "outer";
+            image = recordOf "image";
+          };
+        expected = {
+          laptop = {
+            hostName = "laptop";
+            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+          };
+          laptopBuilds = "/nix/store/stub-system-with-1-units";
+          bare = null;
+          outer = null;
+          image = {
+            hostName = "image";
+            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+          };
+        };
+      };
+
       # Beneath a NixOS configuration at a system, that system is the
       # one in force, so a home declared there has that evaluation
       # alone, and each evaluation of the machine publishes its home.
