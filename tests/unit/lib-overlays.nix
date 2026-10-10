@@ -3162,6 +3162,13 @@ in
               inherit (lib.caisson-core.modules.nixos) default;
             };
           };
+          # A package overlay of the flake itself, which adds nothing.
+          # A configuration exports the package overlays its library
+          # registers, so every configuration built on this library
+          # has one to export.
+          pkgOverlays = _lib: {
+            tools.overlay = _final: _prev: { };
+          };
           configs = callbackLib: {
             homeManager.chris = callbackLib.caisson.home-manager.mkModule (
               { ... }:
@@ -4016,6 +4023,62 @@ in
             hostName = "image";
             baseSystemOutPath = "/nix/store/stub-system-with-0-units";
           };
+        };
+      };
+
+      # The library of a flake has registries: its lib overlays, its
+      # modules and its package overlays. A configuration exports the
+      # registries, and a configuration also passes up what the
+      # configurations declared inside it export.
+      #
+      # A configuration and the configurations declared inside it
+      # share one library, so they hold the same registries. The
+      # same entry therefore reaches a configuration twice: once from
+      # the configuration itself, and once passed up from a
+      # configuration declared inside it. The two are the same entry,
+      # and the export holds the entry once.
+      #
+      # The library below registers lib overlays, one NixOS module
+      # and one package overlay. `laptop` is a NixOS configuration
+      # with a home declared inside it. The home passes all three
+      # registries up to `laptop`, and `laptop` exports each entry
+      # once.
+      "test: a registry entry passed up from inside a configuration is exported once" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            machine =
+              { lib, ... }:
+              {
+                users.users.chris.home = "/home/chris";
+                caisson.home-manager.configurations.chris = home lib { };
+              };
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                    configModule = machine;
+                  };
+                };
+            };
+            inherit (top.nixosConfigurations.laptop.config.caisson) exports;
+          in
+          {
+            # The names alone do not show that an entry merges: the
+            # module system merges the definitions of an entry only
+            # when the entry is read. So each entry is read as well.
+            pkgOverlays = builtins.attrNames exports.pkgOverlays;
+            pkgOverlayIsRead = builtins.isFunction exports.pkgOverlays.tools.overlay;
+            libOverlayIsRead = builtins.isFunction exports.libOverlays.nixos.overlay;
+            nixosModules = builtins.attrNames exports.modules.nixos;
+          };
+        expected = {
+          pkgOverlays = [ "tools" ];
+          pkgOverlayIsRead = true;
+          libOverlayIsRead = true;
+          nixosModules = [ "default" ];
         };
       };
 
