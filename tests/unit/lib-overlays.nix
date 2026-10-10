@@ -3768,6 +3768,170 @@ in
         };
       };
 
+      # A NixOS configuration activates the homes declared inside it.
+      # The `default` NixOS module of caisson imports a module that
+      # writes a systemd unit for each such home. The unit is a system
+      # unit when the machine declares the account of the user of the
+      # home in `users.users`. A home whose user has no account there
+      # is refused, unless the machine lists the user in
+      # `caisson.home-manager.activation.usersDeclaredElsewhere`, and
+      # then the unit is a user unit.
+      #
+      # The machine `laptop` below has four homes. It declares the
+      # account of the first. It lists the users of the second and
+      # the third as declared elsewhere. The third is declared inside
+      # a structural configuration inside the machine, and the machine
+      # activates it too. The fourth is declared inside a second NixOS
+      # configuration, `image`, that is itself inside `laptop`. That
+      # home belongs to `image`, and `laptop` writes no unit for it.
+      #
+      # Three more machines are each refused with one assertion.
+      # `clash` has two homes for one user. `stray` has a home whose
+      # user has no account and is not listed. `both` lists a user
+      # that it also declares.
+      "test: a NixOS configuration writes a unit for each home declared inside it" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.declared.home = "/home/declared";
+                        caisson.home-manager.activation.usersDeclaredElsewhere = [
+                          "elsewhere"
+                          "layered"
+                        ];
+                        caisson.home-manager.configurations = {
+                          declared = home lib { };
+                          elsewhere = home lib { };
+                        };
+                        caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                          moduleImports = _modules: [ ];
+                          configModule =
+                            { lib, ... }:
+                            {
+                              caisson.home-manager.configurations.layered = home lib { };
+                            };
+                        };
+                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                          configModule =
+                            { lib, ... }:
+                            {
+                              users.users.inner.home = "/home/inner";
+                              caisson.home-manager.configurations.inner = home lib { };
+                            };
+                        };
+                      };
+                  };
+                  caisson.nixos.configurations.clash = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.shared.home = "/home/shared";
+                        caisson.home-manager.configurations = {
+                          first = home lib { configModule.home.username = "shared"; };
+                          second = home lib { configModule.home.username = "shared"; };
+                        };
+                      };
+                  };
+                  caisson.nixos.configurations.stray = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        caisson.home-manager.configurations.typo = home lib {
+                          configModule.home.username = "nobody";
+                        };
+                      };
+                  };
+                  caisson.nixos.configurations.both = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.twice.home = "/home/twice";
+                        caisson.home-manager.activation.usersDeclaredElsewhere = [ "twice" ];
+                        caisson.home-manager.configurations.twice = home lib { };
+                      };
+                  };
+                };
+            };
+            units = machine: {
+              system = builtins.attrNames machine.config.systemd.services;
+              user = builtins.attrNames machine.config.systemd.user.services;
+              refused = builtins.map (assertion: assertion.message) (
+                builtins.filter (assertion: !assertion.assertion) machine.config.assertions
+              );
+            };
+            laptop = units top.nixosConfigurations.laptop;
+            image = units top.nixosConfigurations.image;
+            # How many assertions of a machine fail, and whether the
+            # message of the first names each of the words given.
+            refusal =
+              name: words:
+              let
+                inherit (units top.nixosConfigurations.${name}) refused;
+              in
+              {
+                count = builtins.length refused;
+                names = builtins.all (word: lib.hasInfix word (builtins.head refused)) words;
+              };
+          in
+          {
+            inherit laptop image;
+            clash = refusal "clash" [
+              "shared"
+              "first"
+              "second"
+            ];
+            stray = refusal "stray" [
+              "typo"
+              "nobody"
+              "usersDeclaredElsewhere"
+            ];
+            both = refusal "both" [ "twice" ];
+            # A home that is refused gets no unit of either kind.
+            strayUnits = {
+              inherit (units top.nixosConfigurations.stray) system user;
+            };
+          };
+        expected = {
+          laptop = {
+            system = [ "home-manager-declared" ];
+            user = [
+              "home-manager-elsewhere"
+              "home-manager-layered"
+            ];
+            refused = [ ];
+          };
+          image = {
+            system = [ "home-manager-inner" ];
+            user = [ ];
+            refused = [ ];
+          };
+          clash = {
+            count = 1;
+            names = true;
+          };
+          stray = {
+            count = 1;
+            names = true;
+          };
+          both = {
+            count = 1;
+            names = true;
+          };
+          strayUnits = {
+            system = [ ];
+            user = [ ];
+          };
+        };
+      };
+
       # Beneath a NixOS configuration at a system, that system is the
       # one in force, so a home declared there has that evaluation
       # alone, and each evaluation of the machine publishes its home.
