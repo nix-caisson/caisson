@@ -454,6 +454,74 @@ let
       && system.config.systemd.user.services.home-manager.unitConfig.ConditionUser == "probe"
       && builtins.isString system.config.system.build.toplevel.drvPath;
 
+    # Two homes declared inside a NixOS configuration, evaluated with
+    # the real home-manager over the real NixOS. The machine declares
+    # the account of the first home and not the account of the
+    # second, as with an account that systemd-homed manages.
+    #
+    # Both homes are given the Nix of the machine, and both build an
+    # activation package, which forces home-manager's whole module
+    # tree with the configuration of the machine handed in as
+    # `osConfig`. The first home takes its home directory and its
+    # user ID from the account. The second home sets its home
+    # directory itself.
+    homesInsideAMachineAreGivenTheMachine =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                ecosystemSrc = inputs.nixpkgs;
+                configModule =
+                  { lib, ... }:
+                  let
+                    home =
+                      module:
+                      lib.caisson.home-manager.mkConfiguration {
+                        ecosystemSrc = inputs.home-manager;
+                        configModule = {
+                          imports = [ module ];
+                          home.stateVersion = "25.05";
+                          programs.home-manager.enable = true;
+                        };
+                      };
+                  in
+                  {
+                    imports = [ minimalNixosBase ];
+                    users.users.declared = {
+                      isNormalUser = true;
+                      home = "/home/declared";
+                      uid = 1001;
+                    };
+                    caisson.home-manager.configurations = {
+                      declared = home { };
+                      undeclared = home { home.homeDirectory = "/home/undeclared"; };
+                    };
+                  };
+              };
+            };
+        };
+        machine = top.nixosConfigurations.probe.config;
+        declared = top.homeConfigurations."declared@probe";
+        undeclared = top.homeConfigurations."undeclared@probe";
+        hasTheProgram =
+          home: builtins.elem home.config.programs.home-manager.package home.config.home.packages;
+      in
+      builtins.isString declared.activationPackage.drvPath
+      && builtins.isString undeclared.activationPackage.drvPath
+      && declared.config.home.homeDirectory == "/home/declared"
+      && declared.config.home.uid == 1001
+      && undeclared.config.home.homeDirectory == "/home/undeclared"
+      && undeclared.config.home.uid == null
+      && declared.config.nix.package == machine.nix.package
+      && undeclared.config.nix.package == machine.nix.package
+      && declared.config.submoduleSupport.enable
+      && undeclared.config.submoduleSupport.enable
+      && hasTheProgram declared
+      && hasTheProgram undeclared;
+
     colmenaHiveEvaluatesEndToEnd =
       let
         hive = hiveLib.caisson.colmena.mkConfiguration {

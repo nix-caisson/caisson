@@ -49,6 +49,44 @@ let
           type = lib.types.str;
           default = "";
         };
+        # The options a NixOS configuration sets in the homes declared
+        # inside it: the home directory and the user ID of the
+        # account, the Nix of the machine, and the option home-manager
+        # reads to tell that a machine activates the home.
+        home.homeDirectory = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+        };
+        home.uid = lib.mkOption {
+          type = lib.types.nullOr lib.types.int;
+          default = null;
+        };
+        home.packages = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+        };
+        nix.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+        };
+        nix.package = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+        };
+        submoduleSupport.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+        };
+        # home-manager's command-line program, which home-manager
+        # leaves out of a home that a machine activates.
+        programs.home-manager.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+        };
+        programs.home-manager.package = lib.mkOption {
+          type = lib.types.str;
+          default = "home-manager-cli";
+        };
         # The activation entries, which the integration's source
         # metadata module defines into.
         home.activation = lib.mkOption {
