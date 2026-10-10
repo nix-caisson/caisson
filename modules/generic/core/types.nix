@@ -22,6 +22,26 @@ in
     check = isLibOverlay;
   };
 
+  # A registered package overlay, as a configuration exports it.
+  #
+  # An option of this type can have more than one definition of the
+  # same entry. A configuration and the configurations declared inside
+  # it share one library. Each of them exports the package overlays of
+  # that library, and a configuration also passes up what the
+  # configurations inside it export. So the same entry reaches a
+  # configuration from two places.
+  #
+  # The type has no merge function of its own, so the module system
+  # merges the definitions as attribute sets. The definitions are the
+  # same entry, and the result is that entry. `libOverlay` above works
+  # the same way. The type `raw` would refuse the second definition.
+  pkgOverlay = lib.mkOptionType {
+    name = "pkgOverlay";
+    description = "package overlay ({ imports ? [ ], overlay })";
+    descriptionClass = "noun";
+    check = v: builtins.isAttrs v && builtins.isFunction (v.overlay or null);
+  };
+
   # The manifest type: structural, checked on the export side only.
   # A producer validates the manifest it publishes in its CI;
   # consumers assume shape.

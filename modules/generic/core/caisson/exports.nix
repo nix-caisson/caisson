@@ -40,7 +40,7 @@ in
     };
 
     pkgOverlays = lib.mkOption {
-      type = lib.types.attrsOf lib.types.raw;
+      type = lib.types.attrsOf types.pkgOverlay;
       description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what lies beneath.";
     };
 
