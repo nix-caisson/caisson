@@ -412,6 +412,48 @@ let
       && throws (pins.npins ./fixtures/pins-npins-v5).sources
       && throws (pins.npins ./fixtures/pins-plain-dir).sources;
 
+    # Every input, and every input of an input, under the path of
+    # names `--override-input` takes. `self` is left out at each
+    # level; a source tree and a bare path have no inputs.
+    realizeInputsNamesEveryLevel =
+      let
+        leaf = {
+          outPath = "/nix/store/00000000000000000000000000000000-leaf";
+        };
+        middle = {
+          outPath = "/nix/store/11111111111111111111111111111111-middle";
+          inputs = {
+            inherit leaf;
+            self = throw "self of an input is not read";
+          };
+        };
+        top = {
+          outPath = "/nix/store/22222222222222222222222222222222-top";
+          inputs = {
+            inherit middle;
+            # a `follows`: the same input under a second path
+            alias = leaf;
+          };
+        };
+      in
+      lib.caisson.realizeInputs {
+        inherit top;
+        sourceTree = {
+          outPath = "/nix/store/33333333333333333333333333333333-source";
+        };
+        barePath = "/nix/store/44444444444444444444444444444444-path";
+        self = throw "self is not read";
+      } == {
+        "top" = top.outPath;
+        "top/middle" = middle.outPath;
+        "top/middle/leaf" = leaf.outPath;
+        "top/alias" = leaf.outPath;
+        "sourceTree" = "/nix/store/33333333333333333333333333333333-source";
+        "barePath" = "/nix/store/44444444444444444444444444444444-path";
+      };
+
+    realizeInputsOfNothing = lib.caisson.realizeInputs { } == { };
+
     pinsGitRootOutsideGit =
       pins.gitRoot ./fixtures/pins-plain-dir == {
         outPath = ./fixtures/pins-plain-dir;

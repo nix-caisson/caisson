@@ -110,6 +110,7 @@ let
     "pkgOverlays"
     "pkgOverlaysFor"
     "pkgsManifest"
+    "realizeInputs"
     "structural"
     "system-manager"
     "terranix"
