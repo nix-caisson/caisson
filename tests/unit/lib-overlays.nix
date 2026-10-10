@@ -3768,6 +3768,108 @@ in
         };
       };
 
+      # A NixOS configuration activates the homes declared inside it.
+      # The `default` NixOS module of caisson imports a module that
+      # writes a systemd unit for each such home. The unit is a system
+      # unit when the machine declares the account of the user of the
+      # home, and a user unit when it does not.
+      #
+      # The machine `laptop` below has four homes. It declares the
+      # account of the first and not of the second. The third is
+      # declared inside a structural configuration inside the
+      # machine, and the machine activates it too. The fourth is
+      # declared inside a second NixOS configuration, `image`, that
+      # is itself inside `laptop`. That home belongs to `image`, and
+      # `laptop` writes no unit for it.
+      #
+      # The machine `clash` has two homes for one user, which the
+      # module refuses with an assertion that names both homes.
+      "test: a NixOS configuration writes a unit for each home declared inside it" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.declared.home = "/home/declared";
+                        caisson.home-manager.configurations = {
+                          declared = home lib { };
+                          undeclared = home lib { };
+                        };
+                        caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                          moduleImports = _modules: [ ];
+                          configModule =
+                            { lib, ... }:
+                            {
+                              caisson.home-manager.configurations.layered = home lib { };
+                            };
+                        };
+                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                          configModule =
+                            { lib, ... }:
+                            {
+                              caisson.home-manager.configurations.inner = home lib { };
+                            };
+                        };
+                      };
+                  };
+                  caisson.nixos.configurations.clash = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        caisson.home-manager.configurations = {
+                          first = home lib { configModule.home.username = "shared"; };
+                          second = home lib { configModule.home.username = "shared"; };
+                        };
+                      };
+                  };
+                };
+            };
+            units = machine: {
+              system = builtins.attrNames machine.config.systemd.services;
+              user = builtins.attrNames machine.config.systemd.user.services;
+              refused = builtins.map (assertion: assertion.message) (
+                builtins.filter (assertion: !assertion.assertion) machine.config.assertions
+              );
+            };
+            laptop = units top.nixosConfigurations.laptop;
+            image = units top.nixosConfigurations.image;
+            clash = units top.nixosConfigurations.clash;
+          in
+          {
+            inherit laptop image;
+            clashRefused = builtins.length clash.refused;
+            clashNamesBothHomes = builtins.all (name: lib.hasInfix name (builtins.head clash.refused)) [
+              "shared"
+              "first"
+              "second"
+            ];
+          };
+        expected = {
+          laptop = {
+            system = [ "home-manager-declared" ];
+            user = [
+              "home-manager-layered"
+              "home-manager-undeclared"
+            ];
+            refused = [ ];
+          };
+          image = {
+            system = [ ];
+            user = [ "home-manager-inner" ];
+            refused = [ ];
+          };
+          clashRefused = 1;
+          clashNamesBothHomes = true;
+        };
+      };
+
       # Beneath a NixOS configuration at a system, that system is the
       # one in force, so a home declared there has that evaluation
       # alone, and each evaluation of the machine publishes its home.

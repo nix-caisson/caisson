@@ -43,12 +43,31 @@
           type = lib.types.str;
           default = "nix-of-the-machine";
         };
+        # The options a machine defines to activate the homes
+        # declared inside it: the systemd units, and the assertions
+        # NixOS checks before it builds a system.
+        systemd.services = lib.mkOption {
+          type = lib.types.attrsOf lib.types.raw;
+          default = { };
+        };
+        systemd.user.services = lib.mkOption {
+          type = lib.types.attrsOf lib.types.raw;
+          default = { };
+        };
+        assertions = lib.mkOption {
+          type = lib.types.listOf lib.types.raw;
+          default = [ ];
+        };
         stub.fromBaseModules = lib.mkOption {
           type = lib.types.bool;
           default = false;
         };
       };
       config.stub.fromBaseModules = true;
+      # NixOS hands its modules a set of helpers as the argument
+      # `utils`. The module that activates homes uses the function
+      # that makes a string safe as part of a unit name.
+      config._module.args.utils.escapeSystemdPath = name: name;
     }
   )
 ]

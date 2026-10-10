@@ -200,6 +200,47 @@ let
     }
   );
 
+  # A NixOS configuration with two homes declared inside it, evaluated
+  # with the real home-manager over the real NixOS. The machine
+  # declares the account of the first home and not the account of the
+  # second, as with an account that systemd-homed manages.
+  machineWithHomes = hiveLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+          ecosystemSrc = inputs.nixpkgs;
+          configModule =
+            { lib, ... }:
+            let
+              home =
+                module:
+                lib.caisson.home-manager.mkConfiguration {
+                  ecosystemSrc = inputs.home-manager;
+                  configModule = {
+                    imports = [ module ];
+                    home.stateVersion = "25.05";
+                    programs.home-manager.enable = true;
+                  };
+                };
+            in
+            {
+              imports = [ minimalNixosBase ];
+              users.users.declared = {
+                isNormalUser = true;
+                home = "/home/declared";
+                uid = 1001;
+              };
+              caisson.home-manager.configurations = {
+                declared = home { };
+                undeclared = home { home.homeDirectory = "/home/undeclared"; };
+              };
+            };
+        };
+      };
+  };
+
   results = {
 
     composesTheCaissonLibrary =
@@ -467,45 +508,9 @@ let
     # directory itself.
     homesInsideAMachineAreGivenTheMachine =
       let
-        top = hiveLib.caisson.structural.mkTopConfiguration {
-          moduleImports = _modules: [ ];
-          configModule =
-            { lib, ... }:
-            {
-              caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
-                ecosystemSrc = inputs.nixpkgs;
-                configModule =
-                  { lib, ... }:
-                  let
-                    home =
-                      module:
-                      lib.caisson.home-manager.mkConfiguration {
-                        ecosystemSrc = inputs.home-manager;
-                        configModule = {
-                          imports = [ module ];
-                          home.stateVersion = "25.05";
-                          programs.home-manager.enable = true;
-                        };
-                      };
-                  in
-                  {
-                    imports = [ minimalNixosBase ];
-                    users.users.declared = {
-                      isNormalUser = true;
-                      home = "/home/declared";
-                      uid = 1001;
-                    };
-                    caisson.home-manager.configurations = {
-                      declared = home { };
-                      undeclared = home { home.homeDirectory = "/home/undeclared"; };
-                    };
-                  };
-              };
-            };
-        };
-        machine = top.nixosConfigurations.probe.config;
-        declared = top.homeConfigurations."declared@probe";
-        undeclared = top.homeConfigurations."undeclared@probe";
+        machine = machineWithHomes.nixosConfigurations.probe.config;
+        declared = machineWithHomes.homeConfigurations."declared@probe";
+        undeclared = machineWithHomes.homeConfigurations."undeclared@probe";
         hasTheProgram =
           home: builtins.elem home.config.programs.home-manager.package home.config.home.packages;
       in
@@ -521,6 +526,38 @@ let
       && undeclared.config.submoduleSupport.enable
       && hasTheProgram declared
       && hasTheProgram undeclared;
+
+    # The same machine activates both homes. It writes a system unit
+    # for the home whose account it declares, which runs as that
+    # user, and a user unit for the other home, which runs only for
+    # that user. The script of each unit runs the `activate` program
+    # of the activation package of its home. The system of the
+    # machine evaluates with the units in it, which also checks the
+    # assertions of the machine.
+    aMachineActivatesTheHomesInsideIt =
+      let
+        machine = machineWithHomes.nixosConfigurations.probe.config;
+        declared = machineWithHomes.homeConfigurations."declared@probe";
+        undeclared = machineWithHomes.homeConfigurations."undeclared@probe";
+        systemUnit = machine.systemd.services.home-manager-declared;
+        userUnit = machine.systemd.user.services.home-manager-undeclared;
+        # The comparison is made on plain strings: a string that
+        # refers to a store path cannot be searched for.
+        plain = builtins.unsafeDiscardStringContext;
+        runs =
+          unit: home:
+          pkgs.lib.hasInfix (plain "${home.activationPackage}/activate") (
+            plain unit.serviceConfig.ExecStart.text
+          );
+      in
+      systemUnit.serviceConfig.User == "declared"
+      && systemUnit.unitConfig.RequiresMountsFor == "/home/declared"
+      && runs systemUnit declared
+      && userUnit.unitConfig.ConditionUser == "undeclared"
+      && runs userUnit undeclared
+      && !(machine.systemd.services ? home-manager-undeclared)
+      && !(machine.systemd.user.services ? home-manager-declared)
+      && builtins.isString machine.system.build.toplevel.drvPath;
 
     colmenaHiveEvaluatesEndToEnd =
       let
