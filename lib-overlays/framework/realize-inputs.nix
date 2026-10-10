@@ -76,25 +76,34 @@
 #
 # Which inputs to give the function
 #
+# Give the function the inputs of the test flake:
+#
+#   nix-unit.inputs = lib.caisson.realizeInputs inputs;
+#
+# The result then names each input of the test flake and each input
+# of those inputs, so the test flake needs no `follows` to point the
+# inputs of its inputs back at inputs it already lists.
+#
 # To return the store path of an input, Nix has to fetch that input.
 # The function therefore fetches every input it is given, and every
 # input of those inputs, to any depth. It fetches an input even when
-# no test reads it.
+# no test reads it. For most test flakes that adds a few small
+# sources.
 #
-# For that reason, give the function only the inputs that the tests
-# evaluate as flakes. List the other inputs of the test flake
-# directly:
+# The cost is large when one input exists to gather many others. The
+# unit test flake of caisson has an input of that kind, `deps`, which
+# pins everything any caisson test uses. Given all the inputs of that
+# test flake, the function fetches 24 sources where the unit tests
+# read 6. In that case, give the function only the inputs that the
+# tests evaluate as flakes, and list the other inputs directly:
 #
 #   nix-unit.inputs = inputs // lib.caisson.realizeInputs { inherit (inputs) caisson; };
 #
-# In this line, `inputs` gives nix-unit each input of the test flake
-# under its name. The call to `realizeInputs` adds the inputs of the
-# caisson flake.
-#
-# Do not give the function all of `inputs`. It would then also fetch
-# the inputs of nix-unit, the inputs of nixpkgs, and the inputs of
-# every other input of the test flake. Most of those are inputs that
-# no test reads.
+# An input that the test flake declares with `flake = false` has no
+# inputs as far as the test flake is concerned. Give the function
+# such an input as a source tree, and not as an evaluated flake, or
+# the result will name inputs under it that nix-unit reports as
+# matching nothing.
 let
 
   # `pathOf` returns the store path of an input. Nix puts the store
