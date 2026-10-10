@@ -415,7 +415,7 @@ let
     # Every input, and every input of an input, under the path of
     # names `--override-input` takes. `self` is left out at each
     # level; a source tree and a bare path have no inputs.
-    inputOverridesNamesEveryLevel =
+    realizeInputsNamesEveryLevel =
       let
         leaf = {
           outPath = "/nix/store/00000000000000000000000000000000-leaf";
@@ -436,7 +436,7 @@ let
           };
         };
       in
-      lib.caisson.inputOverrides {
+      lib.caisson.realizeInputs {
         inherit top;
         sourceTree = {
           outPath = "/nix/store/33333333333333333333333333333333-source";
@@ -452,7 +452,7 @@ let
         "barePath" = "/nix/store/44444444444444444444444444444444-path";
       };
 
-    inputOverridesOfNothing = lib.caisson.inputOverrides { } == { };
+    realizeInputsOfNothing = lib.caisson.realizeInputs { } == { };
 
     pinsGitRootOutsideGit =
       pins.gitRoot ./fixtures/pins-plain-dir == {

@@ -35,12 +35,12 @@ let
   # files, which hand `mkLib` its `sources` and `root`, the functions
   # that evaluate a flake from source over inputs supplied by hand,
   # which a flake uses to check consumer-style flakes, and the
-  # function that turns resolved inputs into the overrides a second
-  # evaluation of a flake is handed.
+  # function that realizes resolved inputs, so that a second
+  # evaluation of a flake can be handed them.
   pins = builtins.import ./pins;
   callFlake = builtins.import ./call-flake.nix;
   callConsumerFlake = builtins.import ./call-consumer-flake.nix;
-  inputOverrides = builtins.import ./input-overrides.nix;
+  realizeInputs = builtins.import ./realize-inputs.nix;
 
   # The names under `lib.caisson`: those above, and the rest read
   # from `lib.caisson-core`. Each is read when it is used, so a library
@@ -51,7 +51,7 @@ let
       pins
       callFlake
       callConsumerFlake
-      inputOverrides
+      realizeInputs
       ;
     inherit (lib.caisson-core)
       # making entries, and reading them from directories
