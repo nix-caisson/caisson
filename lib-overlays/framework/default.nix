@@ -32,19 +32,27 @@
 let
 
   # What caisson holds itself, bound to no library: the readers of pin
-  # files, which hand `mkLib` its `sources` and `root`, and the
-  # functions that evaluate a flake from source over inputs supplied
-  # by hand, which a flake uses to check consumer-style flakes.
+  # files, which hand `mkLib` its `sources` and `root`, the functions
+  # that evaluate a flake from source over inputs supplied by hand,
+  # which a flake uses to check consumer-style flakes, and the
+  # function that turns resolved inputs into the overrides a second
+  # evaluation of a flake is handed.
   pins = builtins.import ./pins;
   callFlake = builtins.import ./call-flake.nix;
   callConsumerFlake = builtins.import ./call-consumer-flake.nix;
+  inputOverrides = builtins.import ./input-overrides.nix;
 
-  # The names under `lib.caisson`: the three above, and the rest read
+  # The names under `lib.caisson`: those above, and the rest read
   # from `lib.caisson-core`. Each is read when it is used, so a library
   # that lacks one (an earlier stage has no configurations yet) fails
   # for that name alone.
   namesIn = lib: {
-    inherit pins callFlake callConsumerFlake;
+    inherit
+      pins
+      callFlake
+      callConsumerFlake
+      inputOverrides
+      ;
     inherit (lib.caisson-core)
       # making entries, and reading them from directories
       mkModule

@@ -90,6 +90,7 @@ let
     "flake-parts"
     "home-manager"
     "importApply"
+    "inputOverrides"
     "integrations"
     "libManifest"
     "libOverlays"
