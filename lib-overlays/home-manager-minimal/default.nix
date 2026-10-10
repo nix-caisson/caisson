@@ -57,7 +57,6 @@
               specialArgs ? null,
               osConfig ? null,
               check ? null,
-              sourceMeta ? null,
             }@args:
             configuration args;
           mkConfigurationWithEcosystemArgs =
@@ -70,7 +69,6 @@
               specialArgs ? null,
               osConfig ? null,
               check ? null,
-              sourceMeta ? null,
               ecosystemArgs ? null,
             }@args:
             configuration args;

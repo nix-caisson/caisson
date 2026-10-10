@@ -3994,15 +3994,7 @@ in
               let
                 inherit (top.nixosConfigurations.${name}.config.environment) etc;
               in
-              if etc ? ${file} then
-                let
-                  record = builtins.fromJSON etc.${file}.text;
-                in
-                {
-                  inherit (record) hostName baseSystemOutPath;
-                }
-              else
-                null;
+              if etc ? ${file} then builtins.fromJSON etc.${file}.text else null;
           in
           {
             laptop = recordOf "laptop";
@@ -4013,14 +4005,12 @@ in
           };
         expected = {
           laptop = {
-            hostName = "laptop";
             baseSystemOutPath = "/nix/store/stub-system-with-0-units";
           };
           laptopBuilds = "/nix/store/stub-system-with-1-units";
           bare = null;
           outer = null;
           image = {
-            hostName = "image";
             baseSystemOutPath = "/nix/store/stub-system-with-0-units";
           };
         };
