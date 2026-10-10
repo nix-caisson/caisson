@@ -35,8 +35,8 @@ let
   # files, which hand `mkLib` its `sources` and `root`, the functions
   # that evaluate a flake from source over inputs supplied by hand,
   # which a flake uses to check consumer-style flakes, and the
-  # function that realizes resolved inputs, so that a second
-  # evaluation of a flake can be handed them.
+  # function that realizes resolved inputs, for a tool that
+  # evaluates a flake inside a build sandbox.
   pins = builtins.import ./pins;
   callFlake = builtins.import ./call-flake.nix;
   callConsumerFlake = builtins.import ./call-consumer-flake.nix;
