@@ -6,9 +6,13 @@
 # home-manager's module list. A home is a configuration: it is
 # evaluated at every system in force where it is declared, on the
 # package set in force there, and a top publishes it under
-# `homeConfigurations`. Beside the entry points the integration
-# carries the adapters that place a home inside a NixOS configuration,
-# and the source metadata the activation coherence check compares.
+# `homeConfigurations`.
+#
+# A home can be declared inside a NixOS configuration. The modules
+# that serve such a home are registered modules of caisson: the NixOS
+# modules `home-manager-activation` and `home-manager-source-marker`,
+# and the home-manager modules `nixos-parent` and
+# `nixos-source-marker`.
 {
   contributeClasses,
   mkLibOverlay,
@@ -29,14 +33,7 @@
   overlay =
     final: prev:
     let
-      mkModule = final.caisson.home-manager.mkModule;
-      mkNixosModule = final.caisson-core.mkModule "nixos";
-
       selection = final.caisson.integrations;
-      # What the adapters share out of the registry of the class, as
-      # the composition holds it: every registered `core`.
-      registry = final.caisson-core.modules.homeManager or { };
-      coreModules = selection.coreModules registry;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "home-manager";
@@ -170,116 +167,6 @@
             argument.
           '';
 
-      # Provenance derives from what composes: the ecosystem source
-      # handed to the entry point and the nixpkgs the package set was
-      # instantiated from. `root` is the tree that builds the home, as
-      # the composition records it (`lib.caisson-core.libManifest.root`);
-      # its out path is recorded as `selfOutPath`, the field of schema 3.
-      mkSourceMeta =
-        {
-          profileName,
-          hostName ? null,
-          hostKind ? "standalone",
-          schemaVersion ? 3,
-          root ? null,
-          nixpkgsOutPath ? null,
-          homeManagerOutPath ? null,
-          baseSystem ? null,
-        }:
-        let
-          canonical = {
-            inherit
-              hostKind
-              hostName
-              profileName
-              schemaVersion
-              ;
-            selfOutPath = resolveOutPath root;
-            inherit nixpkgsOutPath homeManagerOutPath;
-            # The out path of the host's NixOS system *without* home-manager:
-            # the coherence check compares this string, so it must not carry
-            # derivation context; stripping it keeps embedding from forcing
-            # a build.
-            baseSystemOutPath =
-              if baseSystem == null then
-                null
-              else
-                builtins.unsafeDiscardStringContext (resolveOutPath baseSystem);
-          };
-        in
-        canonical
-        // {
-          fingerprint = builtins.hashString "sha256" (builtins.toJSON canonical);
-        };
-
-      mkSourceMetaModule =
-        sourceMeta:
-        mkModule (
-          { ... }:
-          {
-            config,
-            lib,
-            pkgs,
-            ...
-          }:
-          {
-            _file = "caisson-home-manager/sourceMetaModule";
-            options.caisson-home-manager = {
-              # No `default`: the module system counts an option default as a
-              # definition in the readOnly check (lib/modules.nix
-              # evalOptionValue prepends it to defs'), so readOnly + default
-              # throws "set multiple times" the moment anything reads the
-              # option.  This module always defines the value anyway.
-              sourceMeta = lib.mkOption {
-                type = lib.types.attrs;
-                readOnly = true;
-              };
-
-              driftWarning = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-                description = "Warn during activation if host source metadata diverges from this configuration.";
-              };
-            };
-
-            config = {
-              caisson-home-manager.sourceMeta = sourceMeta;
-
-              home.activation.checkSourceCoherence = lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-                _marker="/etc/caisson-home-manager/source.json"
-                _expected_base="${
-                  if (sourceMeta.baseSystemOutPath or null) != null then sourceMeta.baseSystemOutPath else ""
-                }"
-                if ${
-                  if config.caisson-home-manager.driftWarning then "true" else "false"
-                } && [ -n "$_expected_base" ]; then
-                  if [ ! -f "$_marker" ]; then
-                    echo "WARNING: no source marker at $_marker." >&2
-                    echo "  This profile expects the NixOS generation to manage home-manager, but the" >&2
-                    echo "  active system was built without the caisson-home-manager adapter (or has" >&2
-                    echo "  never been rebuilt since it was enabled).  Run nixos-rebuild to converge." >&2
-                  else
-                    _host_base="$(${lib.getExe' pkgs.jq "jq"} -r '.baseSystemOutPath // empty' < "$_marker")"
-                    if [ -z "$_host_base" ]; then
-                      echo "WARNING: $_marker has no baseSystemOutPath." >&2
-                      echo "  The active NixOS generation predates the base-system coherence scheme." >&2
-                      echo "  Run nixos-rebuild to refresh it." >&2
-                    elif [ "$_host_base" != "$_expected_base" ]; then
-                      echo "WARNING: source drift detected." >&2
-                      echo "  active system's base (non-home-manager) closure:" >&2
-                      echo "    $_host_base" >&2
-                      echo "  this configuration expects:" >&2
-                      echo "    $_expected_base" >&2
-                      echo "  The system differs from source in non-home-manager ways; run nixos-rebuild" >&2
-                      echo "  to converge, or set caisson-home-manager.driftWarning = false." >&2
-                    fi
-                  fi
-                fi
-              '';
-            };
-          }
-        );
-
       # The composition of the class, shared by every evaluator over
       # it: the definition of the module list, the package set and the
       # special arguments, so the evaluators cannot express different
@@ -371,27 +258,16 @@
               null;
 
           hmSource = resolveOutPath (resolveSrc (args.ecosystemSrc or null));
-          resolvedSourceMeta =
-            if (args.sourceMeta or null) != null then
-              args.sourceMeta
-            else
-              mkSourceMeta {
-                profileName = "default";
-                homeManagerOutPath = hmSource;
-                nixpkgsOutPath = resolveOutPath (pkgs.path or null);
-              };
         in
         {
           inherit minimal pkgs;
           check = if (args.check or null) == null then true else args.check;
-          sourceMeta = resolvedSourceMeta;
           configuration = {
             imports =
               frameworkModules
               ++ moduleImports classRegistry
               ++ (if configModule == null then [ ] else [ configModule ])
               ++ [
-                (mkSourceMetaModule resolvedSourceMeta)
                 { programs.home-manager.path = final.mkDefault hmSource; }
               ]
               ++ (if declaredUnderAName then [ usernameModule ] else [ ]);
@@ -408,7 +284,6 @@
             # The package sets at the system of the home, by config
             # name.
             inherit pkgSets osConfig;
-            sourceMeta = resolvedSourceMeta;
           }
           # home-manager also hands a home inside a machine the class
           # of the machine, as `osClass`. A home with no machine gets
@@ -573,8 +448,6 @@
         in
         withExtraAttrs rawModule;
 
-      mkConfiguration = final.caisson.home-manager.mkConfiguration;
-
       # The evaluator step of a home, on the view being evaluated: the
       # evaluation over the composition, with the twin's
       # `ecosystemArgs` merged over the composed call last. `variant`
@@ -644,328 +517,6 @@
           final.caisson-core.finalizeTop (final.caisson.home-manager.mkConfiguration rawArgs)
         );
 
-      mkStandaloneAdapter =
-        args@{
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          ...
-        }:
-        let
-          selectedModules = moduleImports registry ++ extraModuleImports registry;
-        in
-        {
-          homeModules = coreModules ++ selectedModules;
-          # A home over the adapter's arguments, as `mkConfiguration`
-          # returns it: a configuration, declared under
-          # `caisson.home-manager.configurations` or finalized as a
-          # top.
-          buildHome = configModule: mkConfiguration (args // { inherit configModule moduleImports; });
-        };
-
-      # The adapter's signature is open, its extras being NixOS-module
-      # options rather than evaluator arguments; home-manager's
-      # `extraSpecialArgs` spelling is refused with a pointer to
-      # `specialArgs`.
-      mkNixosAdapter =
-        rawArgs:
-        if rawArgs ? extraSpecialArgs then
-          throw "lib.caisson.home-manager.mkNixosAdapter does not accept `extraSpecialArgs`: pass extra module arguments as `specialArgs`."
-        else if rawArgs ? pkgSets then
-          throw "lib.caisson.home-manager.mkNixosAdapter does not accept `pkgSets`: the homes run on the package set in force where the NixOS configuration is declared, and `defaultPkgs` selects another."
-        else
-          mkNixosAdapterChecked rawArgs;
-      mkNixosAdapterChecked =
-        {
-          users,
-          ecosystemSrc ? null,
-          hostName ? null,
-          hostKind ? "nixos",
-          # The same host's NixOS system evaluated *without* this adapter
-          # module.  Its out path is what standalone home-manager activations
-          # compare against to detect non-home-manager drift; without it the
-          # marker cannot vouch for coherence.
-          baseSystem ? null,
-          sourceMeta ? null,
-          # The package set the homes run on, as the `defaultPkgs` of
-          # `mkConfiguration` selects it; the set in force at the
-          # NixOS configuration when absent. It applies to the
-          # "user-service" mode, where each home is a configuration.
-          defaultPkgs ? null,
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          sharedModules ? [ ],
-          useGlobalPkgs ? true,
-          useUserPackages ? true,
-          # How the NixOS generation triggers home-manager activation:
-          #
-          # "upstream": home-manager's nixos module delivery (system
-          # units at boot).  Fine when the OS declares the users and their
-          # homes are available at boot.
-          #
-          # "user-service": a complete user unit in /etc, gated by
-          # ConditionUser, that runs `activate` when the user's service
-          # manager starts.  It leaves `users.users` untouched, so it is safe for
-          # systemd-homed hosts, where a NixOS-created passwd entry would
-          # conflict with the homed user record and the home directory is
-          # only mounted at login anyway.  Limited to one user: a
-          # shared unit cannot carry per-user ExecStarts.
-          activationMode ? "upstream",
-          specialArgs ? { },
-          ...
-        }:
-        assert final.assertMsg (builtins.elem activationMode [
-          "upstream"
-          "user-service"
-        ]) "mkNixosAdapter: activationMode must be \"upstream\" or \"user-service\".";
-        assert final.assertMsg (
-          activationMode != "user-service" || builtins.length (builtins.attrNames users) == 1
-        ) "mkNixosAdapter: activationMode \"user-service\" supports exactly one user.";
-        mkNixosModule (
-          { ... }:
-          {
-            config,
-            lib,
-            pkgs,
-            ...
-          }:
-          let
-            # The manifest of the NixOS evaluation this module is in,
-            # where caisson performs that evaluation; null in a NixOS
-            # evaluation made another way, a test node for one.
-            nixosManifest = lib.caisson-core.evalManifest or null;
-            system = pkgs.stdenv.hostPlatform.system;
-            # The package sets at the system of the machine, by config
-            # name, as its modules receive them.
-            pkgSetsHere =
-              if nixosManifest == null then
-                { default = pkgs; }
-              else
-                selection.pkgSetsAt {
-                  context = "lib.caisson.home-manager.mkNixosAdapter";
-                  what = "the NixOS configuration at ${system}";
-                } nixosManifest system;
-            sharedClassModules = coreModules ++ moduleImports registry ++ extraModuleImports registry;
-            hmSource = resolveOutPath (resolveSrc ecosystemSrc);
-            resolvedSourceMeta =
-              if sourceMeta != null then
-                sourceMeta
-              else
-                mkSourceMeta {
-                  profileName = "hosted";
-                  inherit
-                    baseSystem
-                    hostKind
-                    hostName
-                    ;
-                  homeManagerOutPath = hmSource;
-                  nixpkgsOutPath = resolveOutPath (pkgs.path or null);
-                };
-            sourceMetaModule = mkSourceMetaModule resolvedSourceMeta;
-
-            mkUserConfig =
-              _username: userArgs:
-              let
-                userModuleImports = userArgs.moduleImports or (_modules: [ ]);
-                userClassModules = userModuleImports registry;
-                configModule =
-                  if userArgs ? configModule then
-                    userArgs.configModule
-                  else
-                    throw "mkNixosAdapter requires `users.<name>.configModule`.";
-              in
-              {
-                imports = userClassModules ++ [ configModule ];
-              };
-          in
-          if activationMode == "user-service" then
-            # No home-manager NixOS module at all: it cannot evaluate without
-            # a `users.users.<name>` entry (its injected defs dereference the
-            # user record), and creating the entry would conflict with
-            # systemd-homed's ownership of the account.  Instead each user is
-            # a home as `mkConfiguration` builds it, the configuration
-            # `home-manager switch` evaluates (the embedded generation is the
-            # standalone generation by construction), and a complete /etc
-            # user unit runs its activation when the user's service manager
-            # starts.
-            #
-            # Each home is finalized here, under the user's name:
-            # beneath the NixOS evaluation where caisson performs it,
-            # so the home runs at the system of the machine and on the
-            # package set in force there, and beneath the composition
-            # otherwise, read at the system of the machine.
-            (
-              let
-                username = builtins.head (builtins.attrNames users);
-                homesParent = if nixosManifest == null then final.caisson-core.libManifest else nixosManifest;
-                userActivations = builtins.mapAttrs (
-                  username: userArgs:
-                  let
-                    evaluations =
-                      final.caisson-core.finalizeChild
-                        {
-                          name = username;
-                          parent = homesParent;
-                          what = "the home of `${username}`";
-                        }
-                        (mkConfiguration {
-                          inherit ecosystemSrc specialArgs defaultPkgs;
-                          configModule =
-                            if userArgs ? configModule then
-                              userArgs.configModule
-                            else
-                              throw "mkNixosAdapter requires `users.<name>.configModule`.";
-                          moduleImports = userArgs.moduleImports or moduleImports;
-                          sourceMeta = userArgs.sourceMeta or resolvedSourceMeta;
-                        });
-                  in
-                  (evaluations.${system} or (throw ''
-                    lib.caisson.home-manager.mkNixosAdapter: the home of `${username}` has
-                    no evaluation at ${system}, the system of this machine. The systems
-                    in force for it are ${
-                      if evaluations == { } then
-                        "none"
-                      else
-                        builtins.concatStringsSep ", " (builtins.attrNames evaluations)
-                    }.
-                  '')
-                  ).value.activationPackage
-                ) users;
-              in
-              {
-                options.caisson-home-manager.hostedActivations = lib.mkOption {
-                  type = lib.types.attrsOf lib.types.package;
-                  readOnly = true;
-                  description = ''
-                    Per-user home-manager activation packages embedded in this
-                    NixOS generation (activationMode = "user-service").
-                  '';
-                };
-
-                config = {
-                  caisson-home-manager.hostedActivations = userActivations;
-
-                  systemd.user.services.home-manager = {
-                    description = "Home Manager activation for ${username}";
-                    unitConfig = {
-                      ConditionUser = username;
-                      RequiresMountsFor = "%h";
-                    };
-                    environment = {
-                      # Mirrors upstream's base unit: Qt tools invoked during
-                      # activation must not require a display.
-                      QT_QPA_PLATFORM = "offscreen";
-                    };
-                    serviceConfig = {
-                      Type = "oneshot";
-                      RemainAfterExit = true;
-                      TimeoutStartSec = "5m";
-                      SyslogIdentifier = "hm-activate-${username}";
-                      # A login shell, as upstream's system units use: the
-                      # standalone activation script expects the user's normal
-                      # environment (nix on PATH to update its profile).
-                      ExecStart = pkgs.writeScript "hm-user-activate-${username}" ''
-                        #! ${pkgs.runtimeShell} -el
-                        exec ${userActivations.${username}}/activate
-                      '';
-                    };
-                    wantedBy = [ "default.target" ];
-                  };
-
-                  environment.etc."caisson-home-manager/source.json".text = builtins.toJSON resolvedSourceMeta;
-                };
-              }
-            )
-          else
-            {
-              imports = [ "${hmSource}/nixos" ];
-
-              "home-manager" = {
-                inherit
-                  useGlobalPkgs
-                  useUserPackages
-                  ;
-                # Framework defaults first; the values the caller passed
-                # win on conflict. The library of an embedded user
-                # generation is the library of the NixOS evaluation
-                # around it, which home-manager's NixOS module extends
-                # with its `hm` namespace and installs as the
-                # submodule's `lib` special argument
-                # (nixos/common.nix). `extraSpecialArgs` merges over
-                # that installation, so a `lib` here would replace the
-                # extended library and take `lib.hm` with it; the
-                # library reaches this path through the NixOS
-                # evaluation instead. That extension is the same
-                # rebuild of nixpkgs' fixpoint the standalone path
-                # composes `lib.hm` to avoid, and it is the nixos
-                # integration that delivers the composed library to a
-                # NixOS evaluation.
-                extraSpecialArgs = {
-                  pkgSets = pkgSetsHere;
-                  sourceMeta = resolvedSourceMeta;
-                }
-                // specialArgs;
-                # The extra entries match the standalone defaults of
-                # mkCommonArgs, so a user generation inside the NixOS
-                # configuration evaluates to the same derivation as the
-                # standalone profile built from the same source.
-                sharedModules =
-                  sharedModules
-                  ++ sharedClassModules
-                  ++ [
-                    sourceMetaModule
-                    { programs.home-manager.path = final.mkDefault hmSource; }
-                    (
-                      {
-                        config,
-                        lib,
-                        pkgs,
-                        ...
-                      }:
-                      {
-                        config = lib.mkMerge [
-                          # Hosted default is the OS's i18n.glibcLocales;
-                          # standalone default is pkgs.glibcLocales.
-                          { i18n.glibcLocales = lib.mkDefault pkgs.glibcLocales; }
-                          # Upstream skips the home-manager CLI for submodule
-                          # evaluations, but the standalone CLI must
-                          # survive a nixos-rebuild "revert" or the user cannot
-                          # layer standalone switches afterwards.
-                          (lib.mkIf (config.programs.home-manager.enable && config.submoduleSupport.enable) {
-                            home.packages = [ config.programs.home-manager.package ];
-                          })
-                        ];
-                      }
-                    )
-                  ];
-                users = lib.mapAttrs mkUserConfig users;
-              };
-
-              environment.etc."caisson-home-manager/source.json".text = builtins.toJSON resolvedSourceMeta;
-            }
-        );
-
-      assertSourceCoherence =
-        {
-          hostSourceMeta,
-          targetSourceMeta,
-          allowDrift ? false,
-        }:
-        let
-          hostFp = hostSourceMeta.fingerprint or null;
-          targetFp = targetSourceMeta.fingerprint or null;
-        in
-        if allowDrift then
-          true
-        else if hostFp == null || targetFp == null then
-          throw "Source coherence check failed: fingerprint missing from host or target metadata."
-        else if hostFp == targetFp then
-          true
-        else
-          throw ''
-            Source coherence check failed.
-            host fingerprint: ${hostFp}
-            target fingerprint: ${targetFp}
-          '';
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
@@ -1019,9 +570,6 @@
             osConfig ? null,
             # home-manager's `check`.
             check ? null,
-            # The source metadata the activation coherence check
-            # compares; derived from the sources when absent.
-            sourceMeta ? null,
           }@args:
           configuration { } args;
         # The same arguments and `ecosystemArgs`, the evaluator's
@@ -1036,18 +584,11 @@
             specialArgs ? null,
             osConfig ? null,
             check ? null,
-            sourceMeta ? null,
             ecosystemArgs ? null,
           }@args:
           configuration { } args;
         extra = {
-          inherit
-            assertSourceCoherence
-            mkNixosAdapter
-            mkSourceMeta
-            mkStandaloneAdapter
-            mkTopConfiguration
-            ;
+          inherit mkTopConfiguration;
           # What an alt over this class builds on: the composition,
           # the evaluator's call, and the two put together as a
           # configuration of this integration (`configuration`, given

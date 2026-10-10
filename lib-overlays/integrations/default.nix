@@ -325,8 +325,8 @@
       # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
       # result holds `namespace`, the value of `lib.caisson.<name>` (the
       # entry points, the registration form `mkModule` bound to the
-      # class, and whatever `extra` adds beside them: variants,
-      # adapters, the composition an alt over the class reads), and
+      # class, and whatever `extra` adds beside them: variants, and
+      # the composition an alt over the class reads), and
       # `classes`, the declaration of the class for the index, so
       # `mkModules` registers the class through this integration. The
       # overlay file writes both under their keys, since an overlay's

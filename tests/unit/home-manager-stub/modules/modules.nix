@@ -87,8 +87,7 @@ let
           type = lib.types.str;
           default = "home-manager-cli";
         };
-        # The activation entries, which the integration's source
-        # metadata module defines into.
+        # The steps of the activation of the home.
         home.activation = lib.mkOption {
           type = lib.types.attrs;
           default = { };

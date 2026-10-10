@@ -373,16 +373,6 @@ let
       in
       system.config.probePkgs ? hello;
 
-    sourceMetaProvenanceIsCompositional =
-      let
-        meta = composed.lib.caisson.home-manager.mkSourceMeta {
-          profileName = "pinned-world";
-          homeManagerOutPath = "/probe-hm";
-          nixpkgsOutPath = "/probe-np";
-        };
-      in
-      meta.schemaVersion == 3 && meta.homeManagerOutPath == "/probe-hm" && meta ? fingerprint;
-
     ecosystemSrcValidationThrows =
       let
         throws = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
@@ -421,81 +411,14 @@ let
               home.stateVersion = "25.05";
             };
         };
-        meta = home.config.caisson-home-manager.sourceMeta;
       in
       builtins.isString home.activationPackage.drvPath
       && home.config.home.username == "probe"
       # The home runs on the package set the composition declares.
       && home.pkgs.pinnedWorldProbe == "the set the composition declares"
-      && meta.schemaVersion == 3
-      && meta.homeManagerOutPath == builtins.toString inputs.home-manager
-      && meta.nixpkgsOutPath == builtins.toString pkgs.path;
-
-    nixosAdapterUpstreamModeEvaluatesEndToEnd =
-      let
-        system = hiveLib.caisson.nixos.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
-          configModule =
-            { ... }:
-            {
-              imports = [
-                minimalNixosBase
-                (hiveLib.caisson.home-manager.mkNixosAdapter {
-                  ecosystemSrc = inputs.home-manager;
-                  hostName = "pinned-world-probe";
-                  users.probe.configModule =
-                    { ... }:
-                    {
-                      home.stateVersion = "25.05";
-                    };
-                })
-              ];
-              users.users.probe = {
-                isNormalUser = true;
-                home = "/home/probe";
-              };
-            };
-        };
-        # fromJSON refuses context-carrying strings; the marker file
-        # embeds store paths as ordinary references.
-        marker = builtins.fromJSON (
-          builtins.unsafeDiscardStringContext
-            system.config.environment.etc."caisson-home-manager/source.json".text
-        );
-      in
-      builtins.isString system.config.system.build.toplevel.drvPath
-      && system.config.home-manager.users.probe.home.stateVersion == "25.05"
-      && marker.hostName == "pinned-world-probe"
-      && marker.schemaVersion == 3;
-
-    nixosAdapterUserServiceModeEvaluatesEndToEnd =
-      let
-        system = hiveLib.caisson.nixos.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
-          configModule =
-            { ... }:
-            {
-              imports = [
-                minimalNixosBase
-                (hiveLib.caisson.home-manager.mkNixosAdapter {
-                  ecosystemSrc = inputs.home-manager;
-                  activationMode = "user-service";
-                  hostName = "pinned-world-probe-homed";
-                  users.probe.configModule =
-                    { ... }:
-                    {
-                      home.username = "probe";
-                      home.homeDirectory = "/home/probe";
-                      home.stateVersion = "25.05";
-                    };
-                })
-              ];
-            };
-        };
-      in
-      builtins.isString system.config.caisson-home-manager.hostedActivations.probe.drvPath
-      && system.config.systemd.user.services.home-manager.unitConfig.ConditionUser == "probe"
-      && builtins.isString system.config.system.build.toplevel.drvPath;
+      # The home-manager command of the home comes from the
+      # home-manager source the home was evaluated with.
+      && home.config.programs.home-manager.path == builtins.toString inputs.home-manager;
 
     # Two homes declared inside a NixOS configuration, evaluated with
     # the real home-manager over the real NixOS. The machine declares
