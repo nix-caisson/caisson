@@ -561,6 +561,37 @@ let
       && !(machine.systemd.user.services ? home-manager-declared)
       && builtins.isString machine.system.build.toplevel.drvPath;
 
+    # The same machine records which NixOS configuration it runs, in
+    # `/etc/caisson-home-manager/source.json`. The recorded path is
+    # the system of the machine with its homes left out, so it is a
+    # store path that differs from the system the machine builds,
+    # which has the units of the homes in it. Each home computes the
+    # same path from its side, and the script that compares the two
+    # when the home is activated contains it.
+    aMachineRecordsWhatItsHomesCompareAgainst =
+      let
+        machine = machineWithHomes.nixosConfigurations.probe.config;
+        homes = [
+          machineWithHomes.homeConfigurations."declared@probe"
+          machineWithHomes.homeConfigurations."undeclared@probe"
+        ];
+        # fromJSON refuses a string that refers to a store path.
+        record = builtins.fromJSON (
+          builtins.unsafeDiscardStringContext machine.environment.etc."caisson-home-manager/source.json".text
+        );
+        base = record.baseSystemOutPath;
+        comparesAgainstIt =
+          home:
+          pkgs.lib.hasInfix base (
+            builtins.unsafeDiscardStringContext home.config.home.activation.caissonMachineDrift.data
+          );
+      in
+      record.hostName == "probe"
+      && record.schemaVersion == 3
+      && pkgs.lib.hasPrefix builtins.storeDir base
+      && base != builtins.unsafeDiscardStringContext machine.system.build.toplevel.outPath
+      && builtins.all comparesAgainstIt homes;
+
     colmenaHiveEvaluatesEndToEnd =
       let
         hive = hiveLib.caisson.colmena.mkConfiguration {

@@ -12,7 +12,7 @@
 # accounts under `users.users`, and the Nix the machine runs.
 [
   (
-    { lib, ... }:
+    { config, lib, ... }:
     {
       options = {
         nixpkgs.pkgs = lib.mkOption {
@@ -58,6 +58,23 @@
           type = lib.types.listOf lib.types.raw;
           default = [ ];
         };
+        # The files a machine installs under `/etc`. A machine with
+        # homes declared inside it writes a record of which NixOS
+        # configuration it runs there.
+        environment.etc = lib.mkOption {
+          type = lib.types.attrsOf lib.types.raw;
+          default = { };
+        };
+        # The system the configuration builds. The store path of the
+        # stub names how many system units the configuration has, so
+        # a test can tell the system of an evaluation that activates
+        # homes from the system of an evaluation that does not.
+        system.build.toplevel = lib.mkOption {
+          type = lib.types.raw;
+          default = {
+            outPath = "/nix/store/stub-system-with-${toString (builtins.length (builtins.attrNames config.systemd.services))}-units";
+          };
+        };
         stub.fromBaseModules = lib.mkOption {
           type = lib.types.bool;
           default = false;
@@ -68,6 +85,10 @@
       # `utils`. The module that activates homes uses the function
       # that makes a string safe as part of a unit name.
       config._module.args.utils.escapeSystemdPath = name: name;
+      # NixOS hands its modules the package set as the argument
+      # `pkgs`. The record a machine writes names the nixpkgs of the
+      # set, which the set holds as `path`.
+      config._module.args.pkgs = lib.mkDefault { path = "/nix/store/stub-nixpkgs"; };
     }
   )
 ]
