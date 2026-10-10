@@ -3932,20 +3932,22 @@ in
         };
       };
 
-      # A NixOS configuration with a home declared inside it records
-      # which NixOS configuration it runs, in the file
-      # `caisson-home-manager/source.json` under `/etc`. The recorded
-      # path is the system of the machine with its homes left out.
+      # A NixOS configuration with a home declared inside it writes the
+      # file `caisson-home-manager/source.json` under `/etc`. The file
+      # holds a store path. The store path is the system of the
+      # machine with the homes left out.
       #
-      # The stub of NixOS names the number of system units in the
-      # store path of the system. The machine `laptop` has one home
-      # with a declared account, so its system has one unit, and the
-      # recorded path must be the system with none.
+      # The stub of NixOS puts the number of system units into the
+      # store path of a system. The machine `laptop` has one home, and
+      # `laptop` declares the account of that home. The system of
+      # `laptop` therefore has one unit. The store path in the file
+      # must be the system with no units.
       #
-      # `bare` has no home and writes no record. `outer` has no home
-      # either: the only home is inside the machine `image` that is
-      # itself inside `outer`, so `image` writes a record and `outer`
-      # does not.
+      # The machine `bare` has no home, and writes no file.
+      #
+      # The machine `outer` has a machine `image` declared inside it,
+      # and `image` has a home. That home belongs to `image`. So
+      # `image` writes the file, and `outer` does not.
       "test: a NixOS configuration with homes records the system it runs without them" = {
         expr =
           let

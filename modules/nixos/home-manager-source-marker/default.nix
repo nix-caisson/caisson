@@ -1,55 +1,68 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS module that records, on the machine, which NixOS
-# configuration the machine is running. A home declared inside the
-# NixOS configuration reads the record when it is activated, and warns
-# when it was built for a different NixOS configuration.
+# A NixOS module for a NixOS configuration that has homes declared
+# inside it. The module writes a file on the machine. The file names
+# the NixOS configuration that the machine is running. A home reads
+# the file when the home is activated. The home prints a warning if
+# the home was built for a different NixOS configuration.
 #
 # Why a home needs this
 #
-# A home declared inside a NixOS configuration is activated by the
-# machine, and the user can also activate it by hand with
-# `home-manager switch`. The second way builds the home from whatever
-# source the user has checked out. That source may describe a machine
-# that differs from the machine that is running: the user changed the
-# NixOS configuration and has not switched the machine yet, or the
-# checkout is older than the machine. A home reads settings of its
-# machine, so a home built from such a source can disagree with the
-# machine it is activated on.
+# The machine activates the homes declared inside its NixOS
+# configuration. The user can also activate such a home by hand, with
+# `home-manager switch`. `home-manager switch` builds the home from
+# the source the user has checked out.
 #
-# What is recorded
+# That source can describe a different machine than the machine that
+# is running. This happens when the user changed the NixOS
+# configuration and has not switched the machine yet. It also happens
+# when the checkout is older than the machine.
 #
-# The module writes `/etc/caisson-home-manager/source.json`. The field
-# `baseSystemOutPath` is the store path of the system of this NixOS
-# configuration as its childless evaluation builds it. The childless
-# evaluation leaves out the configurations declared inside the NixOS
-# configuration, the homes among them. So the path identifies the
-# machine apart from its homes, and a change to a home does not change
-# it.
+# A home reads settings of its machine. A home built from such a
+# source has read the settings of a machine that is not the machine
+# the home is activated on.
 #
-# A home declared inside the NixOS configuration reads the same
-# childless evaluation through its manifest, and so computes the same
-# path from the same source. The home-manager module
-# `nixos-source-marker` compares the two when the home is activated.
+# What the file holds
 #
-# The other fields say where the record came from: the name of the
-# NixOS configuration, the source tree of the flake, and the nixpkgs
-# of the package set.
+# The file is `/etc/caisson-home-manager/source.json`. The field
+# `baseSystemOutPath` of the file is a store path. The store path is
+# the system that the childless evaluation of this NixOS configuration
+# builds.
+#
+# The childless evaluation is the evaluation of the NixOS
+# configuration that leaves out the configurations declared inside the
+# NixOS configuration. The homes are among those configurations. So
+# the store path does not depend on the homes. Changing a home leaves
+# the store path the same. Changing anything else about the machine
+# changes the store path.
+#
+# A home declared inside the NixOS configuration can read the same
+# childless evaluation through the manifest of the home. The home
+# therefore computes the same store path from the same source. The
+# home-manager module `nixos-source-marker` compares the store path
+# the home computed with the store path in the file.
+#
+# The other fields of the file say where the file came from. They are
+# the name of the NixOS configuration, the source tree of the flake,
+# and the nixpkgs of the package set.
 #
 # Cost
 #
-# Writing the record evaluates the system of the childless evaluation,
-# which is a second evaluation of the whole NixOS configuration. The
-# module writes the record only when at least one home is declared
-# inside the NixOS configuration, so a machine with no homes does not
-# pay for it.
+# To write the file, the module evaluates the system of the childless
+# evaluation. That is a second evaluation of the whole NixOS
+# configuration. The module writes the file only when at least one
+# home is declared inside the NixOS configuration. A machine with no
+# homes does not pay for the second evaluation.
 #
 # Where the module defines nothing
 #
-# The childless evaluation has no homes, so there the module defines
-# nothing. A NixOS evaluation that has no `environment.etc` option,
-# which the nixos-minimal integration can produce, cannot hold the
-# file, so there the module also defines nothing.
+# The module defines nothing in the childless evaluation, because the
+# childless evaluation has no homes.
+#
+# The module also defines nothing in a NixOS evaluation that has no
+# `environment.etc` option. The nixos-minimal integration can produce
+# such an evaluation, and such an evaluation has nowhere to put the
+# file.
 { ... }:
 {
   config,
@@ -63,11 +76,13 @@ let
 
   hasEtc = options ? environment && options.environment ? etc;
 
-  # True for a home that belongs to this machine. `entry.path` is the
-  # path from this NixOS configuration to the configuration of the
-  # entry, a list of `{ type, name }` segments. A NixOS configuration
-  # on the path is a machine inside this machine, and the home belongs
-  # to it.
+  # True for a home that belongs to this machine.
+  #
+  # `entry.path` is a list of `{ type, name }` segments. The list is
+  # the path from this NixOS configuration to the configuration of the
+  # entry. A NixOS configuration on that path is a machine inside this
+  # machine. A home below such a machine belongs to that machine and
+  # not to this machine.
   isHomeOfThisMachine =
     entry:
     entry.manifest.type == "home-manager"
@@ -84,9 +99,10 @@ let
     else
       toString value;
 
-  # The store path is recorded as a plain string. A string that refers
-  # to the system would make the file depend on that system, and the
-  # machine would then build a second system only to name it.
+  # The store path is written as a plain string. A string that refers
+  # to the system would make the file depend on the system. The
+  # machine would then have to build the system of the childless
+  # evaluation, only to write the name of that system into the file.
   baseSystemOutPath = builtins.unsafeDiscardStringContext evalManifest.childlessManifest.outputs.toplevel.outPath;
 
   record = {

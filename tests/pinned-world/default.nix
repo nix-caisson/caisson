@@ -561,13 +561,18 @@ let
       && !(machine.systemd.user.services ? home-manager-declared)
       && builtins.isString machine.system.build.toplevel.drvPath;
 
-    # The same machine records which NixOS configuration it runs, in
-    # `/etc/caisson-home-manager/source.json`. The recorded path is
-    # the system of the machine with its homes left out, so it is a
-    # store path that differs from the system the machine builds,
-    # which has the units of the homes in it. Each home computes the
-    # same path from its side, and the script that compares the two
-    # when the home is activated contains it.
+    # The same machine writes the file
+    # `/etc/caisson-home-manager/source.json`. The file holds a store
+    # path. The store path is the system of the machine with the homes
+    # left out.
+    #
+    # The system that the machine builds has the units of the homes in
+    # it. So the store path in the file must differ from the system
+    # that the machine builds.
+    #
+    # Each home computes the same store path. The activation of each
+    # home has a step that compares that store path with the file. The
+    # script of the step must therefore contain the store path.
     aMachineRecordsWhatItsHomesCompareAgainst =
       let
         machine = machineWithHomes.nixosConfigurations.probe.config;

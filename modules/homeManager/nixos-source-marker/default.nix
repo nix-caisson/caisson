@@ -1,53 +1,65 @@
 # SPDX-License-Identifier: MIT
 #
 # A home-manager module for a home that is declared inside a NixOS
-# configuration. When the home is activated, it warns if the home was
-# built for a NixOS configuration that differs from the machine that is
-# running.
+# configuration. The module adds a step to the activation of the home.
+# The step prints a warning if the home was built for a NixOS
+# configuration that differs from the machine that is running.
 #
 # Why
 #
-# A home declared inside a NixOS configuration is activated by the
-# machine, and the user can also activate it by hand with
-# `home-manager switch`. The second way builds the home from whatever
-# source the user has checked out. That source may describe a machine
-# that differs from the machine that is running: the user changed the
-# NixOS configuration and has not switched the machine yet, or the
-# checkout is older than the machine. A home reads settings of its
-# machine, so a home built from such a source can disagree with the
-# machine it is activated on.
+# The machine activates the homes declared inside its NixOS
+# configuration. The user can also activate such a home by hand, with
+# `home-manager switch`. `home-manager switch` builds the home from
+# the source the user has checked out.
+#
+# That source can describe a different machine than the machine that
+# is running. This happens when the user changed the NixOS
+# configuration and has not switched the machine yet. It also happens
+# when the checkout is older than the machine.
+#
+# A home reads settings of its machine. A home built from such a
+# source has read the settings of a machine that is not the machine
+# the home is activated on.
 #
 # How
 #
-# The machine records which NixOS configuration it is running, in
-# `/etc/caisson-home-manager/source.json`. The NixOS module
-# `home-manager-source-marker` writes that file. Its field
-# `baseSystemOutPath` is the store path of the system of the NixOS
-# configuration as its childless evaluation builds it, which is the
-# evaluation that leaves out the homes.
+# The machine has a file, `/etc/caisson-home-manager/source.json`,
+# that names the NixOS configuration the machine is running. The NixOS
+# module `home-manager-source-marker` writes the file. The field
+# `baseSystemOutPath` of the file is a store path. The store path is
+# the system that the childless evaluation of the NixOS configuration
+# builds. The childless evaluation is the evaluation that leaves out
+# the homes.
 #
-# This module computes the same path from the source the home is built
-# from. It reads the childless evaluation of the NixOS configuration
-# through the manifest of the home. The activation of the home
-# compares the path with the path in the file, and prints a warning
-# when they differ or when the file is missing. It does not stop the
-# activation.
+# This module computes the same store path from the source the home is
+# built from. The module reads the childless evaluation of the NixOS
+# configuration through the manifest of the home.
 #
-# When the machine activates the home itself, the file already belongs
-# to the generation that is being activated, so the paths are equal.
+# The step in the activation compares the store path this module
+# computed with the store path in the file. The step prints a warning
+# when the two store paths differ. The step also prints a warning when
+# the file does not exist. The step does not stop the activation.
+#
+# When the machine activates the home, the file on the machine already
+# belongs to the generation that is being activated. The two store
+# paths are then equal, and the step prints nothing.
 #
 # Cost
 #
 # Building the activation package of the home evaluates the system of
 # the childless evaluation of the NixOS configuration.
 #
-# A NixOS configuration adds this module to the modules that the homes
-# declared inside it import by default. caisson's `default` NixOS
-# module does that, through `caisson.forChildren`. A home that passes
-# `moduleImports` selects its modules itself, and gets this module
-# only if it lists it. The module reads the machine through the
-# manifest of the home, so it can only be imported by a home that has
-# a NixOS configuration above it.
+# Which homes import this module
+#
+# caisson's `default` NixOS module gives this module to the homes
+# declared inside the NixOS configuration, through
+# `caisson.forChildren`. Such a home imports this module by default.
+# A home that passes `moduleImports` selects its modules itself. That
+# home imports this module only if the home lists it.
+#
+# The module reads the NixOS configuration through the manifest of the
+# home. A home with no NixOS configuration above it cannot import this
+# module.
 { ... }:
 # `lib` is the library of the home, and `config` is the configuration
 # of the home.
@@ -62,11 +74,15 @@ let
   # the home is declared inside.
   machine = lib.caisson.evalManifest.nearest.nixos;
 
-  # The store path of the system of that evaluation, as a plain string.
-  # A string that refers to the system would make the home depend on
-  # the system, and building the home would then build the system.
-  # It is null for a NixOS configuration that builds no system, which
-  # the nixos-minimal integration can produce.
+  # The store path of the system that the childless evaluation builds.
+  #
+  # The store path is kept as a plain string. A string that refers to
+  # the system would make the home depend on the system. Building the
+  # home would then build the system.
+  #
+  # The value is null for a NixOS configuration that builds no system.
+  # The nixos-minimal integration can produce such a NixOS
+  # configuration.
   expected =
     if machine.outputs ? toplevel then
       builtins.unsafeDiscardStringContext machine.outputs.toplevel.outPath
@@ -81,15 +97,17 @@ in
     type = lib.types.bool;
     default = true;
     description = ''
-      Whether the activation of this home warns when the home was built
-      for a NixOS configuration that differs from the machine that is
-      running.
+      Whether the activation of this home prints a warning when the
+      home was built for a NixOS configuration that differs from the
+      machine that is running.
 
-      The machine records the NixOS configuration it runs in
-      `/etc/caisson-home-manager/source.json`. The activation compares
-      that record with the NixOS configuration in the source this home
-      was built from. The comparison leaves the homes out, so a change
-      to a home does not cause a warning.
+      The file `/etc/caisson-home-manager/source.json` on the machine
+      names the NixOS configuration the machine is running. The
+      activation of this home compares the file with the NixOS
+      configuration in the source this home was built from.
+
+      The comparison leaves the homes out. A change to a home does not
+      cause a warning.
     '';
   };
 

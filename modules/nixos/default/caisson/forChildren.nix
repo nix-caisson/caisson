@@ -9,9 +9,10 @@
 # this NixOS configuration imports by default.
 #
 # `nixos-source-marker` is the module caisson registers as
-# `modules/homeManager/nixos-source-marker`. When the home is
-# activated, it warns if the home was built for a NixOS configuration
-# that differs from the machine that is running.
+# `modules/homeManager/nixos-source-marker`. It adds a step to the
+# activation of the home. The step prints a warning if the home was
+# built for a NixOS configuration that differs from the machine that
+# is running.
 #
 # `nixos-parent` is the module caisson registers as
 # `modules/homeManager/nixos-parent`. It sets the options of a home
