@@ -12,8 +12,9 @@
 # configuration is a caisson configuration, and this module gives it
 # the same settings.
 #
-# caisson's `default` home-manager module imports this module in a
-# home that is declared inside a NixOS configuration. A home that
+# A NixOS configuration adds this module to the modules that the
+# homes declared inside it import by default. caisson's `default`
+# NixOS module does that, through `caisson.forChildren`. A home that
 # passes `moduleImports` selects its modules itself, and gets this
 # module only if it lists it.
 #
