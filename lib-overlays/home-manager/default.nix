@@ -348,6 +348,28 @@
             home.username = lib.mkDefault name;
           };
 
+          # The NixOS configuration the home is declared inside, when
+          # there is one. It is the nearest NixOS configuration above
+          # the home, so a structural configuration between the two
+          # changes nothing. The manifest holds the childless
+          # evaluation of that NixOS configuration, which is the
+          # evaluation that leaves out the configurations declared
+          # inside it. The home is one of those, so the full
+          # evaluation would depend on the home.
+          machine = manifest.nearest.nixos or null;
+
+          # home-manager hands a home the configuration of its machine
+          # as the module argument `osConfig`, and null when the home
+          # has no machine. An `osConfig` passed to the constructor
+          # takes the place of the configuration of the machine.
+          osConfig =
+            if (args.osConfig or null) != null then
+              args.osConfig
+            else if machine != null then
+              machine.value.config
+            else
+              null;
+
           hmSource = resolveOutPath (resolveSrc (args.ecosystemSrc or null));
           resolvedSourceMeta =
             if (args.sourceMeta or null) != null then
@@ -385,10 +407,20 @@
           extraSpecialArgs = {
             # The package sets at the system of the home, by config
             # name.
-            inherit pkgSets;
-            osConfig = args.osConfig or null;
+            inherit pkgSets osConfig;
             sourceMeta = resolvedSourceMeta;
           }
+          # home-manager also hands a home inside a machine the class
+          # of the machine, as `osClass`. A home with no machine gets
+          # no such argument from home-manager, so none is added here.
+          #
+          # home-manager's legacy argument `nixosConfig` is left at
+          # null, the value home-manager gives it in a home with no
+          # machine. home-manager's fontconfig module reads
+          # `nixosConfig.home-manager`, an option that only
+          # home-manager's NixOS module declares, and caisson does not
+          # use that module.
+          // (if machine != null then { osClass = "nixos"; } else { })
           // (if (args.specialArgs or null) != null then args.specialArgs else { });
           # The module tree the evaluation reads: home-manager's
           # module list, its module files and the `modulesPath` special
@@ -980,8 +1012,10 @@
             # Extra module arguments, merged over those the framework
             # supplies; home-manager names these `extraSpecialArgs`.
             specialArgs ? null,
-            # The NixOS configuration around this configuration, the
-            # `osConfig` module argument.
+            # The value of the module argument `osConfig`. When absent,
+            # a home declared inside a NixOS configuration gets the
+            # configuration of that NixOS configuration, and any other
+            # home gets null.
             osConfig ? null,
             # home-manager's `check`.
             check ? null,

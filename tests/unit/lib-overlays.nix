@@ -3153,6 +3153,15 @@ in
             home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
             nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
           };
+          # caisson's `default` NixOS module, which a flake that takes
+          # caisson as a project has in its registry. A NixOS
+          # configuration imports it unless the NixOS configuration
+          # passes `moduleImports`.
+          modules = _lib: {
+            nixos = {
+              inherit (lib.caisson-core.modules.nixos) default;
+            };
+          };
           configs = callbackLib: {
             homeManager.chris = callbackLib.caisson.home-manager.mkModule (
               { ... }:
@@ -3608,6 +3617,154 @@ in
             set = "default at x86_64-linux";
           };
           aTopHasNoDeclaredName = "";
+        };
+      };
+
+      # A home declared inside a NixOS configuration is given its
+      # machine. The home-manager integration hands it the
+      # configuration of the machine as `osConfig`. The `default`
+      # NixOS module of caisson adds the module `nixos-parent` to the
+      # modules the home imports by default, and that module sets the
+      # home directory and the user ID from the account the machine
+      # declares, the Nix of the machine, and the option home-manager
+      # reads to tell that a machine activates the home.
+      #
+      # The five homes below are these. A home whose account the
+      # machine declares. A home whose account the machine does not
+      # declare, as with an account that systemd-homed manages. A home
+      # that passes `moduleImports` and so selects its modules itself.
+      # A home inside a NixOS configuration that passes
+      # `moduleImports`, and so does not import the `default` NixOS
+      # module. A home declared outside any machine.
+      "test: a home declared inside a NixOS configuration is given its machine" = {
+        expr =
+          let
+            lib = treeLibWith [ "x86_64-linux" ];
+            # What a home sees of its machine through `osConfig`.
+            probe =
+              { osConfig, ... }:
+              {
+                seenLib.machineNix = if osConfig == null then null else osConfig.nix.package;
+                programs.home-manager.enable = true;
+              };
+            # The class of the machine, which only a home inside a
+            # machine is handed.
+            classProbe =
+              { osClass, ... }:
+              {
+                seenLib.machineClass = osClass;
+              };
+            top = lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.home-manager.configurations.alone = home lib { configModule = probe; };
+                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.declared = {
+                          home = "/home/declared";
+                          uid = 1001;
+                        };
+                        caisson.home-manager.configurations = {
+                          declared = home lib {
+                            configModule.imports = [
+                              probe
+                              classProbe
+                            ];
+                          };
+                          undeclared = home lib { configModule = probe; };
+                          selecting = home lib {
+                            configModule = probe;
+                            moduleImports = _modules: [ ];
+                          };
+                        };
+                      };
+                  };
+                  # A NixOS configuration that selects its modules
+                  # itself. It does not import caisson's `default`
+                  # NixOS module, so it adds nothing to the default
+                  # modules of the home declared inside it.
+                  caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
+                    moduleImports = _modules: [ ];
+                    configModule =
+                      { lib, ... }:
+                      {
+                        users.users.declared = {
+                          home = "/home/declared";
+                          uid = 1001;
+                        };
+                        caisson.home-manager.configurations.declared = home lib { configModule = probe; };
+                      };
+                  };
+                };
+            };
+            seen =
+              home:
+              let
+                inherit (home) config;
+              in
+              {
+                inherit (config.seenLib) machineNix;
+                inherit (config.home) homeDirectory uid packages;
+                nix = config.nix.package;
+                activatedByAMachine = config.submoduleSupport.enable;
+              };
+            homes = top.homeConfigurations;
+          in
+          {
+            declared = seen homes."declared@laptop" // {
+              inherit (homes."declared@laptop".config.seenLib) machineClass;
+            };
+            undeclared = seen homes."undeclared@laptop";
+            selecting = seen homes."selecting@laptop";
+            insideAMachineThatSelects = seen homes."declared@bare";
+            alone = seen homes.alone;
+          };
+        expected = {
+          declared = {
+            machineNix = "nix-of-the-machine";
+            machineClass = "nixos";
+            homeDirectory = "/home/declared";
+            uid = 1001;
+            packages = [ "home-manager-cli" ];
+            nix = "nix-of-the-machine";
+            activatedByAMachine = true;
+          };
+          undeclared = {
+            machineNix = "nix-of-the-machine";
+            homeDirectory = "";
+            uid = null;
+            packages = [ "home-manager-cli" ];
+            nix = "nix-of-the-machine";
+            activatedByAMachine = true;
+          };
+          selecting = {
+            machineNix = "nix-of-the-machine";
+            homeDirectory = "";
+            uid = null;
+            packages = [ ];
+            nix = null;
+            activatedByAMachine = false;
+          };
+          insideAMachineThatSelects = {
+            machineNix = "nix-of-the-machine";
+            homeDirectory = "";
+            uid = null;
+            packages = [ ];
+            nix = null;
+            activatedByAMachine = false;
+          };
+          alone = {
+            machineNix = null;
+            homeDirectory = "";
+            uid = null;
+            packages = [ ];
+            nix = null;
+            activatedByAMachine = false;
+          };
         };
       };
 
