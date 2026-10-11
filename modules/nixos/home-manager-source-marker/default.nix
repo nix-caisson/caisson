@@ -59,7 +59,7 @@
 # `environment.etc` option. The nixos-minimal integration can produce
 # such an evaluation, and such an evaluation has nowhere to put the
 # file.
-{ ... }:
+{ closure-lib, ... }:
 {
   config,
   lib,
@@ -92,6 +92,10 @@ let
   baseSystemOutPath = builtins.unsafeDiscardStringContext evalManifest.childlessManifest.outputs.toplevel.outPath;
 in
 {
+  # The module reads `config.caisson.exports.configurations`. The core
+  # module declares that option.
+  imports = [ closure-lib.caisson-core.modules.nixos.core ];
+
   # `optionalAttrs` and not `mkIf` decides whether the option is
   # defined at all. A definition under `mkIf false` is still a
   # definition, and NixOS refuses a definition of an option that no

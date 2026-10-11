@@ -4,5 +4,10 @@
 { closure-lib, ... }:
 { ... }:
 {
-  imports = [ (import ./forChildren.nix { inherit closure-lib; }) ];
+  imports = [
+    # `forChildren.nix` sets an option under `caisson.forChildren`.
+    # The core module declares those options.
+    closure-lib.caisson-core.modules.nixos.core
+    (import ./forChildren.nix { inherit closure-lib; })
+  ];
 }
