@@ -30,12 +30,11 @@ in
       // {
         # The `lib` output is the composed library of this evaluation.
         #
-        # Only the `lib` flake output can hold values of any shape. A
-        # value that fits no other flake output is published here. The
-        # manifest of this evaluation is such a value. It is at
-        # `lib.caisson-core.evalManifest`. A flake
-        # that lists this flake in `projects` reads what this flake
-        # exports from that manifest.
+        # The manifest of this evaluation is in the composed library,
+        # at `lib.caisson-core.evalManifest`. A flake that lists this
+        # flake in `projects` reads what this flake exports from that
+        # manifest. The manifest is published in `lib` because the
+        # other flake outputs each have a fixed shape.
         inherit lib;
         libOverlays = exports.libOverlays;
         modules = exports.modules // {
