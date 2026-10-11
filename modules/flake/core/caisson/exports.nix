@@ -28,7 +28,7 @@ in
         pkgOverlays = exports.pkgOverlays;
       }
       // {
-        # The composed library of this evaluation, whole.
+        # The `lib` output is the composed library of this evaluation.
         #
         # Only the `lib` flake output can hold values of any shape. A
         # value that fits no other flake output is published here. The
