@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake outputs of what the selectors chose: `caisson.exports`
-# copied into `flake.lib`, `flake.libOverlays`, `flake.modules` and,
-# when the selection holds any, `flake.pkgOverlays`, with these
+# copied into `flake.libOverlays`, `flake.modules` and, when the
+# selection holds any, `flake.pkgOverlays`, with these
 # flake-parts conventions on top: the `flake` class always exports a
 # `default` entry (an empty module unless the selection provides it),
 # so `flakeModules.default` exists for consumers that import it by
@@ -28,7 +28,15 @@ in
         pkgOverlays = exports.pkgOverlays;
       }
       // {
-        lib = exports.lib;
+        # The composed library of this evaluation, whole.
+        #
+        # `lib` is the one flake output that can hold values of any
+        # shape, so everything a flake publishes that has no output of
+        # its own is published here. That includes the manifest of
+        # this evaluation, at `lib.caisson-core.evalManifest`. A flake
+        # that lists this flake in `projects` reads what this flake
+        # exports from that manifest.
+        inherit lib;
         libOverlays = exports.libOverlays;
         modules = exports.modules // {
           flake = {

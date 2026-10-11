@@ -106,7 +106,7 @@ let
 
 in
 {
-  config.caisson.exports = lib.genAttrs [ "lib" "libOverlays" "modules" "pkgOverlays" ] passedUp // {
+  config.caisson.exports = lib.genAttrs [ "libOverlays" "modules" "pkgOverlays" ] passedUp // {
     configurations = lib.caisson.integrations.entriesOf selected;
   };
 
