@@ -12,11 +12,6 @@ in
 {
   options.caisson.exports = {
 
-    lib = lib.mkOption {
-      type = lib.types.lazyAttrsOf lib.types.raw;
-      description = "The part of the composed library `caisson.lib.exported` selected, merged with what lies beneath.";
-    };
-
     libOverlays = lib.mkOption {
       type = lib.types.attrsOf types.libOverlay;
       description = "The registered library overlays `caisson.libOverlays.exported` selected, merged with what lies beneath.";

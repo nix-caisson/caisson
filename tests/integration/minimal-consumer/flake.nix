@@ -26,10 +26,9 @@
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
         # The project's name, also the namespace this composition
-        # contributes to the composed library.
-        # `caisson.lib.export.enabled` publishes the namespace named
-        # here, so the `lib` flake output is this overlay's contribution
-        # and nothing else.
+        # contributes to the composed library. The `lib` flake output
+        # is the composed library, so this overlay's contribution is
+        # at `lib.minimal-consumer`.
         name = "minimal-consumer";
 
         libOverlays = coreLib: {

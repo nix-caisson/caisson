@@ -124,67 +124,6 @@ let
 
 in
 {
-  # The default selector for `caisson.lib.exported`: a function of the
-  # composed library that looks up the namespace named after the
-  # project, the `name` that library's composition declares. These tests apply it to libraries directly, so
-  # what they observe is the lookup and nothing around it.
-  libExport =
-    let
-      selectorOf =
-        composed:
-        (composed.caisson-core.finalizeTop (
-          composed.caisson.structural.mkConfiguration {
-            configModule = { };
-            moduleImports = _modules: [ ];
-          }
-        )).value.config.caisson.lib.exported;
-
-      # A composition declaring a name and contributing the namespace
-      # of that name.
-      namedLib = caisson.mkLib {
-        sources = mockSources;
-        name = "the-namespace";
-        libOverlays = _lib: {
-          the-namespace = mkLibOverlay (
-            { ... }:
-            {
-              overlay = _final: prev: {
-                the-namespace = (prev.the-namespace or { }) // {
-                  marker = "selected";
-                };
-              };
-            }
-          );
-        };
-      };
-
-      # The same composition with no name declared.
-      unnamedLib = caisson.mkLib { sources = mockSources; };
-    in
-    {
-      "test: the selector reads the namespace off the library it is handed" = {
-        expr = (selectorOf namedLib) namedLib;
-        expected = {
-          marker = "selected";
-        };
-      };
-
-      # The selector reads the library passed to it, not the library the
-      # configuration it came from was evaluated over: handing it another
-      # composition's library selects that composition's namespace.
-      "test: the selector follows the library, not the configuration it came from" = {
-        expr = (selectorOf unnamedLib) namedLib;
-        expected = {
-          marker = "selected";
-        };
-      };
-
-      "test: the selector refuses a library whose composition declares no name" = {
-        expr = (builtins.tryEval (builtins.deepSeq ((selectorOf namedLib) unnamedLib) true)).success;
-        expected = false;
-      };
-    };
-
   importApply = {
     "test: applies static args to a function" = {
       expr =
@@ -4328,13 +4267,11 @@ in
           {
             modules = builtins.attrNames top.modules.flake;
             libOverlays = builtins.attrNames top.libOverlays;
-            lib = top.lib;
             hasManifest = top.caisson.manifest ? modules;
           };
         expected = {
           modules = [ "thing" ];
           libOverlays = [ "provider" ];
-          lib = { };
           hasManifest = true;
         };
       };
@@ -4386,57 +4323,6 @@ in
             }
           )).value.config.whichEntry;
         expected = "from-the-registry";
-      };
-
-      # The lib export reader: the namespace it selects comes from the
-      # composed library it is handed, so declaring a name on mkLib is
-      # the whole of what decides which namespace gets published.
-      "test: the lib export selects the namespace named after the declared name" = {
-        expr =
-          (namespacedLib.caisson-core.finalizeTop (
-            namespacedLib.caisson.structural.mkConfiguration {
-              configModule = {
-                caisson.lib.export.enabled = true;
-              };
-              moduleImports = _modules: [ ];
-            }
-          )).value.config.caisson.exports.lib;
-        expected = {
-          marker = "from-the-namespace-overlay";
-        };
-      };
-
-      # Declaring none is a state the tree supports, up to the point
-      # something asks for a name. The lib export is such a reader, and
-      # what it produces is the message, not a missing attribute.
-      "test: the lib export refuses a composition that declares no name" = {
-        expr =
-          (builtins.tryEval (
-            builtins.deepSeq
-              (registeringLib.caisson-core.finalizeTop (
-                registeringLib.caisson.structural.mkConfiguration {
-                  configModule = {
-                    caisson.lib.export.enabled = true;
-                  };
-                  moduleImports = _modules: [ ];
-                }
-              )).value.config.caisson.exports.lib
-              true
-          )).success;
-        expected = false;
-      };
-
-      # Nothing asking for a name is the ordinary case for a composition
-      # that declares none: the evaluation goes through.
-      "test: a composition declaring no name evaluates without one" = {
-        expr =
-          (registeringLib.caisson-core.finalizeTop (
-            registeringLib.caisson.structural.mkConfiguration {
-              configModule = { };
-              moduleImports = _modules: [ ];
-            }
-          )).value.config.caisson.exports.lib;
-        expected = { };
       };
 
       # No entry point takes a `name`: a parentless configuration's name

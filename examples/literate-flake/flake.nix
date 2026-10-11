@@ -80,9 +80,9 @@
         inherit (caisson.lib.caisson.pins.flake inputs) sources root;
 
         # The project's name, which this flake holds and which is the
-        # namespace it contributes to the composed library:
-        # `lib.export.enabled` publishes `lib.literate-flake` because of
-        # this declaration, and the package scope would land at
+        # namespace it contributes to the composed library: the `lib`
+        # flake output holds `lib.literate-flake` because of this
+        # declaration, and the package scope would land at
         # `pkgs.literate-flake`.
         name = "literate-flake";
 

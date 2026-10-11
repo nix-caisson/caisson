@@ -947,7 +947,12 @@ let
       builtins.attrNames top.libOverlays == [ "structural" ]
       && builtins.attrNames flake.libOverlays == [ "structural" ]
       && top.caisson.manifest ? modules
-      && top.lib == { };
+      # The `lib` output of the flake is the composed library, and the
+      # manifest in it holds what the flake exports.
+      && flake.lib ? caisson
+      &&
+        builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays
+        == [ "structural" ];
 
   };
 

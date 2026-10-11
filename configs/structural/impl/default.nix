@@ -45,13 +45,6 @@
       structural.exported = modules: { inherit (modules) core; };
     };
 
-    lib = {
-      export.enabled = true;
-      # The native surface mirrors the composed library's framework
-      # namespaces, so flake-level and composed-level addresses match.
-      exported = lib: { inherit (lib) caisson caisson-core; };
-    };
-
   };
 
 }
