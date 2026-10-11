@@ -69,7 +69,7 @@
 # that has no systemd options and no assertions. A NixOS configuration
 # of that kind cannot run units, so there the module also defines
 # nothing.
-{ ... }:
+{ closure-lib, ... }:
 {
   config,
   lib,
@@ -225,6 +225,10 @@ let
   );
 in
 {
+  # The module reads `config.caisson.exports.configurations`. The core
+  # module declares that option.
+  imports = [ closure-lib.caisson-core.modules.nixos.core ];
+
   options.caisson.home-manager.activation.usersDeclaredElsewhere = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [ ];

@@ -243,7 +243,67 @@ let
       };
   };
 
+  # The library of a NixOS evaluation that caisson runs. It has
+  # `lib.caisson`, and it carries the manifest of that evaluation.
+  #
+  # The check `aNixosModuleImportsWhatDeclaresItsCaissonOptions` below
+  # needs such a library without the evaluation it came from. A module
+  # of the evaluation hands the library out through an option.
+  nixosEvaluationLib =
+    (hiveLib.caisson.nixos.mkTopConfiguration {
+      ecosystemSrc = inputs.nixpkgs;
+      configModule =
+        { lib, ... }:
+        {
+          imports = [ minimalNixosBase ];
+          options.pinnedWorldLib = lib.mkOption { type = lib.types.raw; };
+          config.pinnedWorldLib = lib;
+        };
+    }).config.pinnedWorldLib;
+
+  # Evaluates a NixOS system from one module of caisson, with what
+  # that module imports and nothing else from caisson.
+  #
+  # caisson adds its core module to every NixOS evaluation it runs.
+  # The core module declares the options under `caisson`. So inside
+  # caisson, a module can use those options without importing the
+  # core module, and nothing shows that the import is missing.
+  #
+  # This evaluation is made with NixOS' own `eval-config.nix`, so no
+  # core module is added. It runs on the library above, so the module
+  # finds `lib.caisson` and a manifest. A module that uses an option
+  # under `caisson` therefore evaluates here only if the module
+  # imports what declares that option.
+  nixosSystemFromOnly =
+    module:
+    import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+      lib = nixosEvaluationLib;
+      system = "x86_64-linux";
+      specialArgs.lib = nixosEvaluationLib;
+      modules = [
+        minimalNixosBase
+        module
+      ];
+    };
+
   results = {
+
+    # Each NixOS module caisson registers evaluates with what it
+    # imports. The modules are read from the registry, as a flake that
+    # lists caisson in `projects` has them.
+    aNixosModuleImportsWhatDeclaresItsCaissonOptions =
+      let
+        registry = hiveLib.caisson-core.modules.nixos;
+        evaluates =
+          name:
+          builtins.isString
+            (nixosSystemFromOnly registry."caisson/${name}").config.system.build.toplevel.drvPath;
+      in
+      builtins.all evaluates [
+        "default"
+        "home-manager-activation"
+        "home-manager-source-marker"
+      ];
 
     composesTheCaissonLibrary =
       builtins.attrNames composed.lib.caisson == expectedCaissonNames
