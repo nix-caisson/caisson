@@ -1,24 +1,24 @@
 {
   "caisson-overhead": {
-    "nrThunks": 47464,
-    "nrValues": 60450,
-    "nrEnvs": 35874,
-    "nrFunctionCalls": 29945,
-    "nrPrimOpCalls": 16573,
-    "totalAllocBytes": 3021520,
+    "nrThunks": 61517,
+    "nrValues": 76766,
+    "nrEnvs": 45649,
+    "nrFunctionCalls": 38250,
+    "nrPrimOpCalls": 22659,
+    "totalAllocBytes": 3846000,
     "nixpkgsEvals": 0,
     "nixpkgsLibEvals": 0,
-    "moduleSystemEvals": 11
+    "moduleSystemEvals": 15
   },
   "minimal-consumer-total": {
-    "nrThunks": 239451,
-    "nrValues": 717406,
-    "nrEnvs": 129115,
-    "nrFunctionCalls": 105093,
-    "nrPrimOpCalls": 66872,
-    "totalAllocBytes": 46102640,
+    "nrThunks": 253252,
+    "nrValues": 733440,
+    "nrEnvs": 138780,
+    "nrFunctionCalls": 113316,
+    "nrPrimOpCalls": 72902,
+    "totalAllocBytes": 46922000,
     "nixpkgsEvals": 1,
     "nixpkgsLibEvals": 2,
-    "moduleSystemEvals": 28
+    "moduleSystemEvals": 32
   }
 }
