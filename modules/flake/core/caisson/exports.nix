@@ -28,14 +28,13 @@ in
         pkgOverlays = exports.pkgOverlays;
       }
       // {
-        # The composed library of this evaluation, whole.
+        # The `lib` output is the composed library of this evaluation.
         #
-        # `lib` is the one flake output that can hold values of any
-        # shape, so everything a flake publishes that has no output of
-        # its own is published here. That includes the manifest of
-        # this evaluation, at `lib.caisson-core.evalManifest`. A flake
-        # that lists this flake in `projects` reads what this flake
-        # exports from that manifest.
+        # The manifest of this evaluation is in the composed library,
+        # at `lib.caisson-core.evalManifest`. A flake that lists this
+        # flake in `projects` reads what this flake exports from that
+        # manifest. The manifest is published in `lib` because the
+        # other flake outputs each have a fixed shape.
         inherit lib;
         libOverlays = exports.libOverlays;
         modules = exports.modules // {

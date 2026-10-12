@@ -269,7 +269,7 @@ let
   # caisson, a module can use those options without importing the
   # core module, and nothing shows that the import is missing.
   #
-  # This evaluation is made with NixOS' own `eval-config.nix`, so no
+  # This evaluation is made with the `eval-config.nix` of NixOS, so no
   # core module is added. It runs on the library above, so the module
   # finds `lib.caisson` and a manifest. A module that uses an option
   # under `caisson` therefore evaluates here only if the module
