@@ -31,12 +31,12 @@
         assert !(pkgs ? producerExtra);
         # The registry is exported as registered, local entries only.
         assert
-          builtins.attrNames self.pkgOverlays == [
+          builtins.attrNames self.lib.caisson-core.evalManifest.outputs.exports.pkgOverlays == [
             "default"
             "extra"
             "shared"
           ];
-        assert self.pkgOverlays.default.key == "default";
+        assert self.lib.caisson-core.evalManifest.outputs.exports.pkgOverlays.default.key == "default";
         assert
           builtins.attrNames self.overlays == [
             "default"

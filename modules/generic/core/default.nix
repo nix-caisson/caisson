@@ -2,7 +2,7 @@
 #
 # caisson's core module: the part of every framework module that is
 # the same for every class. It declares the composition's manifest, the
-# registry selectors (`caisson.lib`, `caisson.libOverlays`,
+# registry selectors (`caisson.libOverlays`, `caisson.pkgOverlays`,
 # `caisson.modules.<class>`) and
 # `caisson.exports`, what the selectors chose, which a top returns and
 # a parent passes up. Registered under the class-free `generic` class

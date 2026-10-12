@@ -34,7 +34,10 @@
         in
         assert exportedNames == [ "polyfillOnly" ];
         assert !(self.overlays ? internalOnly);
-        assert builtins.attrNames self.pkgOverlays == [ "polyfillOnly" ];
+        assert
+          builtins.attrNames self.lib.caisson-core.evalManifest.outputs.exports.pkgOverlays == [
+            "polyfillOnly"
+          ];
         assert first == second;
         assert downstreamPkgs.exportedPolyfill == "ok";
         pkgs.runCommand "nixpkgs-overlay-export-success" { } "touch $out";

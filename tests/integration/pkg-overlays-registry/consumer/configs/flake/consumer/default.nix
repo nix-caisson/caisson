@@ -43,7 +43,7 @@ in
         # Exports: what the consumer registers itself, and the project
         # entries a selector names; no other producer entry.
         assert
-          builtins.attrNames self.pkgOverlays == [
+          builtins.attrNames self.lib.caisson-core.evalManifest.outputs.exports.pkgOverlays == [
             "default"
             "producer/extra"
           ];

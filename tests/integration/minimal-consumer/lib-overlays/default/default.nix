@@ -2,8 +2,8 @@
 #
 # The contribution this composition makes to the composed library,
 # under the namespace named after the `name` the composition declares
-# on mkLib. What the lib
-# export publishes is this attribute set.
+# on mkLib. The `lib` flake output holds this attribute set at
+# `lib.minimal-consumer`.
 { ... }:
 {
   imports = [ ];

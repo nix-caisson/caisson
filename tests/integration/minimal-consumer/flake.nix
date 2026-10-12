@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 {
-  description = "Minimal consumer test -- no custom modules, and the lib export taking its namespace from the project's name";
+  description = "Minimal consumer test -- no custom modules, and a lib overlay under the namespace named after the project";
 
   inputs = {
     # Standalone equivalent (without shared deps infrastructure):
