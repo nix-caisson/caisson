@@ -18,10 +18,14 @@
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
         # The name this flake holds, deliberately not the directory
-        # name: the final consumer registers this composition's exported
-        # overlay under the same string, so the two halves of the chain
+        # name: the final consumer lists this flake in `projects` under
+        # the same string, so the two halves of the chain
         # agree on a name neither derives from a path.
         name = "middle-chain";
+
+        projects = {
+          caisson = parent;
+        };
 
         modules = lib: {
           flake = {
@@ -30,7 +34,6 @@
         };
 
         libOverlays = coreLib: {
-          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           default = coreLib.caisson.mkLibOverlay ./lib-overlays/default;
         };
       };

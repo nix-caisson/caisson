@@ -26,9 +26,9 @@ let
   inherit (core) compose resolve;
 
   # caisson's integrations as the keyed entries a registry holds: the
-  # overlays caisson exports, registered by mkLib and read back from
-  # the manifest, each keyed by its registry name and importing the
-  # published nixpkgs-lib entry. The suite composes them with
+  # overlays caisson exports, registered by mkLib from the `projects`
+  # entry `caisson` and read back from the manifest, each keyed
+  # `caisson/<name>` and importing the published nixpkgs-lib entry. The suite composes them with
   # caisson-core's `compose` directly, the way mkLib does, so the
   # composition guarantees are probed on the real entries. The
   # `nixpkgs-lib` import each exported overlay carries is the entry of
@@ -40,7 +40,7 @@ let
     (core.mkLib {
       sources = { };
       defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-      libOverlays = _lib: inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays;
+      projects.caisson = inputs.caisson;
     }).caisson-core.libManifest.libOverlays;
 
   # The registry names of caisson-core's entries, read from the
@@ -54,20 +54,20 @@ let
 
   composed = compose {
     entries = builtins.map (name: registered.${name}) coreNames ++ [
-      registered.integrations
-      registered.flake-parts
-      registered.tooling
-      registered.nixpkgs
-      registered.nixos
-      registered.nixos-minimal
-      registered.home-manager
-      registered.colmena
-      registered.terranix
-      registered.system-manager
-      registered.structural
+      registered."caisson/integrations"
+      registered."caisson/flake-parts"
+      registered."caisson/tooling"
+      registered."caisson/nixpkgs"
+      registered."caisson/nixos"
+      registered."caisson/nixos-minimal"
+      registered."caisson/home-manager"
+      registered."caisson/colmena"
+      registered."caisson/terranix"
+      registered."caisson/system-manager"
+      registered."caisson/structural"
       # Last, so its value replaces the pin the overlays carry while
       # its position stays where the first import placed it.
-      registered.nixpkgs-lib
+      registered."caisson/nixpkgs-lib"
     ];
   };
 
@@ -311,19 +311,19 @@ let
       &&
         composed.meta.order == coreNames
         ++ [
-          "framework"
-          "integrations"
-          "nixpkgs-lib"
-          "flake-parts"
-          "tooling"
-          "nixpkgs"
-          "nixos"
-          "nixos-minimal"
-          "home-manager"
-          "colmena"
-          "terranix"
-          "system-manager"
-          "structural"
+          "caisson/framework"
+          "caisson/integrations"
+          "caisson/nixpkgs-lib"
+          "caisson/flake-parts"
+          "caisson/tooling"
+          "caisson/nixpkgs"
+          "caisson/nixos"
+          "caisson/nixos-minimal"
+          "caisson/home-manager"
+          "caisson/colmena"
+          "caisson/terranix"
+          "caisson/system-manager"
+          "caisson/structural"
         ];
 
     baseLibraryBehaves =
@@ -348,7 +348,7 @@ let
       let
         polyfill = {
           key = "pinned-world.polyfill";
-          imports = [ registered.nixpkgs-lib ];
+          imports = [ registered."caisson/nixpkgs-lib" ];
           overlay = _final: prev: {
             compatProbe = prev.compatProbe or (x: "probe-${prev.concatStringsSep "-" x}");
           };
@@ -366,13 +366,13 @@ let
     baseReplacementLastWins =
       let
         stub = {
-          key = "nixpkgs-lib";
+          key = "caisson/nixpkgs-lib";
           imports = [ ];
           overlay = _final: _prev: { stubMarker = true; };
         };
         r = compose {
           entries = builtins.map (name: registered.${name}) coreNames ++ [
-            registered.flake-parts
+            registered."caisson/flake-parts"
             stub
           ];
         };
@@ -382,10 +382,10 @@ let
       &&
         r.meta.order == coreNames
         ++ [
-          "nixpkgs-lib"
-          "framework"
-          "integrations"
-          "flake-parts"
+          "caisson/nixpkgs-lib"
+          "caisson/framework"
+          "caisson/integrations"
+          "caisson/flake-parts"
         ];
 
     keylessPatchSeesComposedWorld =
@@ -786,10 +786,8 @@ let
           // {
             sources = { };
             defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+            projects.caisson = inputs.caisson;
             libOverlays = _lib: {
-              nixos = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos;
-              nixos-minimal =
-                inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos-minimal;
               contrib = core.mkLibOverlay (
                 {
                   mkModule,
@@ -836,9 +834,7 @@ let
         composedWithMkLib = core.mkLib {
           sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          libOverlays = _lib: {
-            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
-          };
+          projects.caisson = inputs.caisson;
         };
         manifest = composedWithMkLib.caisson-core.libManifest;
       in
@@ -857,7 +853,7 @@ let
       && manifest.systems == null
       && composedWithMkLib.caisson-core.pkgsManifest == null
       && composedWithMkLib.caisson-core.evalManifest == null
-      && includesAll (coreNames ++ [ "flake-parts" ]) (builtins.attrNames manifest.libOverlays)
+      && includesAll (coreNames ++ [ "caisson/flake-parts" ]) (builtins.attrNames manifest.libOverlays)
       # The library of nixpkgs came in through the entry flake-parts
       # imports, from the source this composition declares.
       && composedWithMkLib ? evalModules
@@ -890,9 +886,7 @@ let
             "x86_64-linux"
             "aarch64-linux"
           ];
-          libOverlays = _lib: {
-            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
-          };
+          projects.caisson = inputs.caisson;
         };
         outputs = composedWithSystems.caisson.flake-parts.mkTopConfiguration {
           configModule = {
@@ -943,11 +937,7 @@ let
           // {
             sources = { };
             defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
-            libOverlays = _lib: {
-              nixos = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos;
-              nixos-minimal =
-                inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos-minimal;
-            };
+            projects.caisson = inputs.caisson;
           }
         );
         system = composedWithDeclaration.caisson.nixos-minimal.mkTopConfiguration {
@@ -991,13 +981,10 @@ let
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           defaultEcosystemSrc.flake-parts = inputs.flake-parts;
           systems = [ "x86_64-linux" ];
-          libOverlays = _lib: {
-            structural = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.structural;
-            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
-          };
+          projects.caisson = inputs.caisson;
         };
         selectors = {
-          caisson.libOverlays.exported = overlays: { inherit (overlays) structural; };
+          caisson.libOverlays.exported = overlays: { inherit (overlays) "caisson/structural"; };
         };
         top = composedWithBoth.caisson.structural.mkTopConfiguration {
           configModule = selectors;
@@ -1006,14 +993,14 @@ let
           configModule = selectors;
         };
       in
-      builtins.attrNames top.libOverlays == [ "structural" ]
+      builtins.attrNames top.libOverlays == [ "caisson/structural" ]
       && top.caisson.manifest ? modules
       # The `lib` output of the flake is the composed library, and the
       # manifest in it holds what the flake exports.
       && flake.lib ? caisson
       &&
         builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays
-        == [ "structural" ];
+        == [ "caisson/structural" ];
 
     # The modules that caisson exports work only inside an evaluation
     # that caisson makes. caisson publishes none of them in its

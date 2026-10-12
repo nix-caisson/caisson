@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: MIT
-{ ... }:
+{ closure-lib, ... }:
 {
   inputs,
   self,
   ...
 }:
 {
-  # The registry (via the default moduleImports over the projects
-  # channel) already applies the nixpkgs flake module. Importing the
-  # copy in the manifest of caisson as well must deduplicate.
-  imports = [ inputs.parent.lib.caisson-core.evalManifest.outputs.exports.modules.flake.nixpkgs ];
+  # The default moduleImports already apply the nixpkgs flake module
+  # of caisson, from the registry. Importing the same registry entry
+  # here as well must deduplicate.
+  imports = [ closure-lib.caisson-core.modules.flake."caisson/nixpkgs" ];
 
   systems = [ "x86_64-linux" ];
 
