@@ -1014,6 +1014,24 @@ let
         builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays
         == [ "structural" ];
 
+    # The modules that caisson exports work only inside an evaluation
+    # that caisson makes. caisson publishes none of them in its
+    # `modules` flake output. The output holds the empty `default`
+    # entry of the `flake` class and nothing else. The modules are in
+    # the manifest of caisson, where a flake that lists caisson in
+    # `projects` reads them.
+    caissonPublishesItsModulesInTheManifestOnly =
+      let
+        exported = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.modules;
+      in
+      builtins.mapAttrs (_class: builtins.attrNames) inputs.caisson.modules == {
+        flake = [ "default" ];
+      }
+      && exported.nixos ? default
+      && exported.nixos ? home-manager-activation
+      && exported.homeManager ? nixos-parent
+      && exported.flake ? nixpkgs;
+
   };
 
   failures = builtins.filter (n: results.${n} != true) (builtins.attrNames results);

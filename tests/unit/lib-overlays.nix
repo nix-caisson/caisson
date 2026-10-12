@@ -4274,6 +4274,37 @@ in
         };
       };
 
+      # `caisson.flakeOutputs.modules` selects which exported modules
+      # the flake publishes in its `modules` output. This flake
+      # publishes none. The exported module `thing` is still in the
+      # manifest of the flake, where a flake that lists this flake in
+      # `projects` reads it. The `default` entry in the output is the
+      # empty module that the `flake` class always has.
+      "test: a flake keeps an exported module in the manifest and off the modules output" = {
+        expr =
+          let
+            flake = registeringLib.caisson.flake-parts.mkTopConfiguration {
+              configModule = registeringLib.caisson.flake-parts.mkModule (
+                { ... }:
+                {
+                  imports = [ selectors ];
+                  systems = [ "x86_64-linux" ];
+                  caisson.flakeOutputs.modules = _: { };
+                }
+              );
+              moduleImports = _modules: [ ];
+            };
+          in
+          {
+            output = builtins.attrNames flake.modules.flake;
+            manifest = builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.modules.flake;
+          };
+        expected = {
+          output = [ "default" ];
+          manifest = [ "thing" ];
+        };
+      };
+
       "test: the flake top and the structural top export the same registries" = {
         expr =
           let

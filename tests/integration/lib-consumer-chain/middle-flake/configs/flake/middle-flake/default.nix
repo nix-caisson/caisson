@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 { ... }:
-{ inputs, ... }:
+{ ... }:
 {
-  imports = [ inputs.parent.flakeModules.default ];
-
   systems = [ "x86_64-linux" ];
 
   caisson = {

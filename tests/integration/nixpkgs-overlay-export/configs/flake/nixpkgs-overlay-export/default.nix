@@ -7,9 +7,9 @@
 }:
 {
   # The registry (via the default moduleImports over the projects
-  # channel) already applies the nixpkgs flake module; importing the
-  # projected copy from the flake output as well must deduplicate.
-  imports = [ inputs.parent.flakeModules.nixpkgs ];
+  # channel) already applies the nixpkgs flake module. Importing the
+  # copy in the manifest of caisson as well must deduplicate.
+  imports = [ inputs.parent.lib.caisson-core.evalManifest.outputs.exports.modules.flake.nixpkgs ];
 
   systems = [ "x86_64-linux" ];
 
