@@ -4182,9 +4182,7 @@ in
         };
       };
       # The same composition with a name declared, contributing the
-      # namespace of that name to the composed library, so what the lib
-      # export selects is observable beside the composition that
-      # declares none.
+      # namespace of that name to the composed library.
       namespacedLib = caisson.mkLib {
         sources = mockSources;
         name = "named-composition";

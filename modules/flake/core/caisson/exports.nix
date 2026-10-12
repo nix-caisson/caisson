@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake outputs of what the selectors chose: `caisson.exports`
-# copied into `flake.libOverlays`, `flake.modules` and, when the
-# selection holds any, `flake.pkgOverlays`, with these
+# copied into `flake.libOverlays` and `flake.modules`, with these
 # flake-parts conventions on top: the `flake` class always exports a
 # `default` entry (an empty module unless the selection provides it),
 # so `flakeModules.default` exists for consumers that import it by
@@ -19,31 +18,23 @@ let
 in
 {
   config = {
-    flake =
-      lib.caisson.integrations.publish exports.configurations
-      // lib.optionalAttrs (exports.pkgOverlays != { }) {
-        # The registered entries as they are, what a consumer's
-        # `projects` merge reads; `overlays` carries them as plain
-        # nixpkgs overlays.
-        pkgOverlays = exports.pkgOverlays;
-      }
-      // {
-        # The `lib` output is the composed library of this evaluation.
-        #
-        # The manifest of this evaluation is in the composed library,
-        # at `lib.caisson-core.evalManifest`. A flake that lists this
-        # flake in `projects` reads what this flake exports from that
-        # manifest. The manifest is published in `lib` because the
-        # other flake outputs each have a fixed shape.
-        inherit lib;
-        libOverlays = exports.libOverlays;
-        modules = exports.modules // {
-          flake = {
-            default = { };
-          }
-          // (exports.modules.flake or { });
-        };
-        flakeModules = config.flake.modules.flake;
+    flake = lib.caisson.integrations.publish exports.configurations // {
+      # The `lib` output is the composed library of this evaluation.
+      #
+      # The manifest of this evaluation is in the composed library,
+      # at `lib.caisson-core.evalManifest`. A flake that lists this
+      # flake in `projects` reads what this flake exports from that
+      # manifest. The manifest is published in `lib` because the
+      # other flake outputs each have a fixed shape.
+      inherit lib;
+      libOverlays = exports.libOverlays;
+      modules = exports.modules // {
+        flake = {
+          default = { };
+        }
+        // (exports.modules.flake or { });
       };
+      flakeModules = config.flake.modules.flake;
+    };
   };
 }
