@@ -25,9 +25,9 @@
 
   # Each module that caisson exports reads the options under `caisson`
   # or the library under `lib.caisson`, so it works only inside an
-  # evaluation that caisson makes. A flake that lists caisson in
-  # `projects` gets these modules from the manifest. None of them is
-  # published in the `modules` flake output.
+  # evaluation that caisson makes. `mkLib` reads these modules from
+  # the manifest when `projects` holds caisson. None of them is
+  # published in the `modules` output.
   caisson.flakeOutputs.modules = _: { };
 
 }

@@ -33,20 +33,19 @@ in
       modules: modules // { nixos = removeAttrs modules.nixos [ "needs-caisson" ]; }
     '';
     description = ''
-      Function that selects which of the exported modules the flake
-      also publishes in its `modules` flake output. It receives the
-      exported modules, as an attribute set of classes that each hold
-      modules by name, and returns the modules to publish in the same
-      shape.
+      Function that selects which exported modules are also published
+      in the `modules` output. It receives the exported modules, as an
+      attribute set of classes that each hold modules by name, and
+      returns the modules to publish in the same shape.
 
       The exported modules are the modules that the
       `caisson.modules.<class>.exported` selectors chose. They are in
-      the manifest of the flake, and a flake that lists this flake in
-      `projects` reads them from the manifest. That flake gets every
-      exported module, whatever this function returns.
+      the manifest, and `mkLib` reads them from there for each entry
+      of `projects`. `mkLib` reads every exported module, whatever
+      this function returns.
 
-      The `modules` flake output is for a flake that imports a module
-      of this flake by hand, as `inputs.<flake>.modules.<class>.<name>`.
+      The `modules` output serves an import by hand, as
+      `inputs.<input>.modules.<class>.<name>`.
       Leave a module out of the output when it only works inside an
       evaluation that caisson makes, because it reads the options under
       `caisson` or the library under `lib.caisson`.
@@ -58,10 +57,10 @@ in
       # The `lib` output is the composed library of this evaluation.
       #
       # The manifest of this evaluation is in the composed library,
-      # at `lib.caisson-core.evalManifest`. A flake that lists this
-      # flake in `projects` reads what this flake exports from that
-      # manifest. The manifest is published in `lib` because the
-      # other flake outputs each have a fixed shape.
+      # at `lib.caisson-core.evalManifest`. `mkLib` reads the exports
+      # from that manifest for each entry of `projects`. The manifest
+      # is published in `lib` because the other outputs each have a
+      # fixed shape.
       inherit lib;
       modules = publishedModules // {
         flake = {
