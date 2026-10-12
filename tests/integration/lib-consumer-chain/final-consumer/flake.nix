@@ -22,9 +22,9 @@
       lib = parent.lib.caisson.mkLib {
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
         name = "final-consumer";
-        libOverlays = _lib: {
-          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
-          middle-chain = middle-flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays.default;
+        projects = {
+          caisson = parent;
+          middle-chain = middle-flake;
         };
       };
     in

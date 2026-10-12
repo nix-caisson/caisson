@@ -19,11 +19,15 @@
   outputs =
     inputs@{ parent, ... }:
     let
-      # The flake-parts integration alone, registered by hand: its core
-      # module reaches the evaluation through the closure of the
-      # overlay, so nothing else is registered or selected.
+      # caisson is listed in `projects`, so its lib overlays and its
+      # modules are in the registry of this composition. This flake
+      # registers one lib overlay and no modules.
       lib = parent.lib.caisson.mkLib {
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
+
+        projects = {
+          caisson = parent;
+        };
 
         # The project's name, also the namespace this composition
         # contributes to the composed library. The `lib` flake output
@@ -32,7 +36,6 @@
         name = "minimal-consumer";
 
         libOverlays = coreLib: {
-          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           default = coreLib.caisson.mkLibOverlay ./lib-overlays/default;
         };
       };

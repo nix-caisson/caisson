@@ -17,8 +17,8 @@
       lib = parent.lib.caisson.mkLib {
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
 
-        libOverlays = _lib: {
-          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
+        projects = {
+          caisson = parent;
         };
 
         modules = lib: {
