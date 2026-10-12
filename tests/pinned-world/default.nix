@@ -40,7 +40,7 @@ let
     (core.mkLib {
       sources = { };
       defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-      libOverlays = _lib: inputs.caisson.libOverlays;
+      libOverlays = _lib: inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays;
     }).caisson-core.libManifest.libOverlays;
 
   # The registry names of caisson-core's entries, read from the
@@ -787,8 +787,9 @@ let
             sources = { };
             defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
             libOverlays = _lib: {
-              nixos = inputs.caisson.libOverlays.nixos;
-              nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
+              nixos = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos;
+              nixos-minimal =
+                inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos-minimal;
               contrib = core.mkLibOverlay (
                 {
                   mkModule,
@@ -836,7 +837,7 @@ let
           sources = { };
           defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
           libOverlays = _lib: {
-            flake-parts = inputs.caisson.libOverlays.flake-parts;
+            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           };
         };
         manifest = composedWithMkLib.caisson-core.libManifest;
@@ -890,7 +891,7 @@ let
             "aarch64-linux"
           ];
           libOverlays = _lib: {
-            flake-parts = inputs.caisson.libOverlays.flake-parts;
+            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           };
         };
         outputs = composedWithSystems.caisson.flake-parts.mkTopConfiguration {
@@ -943,8 +944,9 @@ let
             sources = { };
             defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
             libOverlays = _lib: {
-              nixos = inputs.caisson.libOverlays.nixos;
-              nixos-minimal = inputs.caisson.libOverlays.nixos-minimal;
+              nixos = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos;
+              nixos-minimal =
+                inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.nixos-minimal;
             };
           }
         );
@@ -990,8 +992,8 @@ let
           defaultEcosystemSrc.flake-parts = inputs.flake-parts;
           systems = [ "x86_64-linux" ];
           libOverlays = _lib: {
-            structural = inputs.caisson.libOverlays.structural;
-            flake-parts = inputs.caisson.libOverlays.flake-parts;
+            structural = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.structural;
+            flake-parts = inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           };
         };
         selectors = {
@@ -1005,7 +1007,6 @@ let
         };
       in
       builtins.attrNames top.libOverlays == [ "structural" ]
-      && builtins.attrNames flake.libOverlays == [ "structural" ]
       && top.caisson.manifest ? modules
       # The `lib` output of the flake is the composed library, and the
       # manifest in it holds what the flake exports.
@@ -1027,6 +1028,12 @@ let
       builtins.mapAttrs (_class: builtins.attrNames) inputs.caisson.modules == {
         flake = [ "default" ];
       }
+      # The lib overlays and package overlays that caisson exports are
+      # entries in the shape caisson registers. They are in the
+      # manifest and have no flake output.
+      && !(inputs.caisson ? libOverlays)
+      && !(inputs.caisson ? pkgOverlays)
+      && inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays ? flake-parts
       && exported.nixos ? default
       && exported.nixos ? home-manager-activation
       && exported.homeManager ? nixos-parent

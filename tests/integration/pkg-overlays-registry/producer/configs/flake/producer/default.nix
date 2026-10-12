@@ -54,7 +54,7 @@
             "unnamed"
           ];
         assert !(lib.any (lib.hasInfix "/") (builtins.attrNames (self.modules.flake or { })));
-        assert self.libOverlays == { };
+        assert self.lib.caisson-core.evalManifest.outputs.exports.libOverlays == { };
         pkgs.runCommand "pkg-overlays-registry-producer" { } "touch $out";
     };
 }

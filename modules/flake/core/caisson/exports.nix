@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
 #
-# The flake outputs of what the selectors chose: `caisson.exports`
-# copied into `flake.libOverlays` and `flake.modules`. Of the exported
+# The flake outputs of what the selectors chose. Of the exported
 # modules, `flake.modules` holds those that
-# `caisson.flakeOutputs.modules` selects. These
+# `caisson.flakeOutputs.modules` selects. The exported lib overlays
+# and package overlays are in the manifest, which is in the `lib`
+# output. They are entries in the shape caisson registers, so they
+# have no flake output. These
 # flake-parts conventions are on top: the `flake` class always exports a
 # `default` entry (an empty module unless the selection provides it),
 # so `flakeModules.default` exists for consumers that import it by
@@ -61,7 +63,6 @@ in
       # manifest. The manifest is published in `lib` because the
       # other flake outputs each have a fixed shape.
       inherit lib;
-      libOverlays = exports.libOverlays;
       modules = publishedModules // {
         flake = {
           default = { };

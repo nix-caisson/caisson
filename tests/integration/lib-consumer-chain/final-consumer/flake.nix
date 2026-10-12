@@ -23,8 +23,8 @@
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
         name = "final-consumer";
         libOverlays = _lib: {
-          flake-parts = parent.libOverlays.flake-parts;
-          middle-chain = middle-flake.libOverlays.default;
+          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
+          middle-chain = middle-flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays.default;
         };
       };
     in

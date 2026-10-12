@@ -4325,7 +4325,9 @@ in
           {
             sameModules =
               builtins.attrNames flake.modules.flake == [ "default" ] ++ builtins.attrNames top.modules.flake;
-            sameOverlays = builtins.attrNames flake.libOverlays == builtins.attrNames top.libOverlays;
+            sameOverlays =
+              builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays
+              == builtins.attrNames top.libOverlays;
           };
         expected = {
           sameModules = true;
@@ -4699,7 +4701,7 @@ in
             };
             innerNearest = builtins.attrNames inner.nearest;
             flakeModules = builtins.attrNames top.outputs.flake.modules.flake;
-            flakeLibOverlays = builtins.attrNames top.outputs.flake.libOverlays;
+            flakeLibOverlays = builtins.attrNames top.outputs.exports.libOverlays;
             # `mkTopConfiguration` is the finalized configuration's flake
             # outputs.
             topReturnsTheFlakeOutputs =

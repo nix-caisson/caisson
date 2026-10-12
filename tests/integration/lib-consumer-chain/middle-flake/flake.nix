@@ -30,7 +30,7 @@
         };
 
         libOverlays = coreLib: {
-          flake-parts = parent.libOverlays.flake-parts;
+          flake-parts = parent.lib.caisson-core.evalManifest.outputs.exports.libOverlays.flake-parts;
           default = coreLib.caisson.mkLibOverlay ./lib-overlays/default;
         };
       };
