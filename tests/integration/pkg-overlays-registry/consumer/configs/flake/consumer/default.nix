@@ -53,7 +53,7 @@ in
             "producer/extra"
           ];
         assert builtins.attrNames self.modules.generic == [ "producer/named" ];
-        assert self.libOverlays == { };
+        assert self.lib.caisson-core.evalManifest.outputs.exports.libOverlays == { };
         pkgs.runCommand "pkg-overlays-registry-consumer" { } "touch $out";
     };
 }

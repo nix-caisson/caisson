@@ -8,7 +8,6 @@
 }:
 {
   imports = [
-    inputs.parent.flakeModules.default
     inputs.middle-flake.flakeModules.default
   ];
 
