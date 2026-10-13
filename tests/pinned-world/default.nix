@@ -616,6 +616,21 @@ let
       in
       systemOf insideStructural == systemOf alone && systemOf insideFlake == systemOf alone;
 
+    # The NixOS integration records what `nixos-rebuild` reads from a
+    # configuration: the system, the VM, the VM with a boot loader,
+    # and the images. Each is a reference into `config.system.build`
+    # of the real NixOS. The system and both VMs are derivations, and
+    # NixOS offers at least one image.
+    aMachineRecordsItsSystemItsVmsAndItsImages =
+      let
+        outputs = nixosEvaluationLib.caisson.evalManifest.childlessManifest.outputs;
+      in
+      builtins.isString outputs.toplevel.drvPath
+      && builtins.isString outputs.vm.drvPath
+      && builtins.isString outputs.vmWithBootLoader.drvPath
+      && builtins.isAttrs outputs.images
+      && outputs.images != { };
+
     # The same for a home. A home evaluated alone and the same home
     # declared inside a structural configuration build the same
     # activation package.
