@@ -12,53 +12,46 @@ let
   # a selector names it.
   localModules = class: lib.filterAttrs (name: _: (moduleProjects.${class}.${name} or null) == null);
 
-  classConfigFor =
-    class:
-    config.caisson.modules.${class} or {
-      export.enabled = true;
-      exported = localModules class;
-    };
+  # The classes of the composition: the classes the integrations
+  # declare, and the classes that have a registered module. Both are
+  # in the library, so they are known before this evaluation starts.
+  # The export settings of each class are declared as options from
+  # this list. A setting for a class that is not in the list is
+  # refused as an option that does not exist.
+  classes = lib.lists.unique (
+    builtins.attrNames (lib.caisson-core.classes or { })
+    ++ builtins.attrNames (lib.caisson-core.libManifest.modules or { })
+  );
 
   exportedClassModules = builtins.mapAttrs (
     class: classModules:
     let
-      classConfig = classConfigFor class;
+      classConfig = config.caisson.modules.${class};
     in
     if classConfig.export.enabled then classConfig.exported classModules else { }
   ) registeredModules;
 in
 {
-  options.caisson.modules = lib.mkOption {
-    type = lib.types.attrsOf (
-      lib.types.submodule (
-        { name, ... }:
-        {
-          options = {
-            export.enabled = lib.mkEnableOption "module class export";
-            exported = lib.mkOption {
-              type = lib.types.functionTo (lib.types.attrsOf lib.types.deferredModule);
-              default = localModules name;
-              defaultText = lib.literalMD "the modules of the class this composition registers itself";
-              description = ''
-                Function that selects which registered modules to export for this
-                class. Receives the modules registered via `mkLib.modules.<class>`
-                and returns the subset to publish. Defaults to the modules this
-                composition registers itself; a module a consumed project
-                contributed (`<project>/<name>`) leaves only when a selector
-                names it.
-              '';
-            };
-          };
-
-          config.export.enabled = lib.mkDefault true;
-        }
-      )
-    );
-    default = { };
-    description = ''
-      Export settings for each registered module class.
-    '';
-  };
+  options.caisson.modules = lib.genAttrs classes (class: {
+    export.enabled = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to export the modules of the class `${class}`.";
+    };
+    exported = lib.mkOption {
+      type = lib.types.functionTo (lib.types.attrsOf lib.types.deferredModule);
+      default = localModules class;
+      defaultText = lib.literalMD "the modules of the class this composition registers itself";
+      description = ''
+        Function that selects which registered modules of the class
+        `${class}` to export. Receives the modules registered for the
+        class and returns the modules to export. Defaults to the
+        modules this composition registers itself. A module that came
+        from an entry of `projects`, registered as `<project>/<name>`,
+        is exported only when the function names it.
+      '';
+    };
+  });
 
   config.caisson.exports.modules = exportedClassModules;
 }
