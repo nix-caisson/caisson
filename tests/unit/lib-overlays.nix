@@ -2964,7 +2964,7 @@ in
       # their paths. Entries with the same path cannot be told apart,
       # and `publish` refuses them. The message names the output
       # attribute set and the path.
-      "test: two configurations with the same path are refused" = {
+      "test: configurations with the same path are refused" = {
         expr =
           let
             entry = {
