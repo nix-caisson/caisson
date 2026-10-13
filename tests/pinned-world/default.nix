@@ -195,7 +195,7 @@ let
         caisson = inputs.caisson;
       };
       defaultEcosystemSrc = {
-        inherit (inputs) nixpkgs colmena;
+        inherit (inputs) nixpkgs colmena flake-parts;
       };
     }
   );
@@ -578,6 +578,145 @@ let
       && pkgs.lib.hasPrefix builtins.storeDir base
       && base != builtins.unsafeDiscardStringContext machine.system.build.toplevel.outPath
       && builtins.all comparesAgainstIt homes;
+
+    # A NixOS configuration can be evaluated alone, with
+    # `mkTopConfiguration`, or declared inside another configuration,
+    # under `caisson.nixos.configurations`. The parent here gives its
+    # children nothing. The machine must then be the same machine in
+    # each position: its system is the same derivation.
+    #
+    # The machine is declared inside a structural configuration and
+    # inside a flake-parts configuration. Each parent publishes it as
+    # `nixosConfigurations.probe`.
+    aMachineInsideAParentIsTheSameMachine =
+      let
+        machine = {
+          ecosystemSrc = inputs.nixpkgs;
+          configModule = {
+            imports = [ minimalNixosBase ];
+            networking.hostName = "probe";
+          };
+        };
+        declaresTheMachine =
+          { lib, ... }:
+          {
+            caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration machine;
+          };
+        alone = hiveLib.caisson.nixos.mkTopConfiguration machine;
+        insideStructural =
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule = declaresTheMachine;
+          }).nixosConfigurations.probe;
+        insideFlake =
+          (hiveLib.caisson.flake-parts.mkTopConfiguration {
+            configModule = declaresTheMachine;
+          }).nixosConfigurations.probe;
+        systemOf = configuration: configuration.config.system.build.toplevel.drvPath;
+      in
+      systemOf insideStructural == systemOf alone && systemOf insideFlake == systemOf alone;
+
+    # The NixOS integration records what `nixos-rebuild` reads from a
+    # configuration: the system, the VM, the VM with a boot loader,
+    # and the images. Each is a reference into `config.system.build`
+    # of the real NixOS. The system and both VMs are derivations, and
+    # NixOS offers at least one image.
+    aMachineRecordsItsSystemItsVmsAndItsImages =
+      let
+        outputs = nixosEvaluationLib.caisson.evalManifest.childlessManifest.outputs;
+      in
+      builtins.isString outputs.toplevel.drvPath
+      && builtins.isString outputs.vm.drvPath
+      && builtins.isString outputs.vmWithBootLoader.drvPath
+      && builtins.isAttrs outputs.images
+      && outputs.images != { };
+
+    # The same for a home. A home evaluated alone and the same home
+    # declared inside a structural configuration build the same
+    # activation package.
+    #
+    # A home declared inside a machine is given the home directory,
+    # the user ID and the Nix package of the machine, by modules that
+    # the machine passes to its homes by default. A home that passes
+    # `moduleImports` selects its modules itself and gets none of
+    # them. Such a home, inside a machine, must also build the same
+    # activation package as the home evaluated alone.
+    aHomeInsideAParentIsTheSameHome =
+      let
+        home = {
+          ecosystemSrc = inputs.home-manager;
+          configModule = {
+            home.username = "probe";
+            home.homeDirectory = "/home/probe";
+            home.stateVersion = "25.05";
+          };
+        };
+        alone = hiveLib.caisson.home-manager.mkTopConfiguration home;
+        insideStructural =
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration home;
+              };
+          }).homeConfigurations.probe;
+        insideMachine =
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
+                  ecosystemSrc = inputs.nixpkgs;
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ minimalNixosBase ];
+                      users.users.probe = {
+                        isNormalUser = true;
+                        home = "/home/probe";
+                      };
+                      caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration (
+                        home // { moduleImports = _modules: [ ]; }
+                      );
+                    };
+                };
+              };
+          }).homeConfigurations."probe@host";
+        activationOf = configuration: configuration.activationPackage.drvPath;
+      in
+      activationOf insideStructural == activationOf alone
+      && activationOf insideMachine == activationOf alone;
+
+    # The same for a structural configuration, which builds nothing.
+    # A structural configuration evaluated alone and the same
+    # configuration declared inside another export the same registry
+    # entries.
+    aStructuralConfigurationInsideAParentExportsTheSame =
+      let
+        selects = {
+          caisson.libOverlays.exported = overlays: { inherit (overlays) "caisson/structural"; };
+        };
+        alone = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = selects;
+        };
+        parent = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.libOverlays.exported = _overlays: { };
+              caisson.structural.configurations.inner = lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule = selects;
+              };
+            };
+        };
+      in
+      builtins.attrNames alone.libOverlays == [ "caisson/structural" ]
+      && builtins.attrNames parent.libOverlays == builtins.attrNames alone.libOverlays;
 
     colmenaHiveEvaluatesEndToEnd =
       let

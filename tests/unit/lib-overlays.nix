@@ -2929,6 +2929,72 @@ in
         };
       };
 
+      # `exported` returns the configurations to pass up, by the name
+      # each is passed up under. A selector that returns a
+      # configuration under another name publishes it under that name.
+      "test: a selector that renames a configuration publishes it under the new name" = {
+        expr =
+          let
+            oneSystemLib = caisson.mkLib {
+              sources = mockSources;
+              name = "one-system";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+            };
+            top = oneSystemLib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                    configModule = probeModule;
+                  };
+                  caisson.nixos.exported = configurations: { renamed = configurations.machine; };
+                };
+            };
+          in
+          builtins.attrNames top.nixosConfigurations;
+        expected = [ "renamed" ];
+      };
+
+      # `publish` names the entries of an output attribute set from
+      # their paths. Entries with the same path cannot be told apart,
+      # and `publish` refuses them. The message names the output
+      # attribute set and the path.
+      "test: configurations with the same path are refused" = {
+        expr =
+          let
+            entry = {
+              attrset = "nixosConfigurations";
+              value = "a machine";
+              manifest = { };
+              path = [
+                {
+                  type = "nixos";
+                  name = "machine";
+                }
+              ];
+            };
+            publishing =
+              entries:
+              (builtins.tryEval (builtins.deepSeq (myLib.caisson.integrations.publish entries) true)).success;
+          in
+          {
+            once = publishing [ entry ];
+            twice = publishing [
+              entry
+              entry
+            ];
+          };
+        expected = {
+          once = true;
+          twice = false;
+        };
+      };
+
       # A `lib` the caller passes in `specialArgs` takes precedence
       # over the `lib` the composition sets, the way every other special
       # argument does.
