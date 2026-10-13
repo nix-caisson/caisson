@@ -4,5 +4,9 @@ tests/integration/*/flake.lock
 tests/integration/*/*/flake.lock
 examples/*/flake.lock
 
+# The symlinks `nix build` leaves behind
+/result
+/result-*
+
 # Claude Code
 /.claude/
