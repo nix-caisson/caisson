@@ -287,6 +287,7 @@
               # by where it is registered, so a selection that names
               # it more than once imports it once.
               forChildren = {
+                inherit (config.caisson.forChildren) libOverlays pkgOverlays;
                 modules = builtins.mapAttrs (
                   class:
                   builtins.mapAttrs (

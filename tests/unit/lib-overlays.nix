@@ -2679,6 +2679,89 @@ in
         };
       };
 
+      # A configuration offers lib overlays and package overlays for
+      # the configurations beneath it. A lib overlay is composed into
+      # the library of each configuration beneath, at any depth, and
+      # not into the library of the configuration that offers it. Both
+      # join the registries the configurations beneath see.
+      "test: a configuration offers lib overlays and package overlays for the configurations beneath it" =
+        {
+          expr =
+            let
+              # The library a configuration runs on, read back through an
+              # option.
+              seesLib = {
+                key = "test-seen-lib-option";
+                imports = [
+                  (
+                    { lib, ... }:
+                    {
+                      options.seenLib = lib.mkOption { type = lib.types.raw; };
+                      config.seenLib = lib;
+                    }
+                  )
+                ];
+              };
+              top = publishingLib.caisson-core.finalizeTop (
+                publishingLib.caisson.structural.mkConfiguration {
+                  moduleImports = _modules: [ ];
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ seesLib ];
+                      caisson.forChildren.libOverlays.site = lib.caisson-core.mkLibOverlay (
+                        { ... }:
+                        {
+                          overlay = _final: _prev: { siteMarker = "from the top"; };
+                        }
+                      );
+                      caisson.forChildren.pkgOverlays.extra = {
+                        overlay = _final: _prev: { };
+                      };
+                      caisson.nixos.configurations.direct = lib.caisson.nixos.mkConfiguration {
+                        configModule = seesLib;
+                      };
+                      caisson.structural.configurations.rack = lib.caisson.structural.mkConfiguration {
+                        moduleImports = _modules: [ ];
+                        configModule =
+                          { lib, ... }:
+                          {
+                            imports = [ seesLib ];
+                            caisson.nixos.configurations.deep = lib.caisson.nixos.mkConfiguration {
+                              configModule = seesLib;
+                            };
+                          };
+                      };
+                    };
+                }
+              );
+              libOf = configuration: configuration.value.config.seenLib;
+              direct = top.children.system.x86_64-linux.children.nixos.direct;
+              rack = top.children.structural.rack;
+              deep = rack.children.system.x86_64-linux.children.nixos.deep;
+            in
+            {
+              top = (libOf top).siteMarker or null;
+              direct = (libOf direct).siteMarker or null;
+              rack = (libOf rack).siteMarker or null;
+              deep = (libOf deep).siteMarker or null;
+              libOverlayRegistryAtTop = (libOf top).caisson-core.libOverlays ? site;
+              libOverlayRegistryBeneath = (libOf direct).caisson-core.libOverlays ? site;
+              pkgOverlayRegistryAtTop = (libOf top).caisson-core.pkgOverlays ? extra;
+              pkgOverlayRegistryBeneath = (libOf deep).caisson-core.pkgOverlays.extra.key or null;
+            };
+          expected = {
+            top = null;
+            direct = "from the top";
+            rack = "from the top";
+            deep = "from the top";
+            libOverlayRegistryAtTop = false;
+            libOverlayRegistryBeneath = true;
+            pkgOverlayRegistryAtTop = false;
+            pkgOverlayRegistryBeneath = "extra";
+          };
+        };
+
       # A configuration reaches the top through every level above it,
       # whatever their integrations: each level passes up what is
       # beneath it. Here a machine sits beneath a machine, beneath a

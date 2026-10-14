@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # What this configuration offers the configurations beneath it, nested
-# ones included: modules, which join the registries those
+# ones included: lib overlays, which are composed into their library;
+# package overlays, which join the registry their package sets select
+# from; modules, which join the registries those
 # configurations select from; additions to the default selection of a
 # class, which a configuration gets when it passes no `moduleImports`;
 # a default package set, which a configuration runs on when neither it
@@ -11,8 +13,50 @@
 # from the childless view, which the configurations beneath are built
 # against.
 { lib, ... }:
+let
+  types = import ../types.nix { inherit lib; };
+in
 {
   options.caisson.forChildren = {
+
+    libOverlays = lib.mkOption {
+      type = lib.types.attrsOf types.libOverlay;
+      default = { };
+      example = lib.literalExpression ''
+        {
+          site = lib.caisson-core.mkLibOverlay ({ ... }: {
+            overlay = _final: prev: { site = (prev.site or { }) // { domain = "example.org"; }; };
+          });
+        }
+      '';
+      description = ''
+        Lib overlays for the configurations beneath this
+        configuration, by key. Each is composed into the library of
+        each configuration beneath, after the lib overlays the
+        composition selects. Each joins the lib overlay registry of
+        those configurations (`lib.caisson-core.libOverlays.<key>`), so
+        an overlay that imports another by its key finds it. An entry
+        under a key the registry already holds replaces it beneath
+        this configuration.
+
+        Build an entry with `lib.caisson-core.mkLibOverlay`. The
+        library of this configuration is not composed with these
+        entries.
+      '';
+    };
+
+    pkgOverlays = lib.mkOption {
+      type = lib.types.attrsOf types.pkgOverlay;
+      default = { };
+      description = ''
+        Package overlays for the configurations beneath this
+        configuration, by key. Each joins the package overlay registry
+        of those configurations (`lib.caisson-core.pkgOverlays.<key>`),
+        where a package set beneath selects it by its key. An entry
+        under a key the registry already holds replaces it beneath
+        this configuration.
+      '';
+    };
 
     modules = lib.mkOption {
       type = lib.types.attrsOf (lib.types.attrsOf lib.types.deferredModule);
