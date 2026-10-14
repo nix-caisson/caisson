@@ -4401,6 +4401,41 @@ in
         };
       };
 
+      # The export settings of a class are options that caisson
+      # declares for each class of the composition. A setting for a
+      # class the composition does not have is refused, and so is a
+      # setting a class does not have. Each would otherwise be ignored,
+      # and the class would export its default selection.
+      "test: an export setting is refused for an unknown class and for an unknown name" = {
+        expr =
+          let
+            evaluates =
+              settings:
+              (builtins.tryEval (
+                builtins.deepSeq (builtins.attrNames
+                  (registeringLib.caisson-core.finalizeTop (
+                    registeringLib.caisson.structural.mkConfiguration {
+                      configModule = {
+                        caisson.modules = settings;
+                      };
+                      moduleImports = _modules: [ ];
+                    }
+                  )).value.config.caisson.exports.modules
+                ) true
+              )).success;
+          in
+          {
+            aClassOfTheComposition = evaluates { flake.exported = modules: modules; };
+            aMisspelledClass = evaluates { flaek.exported = modules: modules; };
+            aMisspelledSetting = evaluates { flake.exportd = modules: modules; };
+          };
+        expected = {
+          aClassOfTheComposition = true;
+          aMisspelledClass = false;
+          aMisspelledSetting = false;
+        };
+      };
+
       "test: the default default applies the entries named default" = {
         expr =
           (registeringLib.caisson-core.finalizeTop (
