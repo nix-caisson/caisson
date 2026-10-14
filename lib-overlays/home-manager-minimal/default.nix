@@ -72,15 +72,9 @@
               ecosystemArgs ? null,
             }@args:
             configuration args;
-          extra = {
-            # A minimal home that is a top, as
-            # `lib.caisson.home-manager.mkTopConfiguration` returns it.
-            mkTopConfiguration =
-              rawArgs:
-              final.caisson.integrations.topValue (
-                final.caisson-core.finalizeTop (final.caisson.home-manager-minimal.mkConfiguration rawArgs)
-              );
-          };
+          # A minimal home that is a top, as
+          # `lib.caisson.home-manager.mkTopConfiguration` returns it.
+          top = final.caisson.integrations.topValue;
         };
       };
     };

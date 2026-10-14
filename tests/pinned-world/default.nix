@@ -718,6 +718,17 @@ let
       builtins.attrNames alone.libOverlays == [ "caisson/structural" ]
       && builtins.attrNames parent.libOverlays == builtins.attrNames alone.libOverlays;
 
+    # An integration declares `top` when a configuration of it can be
+    # a top, and only then has `mkTopConfiguration`. The colmena
+    # integration returns the hive from `mkConfiguration` and declares
+    # no `top`.
+    onlyAnIntegrationWithATopHasMkTopConfiguration =
+      hiveLib.caisson.nixos ? mkTopConfiguration
+      && hiveLib.caisson.home-manager ? mkTopConfiguration
+      && hiveLib.caisson.structural ? mkTopConfiguration
+      && hiveLib.caisson.flake-parts ? mkTopConfiguration
+      && !(hiveLib.caisson.colmena ? mkTopConfiguration);
+
     colmenaHiveEvaluatesEndToEnd =
       let
         hive = hiveLib.caisson.colmena.mkConfiguration {

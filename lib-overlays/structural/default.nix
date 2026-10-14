@@ -92,28 +92,26 @@
           evaluate = evaluate args;
         };
 
-      # What a tool reads from a top: the registries it exports and the
-      # configurations declared beneath it, each published under the
-      # output attribute set its integration declares and named from
-      # its path (`nixosConfigurations.<name>`), with the manifest
-      # beside them for `manifestOf` and `topside --file`. A top has no
-      # parent to declare it under an attribute, so its name is the name
-      # the composition declares on mkLib.
-      mkTopConfiguration =
-        rawArgs:
-        let
-          manifest = final.caisson-core.finalizeTop (final.caisson.structural.mkConfiguration rawArgs);
-          exports = manifest.outputs.exports;
-        in
-        builtins.removeAttrs exports [ "configurations" ]
-        // final.caisson.integrations.publish exports.configurations
-        // {
-          caisson.manifest = manifest;
-        };
-
       integration = final.caisson.integrations.mkIntegration {
         name = "structural";
         class = "structural";
+        # What a tool reads from a top: the registries it exports and the
+        # configurations declared beneath it, each published under the
+        # output attribute set its integration declares and named from
+        # its path (`nixosConfigurations.<name>`), with the manifest
+        # beside them for `manifestOf` and `topside --file`. A top has no
+        # parent to declare it under an attribute, so its name is the name
+        # the composition declares on mkLib.
+        top =
+          manifest:
+          let
+            exports = manifest.outputs.exports;
+          in
+          builtins.removeAttrs exports [ "configurations" ]
+          // final.caisson.integrations.publish exports.configurations
+          // {
+            caisson.manifest = manifest;
+          };
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.structural.configurations.<name>` finalizes it, and
@@ -161,9 +159,6 @@
             ecosystemArgs ? null,
           }@args:
           configuration args;
-        extra = {
-          inherit mkTopConfiguration;
-        };
       };
 
     in

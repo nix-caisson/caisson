@@ -113,15 +113,9 @@
               ecosystemArgs ? null,
             }@args:
             configuration args;
-          extra = {
-            # A minimal configuration that is a top, as
-            # `lib.caisson.nixos.mkTopConfiguration` returns it.
-            mkTopConfiguration =
-              rawArgs:
-              final.caisson.integrations.topValue (
-                final.caisson-core.finalizeTop (final.caisson.nixos-minimal.mkConfiguration rawArgs)
-              );
-          };
+          # A minimal configuration that is a top, as
+          # `lib.caisson.nixos.mkTopConfiguration` returns it.
+          top = final.caisson.integrations.topValue;
         };
       };
     };

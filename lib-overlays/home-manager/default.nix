@@ -506,20 +506,15 @@
           evaluate = evaluation variant args;
         };
 
-      # A home that is a top, as the home-manager CLI reads it: the
-      # evaluated home, with its `activationPackage`. Where the
-      # composition has several systems in force, it is the evaluated
-      # homes by system, and where it has none, the empty set
-      # (`integrations.topValue`).
-      mkTopConfiguration =
-        rawArgs:
-        selection.topValue (
-          final.caisson-core.finalizeTop (final.caisson.home-manager.mkConfiguration rawArgs)
-        );
-
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
+        # A home that is a top, as the home-manager CLI reads it: the
+        # evaluated home, with its `activationPackage`. Where the
+        # composition has several systems in force, it is the evaluated
+        # homes by system, and where it has none, the empty set
+        # (`integrations.topValue`).
+        top = selection.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.home-manager.configurations.<name>` finalizes it,
@@ -588,7 +583,6 @@
           }@args:
           configuration { } args;
         extra = {
-          inherit mkTopConfiguration;
           # What an alt over this class builds on: the composition,
           # the evaluator's call, and the two put together as a
           # configuration of this integration (`configuration`, given
