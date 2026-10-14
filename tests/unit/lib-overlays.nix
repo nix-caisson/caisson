@@ -3017,6 +3017,21 @@ in
       # A `lib` the caller passes in `specialArgs` takes precedence
       # over the `lib` the composition sets, the way every other special
       # argument does.
+      # `mkIntegration` generates `mkTopConfiguration` from the `top`
+      # function an integration declares. The generated function
+      # takes the arguments of `mkConfiguration`, and its argument
+      # pattern is the pattern of `mkConfiguration`.
+      "test: the generated mkTopConfiguration takes the arguments of mkConfiguration" = {
+        expr =
+          let
+            inherit (myLib.caisson-core.functions) functionArgs;
+          in
+          functionArgs myLib.caisson.nixos.mkTopConfiguration
+          == functionArgs myLib.caisson.nixos.mkConfiguration
+          && functionArgs myLib.caisson.nixos.mkConfiguration ? configModule;
+        expected = true;
+      };
+
       "test: the caller's specialArgs lib takes precedence" = {
         expr =
           (myLib.caisson.nixos.mkTopConfiguration {

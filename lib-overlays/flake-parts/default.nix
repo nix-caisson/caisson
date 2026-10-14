@@ -235,17 +235,14 @@
           evaluate = evaluate args;
         };
 
-      # What a flake returns from `outputs`, and what a flakeless top
-      # that keeps flake-parts returns from `default.nix`: the flake
-      # outputs of the configuration, finalized as a top is, under the
-      # name the composition declares on mkLib.
-      mkTopConfiguration =
-        rawArgs:
-        (final.caisson-core.finalizeTop (final.caisson.flake-parts.mkConfiguration rawArgs)).outputs.flake;
-
       integration = final.caisson.integrations.mkIntegration {
         name = "flake-parts";
         class = "flake";
+        # What a flake returns from `outputs`, and what a flakeless top
+        # that keeps flake-parts returns from `default.nix`: the flake
+        # outputs of the configuration, finalized as a top is, under the
+        # name the composition declares on mkLib.
+        top = manifest: manifest.outputs.flake;
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.flake-parts.configurations.<name>` finalizes it, and
@@ -306,7 +303,7 @@
           }@args:
           configuration args;
         extra = {
-          inherit mkTopConfiguration types;
+          inherit types;
         };
       };
 

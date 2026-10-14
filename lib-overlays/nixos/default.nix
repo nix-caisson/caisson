@@ -118,22 +118,17 @@
           evaluate = evaluate variant args;
         };
 
-      # A NixOS configuration that is a top, as a tool reads it: the
-      # evaluated configuration, which is what `nixos-rebuild --file`
-      # reads and what a test or the REPL evaluates with no
-      # configuration above it. Where the composition has several
-      # systems in force, it is the evaluated configurations by
-      # system, and where it has none, the empty set: the evaluations
-      # are named as anything published is (`integrations.topValue`).
-      # Its name is the name the composition declares on mkLib.
-      mkTopConfiguration =
-        rawArgs:
-        final.caisson.integrations.topValue (
-          final.caisson-core.finalizeTop (final.caisson.nixos.mkConfiguration rawArgs)
-        );
-
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
+        # A NixOS configuration that is a top, as a tool reads it: the
+        # evaluated configuration, which is what `nixos-rebuild --file`
+        # reads and what a test or the REPL evaluates with no
+        # configuration above it. Where the composition has several
+        # systems in force, it is the evaluated configurations by
+        # system, and where it has none, the empty set: the evaluations
+        # are named as anything published is (`integrations.topValue`).
+        # Its name is the name the composition declares on mkLib.
+        top = final.caisson.integrations.topValue;
         class = "nixos";
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
@@ -196,7 +191,6 @@
           }@args:
           configuration { explicitBaseModules = false; } args;
         extra = {
-          inherit mkTopConfiguration;
           # eval-config with nixpkgs' module list passed explicitly as
           # `baseModules`. The signature is that of `mkConfiguration`.
           mkConfigurationFull =

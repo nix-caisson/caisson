@@ -325,16 +325,37 @@
       #     let integration = final.caisson.integrations.mkIntegration { ... }; in
       #     contributeClasses prev integration.classes
       #     // { caisson = (prev.caisson or { }) // { nixos = integration.namespace; }; };
+      # The `mkTopConfiguration` of an integration: it takes the
+      # arguments of `mkConfiguration`, finalizes the configuration
+      # with no parent, and applies `top` to the manifest. It has the
+      # argument pattern of `mkConfiguration`, so a reader of
+      # `builtins.functionArgs` sees the same arguments.
+      topConfiguration =
+        top: mkConfiguration:
+        setFunctionArgs (args: top (final.caisson-core.finalizeTop (mkConfiguration args))) (
+          functionArgs mkConfiguration
+        );
+
       mkIntegration =
         {
           name,
           class,
           mkConfiguration,
           mkConfigurationWithEcosystemArgs,
+          # What a configuration of this integration that has no parent
+          # returns, as a function of its finalized manifest. When
+          # given, the integration has a `mkTopConfiguration`: it takes
+          # the arguments of `mkConfiguration`, finalizes the
+          # configuration with no parent, and applies this function to
+          # the manifest. An integration whose configurations are only
+          # declared inside other configurations gives none.
+          top ? null,
           extra ? { },
         }:
         let
           mkModule = final.caisson-core.mkModule class;
+
+          mkTopConfiguration = topConfiguration top mkConfiguration;
 
           # A configuration for every configuration registered in the
           # class (`configs/<class>/<name>`), by its name, each as
@@ -368,6 +389,7 @@
               ;
           }
           // (if findsModuleByName then { inherit mkConfigurations; } else { })
+          // (if top == null then { } else { inherit mkTopConfiguration; })
           // extra;
           classes = {
             ${class} = {
@@ -605,12 +627,15 @@
           over,
           mkConfiguration,
           mkConfigurationWithEcosystemArgs,
+          # As for `mkIntegration`.
+          top ? null,
           extra ? { },
         }:
         assert builtins.isAttrs over && over ? mkModule;
         {
           inherit mkConfiguration mkConfigurationWithEcosystemArgs;
         }
+        // (if top == null then { } else { mkTopConfiguration = topConfiguration top mkConfiguration; })
         // extra;
 
     in
