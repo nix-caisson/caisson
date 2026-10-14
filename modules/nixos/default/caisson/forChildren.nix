@@ -32,7 +32,7 @@
 { closure-lib }:
 { ... }:
 {
-  caisson.forChildren.defaultModuleImports.homeManager = _lib: [
+  caisson.forChildren.extraDefaultModuleImports.homeManager = _lib: [
     closure-lib.caisson-core.modules.homeManager.nixos-parent
     closure-lib.caisson-core.modules.homeManager.nixos-source-marker
   ];

@@ -1,40 +1,19 @@
 # SPDX-License-Identifier: MIT
 #
-# What this configuration offers the configurations beneath it, nested
-# ones included: modules, which join the registries those
-# configurations select from; additions to the default selection of a
-# class, which a configuration gets when it passes no `moduleImports`;
-# a default package set, which a configuration runs on when neither it
-# nor a configuration between selects another; and the systems that
+# What this configuration gives the configurations beneath it, nested
+# ones included: additions to the default selection of a class, which
+# a configuration gets when it passes no `moduleImports`; a default
+# package set, which a configuration runs on when neither it nor a
+# configuration between selects another; and the systems that
 # configurations evaluated per system are evaluated for. This
-# configuration is not among those they are offered to. They are read
+# configuration is not among those they are given to. They are read
 # from the childless view, which the configurations beneath are built
 # against.
 { lib, ... }:
 {
   options.caisson.forChildren = {
 
-    modules = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.attrsOf lib.types.deferredModule);
-      default = { };
-      example = lib.literalExpression ''
-        {
-          nixos.gaming = { pkgs, ... }: { programs.steam.enable = true; };
-        }
-      '';
-      description = ''
-        Modules registered for the configurations beneath this
-        configuration, by class and then name. An entry joins the
-        registry of its class as those configurations see it
-        (`lib.caisson-core.modules.<class>.<name>`), where a
-        configuration selects it with `moduleImports`. An entry under a
-        name the registry already holds replaces it beneath this
-        configuration. Definitions of the same entry from several
-        modules merge.
-      '';
-    };
-
-    defaultModuleImports = lib.mkOption {
+    extraDefaultModuleImports = lib.mkOption {
       type = lib.types.attrsOf (lib.types.functionTo (lib.types.listOf lib.types.raw));
       default = { };
       example = lib.literalExpression ''
@@ -48,8 +27,13 @@
         function of the lib of such a configuration returning
         registered modules. A configuration that passes no
         `moduleImports` gets every entry named `default` followed by
-        these, those of the levels above it first. Definitions from
-        several modules are concatenated.
+        these, those of the levels above it first. A configuration
+        that passes `moduleImports` selects its modules itself and
+        gets none of them. Definitions from several modules are
+        concatenated.
+
+        A module listed here is a module registered in the
+        composition, on `mkLib` or by a project.
       '';
     };
 

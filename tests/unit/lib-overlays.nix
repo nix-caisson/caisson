@@ -2578,12 +2578,13 @@ in
           };
       };
 
-      # A configuration registers modules for the configurations
-      # beneath it and adds to the default selection of a class. They
+      # A configuration adds registered modules to the default selection
+      # of a class for the configurations beneath it. The additions
       # reach a configuration of that class at any depth, through
-      # levels of other integrations, and the configuration that
-      # registers them does not get them.
-      "test: a configuration registers modules for the configurations beneath it" = {
+      # levels of other integrations, and the configuration that adds
+      # them does not get them. A level beneath adds after the levels
+      # above. The module registry is the composition's at every level.
+      "test: a configuration adds to the default module selection of the configurations beneath it" = {
         expr =
           let
             # The option the test modules define into, keyed so that a
@@ -2607,18 +2608,35 @@ in
               imports = [ notesOption ];
               config.notes = [ note ];
             };
-            top = publishingLib.caisson-core.finalizeTop (
-              publishingLib.caisson.structural.mkConfiguration {
+            # The modules are registered in the composition. A
+            # configuration selects from that registry.
+            registeringModulesLib = caisson.mkLib {
+              sources = mockSources;
+              name = "registering-modules";
+              defaultEcosystemSrc.nixpkgs = nixosStub;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { default = { }; };
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+              };
+              modules = lib: {
+                nixos = {
+                  site = lib.caisson.nixos.mkModule ({ ... }: noted "site");
+                  spare = lib.caisson.nixos.mkModule ({ ... }: noted "spare");
+                  rack-site = lib.caisson.nixos.mkModule ({ ... }: noted "rack site");
+                };
+                structural.site = lib.caisson.structural.mkModule ({ ... }: noted "structural site");
+              };
+            };
+            top = registeringModulesLib.caisson-core.finalizeTop (
+              registeringModulesLib.caisson.structural.mkConfiguration {
                 moduleImports = _modules: [ ];
                 configModule =
                   { lib, ... }:
                   {
                     imports = [ (noted "top") ];
-                    caisson.forChildren.modules.nixos.site = noted "site";
-                    caisson.forChildren.modules.nixos.spare = noted "spare";
-                    caisson.forChildren.modules.structural.site = noted "structural site";
-                    caisson.forChildren.defaultModuleImports.nixos = lib: [ lib.caisson-core.modules.nixos.site ];
-                    caisson.forChildren.defaultModuleImports.structural = lib: [
+                    caisson.forChildren.extraDefaultModuleImports.nixos = lib: [ lib.caisson-core.modules.nixos.site ];
+                    caisson.forChildren.extraDefaultModuleImports.structural = lib: [
                       lib.caisson-core.modules.structural.site
                     ];
                     caisson.nixos.configurations.direct = lib.caisson.nixos.mkConfiguration {
@@ -2638,7 +2656,9 @@ in
                       configModule =
                         { lib, ... }:
                         {
-                          caisson.forChildren.modules.nixos.site = noted "rack site";
+                          caisson.forChildren.extraDefaultModuleImports.nixos = lib: [
+                            lib.caisson-core.modules.nixos.rack-site
+                          ];
                           caisson.nixos.configurations.deep = lib.caisson.nixos.mkConfiguration {
                             configModule = { ... }: { };
                           };
@@ -2657,9 +2677,9 @@ in
             chosen = machines.chosen.value.config.notes;
             added = builtins.sort builtins.lessThan machines.added.value.config.notes;
             rack = rack.value.config.notes;
-            deep = deep.value.config.notes;
-            registryAtTop = builtins.attrNames (top.modules.nixos or { });
-            registryBeneath = builtins.attrNames machines.direct.modules.nixos;
+            deep = builtins.sort builtins.lessThan deep.value.config.notes;
+            sameRegistryBeneath =
+              builtins.attrNames machines.direct.modules.nixos == builtins.attrNames top.modules.nixos;
           };
         expected = {
           top = [ "top" ];
@@ -2670,12 +2690,11 @@ in
             "spare"
           ];
           rack = [ "structural site" ];
-          deep = [ "rack site" ];
-          registryAtTop = [ ];
-          registryBeneath = [
+          deep = [
+            "rack site"
             "site"
-            "spare"
           ];
+          sameRegistryBeneath = true;
         };
       };
 
