@@ -155,7 +155,7 @@
       # registry: what `moduleImports` selects, and with none
       # given the default of the class, every entry named `default`
       # followed by what the levels above the evaluation added for the
-      # class (`caisson.forChildren.defaultModuleImports`), each
+      # class (`caisson.forChildren.extraDefaultModuleImports`), each
       # applied to the lib of the evaluation.
       #
       # `extraModuleImports` of the configuration is appended to
@@ -282,23 +282,12 @@
                 exports = config.caisson.exports;
               };
               children = view.lib.caisson.integrations.childrenOf config;
-              # What the modules register for the configurations
-              # beneath (`caisson.forChildren`). Each module is keyed
-              # by where it is registered, so a selection that names
-              # it more than once imports it once.
+              # What the modules give the configurations beneath
+              # (`caisson.forChildren`).
               forChildren = {
-                modules = builtins.mapAttrs (
-                  class:
-                  builtins.mapAttrs (
-                    name: module: {
-                      key = "caisson.forChildren.modules.${class}.${name} of ${type} ${view.manifest.name or ""}";
-                      imports = [ module ];
-                    }
-                  )
-                ) config.caisson.forChildren.modules;
-                defaultModuleImports = builtins.mapAttrs (_: selection: [
+                extraDefaultModuleImports = builtins.mapAttrs (_: selection: [
                   selection
-                ]) config.caisson.forChildren.defaultModuleImports;
+                ]) config.caisson.forChildren.extraDefaultModuleImports;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
                 systems = config.caisson.forChildren.systems;
               };
