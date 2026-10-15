@@ -5,7 +5,6 @@
 # system-manager flake.
 {
   closure-inputs,
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -48,7 +47,7 @@
           ...
         }:
         let
-          registry = final.caisson-core.modules.systemManager or { };
+          registry = final.caisson.modules.systemManager or { };
           # The framework module of the class: every registered `core`, forced.
           coreModules = selection.coreModules registry;
           selectedModules = moduleImports registry ++ extraModuleImports registry;
@@ -223,8 +222,7 @@
           evaluation args;
       };
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         system-manager = integration.namespace;
       };

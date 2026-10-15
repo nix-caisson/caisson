@@ -12,7 +12,6 @@
 # depth, declared beneath another configuration under
 # `caisson.structural.configurations`.
 {
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -43,7 +42,7 @@
         { lib, manifest }:
         let
           selection = lib.caisson.integrations;
-          registry = lib.caisson-core.modules.structural or { };
+          registry = lib.caisson.modules.structural or { };
 
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "structural" registry;
@@ -54,7 +53,7 @@
           # configuration registered under the configuration's name
           # (`configs/structural/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson-core.configs.structural or { };
+          registered = lib.caisson.configs.structural or { };
           configModule =
             if (args.configModule or null) != null then
               args.configModule
@@ -121,7 +120,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson-core.configs.structural.<name>`), if any.
+            # (`lib.caisson.configs.structural.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,
@@ -162,8 +161,7 @@
       };
 
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         structural = integration.namespace;
       };

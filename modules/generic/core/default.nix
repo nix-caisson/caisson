@@ -3,9 +3,12 @@
 # caisson's core module: the part of every framework module that is
 # the same for every class. It declares the composition's manifest, the
 # registry selectors (`caisson.libOverlays`, `caisson.pkgOverlays`,
-# `caisson.modules.<class>`) and
+# `caisson.modules.<class>`),
 # `caisson.exports`, what the selectors chose, which a top returns and
-# a parent passes up. Registered under the class-free `generic` class
+# a parent passes up, and, through the module of each integration of
+# caisson, the configurations an evaluation holds beneath it
+# (`caisson.<integration>.configurations`). Registered under the
+# class-free `generic` class
 # (flake-parts' name for a module any class may import), and under
 # every class whose integration forces it, as that class's `core`:
 # `modules/structural/core` is a symlink here, and `modules/flake/core`
@@ -17,8 +20,22 @@
 # module declares nothing: a module list that carries it can be handed
 # to an evaluator that runs on a library of its making, as
 # home-manager's NixOS module does for the homes it embeds.
-{ ... }:
+{ closure-lib, ... }:
 { lib, ... }:
 {
-  imports = if lib ? caisson && lib ? caisson-core then [ ./caisson ] else [ ];
+  imports =
+    if lib ? caisson && lib ? caisson-core then
+      [ ./caisson ]
+      ++ builtins.map (integration: closure-lib.caisson.${integration}.configurationsModule) [
+        "colmena"
+        "flake-parts"
+        "home-manager"
+        "nixos"
+        "nixpkgs"
+        "structural"
+        "system-manager"
+        "terranix"
+      ]
+    else
+      [ ];
 }

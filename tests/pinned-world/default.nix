@@ -77,11 +77,8 @@ let
   expectedCaissonNames = [
     "callConsumerFlake"
     "callFlake"
-    "classes"
     "colmena"
     "configs"
-    "contributeClasses"
-    "contributeModules"
     "ecosystemSrc"
     "elide"
     "eval-weight"
@@ -117,25 +114,18 @@ let
   ];
 
   expectedCoreNames = [
-    "classes"
     "compose"
-    "configs"
-    "contributeClasses"
-    "contributeModules"
     "coreEntries"
     "ecosystemSrc"
     "evalManifest"
     "importApply"
     "libManifest"
-    "libOverlays"
     "mkExtendedLib"
     "mkLib"
     "mkLibOverlay"
     "mkLibOverlays"
     "mkModule"
     "mkModules"
-    "modules"
-    "pkgOverlays"
     "pkgsManifest"
     "resolve"
   ];
@@ -293,7 +283,7 @@ let
     # lists caisson in `projects` has them.
     aNixosModuleImportsWhatDeclaresItsCaissonOptions =
       let
-        registry = hiveLib.caisson-core.modules.nixos;
+        registry = hiveLib.caisson.modules.nixos;
         evaluates =
           name:
           builtins.isString
@@ -929,43 +919,29 @@ let
       && builtins.isString terraform.drvPath
       && builtins.isString home.activationPackage.drvPath;
 
-    overlayBorneModulesReachAdapters =
+    registeredModulesReachAdapters =
       let
-        contributingLib = core.mkLib (
+        registeringLib = core.mkLib (
           declaresPkgs
           // {
             sources = { };
             defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
             projects.caisson = inputs.caisson;
-            libOverlays = _lib: {
-              contrib = core.mkLibOverlay (
+            modules = lib: {
+              nixos.pinned-world-probe = lib.caisson-core.mkModule "nixos" (
+                { ... }:
+                { lib, ... }:
                 {
-                  mkModule,
-                  contributeModules,
-                  ...
-                }:
-                {
-                  imports = [ ];
-                  overlay =
-                    _final: prev:
-                    contributeModules prev {
-                      nixos.pinned-world-probe = mkModule "nixos" (
-                        { ... }:
-                        { lib, ... }:
-                        {
-                          options.compatProbe = lib.mkOption {
-                            type = lib.types.bool;
-                            default = true;
-                          };
-                        }
-                      );
-                    };
+                  options.compatProbe = lib.mkOption {
+                    type = lib.types.bool;
+                    default = true;
+                  };
                 }
               );
             };
           }
         );
-        system = contributingLib.caisson.nixos-minimal.mkTopConfiguration {
+        system = registeringLib.caisson.nixos-minimal.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
           configModule =
             { lib, ... }:
@@ -1077,7 +1053,7 @@ let
         };
       in
       composedFromProject.caisson.flake-parts ? mkConfiguration
-      && composedFromProject.caisson-core.modules.flake ? "caisson/default"
+      && composedFromProject.caisson-core.libManifest.modules.flake ? "caisson/default"
       && system.config.probe;
 
     declaredEcosystemServesAdapters =

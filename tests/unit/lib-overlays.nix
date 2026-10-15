@@ -696,164 +696,65 @@ in
     };
   };
 
-  moduleContribution = {
-    "test: overlays contribute modules through the closure" = {
-      expr =
-        let
-          myLib = mkTestLib {
-            libOverlays = _lib: {
-              contrib = mkLibOverlay (
-                {
-                  mkModule,
-                  contributeModules,
-                  ...
-                }:
-                {
-                  imports = [ ];
-                  overlay =
-                    _final: prev:
-                    contributeModules prev {
-                      nixos.probe = mkModule "nixos" ({ ... }: { config.probe = true; });
-                    };
-                }
-              );
-            };
-          };
-        in
-        builtins.attrNames (myLib.caisson-core.modules.nixos or { });
-      expected = [ "probe" ];
-    };
-
-    "test: contributions merge with argument registrations" = {
+  registries = {
+    # The registries under `lib.caisson` are read from the manifest of
+    # the library, and a lib overlay that writes a registry attribute
+    # into the library adds nothing to them.
+    "test: the registries are read from the manifest" = {
       expr =
         let
           myLib = mkTestLib {
             modules = testLib: {
-              nixos.local = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.local = true; });
+              nixos.local = testLib.caisson.mkModule "nixos" ({ ... }: { config.local = true; });
             };
             libOverlays = _lib: {
-              contrib = mkLibOverlay (
-                {
-                  mkModule,
-                  contributeModules,
-                  ...
-                }:
+              writer = mkLibOverlay (
+                { mkModule, ... }:
                 {
                   imports = [ ];
-                  overlay =
-                    _final: prev:
-                    contributeModules prev {
-                      nixos.contributed = mkModule "nixos" ({ ... }: { config.contributed = true; });
+                  overlay = _final: prev: {
+                    caisson-core = prev.caisson-core // {
+                      modules.nixos.written = mkModule "nixos" ({ ... }: { });
                     };
-                }
-              );
-            };
-          };
-        in
-        builtins.attrNames (myLib.caisson-core.modules.nixos or { });
-      expected = [
-        "contributed"
-        "local"
-      ];
-    };
-
-    "test: contributions ride an overlay's imports chain" = {
-      expr =
-        let
-          contributor = mkLibOverlay (
-            {
-              mkModule,
-              contributeModules,
-              ...
-            }:
-            {
-              imports = [ ];
-              overlay =
-                _final: prev:
-                contributeModules prev {
-                  homeManager.carried = mkModule "homeManager" ({ ... }: { config.carried = true; });
-                };
-            }
-          );
-          myLib = mkTestLib {
-            libOverlays = _lib: {
-              wrapper = mkLibOverlay (
-                { ... }:
-                {
-                  imports = [ contributor ];
-                  overlay = _final: _prev: { };
-                }
-              );
-            };
-          };
-        in
-        builtins.attrNames (myLib.caisson-core.modules.homeManager or { });
-      expected = [ "carried" ];
-    };
-
-    "test: local registrations win over same-named contributions" = {
-      expr =
-        let
-          myLib = mkTestLib {
-            modules = testLib: {
-              nixos.shared = testLib.caisson-core.mkModule "nixos" ({ ... }: { config.origin = "local"; });
-            };
-            libOverlays = _lib: {
-              contrib = mkLibOverlay (
-                {
-                  mkModule,
-                  contributeModules,
-                  ...
-                }:
-                {
-                  imports = [ ];
-                  overlay =
-                    _final: prev:
-                    contributeModules prev {
-                      nixos.shared = mkModule "nixos" ({ ... }: { config.origin = "contributed"; });
-                    };
-                }
-              );
-            };
-          };
-        in
-        myLib.caisson-core.modules.nixos.shared.config.origin;
-      expected = "local";
-    };
-
-    "test: contributeModules composes with namespace contributions" = {
-      expr =
-        let
-          myLib = mkTestLib {
-            libOverlays = _lib: {
-              contrib = mkLibOverlay (
-                {
-                  mkModule,
-                  contributeModules,
-                  ...
-                }:
-                {
-                  imports = [ ];
-                  overlay =
-                    _final: prev:
-                    contributeModules prev {
-                      nixos.probe = mkModule "nixos" ({ ... }: { config.probe = true; });
-                    }
-                    // {
-                      probe-ns.marker = "ok";
-                    };
+                  };
                 }
               );
             };
           };
         in
         {
-          marker = myLib.probe-ns.marker or "missing";
-          stillHasMkLib = builtins.isFunction (myLib.caisson-core.mkLib or null);
+          modules = builtins.attrNames myLib.caisson.modules.nixos;
+          fromManifest = myLib.caisson.modules == myLib.caisson-core.libManifest.modules;
+          libOverlays =
+            builtins.attrNames myLib.caisson.libOverlays
+            == builtins.attrNames myLib.caisson-core.libManifest.libOverlays;
         };
       expected = {
-        marker = "ok";
-        stillHasMkLib = true;
+        modules = [ "local" ];
+        fromManifest = true;
+        libOverlays = true;
+      };
+    };
+
+    # Each integration of caisson has the module that declares its
+    # configurations option, and an evaluation holds configurations of
+    # the integrations whose module it imports.
+    "test: an integration has the module that declares its configurations" = {
+      expr = {
+        key = lib.caisson.nixos.configurationsModule.key;
+        declared = lib.caisson.integrations.integrationsIn {
+          caisson = {
+            nixos = {
+              configurations = { };
+              exported = { };
+            };
+            exports.configurations = { };
+          };
+        };
+      };
+      expected = {
+        key = "caisson-configurations:nixos";
+        declared = [ "nixos" ];
       };
     };
   };
@@ -919,7 +820,7 @@ in
               kept = mkLibOverlay ({ ... }: { overlay = final: prev: { keptVal = "yes"; }; });
               dropped = mkLibOverlay ({ ... }: { overlay = final: prev: { droppedVal = "no"; }; });
             };
-            libOverlayImports = lib: [ lib.caisson-core.libOverlays.kept ];
+            libOverlayImports = lib: [ lib.caisson-core.libManifest.libOverlays.kept ];
           };
         in
         {
@@ -1277,8 +1178,8 @@ in
       # `libOverlays` and `libOverlayImports` receive a library that
       # holds caisson-core alone; `modules` receives the next stage.
       # Each finds the names of the framework under `lib.caisson`,
-      # reading the same registry as `lib.caisson-core` of the same
-      # library, and the composed library carries them too.
+      # reading the registry from the manifest of the same library,
+      # and the composed library carries them too.
       expr =
         let
           seen = stage: given: {
@@ -1286,7 +1187,8 @@ in
               given.caisson ? mkLib
               && builtins.isFunction given.caisson.mkModules
               &&
-                builtins.attrNames given.caisson.libOverlays == builtins.attrNames given.caisson-core.libOverlays;
+                builtins.attrNames given.caisson.libOverlays
+                == builtins.attrNames given.caisson-core.libManifest.libOverlays;
           };
           myLib = lib.caisson.mkLib {
             sources = mockSources;
@@ -1319,7 +1221,8 @@ in
           inherit (myLib) libOverlays extraLibOverlayImports;
           inherit (myLib.caisson.modules.generic.probe.config) modules;
           composed =
-            builtins.attrNames myLib.caisson.libOverlays == builtins.attrNames myLib.caisson-core.libOverlays
+            builtins.attrNames myLib.caisson.libOverlays
+            == builtins.attrNames myLib.caisson-core.libManifest.libOverlays
             && myLib.caisson.libOverlays ? probe;
           malformed =
             (builtins.tryEval (
@@ -2635,9 +2538,9 @@ in
                   { lib, ... }:
                   {
                     imports = [ (noted "top") ];
-                    caisson.forChildren.extraDefaultModuleImports.nixos = lib: [ lib.caisson-core.modules.nixos.site ];
+                    caisson.forChildren.extraDefaultModuleImports.nixos = lib: [ lib.caisson.modules.nixos.site ];
                     caisson.forChildren.extraDefaultModuleImports.structural = lib: [
-                      lib.caisson-core.modules.structural.site
+                      lib.caisson.modules.structural.site
                     ];
                     caisson.nixos.configurations.direct = lib.caisson.nixos.mkConfiguration {
                       configModule = { ... }: { };
@@ -2657,7 +2560,7 @@ in
                         { lib, ... }:
                         {
                           caisson.forChildren.extraDefaultModuleImports.nixos = lib: [
-                            lib.caisson-core.modules.nixos.rack-site
+                            lib.caisson.modules.nixos.rack-site
                           ];
                           caisson.nixos.configurations.deep = lib.caisson.nixos.mkConfiguration {
                             configModule = { ... }: { };
@@ -3198,7 +3101,7 @@ in
           # passes `moduleImports`.
           modules = _lib: {
             nixos = {
-              inherit (lib.caisson-core.modules.nixos) default;
+              inherit (lib.caisson.modules.nixos) default;
             };
           };
           # A package overlay of the flake itself, which adds nothing.
@@ -4924,7 +4827,7 @@ in
         libOverlays = _lib: {
           # An owner whose pattern requires nothing.
           probe = mkLibOverlay (
-            { contributeClasses, ... }:
+            { ... }:
             {
               overlay =
                 final: prev:
@@ -4932,7 +4835,7 @@ in
                   evaluation = final.caisson.integrations.mkEvaluation {
                     compose = args: {
                       ecosystemArgs = {
-                        modules = (args.moduleImports or (_modules: [ ])) (final.caisson-core.modules.probe or { });
+                        modules = (args.moduleImports or (_modules: [ ])) (final.caisson.modules.probe or { });
                         tag = args.tag or "none";
                       };
                     };
@@ -4961,8 +4864,7 @@ in
                     };
                   };
                 in
-                contributeClasses prev integration.classes
-                // {
+                {
                   caisson = (prev.caisson or { }) // {
                     probe = integration.namespace;
                   };
@@ -5008,7 +4910,7 @@ in
           # composition destructures without a default, and an alt over
           # it that requires one.
           probe-strict = mkLibOverlay (
-            { contributeClasses, ... }:
+            { ... }:
             {
               overlay =
                 final: prev:
@@ -5047,8 +4949,7 @@ in
                       evaluation args;
                   };
                 in
-                contributeClasses prev integration.classes
-                // {
+                {
                   caisson = (prev.caisson or { }) // {
                     probe-strict = integration.namespace;
                   };
@@ -5094,7 +4995,7 @@ in
           # a merge of the call's arguments forces its operands in
           # an order the Nix version decides.
           probe-forcing = mkLibOverlay (
-            { contributeClasses, ... }:
+            { ... }:
             {
               overlay =
                 final: prev:
@@ -5115,8 +5016,7 @@ in
                       evaluation args;
                   };
                 in
-                contributeClasses prev integration.classes
-                // {
+                {
                   caisson = (prev.caisson or { }) // {
                     probe-forcing = integration.namespace;
                   };
@@ -5169,15 +5069,15 @@ in
       };
     in
     {
-      "test: an owner declares its class in the index and carries mkModule" = {
+      "test: an owner carries mkModule and the module of its configurations" = {
         expr = {
-          integration = declaringLib.caisson-core.classes.probe.integration;
           hasMkModule = builtins.isFunction declaringLib.caisson.probe.mkModule;
+          configurationsModule = declaringLib.caisson.probe.configurationsModule.key;
           marker = declaringLib.caisson.probe.marker;
         };
         expected = {
-          integration = "probe";
           hasMkModule = true;
+          configurationsModule = "caisson-configurations:probe";
           marker = true;
         };
       };
@@ -5543,12 +5443,6 @@ in
           "mkConfigurationWithEcosystemArgs"
           "mkTopConfiguration"
         ];
-      };
-
-      # The class is declared by the integration that owns it.
-      "test: the alt declares no class" = {
-        expr = myLib.caisson-core.classes.homeManager.integration;
-        expected = "home-manager";
       };
 
       # The alt takes the arguments of the integration that owns the

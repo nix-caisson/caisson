@@ -18,7 +18,6 @@
 # `pkgs.lib` carries the set's manifest.
 {
   closure-inputs,
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -228,7 +227,7 @@
           src = toString (resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
           });
-          registry = lib.caisson-core.modules.nixpkgsConfig or { };
+          registry = lib.caisson.modules.nixpkgsConfig or { };
           pkgOverlayRegistry = parent.pkgOverlays or { };
           moduleImports =
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
@@ -239,11 +238,11 @@
             if (args.configModule or null) != null then
               args.configModule
             else
-              (lib.caisson-core.configs.nixpkgsConfig or { }).${name} or null;
+              (lib.caisson.configs.nixpkgsConfig or { }).${name} or null;
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
             # The composed lib, so a config module reads
-            # `lib.caisson-core.pkgOverlays` and the rest of the lib the
+            # `lib.caisson.pkgOverlays` and the rest of the lib the
             # config is declared under.
             specialArgs.lib = lib;
             modules = [
@@ -330,7 +329,7 @@
             # nixpkgs' options at the top level, caisson's under
             # `caisson.nixpkgs`. When absent, the configuration
             # registered under the config's name
-            # (`lib.caisson-core.configs.nixpkgsConfig.<name>`), if any.
+            # (`lib.caisson.configs.nixpkgsConfig.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,
@@ -494,8 +493,7 @@
         };
       };
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         nixpkgs = prevNs // integration.namespace;
       };

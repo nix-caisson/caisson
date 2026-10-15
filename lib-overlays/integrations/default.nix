@@ -148,7 +148,7 @@
       # caisson itself is read from the closure, so it is there
       # however the integration was registered.
       frameworkModules =
-        class: registry: [ closure-lib.caisson-core.modules.${class}.core ] ++ select "core" registry;
+        class: registry: [ closure-lib.caisson.modules.${class}.core ] ++ select "core" registry;
 
       # The selection of an evaluation over the registry of its class,
       # from the arguments of the configuration, as a function of that
@@ -275,13 +275,14 @@
             let
               evaluated = evaluate view;
               config = evaluated.config or evaluated.value.config;
+              options = evaluated.options or evaluated.value.options;
             in
             {
               inherit (evaluated) value;
               outputs = (evaluated.outputs or { }) // {
                 exports = config.caisson.exports;
               };
-              children = view.lib.caisson.integrations.childrenOf config;
+              children = view.lib.caisson.integrations.childrenOf { inherit options config; };
               # What the modules give the configurations beneath
               # (`caisson.forChildren`).
               forChildren = {
@@ -309,22 +310,6 @@
         in
         evaluate composed (composed.ecosystemArgs // (args.ecosystemArgs or { }));
 
-      # An integration that owns a module class, declared. The
-      # declaration carries the entry points as pattern functions,
-      # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
-      # result holds `namespace`, the value of `lib.caisson.<name>` (the
-      # entry points, the registration form `mkModule` bound to the
-      # class, and whatever `extra` adds beside them: variants, and
-      # the composition an alt over the class reads), and
-      # `classes`, the declaration of the class for the index, so
-      # `mkModules` registers the class through this integration. The
-      # overlay file writes both under their keys, since an overlay's
-      # output attribute names must not depend on `final`:
-      #
-      #   overlay = final: prev:
-      #     let integration = final.caisson.integrations.mkIntegration { ... }; in
-      #     contributeClasses prev integration.classes
-      #     // { caisson = (prev.caisson or { }) // { nixos = integration.namespace; }; };
       # The `mkTopConfiguration` of an integration: it takes the
       # arguments of `mkConfiguration`, finalizes the configuration
       # with no parent, and applies `top` to the manifest. It has the
@@ -336,6 +321,20 @@
           functionArgs mkConfiguration
         );
 
+      # An integration that owns a module class, declared. The
+      # declaration carries the entry points as pattern functions,
+      # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
+      # result holds `namespace`, the value of `lib.caisson.<name>`: the
+      # entry points, the registration form `mkModule` bound to the
+      # class, `configurationsModule`, and whatever `extra` adds beside
+      # them (variants, and the composition an alt over the class
+      # reads). The overlay file writes the namespace under its key,
+      # since the output attribute names of an overlay must not depend
+      # on `final`:
+      #
+      #   overlay = final: prev:
+      #     let integration = final.caisson.integrations.mkIntegration { ... }; in
+      #     { caisson = (prev.caisson or { }) // { nixos = integration.namespace; }; };
       mkIntegration =
         {
           name,
@@ -377,7 +376,7 @@
                 another.
               ''
             else
-              builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson-core.configs.${class} or { })
+              builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson.configs.${class} or { })
           ) (builtins.removeAttrs (functionArgs mkConfiguration) [ "configModule" ]);
         in
         {
@@ -387,26 +386,132 @@
               mkConfigurationWithEcosystemArgs
               mkModule
               ;
+            configurationsModule = configurationsModuleOf name;
           }
           // (if findsModuleByName then { inherit mkConfigurations; } else { })
           // (if top == null then { } else { inherit mkTopConfiguration; })
           // extra;
-          classes = {
-            ${class} = {
-              integration = name;
-              inherit mkModule;
-            };
-          };
         };
 
-      # The integrations a configuration may be declared of: those
-      # that own a class, by the class index. caisson's core module
-      # declares `caisson.<integration>.configurations` for each.
-      names =
-        let
-          owners = builtins.map (class: class.integration) (builtins.attrValues final.caisson-core.classes);
-        in
-        builtins.filter (name: name != "caisson-core") (unique owners);
+      # The module of the integration `name` that lets a configuration
+      # hold configurations of that integration beneath it. It declares
+      # `caisson.<name>.configurations`, which takes what
+      # `lib.caisson.<name>.mkConfiguration` returns and holds the
+      # finished manifest, and `caisson.<name>.exported`, which selects
+      # those that are passed up. A configuration learns its name and
+      # its parent from where it is declared, so the option finalizes
+      # each entry when it is read, with the attribute it is declared
+      # under and the childless manifest of the evaluation. caisson's
+      # core module imports this module for each integration of
+      # caisson. An integration written outside caisson registers a
+      # module that imports it where its configurations may be declared.
+      configurationsModuleOf = name: {
+        key = "caisson-configurations:${name}";
+        imports = [
+          (
+            { lib, options, ... }:
+            let
+              manifest = lib.caisson-core.evalManifest;
+              what = childName: "`caisson.${name}.configurations.${childName}`";
+              finalize =
+                childName: child:
+                let
+                  finalized = lib.caisson-core.finalizeChild {
+                    name = childName;
+                    what = what childName;
+                    parent = manifest.childlessManifest;
+                  } child;
+                  # The integration of what was declared: of the
+                  # manifest, or of the evaluations of a configuration
+                  # evaluated at a system, null where it has none.
+                  declaredType =
+                    if isManifest finalized then
+                      finalized.type
+                    else if finalized == { } then
+                      null
+                    else
+                      (builtins.head (builtins.attrValues finalized)).type;
+                in
+                if manifest == null then
+                  throw ''
+                    ${what childName} is declared in an evaluation that carries no manifest
+                    (`lib.caisson-core.evalManifest` is null there), so no
+                    configuration can be finalized beneath it.
+                  ''
+                else if manifest.childless then
+                  throw ''
+                    The result of the ${name} configuration `${childName}` is not
+                    readable from the ${manifest.type} configuration it is declared in, or
+                    from another configuration beneath that configuration; only the
+                    options of the ${manifest.type} configuration are readable there.
+                    Put the value in one of those options and read it there.
+                  ''
+                else if declaredType != null && declaredType != name then
+                  throw (
+                    if builtins.elem declaredType (integrationsIn options) then
+                      ''
+                        ${what childName} is declared with a ${declaredType} configuration.
+                        Declare it under `caisson.${declaredType}.configurations`.
+                      ''
+                    else
+                      ''
+                        ${what childName} is declared with a ${declaredType} configuration, and a
+                        ${declaredType} configuration cannot be declared beneath another
+                        configuration.
+                      ''
+                  )
+                else
+                  finalized;
+            in
+            {
+              options.caisson.${name} = {
+                exported = lib.mkOption {
+                  type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
+                  default = configurations: configurations;
+                  defaultText = lib.literalMD "every configuration declared";
+                  description = ''
+                    Function that selects which of the ${name} configurations
+                    declared beneath this configuration it passes up. Receives
+                    `caisson.${name}.configurations` and returns the subset to
+                    export; `_: { }` exports none. What each selected configuration
+                    exports is merged into this configuration's `caisson.exports`.
+                  '';
+                };
+                configurations = lib.mkOption {
+                  type = lib.types.lazyAttrsOf lib.types.raw;
+                  default = { };
+                  apply = builtins.mapAttrs finalize;
+                  description = ''
+                    The ${name} configurations declared beneath this
+                    configuration, by name: each is what
+                    `lib.caisson.${name}.mkConfiguration` returns, and reads
+                    back as its manifest, finalized with the name it is declared
+                    under and this configuration as its parent. A configuration
+                    beneath sees this configuration without the configurations declared
+                    beneath it, so a definition that reads one of them is guarded
+                    with `!lib.caisson-core.evalManifest.childless`.
+                  '';
+                };
+              };
+            }
+          )
+        ];
+      };
+
+      # The integrations whose configurations an evaluation can hold
+      # beneath it: those whose `configurationsModule` the evaluation
+      # imports, read from its options. The module declares both
+      # `configurations` and `exported`; `caisson.exports` declares
+      # `configurations` alone.
+      integrationsIn =
+        options:
+        builtins.filter (
+          name:
+          let
+            declared = options.caisson.${name};
+          in
+          declared ? configurations && declared ? exported
+        ) (builtins.attrNames (options.caisson or { }));
 
       # The configurations an evaluated configuration declares beneath
       # it, by integration and then name, as the `children` an
@@ -415,9 +520,9 @@
       # each entry when read. An integration with none declared is left
       # out.
       childrenOf =
-        config:
+        { options, config }:
         filterAttrs (_: declared: declared != { }) (
-          genAttrs names (name: config.caisson.${name}.configurations)
+          genAttrs (integrationsIn options) (name: config.caisson.${name}.configurations)
         );
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
@@ -646,8 +751,8 @@
             childrenOf
             displayName
             entriesOf
+            integrationsIn
             mkEvaluation
-            names
             publish
             topValue
             resolveEcosystemSrc

@@ -7,7 +7,7 @@
 { ... }:
 {
   imports = [
-    closure-lib.caisson-core.modules.flake.nixpkgs
+    closure-lib.caisson.modules.flake.nixpkgs
     (mkModule ./caisson)
   ];
 }

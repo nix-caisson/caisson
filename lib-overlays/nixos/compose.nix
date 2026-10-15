@@ -52,7 +52,7 @@ let
         if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
     };
 
-  registry = lib.caisson-core.modules.nixos or { };
+  registry = lib.caisson.modules.nixos or { };
   # The framework module of the class, forced.
   coreModules = selection.frameworkModules "nixos" registry;
   moduleImports = selection.moduleImportsOf "nixos" { inherit lib manifest; } args;
@@ -60,7 +60,7 @@ let
   # The configuration's module: the module passed, else the
   # configuration registered under the configuration's name
   # (`configs/nixos/<name>`), else none.
-  registered = lib.caisson-core.configs.nixos or { };
+  registered = lib.caisson.configs.nixos or { };
   configModule =
     if (args.configModule or null) != null then
       args.configModule

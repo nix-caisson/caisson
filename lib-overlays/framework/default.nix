@@ -9,8 +9,12 @@
 # caisson-core supplies the machinery. This overlay publishes the part
 # of it that a flake calls, under `lib.caisson`, each name being the
 # value of the same name under `lib.caisson-core` in the same library.
-# The rest of `lib.caisson-core` is what integrations and caisson
-# itself are written on.
+# The registries are the exception: caisson-core keeps them in the
+# manifest of the library, and `lib.caisson.modules`,
+# `lib.caisson.configs`, `lib.caisson.libOverlays` and
+# `lib.caisson.pkgOverlays` read them from there. The rest of
+# `lib.caisson-core` is what integrations and caisson itself are
+# written on.
 #
 # `mkLib` is the exception to "the same value": it is the `mkLib` of
 # caisson-core with one thing added. Several of its arguments are
@@ -44,8 +48,7 @@ let
 
   # The names under `lib.caisson`: those above, and the rest read
   # from `lib.caisson-core`. Each is read when it is used, so a library
-  # that lacks one (an earlier stage has no configurations yet) fails
-  # for that name alone.
+  # that lacks one fails for that name alone.
   namesIn = lib: {
     inherit
       pins
@@ -62,12 +65,6 @@ let
       mkPkgOverlay
       mkPkgOverlays
       importApply
-      # the registries
-      modules
-      configs
-      classes
-      libOverlays
-      pkgOverlays
       pkgOverlaysFor
       # the manifests
       libManifest
@@ -75,14 +72,29 @@ let
       evalManifest
       manifestOf
       # what an integration written outside caisson uses
-      contributeClasses
-      contributeModules
       finalizeTop
       elide
       ecosystemSrc
       ;
     mkLib = mkLibIn lib;
+    # the registries
+    modules = registryIn lib "modules";
+    configs = registryIn lib "configs";
+    libOverlays = registryIn lib "libOverlays";
+    pkgOverlays = registryIn lib "pkgOverlays";
   };
+
+  # A registry, read from the manifest of the library. A registry is
+  # empty in a library that no mkLib built, and in a stage of the
+  # library that does not hold it yet: the registered modules,
+  # configurations and package overlays join the manifest after the
+  # stage that the `modules` function receives.
+  registryIn =
+    lib: name:
+    let
+      manifest = lib.caisson-core.libManifest or null;
+    in
+    if manifest == null then { } else manifest.${name} or { };
 
   # The library a function argument of mkLib receives, with the names
   # under `caisson` beside whatever the stage already holds there.

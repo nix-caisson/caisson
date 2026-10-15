@@ -12,15 +12,16 @@ let
   # a selector names it.
   localModules = class: lib.filterAttrs (name: _: (moduleProjects.${class}.${name} or null) == null);
 
-  # The classes of the composition: the classes the integrations
-  # declare, and the classes that have a registered module. Both are
-  # in the library, so they are known before this evaluation starts.
-  # The export settings of each class are declared as options from
-  # this list. A setting for a class that is not in the list is
-  # refused as an option that does not exist.
+  # The classes that have a registered module, in the registry of the
+  # library and in the registry the manifest of this evaluation holds.
+  # Both manifests are in the library, so the classes are known before
+  # this evaluation starts. The export settings of each class are
+  # declared as options from this list. A setting for a class that is
+  # not in the list is refused as an option that does not exist.
+  evalManifest = lib.caisson-core.evalManifest;
   classes = lib.lists.unique (
-    builtins.attrNames (lib.caisson-core.classes or { })
-    ++ builtins.attrNames (lib.caisson-core.libManifest.modules or { })
+    builtins.attrNames lib.caisson.modules
+    ++ builtins.attrNames (if evalManifest == null then { } else evalManifest.modules or { })
   );
 
   exportedClassModules = builtins.mapAttrs (
