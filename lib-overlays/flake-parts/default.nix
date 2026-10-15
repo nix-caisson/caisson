@@ -19,7 +19,6 @@
 # module evaluation runs on the same library everything else in the
 # composition does, and on no library flake-parts assembled for itself.
 {
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -93,7 +92,7 @@
           # adapter selects from, so modules arriving by any channel
           # (local registration, overlay contribution, consumed
           # project) are selectable here.
-          registry = lib.caisson-core.modules.flake or { };
+          registry = lib.caisson.modules.flake or { };
 
           # The framework module of the class.
           frameworkModules = selection.frameworkModules "flake" registry;
@@ -108,7 +107,7 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/flake/<name>`), else none.
-          registered = lib.caisson-core.configs.flake or { };
+          registered = lib.caisson.configs.flake or { };
           configModule =
             if (args.configModule or null) != null then
               args.configModule
@@ -254,7 +253,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson-core.configs.flake.<name>`), if any. Further
+            # (`lib.caisson.configs.flake.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,
@@ -308,8 +307,7 @@
       };
 
     in
-    contributeClasses prev integration.classes
-    // {
+    {
 
       caisson = (prev.caisson or { }) // {
         flake-parts = integration.namespace;

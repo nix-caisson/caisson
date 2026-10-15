@@ -9,7 +9,7 @@
   # The default moduleImports already apply the nixpkgs flake module
   # of caisson, from the registry. Importing the same registry entry
   # here as well must deduplicate.
-  imports = [ closure-lib.caisson-core.modules.flake."caisson/nixpkgs" ];
+  imports = [ closure-lib.caisson.modules.flake."caisson/nixpkgs" ];
 
   systems = [ "x86_64-linux" ];
 

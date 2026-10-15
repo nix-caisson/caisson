@@ -6,7 +6,6 @@
 # composition of the class, shared with any integration that evaluates
 # the class another way.
 {
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -144,7 +143,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson-core.configs.nixos.<name>`), if any. Further
+            # (`lib.caisson.configs.nixos.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry. The base module list belongs to the
             # entry point: mkConfiguration and mkConfigurationFull
@@ -209,8 +208,7 @@
         };
       };
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         nixos = integration.namespace;
       };

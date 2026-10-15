@@ -30,8 +30,8 @@
     if lib ? caisson && lib ? caisson-core then
       [
         (mkModule ./caisson)
-        closure-lib.caisson-core.modules.nixos.home-manager-activation
-        closure-lib.caisson-core.modules.nixos.home-manager-source-marker
+        closure-lib.caisson.modules.nixos.home-manager-activation
+        closure-lib.caisson.modules.nixos.home-manager-source-marker
       ]
     else
       [ ];

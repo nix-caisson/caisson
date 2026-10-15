@@ -14,7 +14,6 @@
 # and the home-manager modules `nixos-parent` and
 # `nixos-source-marker`.
 {
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -208,7 +207,7 @@
           # manifest, applied to those.
           pkgs = integrations.pkgSetOf { inherit context what; } manifest pkgSets;
 
-          classRegistry = lib.caisson-core.modules.homeManager or { };
+          classRegistry = lib.caisson.modules.homeManager or { };
           # The framework module of the class, forced.
           frameworkModules = integrations.frameworkModules "homeManager" classRegistry;
           moduleImports = integrations.moduleImportsOf "homeManager" { inherit lib manifest; } args;
@@ -216,7 +215,7 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the home's name
           # (`configs/homeManager/<name>`), else none.
-          registered = lib.caisson-core.configs.homeManager or { };
+          registered = lib.caisson.configs.homeManager or { };
           configModule =
             if (args.configModule or null) != null then
               args.configModule
@@ -528,7 +527,7 @@
           {
             # The home's module. When absent, the configuration
             # registered under the home's name
-            # (`lib.caisson-core.configs.homeManager.<name>`), if any.
+            # (`lib.caisson.configs.homeManager.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry. home-manager's module
             # list belongs to the entry point: mkConfiguration
@@ -594,8 +593,7 @@
         };
       };
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         home-manager = integration.namespace;
       };

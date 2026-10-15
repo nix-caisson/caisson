@@ -94,7 +94,7 @@ in
 {
   # The module reads `config.caisson.exports.configurations`. The core
   # module declares that option.
-  imports = [ closure-lib.caisson-core.modules.nixos.core ];
+  imports = [ closure-lib.caisson.modules.nixos.core ];
 
   # `optionalAttrs` and not `mkIf` decides whether the option is
   # defined at all. A definition under `mkIf false` is still a

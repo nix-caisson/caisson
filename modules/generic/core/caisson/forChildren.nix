@@ -18,7 +18,7 @@
       default = { };
       example = lib.literalExpression ''
         {
-          nixos = lib: [ lib.caisson-core.modules.nixos.gaming ];
+          nixos = lib: [ lib.caisson.modules.nixos.gaming ];
         }
       '';
       description = ''

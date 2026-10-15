@@ -9,7 +9,7 @@
 { ... }:
 {
   imports = [
-    closure-lib.caisson-core.modules.generic.core
+    closure-lib.caisson.modules.generic.core
     ./caisson
   ];
 }

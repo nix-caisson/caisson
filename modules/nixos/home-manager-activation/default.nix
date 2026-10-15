@@ -227,7 +227,7 @@ in
 {
   # The module reads `config.caisson.exports.configurations`. The core
   # module declares that option.
-  imports = [ closure-lib.caisson-core.modules.nixos.core ];
+  imports = [ closure-lib.caisson.modules.nixos.core ];
 
   options.caisson.home-manager.activation.usersDeclaredElsewhere = lib.mkOption {
     type = lib.types.listOf lib.types.str;

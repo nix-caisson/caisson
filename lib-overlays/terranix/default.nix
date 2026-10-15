@@ -4,7 +4,6 @@
 # evaluates it with `terranixConfiguration` from the terranix flake.
 {
   closure-inputs,
-  contributeClasses,
   mkLibOverlay,
   ...
 }:
@@ -57,7 +56,7 @@
             explicit = ecosystemSrc;
             manifest = final.caisson-core.libManifest or { };
           });
-          registry = final.caisson-core.modules.terranix or { };
+          registry = final.caisson.modules.terranix or { };
           # The framework module of the class: every registered `core`, forced.
           coreModules = selection.coreModules registry;
           selectedModules = moduleImports registry ++ extraModuleImports registry;
@@ -129,8 +128,7 @@
           evaluation args;
       };
     in
-    contributeClasses prev integration.classes
-    // {
+    {
       caisson = (prev.caisson or { }) // {
         terranix = integration.namespace;
       };
