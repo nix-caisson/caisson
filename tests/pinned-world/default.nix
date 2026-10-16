@@ -230,8 +230,8 @@ let
 
   # A top holding a disko configuration of `integration` named
   # `nas-1`, over `layout`. With `machine`, a NixOS module, the layout
-  # declares a NixOS configuration named `default` from it, installed
-  # onto the layout.
+  # declares a NixOS configuration named `nas-1` from it, installed onto
+  # the layout.
   layoutTop =
     {
       integration,
@@ -254,7 +254,7 @@ let
                   { }
                 else
                   {
-                    caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                    caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
                       configModule = machine;
                     };
                   }
@@ -1190,9 +1190,8 @@ let
     # systems, boot settings and swap the layout produces, and nothing
     # of disko: it has no `disko` option and no disko scripts. It is
     # the system NixOS builds from disko's own module and the same
-    # layout. The machine declared as `default` inside the layout
-    # `nas-1` is published as `nixosConfigurations.nas-1`, beside
-    # `diskoConfigurations.nas-1`.
+    # layout. The machine `nas-1` inside the layout `nas-1` is published
+    # as `nixosConfigurations.nas-1`, beside `diskoConfigurations.nas-1`.
     caissonDiskoMachinesGetTheLayoutsSettings =
       let
         top = layoutTop {
@@ -1301,9 +1300,9 @@ let
       && installed.config.disko.devices.disk.main.device == "/dev/vdz";
 
     # A layout declared inside a colmena configuration passes up the
-    # machine installed onto it under the name of the layout, so the
-    # machine is the node `nas-1` of the hive, and the top publishes it
-    # as `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
+    # machine installed onto it, so the machine `nas-1` is the node
+    # `nas-1` of the hive, and the top publishes it as
+    # `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
     diskoLayoutsInsideColmenaAreNodes =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -1320,7 +1319,7 @@ let
                         { lib, ... }:
                         {
                           imports = [ luksLvmLayout ];
-                          caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                          caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
                             configModule = diskoMachineBase // {
                               networking.hostName = "nas-1";
                             };
