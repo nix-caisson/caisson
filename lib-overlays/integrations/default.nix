@@ -558,6 +558,7 @@
         {
           inherit manifest;
           inherit (exportsTo) attrset;
+          single = exportsTo.single or false;
           value = exportsTo.value manifest;
           path = init prefix ++ [
             (
@@ -646,6 +647,11 @@
       # bare, and names that collide gain the segments that tell them
       # apart. Entries that still share a name are refused, with their
       # paths.
+      #
+      # An output that holds a single value (`colmenaHive`) is the value
+      # of the entry named `default`, the entry whose `exportsTo` says
+      # `single`. Any other entry for that output is refused, since the
+      # output has no names to hold it under.
       publish =
         entries:
         let
@@ -661,8 +667,20 @@
               clashing = builtins.filter (
                 name: builtins.length (builtins.filter (other: other == name) names) > 1
               ) (unique names);
+              single = builtins.any (entry: entry.single or false) members;
+              notDefault = builtins.filter (entry: (last entry.path).name != "default") members;
             in
-            if clashing != [ ] then
+            if single then
+              if builtins.length members == 1 && notDefault == [ ] then
+                (builtins.head members).value
+              else
+                throw ''
+                  ${attrset}: this output holds a single value, the configuration
+                  declared under the name `default`, but these configurations would
+                  be published there:
+                  ${builtins.concatStringsSep "\n" (builtins.map (entry: "  ${showPath entry.path}") members)}
+                ''
+            else if clashing != [ ] then
               throw ''
                 ${attrset}: these configurations would be published under the same
                 name, `${builtins.head clashing}`:

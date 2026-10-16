@@ -117,7 +117,7 @@ let
     "home-manager-minimal"
     "flake-parts"
     "structural"
-    "colmena"
+    "caisson-colmena"
     "terranix"
     "system-manager"
   ];
@@ -5254,6 +5254,7 @@ in
                   signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
                   byName = builtins.elem name [
                     "structural"
+                    "caisson-colmena"
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"
@@ -5285,38 +5286,35 @@ in
         expected = builtins.functionArgs lib.caisson.nixos.mkConfiguration;
       };
 
-      # The node constructors a colmena configuration receives forward
-      # to the nixos entry points, and their patterns are the same, so
-      # a wrong argument is reported under the constructor's name.
-      "test: the colmena node constructors take the arguments of the nixos entry points" = {
+      # A colmena configuration declared under the name `default` fills
+      # the `colmenaHive` of the top it is declared beneath, an output
+      # that holds a single value: the hive, with the colmena
+      # configuration's `meta` and no nodes when no NixOS configuration
+      # is declared inside it.
+      "test: a colmena configuration named default fills colmenaHive" = {
         expr =
           let
-            hive = lib.caisson.colmena.mkConfiguration {
-              ecosystemSrc = colmenaStub;
-              configModule =
-                { mkNixosConfiguration, mkNixosConfigurationWithEcosystemArgs, ... }:
-                {
-                  meta.description = builtins.toJSON {
-                    # A node names its module, where a NixOS
-                    # configuration may take the configuration
-                    # registered under its name; the argument names
-                    # are the same.
-                    node =
-                      builtins.attrNames (builtins.functionArgs mkNixosConfiguration)
-                      == builtins.attrNames (builtins.functionArgs lib.caisson.nixos.mkConfiguration);
-                    twin =
-                      builtins.attrNames (builtins.functionArgs mkNixosConfigurationWithEcosystemArgs)
-                      == builtins.attrNames (builtins.functionArgs lib.caisson.nixos.mkConfigurationWithEcosystemArgs);
-                    requiresItsModule = !(builtins.functionArgs mkNixosConfiguration).configModule;
+            hive =
+              (lib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                      ecosystemSrc = colmenaStub;
+                      configModule.meta.description = "probe";
+                    };
                   };
-                };
-            };
+              }).colmenaHive;
           in
-          builtins.fromJSON hive.metaConfig.description;
+          {
+            inherit (hive) __schema nodes;
+            inherit (hive.metaConfig) description;
+          };
         expected = {
-          node = true;
-          twin = true;
-          requiresItsModule = true;
+          __schema = "v0.5";
+          nodes = { };
+          description = "probe";
         };
       };
 

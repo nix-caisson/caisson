@@ -27,7 +27,7 @@
     if lib ? caisson && lib ? caisson-core then
       [ ./caisson ]
       ++ builtins.map (integration: closure-lib.caisson.${integration}.configurationsModule) [
-        "colmena"
+        "caisson-colmena"
         "flake-parts"
         "home-manager"
         "nixos"
