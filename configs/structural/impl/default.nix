@@ -25,6 +25,7 @@
         home-manager
         home-manager-minimal
         caisson-colmena
+        colmena
         terranix
         system-manager
         ;

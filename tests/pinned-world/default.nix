@@ -62,6 +62,7 @@ let
       registered."caisson/nixos-minimal"
       registered."caisson/home-manager"
       registered."caisson/caisson-colmena"
+      registered."caisson/colmena"
       registered."caisson/terranix"
       registered."caisson/system-manager"
       registered."caisson/structural"
@@ -78,6 +79,7 @@ let
     "caisson-colmena"
     "callConsumerFlake"
     "callFlake"
+    "colmena"
     "configs"
     "ecosystemSrc"
     "elide"
@@ -216,6 +218,53 @@ let
     };
   colmenaTop = colmenaTopWith { };
 
+  # A hive in the format colmena reads, with every feature the
+  # upstream-compatible integration carries: `meta.nixpkgs`, shared and
+  # per-node special arguments, `defaults` that read the node's name, a
+  # node as a single module and a node as a list of modules, and a node
+  # that reads another through `nodes`.
+  upstreamHive = {
+    meta = {
+      nixpkgs = pkgs;
+      allowApplyAll = false;
+      specialArgs.shared = "everywhere";
+      nodeSpecialArgs.beta.only = "beta";
+    };
+    defaults =
+      { name, ... }:
+      {
+        imports = [ minimalNixosBase ];
+        networking.hostName = name;
+      };
+    alpha =
+      { shared, nodes, ... }:
+      {
+        environment.etc.shared.text = shared;
+        environment.etc.peer.text = nodes.beta.config.networking.hostName;
+      };
+    beta = [
+      (
+        { only, ... }:
+        {
+          environment.etc.only.text = only;
+        }
+      )
+    ];
+  };
+
+  # A top holding the upstream hive as a colmena configuration named
+  # `default`.
+  upstreamHiveTop = hiveLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+          hive = upstreamHive;
+        };
+      };
+  };
+
   # A NixOS configuration with two homes declared inside it, evaluated
   # with the real home-manager over the real NixOS. The machine
   # declares the account of the first home. It does not declare the
@@ -337,6 +386,7 @@ let
           "caisson/nixos-minimal"
           "caisson/home-manager"
           "caisson/caisson-colmena"
+          "caisson/colmena"
           "caisson/terranix"
           "caisson/system-manager"
           "caisson/structural"
@@ -429,6 +479,7 @@ let
       "nixos-minimal"
       "home-manager"
       "caisson-colmena"
+      "colmena"
       "terranix"
       "system-manager"
     ];
@@ -1001,6 +1052,43 @@ let
           "d"
           "e"
         ];
+
+    # The upstream-compatible colmena integration takes a hive in the
+    # format colmena reads. Each node is a caisson NixOS configuration
+    # built as colmena builds it: the `defaults` of the hive and the
+    # modules of the node, with `name`, `nodes`, `meta.specialArgs` and
+    # `meta.nodeSpecialArgs` as special arguments, running on
+    # `meta.nixpkgs`, and `deployment.targetHost` defaulting to the
+    # name of the node. A node reads another through `nodes`, and the
+    # top publishes the nodes as NixOS configurations.
+    colmenaUpstreamHiveEvaluates =
+      let
+        top = upstreamHiveTop;
+        hive = top.colmenaHive;
+        etc = node: hive.nodes.${node}.config.environment.etc;
+      in
+      builtins.attrNames hive.nodes == [
+        "alpha"
+        "beta"
+      ]
+      && (etc "alpha").shared.text == "everywhere"
+      && (etc "alpha").peer.text == "beta"
+      && (etc "beta").only.text == "beta"
+      && hive.nodes.alpha.config.deployment.targetHost == "alpha"
+      && hive.deploymentConfig.beta.targetHost == "beta"
+      && hive.metaConfig.allowApplyAll == false
+      && hive.nodes.alpha.pkgs.hello.drvPath == pkgs.hello.drvPath
+      && top.nixosConfigurations.beta.config.networking.hostName == "beta";
+
+    # A node of the upstream-compatible integration builds the same
+    # system as colmena builds from the same hive.
+    colmenaUpstreamHiveBuildsWhatColmenaBuilds =
+      let
+        upstream = inputs.colmena.lib.makeHive upstreamHive;
+        hive = upstreamHiveTop.colmenaHive;
+      in
+      hive.toplevel.alpha.drvPath == upstream.toplevel.alpha.drvPath
+      && hive.toplevel.beta.drvPath == upstream.toplevel.beta.drvPath;
 
     # `colmenaHive` holds a single value, so only a colmena
     # configuration declared under the name `default` is published

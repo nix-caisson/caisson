@@ -134,6 +134,16 @@ check "home-manager.mkConfiguration { pkgSets, ... }" \
   "lib.caisson.home-manager.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
   "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
 
+# The upstream-compatible colmena entry points take the hive in place of
+# `configModule`, and require it.
+for fn in mkConfiguration mkConfigurationWithEcosystemArgs; do
+  check "colmena.$fn { }" "lib.caisson.colmena.$fn { }" \
+    "function '[^']*$fn' called without required argument 'hive'"
+  # shellcheck disable=SC2059
+  check "colmena.$fn { bogus, hive }" "lib.caisson.colmena.$fn { bogus = 1; hive = { }; }" \
+    "$(printf "$unexpected" "$fn")"
+done
+
 if [ "$failures" != 0 ]; then
   printf '%s check(s) failed\n' "$failures"
   exit 1

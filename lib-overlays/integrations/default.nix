@@ -405,98 +405,111 @@
       # core module imports this module for each integration of
       # caisson. An integration written outside caisson registers a
       # module that imports it where its configurations may be declared.
-      configurationsModuleOf = name: {
-        key = "caisson-configurations:${name}";
+      configurationsModuleOf = name: configurationsModuleFor [ name ];
+
+      # The module that declares the options `configurationsModuleOf`
+      # declares, for several integrations at once. The core module of
+      # caisson imports it once, for all the integrations of caisson.
+      configurationsModuleFor = names: {
+        key = "caisson-configurations:${builtins.concatStringsSep "," names}";
         imports = [
           (
             { lib, options, ... }:
-            let
-              manifest = lib.caisson-core.evalManifest;
-              what = childName: "`caisson.${name}.configurations.${childName}`";
-              finalize =
-                childName: child:
-                let
-                  finalized = lib.caisson-core.finalizeChild {
-                    name = childName;
-                    what = what childName;
-                    parent = manifest.childlessManifest;
-                  } child;
-                  # The integration of what was declared: of the
-                  # manifest, or of the evaluations of a configuration
-                  # evaluated at a system, null where it has none.
-                  declaredType =
-                    if isManifest finalized then
-                      finalized.type
-                    else if finalized == { } then
-                      null
-                    else
-                      (builtins.head (builtins.attrValues finalized)).type;
-                in
-                if manifest == null then
-                  throw ''
-                    ${what childName} is declared in an evaluation that carries no manifest
-                    (`lib.caisson-core.evalManifest` is null there), so no
-                    configuration can be finalized beneath it.
-                  ''
-                else if manifest.childless then
-                  throw ''
-                    The result of the ${name} configuration `${childName}` is not
-                    readable from the ${manifest.type} configuration it is declared in, or
-                    from another configuration beneath that configuration; only the
-                    options of the ${manifest.type} configuration are readable there.
-                    Put the value in one of those options and read it there.
-                  ''
-                else if declaredType != null && declaredType != name then
-                  throw (
-                    if builtins.elem declaredType (integrationsIn options) then
-                      ''
-                        ${what childName} is declared with a ${declaredType} configuration.
-                        Declare it under `caisson.${declaredType}.configurations`.
-                      ''
-                    else
-                      ''
-                        ${what childName} is declared with a ${declaredType} configuration, and a
-                        ${declaredType} configuration cannot be declared beneath another
-                        configuration.
-                      ''
-                  )
-                else
-                  finalized;
-            in
             {
-              options.caisson.${name} = {
-                exported = lib.mkOption {
-                  type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
-                  default = configurations: configurations;
-                  defaultText = lib.literalMD "every configuration declared";
-                  description = ''
-                    Function that selects which of the ${name} configurations
-                    declared beneath this configuration it passes up. Receives
-                    `caisson.${name}.configurations` and returns the subset to
-                    export; `_: { }` exports none. What each selected configuration
-                    exports is merged into this configuration's `caisson.exports`.
-                  '';
-                };
-                configurations = lib.mkOption {
-                  type = lib.types.lazyAttrsOf lib.types.raw;
-                  default = { };
-                  apply = builtins.mapAttrs finalize;
-                  description = ''
-                    The ${name} configurations declared beneath this
-                    configuration, by name: each is what
-                    `lib.caisson.${name}.mkConfiguration` returns, and reads
-                    back as its manifest, finalized with the name it is declared
-                    under and this configuration as its parent. A configuration
-                    beneath sees this configuration without the configurations declared
-                    beneath it, so a definition that reads one of them is guarded
-                    with `!lib.caisson-core.evalManifest.childless`.
-                  '';
-                };
-              };
+              options.caisson = genAttrs names (name: configurationsOptionsOf { inherit lib options; } name);
             }
           )
         ];
       };
+
+      # The options `caisson.<name>.configurations` and
+      # `caisson.<name>.exported` of the integration `name`, in the
+      # evaluation whose `lib` and `options` are given.
+      configurationsOptionsOf =
+        { lib, options }:
+        name:
+        let
+          manifest = lib.caisson-core.evalManifest;
+          what = childName: "`caisson.${name}.configurations.${childName}`";
+          finalize =
+            childName: child:
+            let
+              finalized = lib.caisson-core.finalizeChild {
+                name = childName;
+                what = what childName;
+                parent = manifest.childlessManifest;
+              } child;
+              # The integration of what was declared: of the
+              # manifest, or of the evaluations of a configuration
+              # evaluated at a system, null where it has none.
+              declaredType =
+                if isManifest finalized then
+                  finalized.type
+                else if finalized == { } then
+                  null
+                else
+                  (builtins.head (builtins.attrValues finalized)).type;
+            in
+            if manifest == null then
+              throw ''
+                ${what childName} is declared in an evaluation that carries no manifest
+                (`lib.caisson-core.evalManifest` is null there), so no
+                configuration can be finalized beneath it.
+              ''
+            else if manifest.childless then
+              throw ''
+                The result of the ${name} configuration `${childName}` is not
+                readable from the ${manifest.type} configuration it is declared in, or
+                from another configuration beneath that configuration; only the
+                options of the ${manifest.type} configuration are readable there.
+                Put the value in one of those options and read it there.
+              ''
+            else if declaredType != null && declaredType != name then
+              throw (
+                if builtins.elem declaredType (integrationsIn options) then
+                  ''
+                    ${what childName} is declared with a ${declaredType} configuration.
+                    Declare it under `caisson.${declaredType}.configurations`.
+                  ''
+                else
+                  ''
+                    ${what childName} is declared with a ${declaredType} configuration, and a
+                    ${declaredType} configuration cannot be declared beneath another
+                    configuration.
+                  ''
+              )
+            else
+              finalized;
+        in
+        {
+          exported = lib.mkOption {
+            type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
+            default = configurations: configurations;
+            defaultText = lib.literalMD "every configuration declared";
+            description = ''
+              Function that selects which of the ${name} configurations
+              declared beneath this configuration it passes up. Receives
+              `caisson.${name}.configurations` and returns the subset to
+              export; `_: { }` exports none. What each selected configuration
+              exports is merged into this configuration's `caisson.exports`.
+            '';
+          };
+          configurations = lib.mkOption {
+            type = lib.types.lazyAttrsOf lib.types.raw;
+            default = { };
+            apply = builtins.mapAttrs finalize;
+            description = ''
+              The ${name} configurations declared beneath this
+              configuration, by name: each is what
+              `lib.caisson.${name}.mkConfiguration` returns, and reads
+              back as its manifest, finalized with the name it is declared
+              under and this configuration as its parent. A configuration
+              beneath sees this configuration without the configurations declared
+              beneath it, so a definition that reads one of them is guarded
+              with `!lib.caisson-core.evalManifest.childless`.
+            '';
+          };
+        };
 
       # The integrations whose configurations an evaluation can hold
       # beneath it: those whose `configurationsModule` the evaluation
@@ -769,6 +782,7 @@
             childrenOf
             displayName
             entriesOf
+            configurationsModuleFor
             integrationsIn
             mkEvaluation
             publish
