@@ -2,11 +2,11 @@
   "nodes": {
     "caisson-core": {
       "locked": {
-        "lastModified": 1792046586,
-        "narHash": "sha256-3B8nnMAKVnZzm0oAmBCS24OAcSOqFOgA/m7sWnEZgJY=",
+        "lastModified": 1792136033,
+        "narHash": "sha256-vdOZ5tKU+s5fWLNDxJG1YzcfTV1oDqrrRMLkO52CC3w=",
         "owner": "nix-caisson",
         "repo": "caisson-core",
-        "rev": "8b44b618b3cc9cc4bb18c24c182fedd3795d6eee",
+        "rev": "02f9189a4f2ce2652fbdefa550ec03fabd101fbf",
         "type": "github"
       },
       "original": {
@@ -36,6 +36,26 @@
       "original": {
         "owner": "zhaofengli",
         "repo": "colmena",
+        "type": "github"
+      }
+    },
+    "disko": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789770686,
+        "narHash": "sha256-uZkBR7yHdIKUFB5SZdfgh1qkGfI3XmYmI/lTiquxbck=",
+        "owner": "nix-community",
+        "repo": "disko",
+        "rev": "725ea35e410ad83be4931d1bff7e090eacaf3563",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "disko",
         "type": "github"
       }
     },
@@ -337,6 +357,7 @@
       "inputs": {
         "caisson-core": "caisson-core",
         "colmena": "colmena",
+        "disko": "disko",
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "nix-unit": "nix-unit",

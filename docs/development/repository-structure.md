@@ -26,7 +26,8 @@ without nixpkgs can depend on it directly.
 
 The layer users reach for: the integrations (`structural`,
 `flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
-`home-manager-minimal`, `colmena`, `terranix`, `system-manager`), each
+`home-manager-minimal`, `caisson-colmena`, `colmena`, `caisson-disko`,
+`disko`, `terranix`, `system-manager`), each
 a library overlay
 contributing its `lib.caisson` namespace, registering its module
 class where it has a class (`nixos-minimal` and `home-manager-minimal`
@@ -49,7 +50,7 @@ inject the same names beside `self`.
 ## The pinned world
 
 The upstream world caisson is tested against (nixpkgs, home-manager,
-colmena, terranix, system-manager, and the test tooling) is pinned in
+colmena, disko, terranix, system-manager, and the test tooling) is pinned in
 `tests/dependencies/flake.lock`, a lock only the checks and formatter
 partitions read, so caisson's `flake.nix` carries no churning pin. The
 pinned-world suite, `tests/pinned-world`, composes caisson with those

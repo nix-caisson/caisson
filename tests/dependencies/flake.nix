@@ -19,5 +19,7 @@
   inputs.terranix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.system-manager.url = "github:numtide/system-manager";
   inputs.system-manager.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.disko.url = "github:nix-community/disko";
+  inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
   outputs = { ... }: { };
 }

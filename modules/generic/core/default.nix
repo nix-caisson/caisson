@@ -29,7 +29,9 @@
         ./caisson
         (closure-lib.caisson.integrations.configurationsModuleFor [
           "caisson-colmena"
+          "caisson-disko"
           "colmena"
+          "disko"
           "flake-parts"
           "home-manager"
           "nixos"

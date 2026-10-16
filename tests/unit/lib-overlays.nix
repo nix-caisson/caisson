@@ -118,6 +118,8 @@ let
     "flake-parts"
     "structural"
     "caisson-colmena"
+    "caisson-disko"
+    "disko"
     "terranix"
     "system-manager"
   ];
@@ -2882,6 +2884,41 @@ in
         expected = [ "renamed" ];
       };
 
+      # `renameDefault` passes up the configuration declared as
+      # `default` under the name it is given, and every other
+      # configuration under its own name. A configuration declared under
+      # that name beside `default` is refused.
+      "test: renameDefault passes up default under the name given" = {
+        expr =
+          let
+            inherit (myLib.caisson.integrations) renameDefault;
+            refused =
+              configurations:
+              !(builtins.tryEval (builtins.deepSeq (renameDefault "nas-1" configurations) true)).success;
+          in
+          {
+            renamed = renameDefault "nas-1" {
+              default = "installed";
+              installer = "beside";
+            };
+            withoutDefault = renameDefault "nas-1" { installer = "beside"; };
+            clash = refused {
+              default = "installed";
+              nas-1 = "also";
+            };
+          };
+        expected = {
+          renamed = {
+            nas-1 = "installed";
+            installer = "beside";
+          };
+          withoutDefault = {
+            installer = "beside";
+          };
+          clash = true;
+        };
+      };
+
       # `publish` names the entries of an output attribute set from
       # their paths. Entries with the same path cannot be told apart,
       # and `publish` refuses them. The message names the output
@@ -5255,6 +5292,8 @@ in
                   byName = builtins.elem name [
                     "structural"
                     "caisson-colmena"
+                    "caisson-disko"
+                    "disko"
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"

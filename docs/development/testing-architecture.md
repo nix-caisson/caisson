@@ -311,6 +311,6 @@ The checks partition merges outputs from all test and example flakes into the
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
 | `debug-disabled` | `checks.nix` (inline) | `self.debug` is not exposed in production |
-| `pinned-world` | `checks.nix` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
+| `pinned-world` | `checks.nix` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, disko, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
 | `argument-errors` | `checks.nix` + `tests/argument-errors/` | The argument error of every entry point comes from Nix itself, raised at the call site with no frame of caisson |
 | `eval-weight` | `checks.nix` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |
