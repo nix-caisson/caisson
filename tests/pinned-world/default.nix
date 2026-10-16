@@ -846,6 +846,72 @@ let
       in
       refused "a,b" && refused "@tagged" && refused "";
 
+    # A structural configuration groups NixOS configurations so the
+    # group can be declared wherever machines are, as a unit. The same
+    # group of two machines is declared under a structural top and
+    # inside a colmena configuration: each machine is the same
+    # evaluation in both places, the top publishes the machines under
+    # their own names, and the colmena configuration finds its nodes
+    # through the group, under the same names.
+    structuralGroupsNixosConfigurationsForReuse =
+      let
+        group =
+          lib:
+          lib.caisson.structural.mkConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations = lib.genAttrs [ "host-1" "host-2" ] (
+                  hostName:
+                  lib.caisson.nixos.mkConfiguration {
+                    configModule = {
+                      imports = [ minimalNixosBase ];
+                      networking.hostName = hostName;
+                    };
+                  }
+                );
+              };
+          };
+        plain = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.structural.configurations.machines = group lib;
+            };
+        };
+        deployed = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.structural.configurations.machines = group lib;
+                  };
+              };
+            };
+        };
+        drvOf = machine: machine.config.system.build.toplevel.drvPath;
+        hive = deployed.colmenaHive;
+      in
+      builtins.attrNames plain.nixosConfigurations == [
+        "host-1"
+        "host-2"
+      ]
+      &&
+        builtins.attrNames hive.nodes == [
+          "host-1"
+          "host-2"
+        ]
+      && drvOf plain.nixosConfigurations.host-1 == drvOf hive.nodes.host-1
+      && hive.nodes.host-2.config.networking.hostName == "host-2"
+      && hive.deploymentConfig.host-1.targetHost == "host-1"
+      && drvOf deployed.nixosConfigurations.host-2 == drvOf hive.nodes.host-2;
+
     # `colmenaHive` holds a single value, so only a colmena
     # configuration declared under the name `default` is published
     # there.
