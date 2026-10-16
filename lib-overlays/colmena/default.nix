@@ -3,24 +3,25 @@
 # The colmena integration: it owns the `caisson-colmena` class,
 # prefixed because caisson defines it, colmena's hive format being no
 # module class. A colmena configuration is a module of that class with
-# `meta` (the metadata colmena's binary reads) and `nodes.<name>`, and
-# the integration is not compatible with colmena's hive modules
-# (`makeHive`, `defaults`, `meta.nixpkgs`). Its evaluator is the module
-# system of the composed library, and the evaluator step projects the
-# evaluated configuration onto the hive: the small versioned attrset
-# (the hive schema) that colmena's binary reads.
+# `meta`, the metadata colmena's command reads. It declares the
+# machines colmena deploys the way any configuration declares NixOS
+# configurations, under `caisson.nixos.configurations.<name>`.
 #
-# The configuration module receives `mkNixosConfiguration` as a module
-# argument, closed over the configuration's colmena source:
-# lib.caisson.nixos's composition plus colmena's public node modules
-# (deploymentOptions, keyChownModule, keyServiceModule,
-# assertionModule), with nixos.mkConfiguration's signature, so its
-# `ecosystemSrc` is nixpkgs as for any NixOS configuration. A node is
-# an ordinary NixOS configuration that also declares `deployment`; a
-# consumer that exports it as `nixosConfigurations.<host>` reads it
-# back from the hive, the same evaluation for nixos-rebuild and colmena
-# apply. Projects can contribute colmena modules through the registry
-# like any other class.
+# The nodes are the NixOS configurations passed up from beneath the
+# colmena configuration, each under the name it is published under.
+# The default module of the class adds caisson's `colmena-deployment`
+# NixOS module to those configurations, which declares colmena's
+# `deployment` options; the integration reads `deployment` back from
+# each node and builds the hive: the small versioned attribute set
+# (the hive schema) that colmena's command reads. The integration is
+# not compatible with colmena's hive modules (`makeHive`, `defaults`,
+# `meta.nixpkgs`): every node is an evaluated NixOS configuration.
+#
+# A colmena configuration is published as `colmenaHive`, an output that
+# holds a single value, so the configuration declared under the name
+# `default` fills it. The nodes are published as well, as the NixOS
+# configurations they are, so `nixos-rebuild` and `colmena apply` build
+# the same machine.
 {
   mkLibOverlay,
   ...
@@ -40,18 +41,11 @@
   overlay =
     final: prev:
     let
-      selection = final.caisson.integrations;
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "colmena";
         context = "caisson.colmena";
       };
-      resolveSrc =
-        explicit:
-        resolveEcosystemSrc {
-          inherit explicit;
-          manifest = final.caisson-core.libManifest or { };
-        };
 
       assertColmenaEcosystemSrc =
         ecosystemSrc:
@@ -60,7 +54,7 @@
         else
           throw "lib.caisson.colmena requires `ecosystemSrc.lib.makeHive` and `ecosystemSrc.nixosModules` (a colmena flake).";
 
-      # The hive schema this integration emits. Colmena's binary asserts
+      # The hive schema this integration emits. Colmena's command asserts
       # the version; the evaluator step asserts it against the makeHive
       # of the ecosystem source, so a colmena revision that moves the
       # schema fails loudly at evaluation rather than at deploy time.
@@ -72,276 +66,252 @@
         "allowApplyAll"
       ];
 
-      # colmena's public node modules, as a NixOS module.
-      mkDeploymentModule = src: {
-        _file = "caisson-colmena:deployment";
-        imports = [
-          src.nixosModules.deploymentOptions
-          src.nixosModules.assertionModule
-          src.nixosModules.keyChownModule
-          src.nixosModules.keyServiceModule
-        ];
-      };
-
-      # The node constructors a colmena configuration receives, closed
-      # over its colmena source: nixos.mkConfiguration over the host's
-      # module plus the deployment module. Their `ecosystemSrc` is
-      # nixpkgs, as for any NixOS configuration. A node is a NixOS
-      # configuration, so each constructor takes the arguments of the
-      # nixos entry point it forwards to, documented at
-      # `lib.caisson.nixos.mkConfiguration`, as its pattern: a wrong
-      # argument is reported under the constructor's name, at the
-      # configuration that called it. `deployment.*` is set in the
-      # host's configModule; the node declares those options. What a
-      # constructor returns is a NixOS configuration, a function of
-      # `{ name, parent }`, and the colmena configuration finalizes it
-      # under the name of the node it is declared as.
-      mkNodeConstructors =
-        src:
-        let
-          nodeArgsOf =
-            args:
-            args
-            // {
-              configModule = {
-                _file = "caisson-colmena:node";
-                imports = [
-                  args.configModule
-                  (mkDeploymentModule src)
-                ];
-              };
-            };
-        in
-        {
-          mkNixosConfiguration =
-            {
-              configModule,
-              ecosystemSrc ? null,
-              defaultPkgs ? null,
-              moduleImports ? null,
-              extraModuleImports ? null,
-              specialArgs ? null,
-            }@args:
-            final.caisson.nixos.mkConfiguration (nodeArgsOf args);
-          mkNixosConfigurationWithEcosystemArgs =
-            {
-              configModule,
-              ecosystemSrc ? null,
-              defaultPkgs ? null,
-              moduleImports ? null,
-              extraModuleImports ? null,
-              specialArgs ? null,
-              ecosystemArgs ? null,
-            }@args:
-            final.caisson.nixos.mkConfigurationWithEcosystemArgs (nodeArgsOf args);
-        };
-
       # The options of the class. `meta` declares the keys colmena's
-      # binary reads (its metaOptions also declare per-node package
+      # command reads (its metaOptions also declare per-node package
       # sets and special arguments, which have no meaning here: every
       # node is an evaluated configuration already).
       colmenaOptions =
         { lib, ... }:
         {
-          options = {
-            meta = {
-              name = lib.mkOption {
-                type = lib.types.str;
-                default = "hive";
-                description = "The name colmena's binary shows for this configuration.";
-              };
-              description = lib.mkOption {
-                type = lib.types.str;
-                default = "A Colmena Hive";
-                description = "A short description of the configuration.";
-              };
-              machinesFile = lib.mkOption {
-                type = lib.types.nullOr lib.types.path;
-                default = null;
-                apply = value: if value == null then null else toString value;
-                description = "The machines file passed to nix-store as `builders` when realizing the nodes.";
-              };
-              allowApplyAll = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-                description = "Whether `colmena apply` without a node filter is allowed.";
-              };
+          options.meta = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              default = "hive";
+              description = "The name colmena's command shows for this configuration.";
             };
-            nodes = lib.mkOption {
-              type = lib.types.attrsOf lib.types.raw;
-              default = { };
-              description = "The nodes: NixOS configurations from the `mkNixosConfiguration` module argument.";
+            description = lib.mkOption {
+              type = lib.types.str;
+              default = "A Colmena Hive";
+              description = "A short description of the configuration.";
+            };
+            machinesFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              apply = value: if value == null then null else toString value;
+              description = "The machines file passed to nix-store as `builders` when realizing the nodes.";
+            };
+            allowApplyAll = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Whether `colmena apply` without a node filter is allowed.";
             };
           };
         };
 
-      # A node as declared is a NixOS configuration, finalized under
-      # the node's name with the composition's manifest as its parent,
-      # which gives its evaluations by system. A node is a machine, so
-      # there has to be exactly one evaluation, whose value is the
-      # evaluated NixOS configuration the hive holds.
-      checkNode =
-        name: declared:
-        let
-          evaluations = final.caisson-core.finalizeChild {
-            inherit name;
-            parent = final.caisson-core.libManifest;
-            what = "`nodes.${name}`";
-          } declared;
-          systems = builtins.attrNames evaluations;
-          node = evaluations.${builtins.head systems}.value;
-        in
-        if builtins.length systems != 1 then
-          throw ''
-            lib.caisson.colmena.mkConfiguration: nodes.${name} is a machine, and
-            the NixOS configuration declared for it has ${
-              if systems == [ ] then
-                "no evaluation, since no system is in force"
-              else
-                "an evaluation at each of ${builtins.concatStringsSep ", " systems}"
-            }. A node is evaluated at exactly one system.
-          ''
-        else if node ? config && node.config ? deployment then
-          node
-        else
-          throw ''
-            lib.caisson.colmena.mkConfiguration: nodes.${name} is not a colmena node. Evaluate the host with the `mkNixosConfiguration` module argument.
-          '';
-
-      # colmena's binary selects nodes with a filter whose grammar
+      # colmena's command selects nodes with a filter whose grammar
       # reserves characters: a leading `@` names a tag and a `,`
       # separates entries. A node whose name uses either, or is empty,
-      # could never be addressed, so the configuration refuses it
-      # before any node is evaluated.
+      # could never be addressed, so the hive refuses it.
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
-      checkNodeNames =
-        nodes:
+
+      # The nodes, by the name each is published under: the NixOS
+      # configurations among the entries the colmena configuration
+      # passes up. A node is refused when colmena could not select it,
+      # and when it does not declare the `deployment` options colmena
+      # reads.
+      nodesOf =
+        entries:
         let
-          bad = builtins.filter unaddressable (builtins.attrNames nodes);
+          published = (final.caisson.integrations.publish entries).nixosConfigurations or { };
+          bad = builtins.filter unaddressable (builtins.attrNames published);
+          checked =
+            name: node:
+            if node ? config && node.config ? deployment then
+              node
+            else
+              throw ''
+                lib.caisson.colmena: the node `${name}` declares no `deployment` options,
+                which colmena reads. A NixOS configuration declared inside a colmena
+                configuration gets them from caisson's `colmena-deployment` module by
+                default; one that passes `moduleImports` lists that module itself.
+              '';
         in
         if bad == [ ] then
-          nodes
+          builtins.mapAttrs checked published
         else
           throw ''
-            lib.caisson.colmena.mkConfiguration: colmena's node filter cannot address ${
+            lib.caisson.colmena: colmena's node filter cannot address ${
               builtins.concatStringsSep ", " (map (n: "\"${n}\"") bad)
             }. A node name is non-empty, does not start with `@` (a tag) and contains no `,` (a separator).
           '';
 
-      # The `evalModules` call over the class: the options of
-      # the class, the framework module, the selection and the
-      # configuration's module, with the node constructors as special
-      # arguments.
-      compose =
+      # The hive: the attributes colmena's command reads, under the
+      # schema version it asserts. A `targetHost` left at `null` is the
+      # node's name.
+      hiveOf =
         {
-          ecosystemSrc ? null,
-          configModule,
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          specialArgs ? { },
-          pkgSets ? null,
-          ...
+          src,
+          config,
+          pkgs,
         }:
         let
-          src = assertColmenaEcosystemSrc (resolveSrc ecosystemSrc);
-          registry = final.caisson.modules.caisson-colmena or { };
-          # The framework module of the class: every registered `core`, forced.
-          coreModules = selection.coreModules registry;
-          selectedModules = moduleImports registry ++ extraModuleImports registry;
-        in
-        {
-          inherit src pkgSets;
-          ecosystemArgs = {
-            class = "caisson-colmena";
-            modules = [ colmenaOptions ] ++ coreModules ++ selectedModules ++ [ configModule ];
-            specialArgs =
-              mkNodeConstructors src // (if pkgSets != null then { inherit pkgSets; } else { }) // specialArgs;
-          };
-        };
-
-      # The evaluated configuration, projected onto the hive: the
-      # attributes colmena's binary reads, under the schema version it
-      # asserts.
-      evaluate =
-        composed: callArgs:
-        let
-          configuration = (final.evalModules callArgs).config;
-          nodes = builtins.mapAttrs checkNode (checkNodeNames configuration.nodes);
-          upstreamSchema = (composed.src.lib.makeHive { }).__schema;
+          nodes = nodesOf config.caisson.exports.configurations;
+          upstreamSchema = (src.lib.makeHive { }).__schema;
         in
         if upstreamSchema != schema then
-          throw "lib.caisson.colmena.mkConfiguration emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
+          throw "lib.caisson.colmena emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
         else
           rec {
             __schema = schema;
             inherit nodes;
             toplevel = builtins.mapAttrs (_: node: node.config.system.build.toplevel) nodes;
-            deploymentConfig = builtins.mapAttrs (_: node: node.config.deployment) nodes;
+            deploymentConfig = builtins.mapAttrs (
+              name: node:
+              node.config.deployment
+              // {
+                targetHost =
+                  if node.config.deployment.targetHost == null then name else node.config.deployment.targetHost;
+              }
+            ) nodes;
             deploymentConfigSelected =
               names: final.filterAttrs (name: _: builtins.elem name names) deploymentConfig;
             evalSelected = names: final.filterAttrs (name: _: builtins.elem name names) toplevel;
             evalSelectedDrvPaths = names: builtins.mapAttrs (_: drv: drv.drvPath) (evalSelected names);
-            metaConfig = final.getAttrs metaConfigKeys configuration.meta;
+            metaConfig = final.getAttrs metaConfigKeys config.meta;
             introspect =
               f:
               f {
                 lib = final;
                 pkgs =
-                  if composed.pkgSets != null && composed.pkgSets ? pkgs then
-                    composed.pkgSets.pkgs
+                  if pkgs != null then
+                    pkgs
                   else
                     throw "lib.caisson.colmena: `colmena eval` needs a package set; pass `pkgSets.pkgs` to mkConfiguration.";
                 inherit nodes;
               };
           };
 
-      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+      # The evaluator's call, on the lib of the view being evaluated:
+      # the options of the class, the framework modules of the class, the
+      # selection and the configuration's module, with the composition's
+      # pinned sources as the `inputs` special argument. `ecosystemArgs`,
+      # which only the twin's pattern admits, is merged over the call
+      # last.
+      evaluate =
+        args:
+        { lib, manifest }:
+        let
+          selection = lib.caisson.integrations;
+          src = assertColmenaEcosystemSrc (resolveEcosystemSrc {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          });
+          registry = lib.caisson.modules.caisson-colmena or { };
+          frameworkModules = selection.frameworkModules "caisson-colmena" registry;
+          moduleImports = selection.moduleImportsOf "caisson-colmena" { inherit lib manifest; } args;
 
-      integration = selection.mkIntegration {
+          # The configuration's module: the module passed, else the
+          # configuration registered under the configuration's name
+          # (`configs/caisson-colmena/<name>`), else none.
+          name = manifest.name or null;
+          registered = lib.caisson.configs.caisson-colmena or { };
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else if name != null then
+              registered.${name} or null
+            else
+              null;
+
+          evaluated = lib.evalModules (
+            {
+              class = "caisson-colmena";
+              specialArgs = {
+                inherit lib;
+                inputs = manifest.sources;
+              }
+              // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
+              // (if (args.specialArgs or null) != null then args.specialArgs else { });
+              modules = [
+                colmenaOptions
+              ]
+              ++ frameworkModules
+              ++ moduleImports registry
+              ++ (if configModule == null then [ ] else [ configModule ]);
+            }
+            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
+          );
+        in
+        {
+          value = evaluated;
+          outputs.hive = hiveOf {
+            inherit src;
+            inherit (evaluated) config;
+            pkgs = (args.pkgSets or { }).pkgs or null;
+          };
+        };
+
+      # A colmena configuration is published as `colmenaHive`, an output
+      # that holds a single value: the hive.
+      exportsTo = {
+        attrset = "colmenaHive";
+        single = true;
+        value = manifest: manifest.outputs.hive;
+      };
+
+      configuration =
+        args:
+        final.caisson.integrations.mkModuleConfiguration {
+          type = "colmena";
+          defaultPkgs = args.defaultPkgs or null;
+          inherit exportsTo;
+          evaluate = evaluate args;
+        };
+
+      integration = final.caisson.integrations.mkIntegration {
         name = "colmena";
         class = "caisson-colmena";
-        # `compose` destructures `configModule` without a default and
-        # supplies the value of every optional argument left out. The
-        # keys of colmena's hive format are not arguments: `meta` and
-        # `nodes` are options of the colmena configuration, and there
-        # is no `defaults` module shared by every node, each node being
-        # an evaluated NixOS configuration (the `mkNixosConfiguration`
-        # module argument) that selects its shared modules itself.
+        # What these return is a configuration, a function of
+        # `{ name, parent }`: the parent that declares it under
+        # `caisson.colmena.configurations.<name>` finalizes it.
         mkConfiguration =
           {
-            # The colmena configuration's module: `meta` and
-            # `nodes.<name>`. Further modules of the class are selected
-            # with `moduleImports`, from the registry.
-            configModule,
+            # The colmena configuration's module: `meta`, and the
+            # machines under `caisson.nixos.configurations`. When
+            # absent, the configuration registered under the
+            # configuration's name
+            # (`lib.caisson.configs.caisson-colmena.<name>`), if any.
+            # Further modules of the class are selected with
+            # `moduleImports`, from the registry.
+            configModule ? null,
             # The package sets, handed to the modules as the `pkgSets`
             # special argument; `colmena eval` needs `pkgSets.pkgs`
             # and reports the miss.
             pkgSets ? null,
+            # The package set the configurations beneath this one run
+            # on: a function that receives the package sets available
+            # to each, by package config name, and returns the set to
+            # run on.
+            defaultPkgs ? null,
             # The colmena flake; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
             # The selection over the caisson-colmena class of the
-            # registry; every entry named `default` when absent.
+            # registry. It replaces the default of the class, which is
+            # every entry named `default` followed by what the
+            # configurations above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
             extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
           {
-            configModule,
+            configModule ? null,
             pkgSets ? null,
+            defaultPkgs ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
       };
     in
     {

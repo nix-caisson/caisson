@@ -190,6 +190,32 @@ let
     }
   );
 
+  # A top holding a colmena configuration named `default`, with a NixOS
+  # configuration declared inside it for each machine given, by name.
+  # `machineArgs` are further arguments of each machine's constructor.
+  # The colmena configuration disallows a bare `colmena apply`.
+  colmenaTopWith =
+    machineArgs: machines:
+    hiveLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+            pkgSets.pkgs = pkgs;
+            configModule =
+              { lib, ... }:
+              {
+                meta.allowApplyAll = false;
+                caisson.nixos.configurations = builtins.mapAttrs (
+                  _: configModule: lib.caisson.nixos.mkConfiguration ({ inherit configModule; } // machineArgs)
+                ) machines;
+              };
+          };
+        };
+    };
+  colmenaTop = colmenaTopWith { };
+
   # A NixOS configuration with two homes declared inside it, evaluated
   # with the real home-manager over the real NixOS. The machine
   # declares the account of the first home. It does not declare the
@@ -427,12 +453,17 @@ let
       let
         throws = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
       in
-      throws (
-        composed.lib.caisson.colmena.mkConfiguration {
-          ecosystemSrc = { };
-          configModule = { };
-        }
-      )
+      throws
+        (hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+                ecosystemSrc = { };
+              };
+            };
+        }).colmenaHive
       && throws (
         composed.lib.caisson.terranix.mkConfiguration {
           ecosystemSrc = { };
@@ -719,24 +750,22 @@ let
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
       && !(hiveLib.caisson.colmena ? mkTopConfiguration);
 
+    # A colmena configuration declared under the name `default` beneath
+    # a top fills the top's `colmenaHive`. Its nodes are the NixOS
+    # configurations declared inside it, which the top also publishes
+    # as `nixosConfigurations`, so the hive and the published machine
+    # are the same evaluation.
     colmenaHiveEvaluatesEndToEnd =
       let
-        hive = hiveLib.caisson.colmena.mkConfiguration {
-          pkgSets.pkgs = pkgs;
-          configModule =
-            { mkNixosConfiguration, ... }:
-            {
-              meta.allowApplyAll = false;
-              nodes.probe-node = mkNixosConfiguration {
-                configModule = {
-                  imports = [ minimalNixosBase ];
-                  networking.hostName = "probe";
-                  deployment.targetHost = "probe";
-                };
-              };
-            };
+        top = colmenaTop {
+          probe-node = {
+            imports = [ minimalNixosBase ];
+            networking.hostName = "probe";
+            deployment.targetHost = "probe";
+          };
         };
-        node = hive.nodes.probe-node;
+        hive = top.colmenaHive;
+        node = top.nixosConfigurations.probe-node;
       in
       hive.__schema == (inputs.colmena.lib.makeHive { }).__schema
       && hive.toplevel.probe-node.drvPath == node.config.system.build.toplevel.drvPath
@@ -745,26 +774,17 @@ let
       && builtins.attrNames (hive.evalSelectedDrvPaths [ "probe-node" ]) == [ "probe-node" ];
 
     # A node is the NixOS configuration nixos.mkConfiguration builds from
-    # the same module, with colmena's deployment options declared: the
-    # extra modules leave the system untouched. The node's ecosystem
-    # source is nixpkgs, explicit here.
+    # the same module, with colmena's deployment options declared by
+    # default: the deployment module leaves the system untouched. A
+    # `targetHost` the node leaves unset is the node's name in the hive.
     colmenaNodesAreNixosConfigurations =
       let
         hostModule = {
           imports = [ minimalNixosBase ];
           networking.hostName = "probe";
         };
-        hive = hiveLib.caisson.colmena.mkConfiguration {
-          configModule =
-            { mkNixosConfiguration, ... }:
-            {
-              nodes.probe = mkNixosConfiguration {
-                ecosystemSrc = inputs.nixpkgs;
-                configModule = hostModule;
-              };
-            };
-        };
-        node = hive.nodes.probe;
+        top = colmenaTop { probe = hostModule; };
+        node = top.colmenaHive.nodes.probe;
         system = hiveLib.caisson.nixos.mkTopConfiguration {
           ecosystemSrc = inputs.nixpkgs;
           configModule = hostModule;
@@ -772,17 +792,17 @@ let
       in
       node.config.system.build.toplevel.drvPath == system.config.system.build.toplevel.drvPath
       && node.options ? deployment
+      && node.config.deployment.targetHost == null
+      && top.colmenaHive.deploymentConfig.probe.targetHost == "probe"
       && node.pkgs.hello.drvPath == pkgs.hello.drvPath;
 
-    # A hive refuses a node that is not a colmena node. A node is
-    # checked when it is read, so the probe forces a node.
-    colmenaRefusesPlainNixosNodes =
+    # A node without colmena's deployment options is refused when the
+    # hive reads it. A NixOS configuration that selects its modules
+    # itself leaves out the deployment module.
+    colmenaRefusesNodesWithoutDeployment =
       !(builtins.tryEval
-        (hiveLib.caisson.colmena.mkConfiguration {
-          configModule.nodes.plain = hiveLib.caisson.nixos.mkConfiguration {
-            configModule = minimalNixosBase;
-          };
-        }).nodes.plain
+        (colmenaTopWith { moduleImports = _modules: [ ]; } { plain = minimalNixosBase; })
+        .colmenaHive.nodes.plain
       ).success;
 
     # Node names colmena's flat hive reserved (meta, defaults, network)
@@ -791,32 +811,21 @@ let
     # definitions rather than from a `name` argument.
     colmenaNodesAreNamedFreely =
       let
-        hive = hiveLib.caisson.colmena.mkConfiguration {
-          configModule =
-            { mkNixosConfiguration, ... }:
-            {
-              nodes =
-                builtins.mapAttrs
-                  (
-                    hostName: peer:
-                    mkNixosConfiguration {
-                      configModule =
-                        { ... }:
-                        {
-                          imports = [ minimalNixosBase ];
-                          networking.hostName = hostName;
-                          deployment.targetHost = peer;
-                          deployment.tags = [ peer ];
-                        };
-                    }
-                  )
-                  {
-                    meta = "defaults";
-                    defaults = "network";
-                    network = "meta";
-                  };
-            };
-        };
+        hive =
+          (colmenaTop (
+            builtins.mapAttrs
+              (hostName: peer: {
+                imports = [ minimalNixosBase ];
+                networking.hostName = hostName;
+                deployment.targetHost = peer;
+                deployment.tags = [ peer ];
+              })
+              {
+                meta = "defaults";
+                defaults = "network";
+                network = "meta";
+              }
+          )).colmenaHive;
       in
       builtins.attrNames hive.deploymentConfig == [
         "defaults"
@@ -833,19 +842,24 @@ let
       let
         refused =
           nodeName:
-          !(builtins.tryEval
-            (hiveLib.caisson.colmena.mkConfiguration {
-              configModule =
-                { mkNixosConfiguration, ... }:
-                {
-                  nodes.${nodeName} = mkNixosConfiguration {
-                    configModule = minimalNixosBase;
-                  };
-                };
-            }).nodes.${nodeName}
-          ).success;
+          !(builtins.tryEval (colmenaTop { ${nodeName} = minimalNixosBase; }).colmenaHive.nodes).success;
       in
       refused "a,b" && refused "@tagged" && refused "";
+
+    # `colmenaHive` holds a single value, so only a colmena
+    # configuration declared under the name `default` is published
+    # there.
+    colmenaHiveIsTheDefaultConfiguration =
+      !(builtins.tryEval
+        (hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.colmena.configurations.other = lib.caisson.colmena.mkConfiguration { };
+            };
+        }).colmenaHive
+      ).success;
 
     terranixConfigurationEvaluatesEndToEnd =
       let

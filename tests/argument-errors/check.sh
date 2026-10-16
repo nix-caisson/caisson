@@ -20,10 +20,10 @@ lib_expr="$1"
 shift
 flags=("$@")
 
-# Every entry point takes `configModule`. The structural, flake-parts,
-# nixos, nixos-minimal, home-manager and home-manager-minimal entry
-# points require nothing: each finds the configuration registered
-# under the name of the configuration. The others require
+# Every entry point takes `configModule`. The structural, colmena,
+# flake-parts, nixos, nixos-minimal, home-manager and
+# home-manager-minimal entry points require nothing: each finds the
+# configuration registered under the name of the configuration. The others require
 # `configModule`, and take `pkgSets`, which the nixos and home-manager
 # entry points do not: a NixOS configuration and a home take their
 # package sets from the composition.
@@ -82,32 +82,6 @@ check() {
   fi
 }
 
-# check_node LABEL CALL MESSAGE_REGEX: the trace of CALL, which
-# reaches a node constructor through a module evaluation, carries a
-# message matching MESSAGE_REGEX, and the last frame above the message
-# is the frame where the module system evaluates the definitions the
-# constructor was called from: a frame of the constructor itself would
-# stand between that frame and the message.
-check_node() {
-  local label="$1" call="$2" want="$3"
-  local trace below
-  if ! trace="$(trace_of "$call")"; then
-    printf 'FAIL %s\n%s\n\n' "$label" "$trace"
-    failures=$((failures + 1))
-    return
-  fi
-  below="$(sed -n '/^[[:space:]]*… while evaluating definitions from/,$p' <<< "$trace" | tail -n +2)"
-  if ! grep -Eq "error: $want" <<< "$trace"; then
-    printf 'FAIL %s: the message is not the native argument error\n%s\n\n' "$label" "$trace"
-    failures=$((failures + 1))
-  elif [ -z "$below" ] || grep -q '^[[:space:]]*… ' <<< "$below"; then
-    printf 'FAIL %s: a frame stands between the module system and the message\n%s\n\n' "$label" "$trace"
-    failures=$((failures + 1))
-  else
-    printf 'ok   %s\n' "$label"
-  fi
-}
-
 missing="function '[^']*%s' called without required argument '(configModule|pkgSets)'"
 
 # The arguments a call passes beside the wrong argument.
@@ -119,7 +93,7 @@ given_for() {
 }
 requires_nothing() {
   case "$1" in
-    structural | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
+    structural | colmena | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -159,22 +133,6 @@ check "nixos.mkConfiguration { pkgSets, ... }" \
 check "home-manager.mkConfiguration { pkgSets, ... }" \
   "lib.caisson.home-manager.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
   "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
-
-# The colmena node constructors, module arguments of a colmena
-# configuration, reached through a stand-in colmena source with the
-# attributes the integration reads.
-colmena_stub='{ lib.makeHive = _: { __schema = "v0.5"; }; nixosModules = { deploymentOptions = { }; assertionModule = { }; keyChownModule = { }; keyServiceModule = { }; }; }'
-node_call() {
-  printf '(lib.caisson.colmena.mkConfiguration { ecosystemSrc = %s; configModule = { %s, ... }: { nodes.probe = %s %s; }; }).nodes.probe' \
-    "$colmena_stub" "$1" "$1" "$2"
-}
-for fn in mkNixosConfiguration mkNixosConfigurationWithEcosystemArgs; do
-  # shellcheck disable=SC2059
-  check_node "colmena node $fn { }" "$(node_call "$fn" '{ }')" "$(printf "$missing" "$fn")"
-  # shellcheck disable=SC2059
-  check_node "colmena node $fn { bogus, configModule }" \
-    "$(node_call "$fn" '{ bogus = 1; configModule = { }; }')" "$(printf "$unexpected" "$fn")"
-done
 
 if [ "$failures" != 0 ]; then
   printf '%s check(s) failed\n' "$failures"
