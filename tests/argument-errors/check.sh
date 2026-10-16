@@ -20,7 +20,7 @@ lib_expr="$1"
 shift
 flags=("$@")
 
-# Every entry point takes `configModule`. The structural, colmena,
+# Every entry point takes `configModule`. The structural, caisson-colmena,
 # flake-parts, nixos, nixos-minimal, home-manager and
 # home-manager-minimal entry points require nothing: each finds the
 # configuration registered under the name of the configuration. The others require
@@ -34,7 +34,7 @@ namespaces=(
   home-manager-minimal
   flake-parts
   structural
-  colmena
+  caisson-colmena
   terranix
   system-manager
 )
@@ -93,7 +93,7 @@ given_for() {
 }
 requires_nothing() {
   case "$1" in
-    structural | colmena | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
+    structural | caisson-colmena | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
     *) return 1 ;;
   esac
 }

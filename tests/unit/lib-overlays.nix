@@ -117,7 +117,7 @@ let
     "home-manager-minimal"
     "flake-parts"
     "structural"
-    "colmena"
+    "caisson-colmena"
     "terranix"
     "system-manager"
   ];
@@ -5254,7 +5254,7 @@ in
                   signature = builtins.functionArgs lib.caisson.${name}.mkConfiguration;
                   byName = builtins.elem name [
                     "structural"
-                    "colmena"
+                    "caisson-colmena"
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"
@@ -5300,7 +5300,7 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+                    caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
                       ecosystemSrc = colmenaStub;
                       configModule.meta.description = "probe";
                     };

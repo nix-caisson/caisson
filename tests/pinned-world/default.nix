@@ -61,7 +61,7 @@ let
       registered."caisson/nixos"
       registered."caisson/nixos-minimal"
       registered."caisson/home-manager"
-      registered."caisson/colmena"
+      registered."caisson/caisson-colmena"
       registered."caisson/terranix"
       registered."caisson/system-manager"
       registered."caisson/structural"
@@ -75,9 +75,9 @@ let
   # tooling, and the names of the framework a tree writes, which the
   # `framework` overlay publishes from `caisson-core`.
   expectedCaissonNames = [
+    "caisson-colmena"
     "callConsumerFlake"
     "callFlake"
-    "colmena"
     "configs"
     "ecosystemSrc"
     "elide"
@@ -201,7 +201,7 @@ let
       configModule =
         { lib, ... }:
         {
-          caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+          caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
             pkgSets.pkgs = pkgs;
             configModule =
               { lib, ... }:
@@ -336,7 +336,7 @@ let
           "caisson/nixos"
           "caisson/nixos-minimal"
           "caisson/home-manager"
-          "caisson/colmena"
+          "caisson/caisson-colmena"
           "caisson/terranix"
           "caisson/system-manager"
           "caisson/structural"
@@ -428,7 +428,7 @@ let
       "nixos"
       "nixos-minimal"
       "home-manager"
-      "colmena"
+      "caisson-colmena"
       "terranix"
       "system-manager"
     ];
@@ -459,7 +459,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
                 ecosystemSrc = { };
               };
             };
@@ -740,15 +740,15 @@ let
       && builtins.attrNames parent.libOverlays == builtins.attrNames alone.libOverlays;
 
     # An integration declares `top` when a configuration of it can be
-    # a top, and only then has `mkTopConfiguration`. The colmena
-    # integration returns the hive from `mkConfiguration` and declares
-    # no `top`.
+    # a top, and only then has `mkTopConfiguration`. A colmena
+    # configuration is always declared beneath another configuration,
+    # so the caisson-colmena integration declares no `top`.
     onlyAnIntegrationWithATopHasMkTopConfiguration =
       hiveLib.caisson.nixos ? mkTopConfiguration
       && hiveLib.caisson.home-manager ? mkTopConfiguration
       && hiveLib.caisson.structural ? mkTopConfiguration
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
-      && !(hiveLib.caisson.colmena ? mkTopConfiguration);
+      && !(hiveLib.caisson.caisson-colmena ? mkTopConfiguration);
 
     # A colmena configuration declared under the name `default` beneath
     # a top fills the top's `colmenaHive`. Its nodes are the NixOS
@@ -856,7 +856,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.colmena.configurations.other = lib.caisson.colmena.mkConfiguration { };
+              caisson.caisson-colmena.configurations.other = lib.caisson.caisson-colmena.mkConfiguration { };
             };
         }).colmenaHive
       ).success;

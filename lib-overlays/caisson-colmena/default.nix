@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# The colmena integration: it owns the `caisson-colmena` class,
-# prefixed because caisson defines it, colmena's hive format being no
-# module class. A colmena configuration is a module of that class with
+# The caisson-colmena integration, the native colmena integration: it
+# owns the `caisson-colmena` class, prefixed because caisson defines
+# it, colmena's hive format being no module class. A colmena
+# configuration is a module of that class with
 # `meta`, the metadata colmena's command reads. It declares the
 # machines colmena deploys the way any configuration declares NixOS
 # configurations, under `caisson.nixos.configurations.<name>`.
@@ -44,7 +45,7 @@
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "colmena";
-        context = "caisson.colmena";
+        context = "caisson.caisson-colmena";
       };
 
       assertColmenaEcosystemSrc =
@@ -52,7 +53,7 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeHive && ecosystemSrc ? nixosModules then
           ecosystemSrc
         else
-          throw "lib.caisson.colmena requires `ecosystemSrc.lib.makeHive` and `ecosystemSrc.nixosModules` (a colmena flake).";
+          throw "lib.caisson.caisson-colmena requires `ecosystemSrc.lib.makeHive` and `ecosystemSrc.nixosModules` (a colmena flake).";
 
       # The hive schema this integration emits. Colmena's command asserts
       # the version; the evaluator step asserts it against the makeHive
@@ -120,7 +121,7 @@
               node
             else
               throw ''
-                lib.caisson.colmena: the node `${name}` declares no `deployment` options,
+                lib.caisson.caisson-colmena: the node `${name}` declares no `deployment` options,
                 which colmena reads. A NixOS configuration declared inside a colmena
                 configuration gets them from caisson's `colmena-deployment` module by
                 default; one that passes `moduleImports` lists that module itself.
@@ -130,7 +131,7 @@
           builtins.mapAttrs checked published
         else
           throw ''
-            lib.caisson.colmena: colmena's node filter cannot address ${
+            lib.caisson.caisson-colmena: colmena's node filter cannot address ${
               builtins.concatStringsSep ", " (map (n: "\"${n}\"") bad)
             }. A node name is non-empty, does not start with `@` (a tag) and contains no `,` (a separator).
           '';
@@ -149,7 +150,7 @@
           upstreamSchema = (src.lib.makeHive { }).__schema;
         in
         if upstreamSchema != schema then
-          throw "lib.caisson.colmena emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
+          throw "lib.caisson.caisson-colmena emits hive schema ${schema}, but this colmena expects ${upstreamSchema}."
         else
           rec {
             __schema = schema;
@@ -176,7 +177,7 @@
                   if pkgs != null then
                     pkgs
                   else
-                    throw "lib.caisson.colmena: `colmena eval` needs a package set; pass `pkgSets.pkgs` to mkConfiguration.";
+                    throw "lib.caisson.caisson-colmena: `colmena eval` needs a package set; pass `pkgSets.pkgs` to mkConfiguration.";
                 inherit nodes;
               };
           };
@@ -252,18 +253,18 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
-          type = "colmena";
+          type = "caisson-colmena";
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
           evaluate = evaluate args;
         };
 
       integration = final.caisson.integrations.mkIntegration {
-        name = "colmena";
+        name = "caisson-colmena";
         class = "caisson-colmena";
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
-        # `caisson.colmena.configurations.<name>` finalizes it.
+        # `caisson.caisson-colmena.configurations.<name>` finalizes it.
         mkConfiguration =
           {
             # The colmena configuration's module: `meta`, and the
@@ -316,7 +317,7 @@
     in
     {
       caisson = (prev.caisson or { }) // {
-        colmena = integration.namespace;
+        caisson-colmena = integration.namespace;
       };
     };
 
