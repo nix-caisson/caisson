@@ -216,7 +216,9 @@ let
   };
 
   # The machine NixOS builds from disko's own NixOS module, the layout
-  # and `diskoMachineBase`, with no caisson involved.
+  # and `diskoMachineBase`, with no caisson involved. It is named
+  # `nas-1`, the host name caisson gives the machine declared as
+  # `nas-1`.
   upstreamDiskoMachine =
     layout:
     import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
@@ -225,6 +227,7 @@ let
         "${inputs.disko}/module.nix"
         layout
         diskoMachineBase
+        { networking.hostName = "nas-1"; }
       ];
     };
 
@@ -1340,39 +1343,37 @@ let
         hive.toplevel.nas-1.drvPath == top.nixosConfigurations.nas-1.config.system.build.toplevel.drvPath;
 
     # The convention for a machine inside a layout: the layout declares
-    # it under the layout's own name, and the machine takes its host
-    # name from the name it is declared under. Both names come from
-    # `lib.caisson-core.evalManifest.name`, so neither module writes
-    # the name.
+    # it under the layout's own name, read from
+    # `lib.caisson-core.evalManifest.name`, and caisson's default NixOS
+    # module names the host after the name the machine is declared
+    # under. A machine that sets its own host name keeps it.
     diskoMachinesNamedAfterTheirLayout =
       let
-        top = hiveLib.caisson.structural.mkTopConfiguration {
-          moduleImports = _modules: [ ];
-          configModule =
-            { lib, ... }:
-            {
-              caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
-                configModule =
-                  { lib, ... }:
-                  {
-                    imports = [ luksLvmLayout ];
-                    caisson.nixos.configurations.${lib.caisson-core.evalManifest.name} =
-                      lib.caisson.nixos.mkConfiguration
-                        {
-                          configModule =
-                            { lib, ... }:
-                            diskoMachineBase
-                            // {
-                              networking.hostName = lib.caisson-core.evalManifest.name;
-                            };
-                        };
-                  };
+        layoutWith =
+          machine:
+          hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ luksLvmLayout ];
+                      caisson.nixos.configurations.${lib.caisson-core.evalManifest.name} =
+                        lib.caisson.nixos.mkConfiguration
+                          { configModule = machine; };
+                    };
+                };
               };
-            };
-        };
+          };
+        named = layoutWith diskoMachineBase;
+        renamed = layoutWith (diskoMachineBase // { networking.hostName = "storage"; });
       in
-      builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
-      && top.nixosConfigurations.nas-1.config.networking.hostName == "nas-1";
+      builtins.attrNames named.nixosConfigurations == [ "nas-1" ]
+      && named.nixosConfigurations.nas-1.config.networking.hostName == "nas-1"
+      && renamed.nixosConfigurations.nas-1.config.networking.hostName == "storage";
 
     terranixConfigurationEvaluatesEndToEnd =
       let
