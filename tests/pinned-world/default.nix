@@ -216,7 +216,9 @@ let
   };
 
   # The machine NixOS builds from disko's own NixOS module, the layout
-  # and `diskoMachineBase`, with no caisson involved.
+  # and `diskoMachineBase`, with no caisson involved. It is named
+  # `nas-1`, the host name caisson gives the machine declared as
+  # `nas-1`.
   upstreamDiskoMachine =
     layout:
     import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
@@ -225,13 +227,14 @@ let
         "${inputs.disko}/module.nix"
         layout
         diskoMachineBase
+        { networking.hostName = "nas-1"; }
       ];
     };
 
   # A top holding a disko configuration of `integration` named
   # `nas-1`, over `layout`. With `machine`, a NixOS module, the layout
-  # declares a NixOS configuration named `default` from it, installed
-  # onto the layout.
+  # declares a NixOS configuration named `nas-1` from it, installed onto
+  # the layout.
   layoutTop =
     {
       integration,
@@ -254,7 +257,7 @@ let
                   { }
                 else
                   {
-                    caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                    caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
                       configModule = machine;
                     };
                   }
@@ -1190,9 +1193,8 @@ let
     # systems, boot settings and swap the layout produces, and nothing
     # of disko: it has no `disko` option and no disko scripts. It is
     # the system NixOS builds from disko's own module and the same
-    # layout. The machine declared as `default` inside the layout
-    # `nas-1` is published as `nixosConfigurations.nas-1`, beside
-    # `diskoConfigurations.nas-1`.
+    # layout. The machine `nas-1` inside the layout `nas-1` is published
+    # as `nixosConfigurations.nas-1`, beside `diskoConfigurations.nas-1`.
     caissonDiskoMachinesGetTheLayoutsSettings =
       let
         top = layoutTop {
@@ -1301,9 +1303,9 @@ let
       && installed.config.disko.devices.disk.main.device == "/dev/vdz";
 
     # A layout declared inside a colmena configuration passes up the
-    # machine installed onto it under the name of the layout, so the
-    # machine is the node `nas-1` of the hive, and the top publishes it
-    # as `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
+    # machine installed onto it, so the machine `nas-1` is the node
+    # `nas-1` of the hive, and the top publishes it as
+    # `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
     diskoLayoutsInsideColmenaAreNodes =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -1320,7 +1322,7 @@ let
                         { lib, ... }:
                         {
                           imports = [ luksLvmLayout ];
-                          caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                          caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
                             configModule = diskoMachineBase // {
                               networking.hostName = "nas-1";
                             };
@@ -1339,6 +1341,39 @@ let
       && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
       &&
         hive.toplevel.nas-1.drvPath == top.nixosConfigurations.nas-1.config.system.build.toplevel.drvPath;
+
+    # The convention for a machine inside a layout: the layout declares
+    # it under the layout's own name, read from
+    # `lib.caisson-core.evalManifest.name`, and caisson's default NixOS
+    # module names the host after the name the machine is declared
+    # under. A machine that sets its own host name keeps it.
+    diskoMachinesNamedAfterTheirLayout =
+      let
+        layoutWith =
+          machine:
+          hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ luksLvmLayout ];
+                      caisson.nixos.configurations.${lib.caisson-core.evalManifest.name} =
+                        lib.caisson.nixos.mkConfiguration
+                          { configModule = machine; };
+                    };
+                };
+              };
+          };
+        named = layoutWith diskoMachineBase;
+        renamed = layoutWith (diskoMachineBase // { networking.hostName = "storage"; });
+      in
+      builtins.attrNames named.nixosConfigurations == [ "nas-1" ]
+      && named.nixosConfigurations.nas-1.config.networking.hostName == "nas-1"
+      && renamed.nixosConfigurations.nas-1.config.networking.hostName == "storage";
 
     terranixConfigurationEvaluatesEndToEnd =
       let

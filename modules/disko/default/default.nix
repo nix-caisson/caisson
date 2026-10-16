@@ -11,17 +11,10 @@
 # its modules itself, and then it lists `disko-layout` itself, as
 # `caisson/disko-layout` in a flake that lists caisson in `projects`.
 #
-# The NixOS configuration declared as `default` is passed up under the
-# name of the disko configuration, so the machine installed onto the
-# layout `nas-1` is published as `nixosConfigurations.nas-1`, beside
-# `diskoConfigurations.nas-1`. A disko configuration that sets
-# `caisson.nixos.exported` passes its NixOS configurations up its own
-# way.
-#
 # `closure-lib` is the library of caisson, where `disko-layout` is
 # registered under that name.
 { closure-lib, ... }:
-{ lib, ... }:
+{ ... }:
 {
   # The options under `caisson` are declared by the core module of the
   # class.
@@ -30,8 +23,4 @@
   caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [
     closure-lib.caisson.modules.nixos.disko-layout
   ];
-
-  caisson.nixos.exported = lib.mkDefault (
-    lib.caisson.integrations.renameDefault lib.caisson-core.evalManifest.name
-  );
 }

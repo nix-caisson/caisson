@@ -5,7 +5,10 @@
 # `moduleImports`, so this is what a NixOS configuration gets from
 # caisson when it does not select its modules itself.
 #
-# It holds what a NixOS configuration does for the homes declared
+# `./networking` defaults the host name of the NixOS configuration to
+# the name it is declared under, at `mkDefault` priority.
+#
+# It also holds what a NixOS configuration does for the homes declared
 # inside it, in three parts:
 #
 # - `./caisson/forChildren.nix` gives each of those homes two
@@ -29,6 +32,7 @@
   imports =
     if lib ? caisson && lib ? caisson-core then
       [
+        (mkModule ./networking)
         (mkModule ./caisson)
         closure-lib.caisson.modules.nixos.home-manager-activation
         closure-lib.caisson.modules.nixos.home-manager-source-marker

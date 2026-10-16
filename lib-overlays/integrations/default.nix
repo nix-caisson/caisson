@@ -592,28 +592,6 @@
         }
         // (if named ? description then { inherit (named) description; } else { });
 
-      # An `exported` selection that passes up the configuration
-      # declared under the name `default` under `name` instead, and
-      # every other configuration under the name it is declared under.
-      # A disko configuration selects the NixOS configurations installed
-      # onto it this way, with its own name, so the machine declared as
-      # `default` inside the layout `nas-1` is published as
-      # `nixosConfigurations.nas-1`. A configuration declared under
-      # `name` beside `default` is refused, since both would be passed
-      # up under that name.
-      renameDefault =
-        name: configurations:
-        if !(configurations ? default) then
-          configurations
-        else if configurations ? ${name} then
-          throw ''
-            The configurations `default` and `${name}` are declared side by side,
-            and the configuration `default` is passed up under the name `${name}`.
-            Rename one of them, or set `exported` to pass them up another way.
-          ''
-        else
-          builtins.removeAttrs configurations [ "default" ] // { ${name} = configurations.default; };
-
       # A published name, from the segments `caisson-core.elide` keeps
       # of a path: the segments in path order, separated by `/`. Every
       # name caisson publishes is written here.
@@ -808,7 +786,6 @@
             integrationsIn
             mkEvaluation
             publish
-            renameDefault
             topValue
             resolveEcosystemSrc
             mkIntegration
