@@ -25,16 +25,19 @@
 {
   imports =
     if lib ? caisson && lib ? caisson-core then
-      [ ./caisson ]
-      ++ builtins.map (integration: closure-lib.caisson.${integration}.configurationsModule) [
-        "caisson-colmena"
-        "flake-parts"
-        "home-manager"
-        "nixos"
-        "nixpkgs"
-        "structural"
-        "system-manager"
-        "terranix"
+      [
+        ./caisson
+        (closure-lib.caisson.integrations.configurationsModuleFor [
+          "caisson-colmena"
+          "colmena"
+          "flake-parts"
+          "home-manager"
+          "nixos"
+          "nixpkgs"
+          "structural"
+          "system-manager"
+          "terranix"
+        ])
       ]
     else
       [ ];

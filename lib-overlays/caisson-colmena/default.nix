@@ -313,6 +313,28 @@
             ecosystemArgs ? null,
           }@args:
           configuration args;
+        # What the upstream-compatible colmena integration builds on, so
+        # both integrations read colmena the same way and build the same
+        # hive from what a colmena configuration passes up.
+        extra = {
+          # The module declaring `meta`, the keys colmena's command reads.
+          metaOptions = colmenaOptions;
+          # The hive of an evaluated colmena configuration, from its
+          # `config`, the colmena source and the package set of
+          # `colmena eval`.
+          inherit hiveOf;
+          # How a colmena configuration is published: as `colmenaHive`.
+          inherit exportsTo;
+          # The colmena source of a configuration: `explicit` when given,
+          # else what the composition declares or pins under the name
+          # `colmena`, as recorded on `manifest`; refused when it is no
+          # colmena flake.
+          ecosystemSrcOf =
+            { explicit, manifest }:
+            assertColmenaEcosystemSrc (resolveEcosystemSrc {
+              inherit explicit manifest;
+            });
+        };
       };
     in
     {
