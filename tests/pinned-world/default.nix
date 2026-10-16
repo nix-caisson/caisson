@@ -1339,6 +1339,41 @@ let
       &&
         hive.toplevel.nas-1.drvPath == top.nixosConfigurations.nas-1.config.system.build.toplevel.drvPath;
 
+    # The convention for a machine inside a layout: the layout declares
+    # it under the layout's own name, and the machine takes its host
+    # name from the name it is declared under. Both names come from
+    # `lib.caisson-core.evalManifest.name`, so neither module writes
+    # the name.
+    diskoMachinesNamedAfterTheirLayout =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ luksLvmLayout ];
+                    caisson.nixos.configurations.${lib.caisson-core.evalManifest.name} =
+                      lib.caisson.nixos.mkConfiguration
+                        {
+                          configModule =
+                            { lib, ... }:
+                            diskoMachineBase
+                            // {
+                              networking.hostName = lib.caisson-core.evalManifest.name;
+                            };
+                        };
+                  };
+              };
+            };
+        };
+      in
+      builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
+      && top.nixosConfigurations.nas-1.config.networking.hostName == "nas-1";
+
     terranixConfigurationEvaluatesEndToEnd =
       let
         terraform = composed.lib.caisson.terranix.mkConfiguration {
