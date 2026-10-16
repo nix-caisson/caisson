@@ -719,6 +719,80 @@ let
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
       && !(hiveLib.caisson.colmena ? mkTopConfiguration);
 
+    # Structural configurations group machines so that each group
+    # gives its machines its own modules. Two groups beneath a top add
+    # different modules to the default of the NixOS configurations
+    # declared beneath them: hosts a, b and c get the first module,
+    # hosts d and e the second. Every host gets its own group's module
+    # and not the other, and the top publishes all five under their
+    # own names.
+    structuralGroupsGiveTheirMachinesModules =
+      let
+        groupModule = groupName: {
+          environment.etc.group-name.text = groupName;
+        };
+        group =
+          lib: groupName: hostNames:
+          lib.caisson.structural.mkConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ (groupModule groupName) ];
+                caisson.nixos.configurations = lib.genAttrs hostNames (
+                  hostName:
+                  lib.caisson.nixos.mkConfiguration {
+                    configModule = {
+                      imports = [ minimalNixosBase ];
+                      networking.hostName = hostName;
+                    };
+                  }
+                );
+              };
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.structural.configurations = {
+                first = group lib "first" [
+                  "a"
+                  "b"
+                  "c"
+                ];
+                second = group lib "second" [
+                  "d"
+                  "e"
+                ];
+              };
+            };
+        };
+        groupOf = host: top.nixosConfigurations.${host}.config.environment.etc.group-name.text;
+      in
+      builtins.attrNames top.nixosConfigurations == [
+        "a"
+        "b"
+        "c"
+        "d"
+        "e"
+      ]
+      &&
+        builtins.map groupOf [
+          "a"
+          "b"
+          "c"
+          "d"
+          "e"
+        ] == [
+          "first"
+          "first"
+          "first"
+          "second"
+          "second"
+        ]
+      && top.nixosConfigurations.d.config.networking.hostName == "d";
+
     colmenaHiveEvaluatesEndToEnd =
       let
         hive = hiveLib.caisson.colmena.mkConfiguration {
