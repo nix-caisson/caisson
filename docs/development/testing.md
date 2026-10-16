@@ -23,9 +23,10 @@ plumbing works.
 ## Pinned-World Suite
 
 - **Scope:** caisson composed with concrete pinned versions of the upstream
-  world (nixpkgs, home-manager, colmena, terranix, system-manager) and
-  exercised end to end: a home configuration, a NixOS system with
-  homes declared inside it, a colmena hive, a terranix and a system-manager
+  world (nixpkgs, home-manager, colmena, disko, terranix, system-manager)
+  and exercised end to end: a home configuration, a NixOS system with
+  homes declared inside it, a colmena hive, disk layouts with the
+  machines installed onto them, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
   overlays. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in

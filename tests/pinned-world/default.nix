@@ -2,8 +2,8 @@
 #
 # The pinned-world suite: caisson, the tree this file lives in,
 # composed with concrete pinned versions of the upstream world
-# (nixpkgs, home-manager, colmena, terranix, system-manager, read
-# from tests/dependencies) and exercised end to end. Every upstream
+# (nixpkgs, home-manager, colmena, disko, terranix, system-manager,
+# read from tests/dependencies) and exercised end to end. Every upstream
 # expectation caisson relies on is held by a probe here, so a pin
 # that moves and breaks an expectation fails at evaluation, in this
 # suite, rather than in a consumer.
@@ -63,6 +63,8 @@ let
       registered."caisson/home-manager"
       registered."caisson/caisson-colmena"
       registered."caisson/colmena"
+      registered."caisson/caisson-disko"
+      registered."caisson/disko"
       registered."caisson/terranix"
       registered."caisson/system-manager"
       registered."caisson/structural"
@@ -77,10 +79,12 @@ let
   # `framework` overlay publishes from `caisson-core`.
   expectedCaissonNames = [
     "caisson-colmena"
+    "caisson-disko"
     "callConsumerFlake"
     "callFlake"
     "colmena"
     "configs"
+    "disko"
     "ecosystemSrc"
     "elide"
     "eval-weight"
@@ -176,9 +180,10 @@ let
       system.stateVersion = "25.05";
     };
 
-  # The colmena probes compose with declared ecosystems: a node's
-  # `ecosystemSrc` is colmena's, and nixpkgs resolves from the
-  # declaration, as it does in a consumer flake.
+  # The colmena and disko probes compose with declared ecosystems: a
+  # node resolves the colmena source, a layout resolves the disko
+  # source, and nixpkgs resolves from the declaration, as it does in a
+  # consumer flake.
   hiveLib = core.mkLib (
     declaresPkgs
     // {
@@ -187,10 +192,79 @@ let
         caisson = inputs.caisson;
       };
       defaultEcosystemSrc = {
-        inherit (inputs) nixpkgs colmena flake-parts;
+        inherit (inputs)
+          nixpkgs
+          colmena
+          flake-parts
+          disko
+          ;
       };
     }
   );
+
+  # Disk layouts as disko writes them, from disko's examples: a disk
+  # with an ESP and LUKS around LVM, and one with mdadm, ZFS, LUKS and
+  # LVM over three disks.
+  luksLvmLayout = import "${inputs.disko}/example/luks-lvm.nix";
+  complexLayout = import "${inputs.disko}/example/complex.nix";
+
+  # What a machine installed onto a layout needs beside the layout,
+  # which gives it its file systems.
+  diskoMachineBase = {
+    boot.loader.grub.enable = false;
+    system.stateVersion = "25.05";
+  };
+
+  # The machine NixOS builds from disko's own NixOS module, the layout
+  # and `diskoMachineBase`, with no caisson involved.
+  upstreamDiskoMachine =
+    layout:
+    import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+      system = "x86_64-linux";
+      modules = [
+        "${inputs.disko}/module.nix"
+        layout
+        diskoMachineBase
+      ];
+    };
+
+  # A top holding a disko configuration of `integration` named
+  # `nas-1`, over `layout`. With `machine`, a NixOS module, the layout
+  # declares a NixOS configuration named `default` from it, installed
+  # onto the layout.
+  layoutTop =
+    {
+      integration,
+      layout,
+      machine ? null,
+    }:
+    hiveLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.${integration}.configurations.nas-1 = lib.caisson.${integration}.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                imports = [ layout ];
+              }
+              // (
+                if machine == null then
+                  { }
+                else
+                  {
+                    caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                      configModule = machine;
+                    };
+                  }
+              );
+          };
+        };
+    };
+
+  # The manifest of the disko configuration `nas-1` of a `layoutTop`.
+  layoutManifest = integration: top: top.caisson.manifest.children.${integration}.nas-1;
 
   # A top holding a colmena configuration named `default`, with a NixOS
   # configuration declared inside it for each machine given, by name.
@@ -387,6 +461,8 @@ let
           "caisson/home-manager"
           "caisson/caisson-colmena"
           "caisson/colmena"
+          "caisson/caisson-disko"
+          "caisson/disko"
           "caisson/terranix"
           "caisson/system-manager"
           "caisson/structural"
@@ -480,6 +556,8 @@ let
       "home-manager"
       "caisson-colmena"
       "colmena"
+      "caisson-disko"
+      "disko"
       "terranix"
       "system-manager"
     ];
@@ -792,14 +870,17 @@ let
 
     # An integration declares `top` when a configuration of it can be
     # a top, and only then has `mkTopConfiguration`. A colmena
-    # configuration is always declared beneath another configuration,
-    # so the caisson-colmena integration declares no `top`.
+    # configuration and a disko configuration are always declared
+    # beneath another configuration, so their integrations declare no
+    # `top`.
     onlyAnIntegrationWithATopHasMkTopConfiguration =
       hiveLib.caisson.nixos ? mkTopConfiguration
       && hiveLib.caisson.home-manager ? mkTopConfiguration
       && hiveLib.caisson.structural ? mkTopConfiguration
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
-      && !(hiveLib.caisson.caisson-colmena ? mkTopConfiguration);
+      && !(hiveLib.caisson.caisson-colmena ? mkTopConfiguration)
+      && !(hiveLib.caisson.caisson-disko ? mkTopConfiguration)
+      && !(hiveLib.caisson.disko ? mkTopConfiguration);
 
     # A colmena configuration declared under the name `default` beneath
     # a top fills the top's `colmenaHive`. Its nodes are the NixOS
@@ -1104,6 +1185,160 @@ let
             };
         }).colmenaHive
       ).success;
+
+    # A machine installed onto a caisson-disko layout gets the file
+    # systems, boot settings and swap the layout produces, and nothing
+    # of disko: it has no `disko` option and no disko scripts. It is
+    # the system NixOS builds from disko's own module and the same
+    # layout. The machine declared as `default` inside the layout
+    # `nas-1` is published as `nixosConfigurations.nas-1`, beside
+    # `diskoConfigurations.nas-1`.
+    caissonDiskoMachinesGetTheLayoutsSettings =
+      let
+        top = layoutTop {
+          integration = "caisson-disko";
+          layout = luksLvmLayout;
+          machine = diskoMachineBase;
+        };
+        machine = top.nixosConfigurations.nas-1;
+        upstream = upstreamDiskoMachine luksLvmLayout;
+      in
+      builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
+      && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      && !(machine.options ? disko)
+      && !(machine.config.system.build ? formatScript)
+      && machine.config.fileSystems."/".device == upstream.config.fileSystems."/".device
+      && machine.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath;
+
+    # A caisson-disko layout is published in the form disko's command
+    # reads. disko's own evaluator, given the published layout, makes
+    # the format script it makes from the layout as written, and the
+    # layout's own `scripts` output is that script too.
+    caissonDiskoPublishesWhatDiskosCommandReads =
+      let
+        top = layoutTop {
+          integration = "caisson-disko";
+          layout = complexLayout;
+        };
+        upstream = import inputs.disko { inherit (pkgs) lib; };
+        formatOf = layout: (upstream._cliFormat layout pkgs).drvPath;
+        outputs = (layoutManifest "caisson-disko" top).outputs;
+      in
+      formatOf top.diskoConfigurations.nas-1 == formatOf complexLayout
+      && (outputs.scripts pkgs).format.drvPath == formatOf complexLayout
+      && outputs.nixosConfig ? fileSystems
+      && builtins.isString outputs.layoutHash;
+
+    # A layout with no machine installed onto it is published as a
+    # layout and nothing else.
+    caissonDiskoLayoutsNeedNoMachine =
+      let
+        top = layoutTop {
+          integration = "caisson-disko";
+          layout = luksLvmLayout;
+        };
+      in
+      builtins.attrNames top.diskoConfigurations == [ "nas-1" ] && !(top ? nixosConfigurations);
+
+    # A module of the caisson-disko class refuses a layout with an
+    # assertion, and then every output of the layout fails.
+    caissonDiskoAssertionsRefuseALayout =
+      let
+        top = layoutTop {
+          integration = "caisson-disko";
+          layout = {
+            imports = [ luksLvmLayout ];
+            assertions = [
+              {
+                assertion = false;
+                message = "the probe refuses every layout";
+              }
+            ];
+          };
+          machine = diskoMachineBase;
+        };
+        fails = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
+      in
+      fails top.diskoConfigurations.nas-1 && fails top.nixosConfigurations.nas-1.config.fileSystems;
+
+    # A machine installed onto a layout of the upstream-compatible disko
+    # integration carries disko's own NixOS module with the layout, so
+    # it is what disko's tools read: the scripts under `system.build`
+    # and `config.disko.devices`. It is the system NixOS builds from
+    # disko's module and the same layout, with the same format script.
+    # The layout is defined at default priority, so `disko-install`,
+    # which replaces the disks with `mkVMOverride`, still replaces them.
+    diskoMachinesGetDiskosModule =
+      let
+        top = layoutTop {
+          integration = "disko";
+          layout = luksLvmLayout;
+          machine = diskoMachineBase;
+        };
+        machine = top.nixosConfigurations.nas-1;
+        upstream = upstreamDiskoMachine luksLvmLayout;
+        installed = machine.extendModules {
+          modules = [
+            (
+              { lib, ... }:
+              {
+                disko.devices.disk.main = lib.mkVMOverride {
+                  device = "/dev/vdz";
+                  type = "disk";
+                };
+              }
+            )
+          ];
+        };
+      in
+      builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
+      && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      && machine.config.disko.devices.disk ? main
+      && machine.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath
+      &&
+        machine.config.system.build.formatScript.drvPath
+        == upstream.config.system.build.formatScript.drvPath
+      && installed.config.disko.devices.disk.main.device == "/dev/vdz";
+
+    # A layout declared inside a colmena configuration passes up the
+    # machine installed onto it under the name of the layout, so the
+    # machine is the node `nas-1` of the hive, and the top publishes it
+    # as `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
+    diskoLayoutsInsideColmenaAreNodes =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          imports = [ luksLvmLayout ];
+                          caisson.nixos.configurations.default = lib.caisson.nixos.mkConfiguration {
+                            configModule = diskoMachineBase // {
+                              networking.hostName = "nas-1";
+                            };
+                          };
+                        };
+                    };
+                  };
+              };
+            };
+        };
+        hive = top.colmenaHive;
+      in
+      builtins.attrNames hive.nodes == [ "nas-1" ]
+      && hive.deploymentConfig.nas-1.targetHost == "nas-1"
+      && builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
+      && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      &&
+        hive.toplevel.nas-1.drvPath == top.nixosConfigurations.nas-1.config.system.build.toplevel.drvPath;
 
     terranixConfigurationEvaluatesEndToEnd =
       let

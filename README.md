@@ -124,7 +124,10 @@ source by.
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
 | `terranix` | `terranix` | Terranix and Terraform configurations |
-| `colmena` | `colmena` | colmena configurations (class `caisson-colmena`), projected onto the hive colmena's binary reads; not compatible with colmena's hive modules |
+| `caisson-colmena` | `colmena` | colmena configurations whose machines are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
+| `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |
+| `caisson-disko` | `disko` | disk layouts, with the NixOS configurations installed onto each declared inside it; a machine gets the layout's file systems and no disko scripts; the disko integration we recommend for new configurations |
+| `disko` | `disko` | disk layouts written as disko reads them, whose machines import disko's NixOS module, so disko's command, `disko-install` and its image builder work on them |
 | `system-manager` | `system-manager` | system-manager configurations on foreign distros |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 

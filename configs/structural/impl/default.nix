@@ -26,6 +26,8 @@
         home-manager-minimal
         caisson-colmena
         colmena
+        caisson-disko
+        disko
         terranix
         system-manager
         ;

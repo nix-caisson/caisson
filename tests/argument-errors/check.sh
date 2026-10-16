@@ -21,8 +21,8 @@ shift
 flags=("$@")
 
 # Every entry point takes `configModule`. The structural, caisson-colmena,
-# flake-parts, nixos, nixos-minimal, home-manager and
-# home-manager-minimal entry points require nothing: each finds the
+# caisson-disko, disko, flake-parts, nixos, nixos-minimal, home-manager
+# and home-manager-minimal entry points require nothing: each finds the
 # configuration registered under the name of the configuration. The others require
 # `configModule`, and take `pkgSets`, which the nixos and home-manager
 # entry points do not: a NixOS configuration and a home take their
@@ -35,6 +35,8 @@ namespaces=(
   flake-parts
   structural
   caisson-colmena
+  caisson-disko
+  disko
   terranix
   system-manager
 )
@@ -93,7 +95,7 @@ given_for() {
 }
 requires_nothing() {
   case "$1" in
-    structural | caisson-colmena | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
+    structural | caisson-colmena | caisson-disko | disko | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
     *) return 1 ;;
   esac
 }
