@@ -912,6 +912,96 @@ let
       && hive.deploymentConfig.host-1.targetHost == "host-1"
       && drvOf deployed.nixosConfigurations.host-2 == drvOf hive.nodes.host-2;
 
+    # Structural configurations inside a colmena configuration group its
+    # machines, and each group gives its machines its own modules, which
+    # is what colmena's `defaults` and per-node modules are for. Two
+    # groups add different modules to the default of the NixOS
+    # configurations beneath them: hosts a, b and c get the first, d and
+    # e the second. Each module also tags its machines with the name of
+    # the group, so `colmena apply --on @first` selects the first group.
+    # Every node gets the module and the tag of its own group and not
+    # the other, and every machine is a node of the hive.
+    structuralGroupsInsideColmenaGiveTheirMachinesModules =
+      let
+        groupModule = groupName: {
+          environment.etc.group-name.text = groupName;
+          deployment.tags = [ groupName ];
+        };
+        group =
+          lib: groupName: hostNames:
+          lib.caisson.structural.mkConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ (groupModule groupName) ];
+                caisson.nixos.configurations = lib.genAttrs hostNames (
+                  hostName:
+                  lib.caisson.nixos.mkConfiguration {
+                    configModule = {
+                      imports = [ minimalNixosBase ];
+                      networking.hostName = hostName;
+                    };
+                  }
+                );
+              };
+          };
+        hive =
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.structural.configurations = {
+                        first = group lib "first" [
+                          "a"
+                          "b"
+                          "c"
+                        ];
+                        second = group lib "second" [
+                          "d"
+                          "e"
+                        ];
+                      };
+                    };
+                };
+              };
+          }).colmenaHive;
+        hosts = [
+          "a"
+          "b"
+          "c"
+          "d"
+          "e"
+        ];
+        groupOf = host: hive.nodes.${host}.config.environment.etc.group-name.text;
+        tagged = tag: builtins.filter (host: builtins.elem tag hive.deploymentConfig.${host}.tags) hosts;
+      in
+      builtins.attrNames hive.nodes == hosts
+      &&
+        builtins.map groupOf hosts == [
+          "first"
+          "first"
+          "first"
+          "second"
+          "second"
+        ]
+      &&
+        tagged "first" == [
+          "a"
+          "b"
+          "c"
+        ]
+      &&
+        tagged "second" == [
+          "d"
+          "e"
+        ];
+
     # `colmenaHive` holds a single value, so only a colmena
     # configuration declared under the name `default` is published
     # there.
