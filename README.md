@@ -134,6 +134,7 @@ source by.
 | `facter` | none | a `facter.json` as nixos-facter writes it, with the NixOS configurations that run on it declared inside it; a machine gets it as `hardware.facter.reportPath` |
 | `treefmt` | `treefmt-nix` | the formatters of a tree, as treefmt-nix modules; the configuration named `default` is published as the `formatter.<system>` that `nix fmt` runs |
 | `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns; a NixOS machine, a darwin machine, a home or an hjem configuration installs the Neovim of an nvf configuration declared inside it |
+| `nixvim` | `nixvim` | a Neovim written as nixvim modules, published as `nixvimConfigurations.<system>.<name>` |
 | `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 

@@ -42,6 +42,7 @@ namespaces=(
   system-manager
   treefmt
   nvf
+  nixvim
 )
 
 failures=0
