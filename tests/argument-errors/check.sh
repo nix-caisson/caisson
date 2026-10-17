@@ -43,6 +43,9 @@ namespaces=(
   treefmt
   nvf
   nixvim
+  topology
+  kubenix
+  nixidy
 )
 
 failures=0

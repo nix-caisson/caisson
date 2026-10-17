@@ -129,6 +129,9 @@ let
     "treefmt"
     "nvf"
     "nixvim"
+    "topology"
+    "kubenix"
+    "nixidy"
   ];
 
 in
@@ -5395,6 +5398,9 @@ in
                     "treefmt"
                     "nvf"
                     "nixvim"
+                    "topology"
+                    "kubenix"
+                    "nixidy"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5410,6 +5416,9 @@ in
                     "treefmt"
                     "nvf"
                     "nixvim"
+                    "topology"
+                    "kubenix"
+                    "nixidy"
                   ];
                 in
                 signature ? configModule
