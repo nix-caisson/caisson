@@ -544,25 +544,29 @@
           declared ? configurations && declared ? exported
         ) (builtins.attrNames (options.caisson or { }));
 
+      # Of `integrationsIn options`, the integrations whose
+      # `caisson.<integration>.configurations` a module of the evaluation
+      # defines: those whose highest priority is above the priority of
+      # an option default. The others hold no configurations, so neither
+      # their configurations nor their `exported` selector is read, which
+      # spares merging those options in every evaluation for every
+      # integration the evaluation could hold.
+      integrationsDeclaringIn =
+        options:
+        builtins.filter (name: options.caisson.${name}.configurations.highestPrio < 1500) (
+          integrationsIn options
+        );
+
       # The configurations an evaluated configuration declares beneath
       # it, by integration and then name, as the `children` an
       # integration's `evaluate` returns: the values of its
       # `caisson.<integration>.configurations` options, which finalize
       # each entry when read. An integration with none declared is left
-      # out. An option with no definition but its default, whose highest
-      # priority is the priority of an option default, is not read at
-      # all, which spares merging it in every evaluation for every
-      # integration the evaluation could hold.
+      # out.
       childrenOf =
         { options, config }:
-        let
-          optionDefaultPriority = 1500;
-          declaring = builtins.filter (
-            name: options.caisson.${name}.configurations.highestPrio < optionDefaultPriority
-          ) (integrationsIn options);
-        in
         filterAttrs (_: declared: declared != { }) (
-          genAttrs declaring (name: config.caisson.${name}.configurations)
+          genAttrs (integrationsDeclaringIn options) (name: config.caisson.${name}.configurations)
         );
 
       # The nearest configuration above `manifest` whose integration is
@@ -831,6 +835,7 @@
             entriesOf
             configurationsModuleFor
             integrationsIn
+            integrationsDeclaringIn
             nearestOf
             mkEvaluation
             publish
