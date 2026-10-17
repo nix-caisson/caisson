@@ -604,18 +604,18 @@ let
               };
             };
         }).colmenaHive
-      && throws (
-        composed.lib.caisson.terranix.mkConfiguration {
-          ecosystemSrc = { };
-          configModule = { };
-        }
-      )
-      && throws (
-        composed.lib.caisson.system-manager.mkConfiguration {
-          ecosystemSrc = { };
-          configModule = { };
-        }
-      );
+      &&
+        throws
+          (hiveLib.caisson.terranix.mkTopConfiguration {
+            ecosystemSrc = { };
+            configModule = { };
+          }).drvPath
+      &&
+        throws
+          (hiveLib.caisson.system-manager.mkTopConfiguration {
+            ecosystemSrc = { };
+            configModule = { };
+          }).drvPath;
 
     homeConfigurationEvaluatesEndToEnd =
       let
@@ -1526,29 +1526,79 @@ let
       )
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
+    # A terranix configuration that is a top is its `config.tf.json`
+    # file, built from the package set of the composition with the
+    # evaluated configuration in its `passthru`, and its modules get the
+    # composed library. Declared under a structural top, it is published
+    # as `terranixConfigurations.<name>`.
     terranixConfigurationEvaluatesEndToEnd =
       let
-        terraform = composed.lib.caisson.terranix.mkConfiguration {
-          ecosystemSrc = inputs.terranix;
-          pkgSets.pkgs = pkgs;
-          configModule = {
+        module =
+          { lib, ... }:
+          {
             config.terraform.required_version = ">= 1.0";
+            config.output.composed.value = lib ? caisson-core;
           };
+        terraform = hiveLib.caisson.terranix.mkTopConfiguration {
+          ecosystemSrc = inputs.terranix;
+          configModule = module;
+        };
+        published = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.terranix.configurations.infra = lib.caisson.terranix.mkConfiguration {
+                ecosystemSrc = inputs.terranix;
+                configModule = module;
+              };
+            };
         };
       in
-      builtins.isString terraform.drvPath;
+      builtins.isString terraform.drvPath
+      && terraform.name == "config.tf.json"
+      && terraform.passthru.config.terraform.required_version == ">= 1.0"
+      && terraform.passthru.config.output.composed.value
+      && published.terranixConfigurations.infra.drvPath == terraform.drvPath;
 
+    # A system-manager configuration that is a top is its system, built
+    # at the system of the evaluation, and its modules get the composed
+    # library. Declared under a structural top under the name `default`,
+    # it is published as `systemConfigs.default`, which
+    # `system-manager switch --flake` reads when no name is given.
     systemManagerConfigEvaluatesEndToEnd =
       let
-        config = composed.lib.caisson.system-manager.mkConfiguration {
-          ecosystemSrc = inputs.system-manager;
-          pkgSets.pkgs = pkgs;
-          configModule = {
+        module =
+          { lib, ... }:
+          {
             config.system-manager.allowAnyDistro = true;
+            config.environment.etc.composed.text = builtins.toJSON (lib ? caisson-core);
           };
+        system = hiveLib.caisson.system-manager.mkTopConfiguration {
+          ecosystemSrc = inputs.system-manager;
+          configModule = module;
+        };
+        published = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.system-manager.configurations.default = lib.caisson.system-manager.mkConfiguration {
+                ecosystemSrc = inputs.system-manager;
+                configModule = module;
+              };
+            };
         };
       in
-      builtins.isString config.drvPath || builtins.isString (config.build.toplevel.drvPath or null);
+      builtins.isString system.drvPath
+      && (
+        let
+          platform = system.config.nixpkgs.hostPlatform;
+        in
+        (if builtins.isString platform then platform else platform.system) == "x86_64-linux"
+      )
+      && system.config.environment.etc.composed.text == "true"
+      && published.systemConfigs.default.drvPath == system.drvPath;
 
     # The ecosystem-args twins take the evaluator's arguments in
     # `ecosystemArgs`, applied last.
@@ -1570,16 +1620,17 @@ let
             )
           )
         );
-        terraform = composed.lib.caisson.terranix.mkConfigurationWithEcosystemArgs {
-          ecosystemSrc = inputs.terranix;
-          configModule = {
-            config.terraform.required_version = ">= 1.0";
-          };
-          ecosystemArgs = {
-            inherit pkgs;
-            strip_nulls = false;
-          };
-        };
+        terraform = hiveLib.caisson.integrations.topValue (
+          hiveLib.caisson-core.finalizeTop (
+            hiveLib.caisson.terranix.mkConfigurationWithEcosystemArgs {
+              ecosystemSrc = inputs.terranix;
+              configModule = {
+                config.terraform.required_version = ">= 1.0";
+              };
+              ecosystemArgs.strip_nulls = false;
+            }
+          )
+        );
         home = hiveLib.caisson.integrations.topValue (
           hiveLib.caisson-core.finalizeTop (
             hiveLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {

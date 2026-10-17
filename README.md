@@ -125,12 +125,12 @@ source by.
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
 | `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS configuration they are declared inside, or applied with `hjem standalone` |
-| `terranix` | `terranix` | Terranix and Terraform configurations |
+| `terranix` | `terranix` | Terraform configurations written as terranix modules, published as `terranixConfigurations` of the `config.tf.json` files Terraform reads |
 | `caisson-colmena` | `colmena` | colmena configurations whose machines are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
 | `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |
 | `caisson-disko` | `disko` | disk layouts, with the NixOS configurations installed onto each declared inside it; a machine gets the layout's file systems and no disko scripts; the disko integration we recommend for new configurations |
 | `disko` | `disko` | disk layouts written as disko reads them, whose machines import disko's NixOS module, so disko's command, `disko-install` and its image builder work on them |
-| `system-manager` | `system-manager` | system-manager configurations on foreign distros |
+| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
