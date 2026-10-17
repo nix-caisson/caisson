@@ -4008,15 +4008,15 @@ in
       };
 
       # A NixOS configuration with a home declared inside it writes the
-      # file `caisson/marker.json` under `/etc`. The file holds a store
-      # path. The store path is the system of the machine with the
+      # file `caisson/marker.json` under `/etc`. The file holds the digest
+      # of the store path of the system of the machine with the
       # configurations declared inside it left out.
       #
       # The stub of NixOS puts the number of system units into the
       # store path of a system. The machine `laptop` has one home, and
       # `laptop` declares the account of that home. The system of
-      # `laptop` therefore has one unit. The store path in the file
-      # must be the system with no units.
+      # `laptop` therefore has one unit. The digest in the file must be
+      # that of the system with no units.
       #
       # The machine `bare` has no home, and writes no file.
       #
@@ -4074,13 +4074,13 @@ in
           };
         expected = {
           laptop = {
-            identity = "/nix/store/stub-system-with-0-units";
+            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
           };
           laptopBuilds = "/nix/store/stub-system-with-1-units";
           bare = null;
           outer = null;
           image = {
-            identity = "/nix/store/stub-system-with-0-units";
+            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
           };
         };
       };

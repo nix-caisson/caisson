@@ -659,11 +659,18 @@
           )
         }.json";
 
+      # The digest a marker holds for an identity: the SHA-256 of its
+      # store path. Computing the store path evaluates the childless
+      # evaluation and builds nothing, and the digest refers to no store
+      # path, so a marker that holds it depends on nothing. The digest
+      # is compared, never read as a path.
+      digestOf = identity: builtins.hashString "sha256" identity;
+
       # What the activation of the configuration of `manifest` writes
-      # into its marker: the identity of its childless evaluation, as a
-      # plain string, so that the marker does not depend on that
-      # evaluation. `path` is the shell text of the path of the marker.
-      # Null when the configuration has no activation or no identity.
+      # into its marker: the digest of the identity of its childless
+      # evaluation (`digestOf`). `path` is the shell text of the path of
+      # the marker. Null when the configuration has no activation or no
+      # identity.
       markerOf =
         manifest:
         let
@@ -676,8 +683,8 @@
         else
           {
             path = activation.marker childless;
-            identity = builtins.unsafeDiscardStringContext identity;
-            text = builtins.toJSON { identity = builtins.unsafeDiscardStringContext identity; };
+            identity = digestOf identity;
+            text = builtins.toJSON { identity = digestOf identity; };
           };
 
       # True when `entry`, an entry of `caisson.exports.configurations`
@@ -717,9 +724,9 @@
           marker = ancestor.activation.marker ancestor;
           above = "the ${ancestor.type} configuration `${ancestor.name or "(unnamed)"}`";
           self = "the ${manifest.type} configuration `${manifest.name or "(unnamed)"}`";
-          # The identity, quoted for the shell. A store path holds no
-          # single quote, so quoting it whole is enough.
-          escaped = "'${builtins.unsafeDiscardStringContext expected}'";
+          # The digest of the identity, quoted for the shell. A digest is
+          # hexadecimal, so quoting it whole is enough.
+          escaped = "'${digestOf expected}'";
         in
         if expected == null then
           ""
@@ -736,9 +743,9 @@
               _caissonApplied="$(${jq} -r '.identity // empty' < "$_caissonMarker")"
               if [ "$_caissonApplied" != ${escaped} ]; then
                 echo "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied." >&2
-                echo "  applied (configurations declared inside it left out):" >&2
+                echo "  digest of the version applied (configurations declared inside it left out):" >&2
                 echo "    ''${_caissonApplied:-unknown}" >&2
-                echo "  built for (configurations declared inside it left out):" >&2
+                echo "  digest of the version built for (configurations declared inside it left out):" >&2
                 echo "    "${escaped} >&2
                 echo "  Activate ${above} as this configuration was built with it," >&2
                 echo "  or set ${optionText} to false in ${self}." >&2

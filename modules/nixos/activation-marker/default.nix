@@ -18,10 +18,13 @@
 # What the file holds
 #
 # The module writes `/etc/caisson/marker.json`, with one field,
-# `identity`: the system that the childless evaluation of this machine
-# builds, which is the evaluation without the configurations declared
-# inside it. Changing one of those configurations leaves the identity
-# the same; changing anything else about the machine changes it.
+# `identity`: the SHA-256 digest of the store path of the system that
+# the childless evaluation of this machine builds, which is the
+# evaluation without the configurations declared inside it. Computing
+# the store path evaluates that system and builds nothing, and the
+# digest names no store path, so the file depends on nothing. Changing
+# one of the configurations declared inside leaves the identity the
+# same; changing anything else about the machine changes it.
 #
 # A configuration declared inside the machine reads the same childless
 # evaluation through its own manifest, so it computes the same identity
