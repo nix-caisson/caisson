@@ -273,7 +273,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "hjem";
-          # An hjem configuration is evaluated at a system: it has an
+          # An hjem configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;

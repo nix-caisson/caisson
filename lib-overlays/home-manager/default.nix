@@ -509,7 +509,7 @@
         variant: args:
         selection.mkModuleConfiguration {
           type = "home-manager";
-          # A home is evaluated at a system: it has an evaluation for
+          # A home is evaluated per system: it has an evaluation for
           # every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;

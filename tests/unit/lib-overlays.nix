@@ -5367,7 +5367,7 @@ in
       # The entry points whose constructor returns a configuration take
       # `configModule` as optional: each finds the configuration
       # registered under the name of the configuration. The entry points
-      # of the configurations evaluated at a system take no `pkgSets`:
+      # of the configurations evaluated per system take no `pkgSets`:
       # those configurations take their package sets from the
       # composition. The structural, colmena, disko and flake-parts
       # entry points take `pkgSets` and hand it to their modules.
