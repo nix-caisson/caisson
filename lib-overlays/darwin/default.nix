@@ -159,7 +159,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "darwin";
-          # A darwin configuration is evaluated at a system: it has an
+          # A darwin configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;

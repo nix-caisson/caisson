@@ -145,7 +145,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "terranix";
-          # A terranix configuration is evaluated at a system: it has an
+          # A terranix configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
