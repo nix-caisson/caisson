@@ -42,6 +42,7 @@
         (mkModule ./caisson)
         closure-lib.caisson.modules.nixos.home-manager-activation
         closure-lib.caisson.modules.nixos.hjem-activation
+        closure-lib.caisson.modules.nixos.nvf-package
         closure-lib.caisson.modules.nixos.home-manager-source-marker
       ]
     else

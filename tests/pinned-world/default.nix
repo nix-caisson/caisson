@@ -72,6 +72,7 @@ let
       registered."caisson/terranix"
       registered."caisson/system-manager"
       registered."caisson/treefmt"
+      registered."caisson/nvf"
       registered."caisson/structural"
       # Last, so its value replaces the pin the overlays carry while
       # its position stays where the first import placed it.
@@ -118,6 +119,7 @@ let
     "nixos"
     "nixos-minimal"
     "nixpkgs"
+    "nvf"
     "pins"
     "pkgOverlays"
     "pkgOverlaysFor"
@@ -483,6 +485,7 @@ let
           "caisson/terranix"
           "caisson/system-manager"
           "caisson/treefmt"
+          "caisson/nvf"
           "caisson/structural"
         ];
 
@@ -583,6 +586,7 @@ let
       "terranix"
       "system-manager"
       "treefmt"
+      "nvf"
     ];
 
     minimalNixosSystemEvaluates =
@@ -1704,6 +1708,67 @@ let
       # The configuration `docs` is evaluated, and only the manifest
       # holds it.
       && builtins.isString children.docs.outputs.wrapper.drvPath;
+
+    # An nvf configuration is published as `packages.<system>.<name>`,
+    # and its Neovim is the one nvf's own `neovimConfiguration` builds
+    # from the same module on the same package set. A NixOS machine and
+    # a home with an nvf configuration declared inside them install that
+    # Neovim.
+    nvfIsTheNeovimNvfBuilds =
+      let
+        module = {
+          vim.viAlias = true;
+          vim.lineNumberMode = "number";
+        };
+        nvfConfiguration =
+          lib:
+          lib.caisson.nvf.mkConfiguration {
+            ecosystemSrc = inputs.nvf;
+            configModule = module;
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nvf.configurations.editor = nvfConfiguration lib;
+              caisson.nixos.configurations.workstation = lib.caisson.nixos.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    boot.loader.grub.enable = false;
+                    fileSystems."/" = {
+                      device = "none";
+                      fsType = "tmpfs";
+                    };
+                    system.stateVersion = "25.05";
+                    caisson.nvf.configurations.machine-editor = nvfConfiguration lib;
+                  };
+              };
+              caisson.home-manager.configurations.alice = lib.caisson.home-manager.mkConfiguration {
+                ecosystemSrc = inputs.home-manager;
+                configModule =
+                  { lib, ... }:
+                  {
+                    home.homeDirectory = "/home/alice";
+                    home.stateVersion = "25.05";
+                    caisson.nvf.configurations.home-editor = nvfConfiguration lib;
+                  };
+              };
+            };
+        };
+        upstream =
+          (inputs.nvf.lib.neovimConfiguration {
+            inherit pkgs;
+            modules = [ module ];
+          }).neovim;
+        drvPaths = packages: builtins.map (package: package.drvPath) packages;
+      in
+      top.packages.x86_64-linux.editor.drvPath == upstream.drvPath
+      && builtins.elem upstream.drvPath (
+        drvPaths top.nixosConfigurations.workstation.config.environment.systemPackages
+      )
+      && builtins.elem upstream.drvPath (drvPaths top.homeConfigurations.alice.config.home.packages);
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the

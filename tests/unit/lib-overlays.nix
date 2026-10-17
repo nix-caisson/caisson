@@ -127,6 +127,7 @@ let
     "terranix"
     "system-manager"
     "treefmt"
+    "nvf"
   ];
 
 in
@@ -5391,6 +5392,7 @@ in
                     "caisson-facter"
                     "facter"
                     "treefmt"
+                    "nvf"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5404,6 +5406,7 @@ in
                     "caisson-facter"
                     "facter"
                     "treefmt"
+                    "nvf"
                   ];
                 in
                 signature ? configModule
