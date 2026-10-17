@@ -38,6 +38,8 @@
           "flake-parts"
           "hjem"
           "home-manager"
+          "kubenix"
+          "nixidy"
           "nixos"
           "nixpkgs"
           "nixvim"
@@ -45,6 +47,7 @@
           "structural"
           "system-manager"
           "terranix"
+          "topology"
           "treefmt"
         ])
       ]

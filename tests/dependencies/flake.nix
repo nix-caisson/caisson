@@ -21,6 +21,12 @@
   inputs.system-manager.inputs.nixpkgs.follows = "nixpkgs";
   inputs.disko.url = "github:nix-community/disko";
   inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nix-topology.url = "github:oddlama/nix-topology";
+  inputs.nix-topology.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.kubenix.url = "github:hall/kubenix";
+  inputs.kubenix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nixidy.url = "github:arnarg/nixidy";
+  inputs.nixidy.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nixvim.url = "github:nix-community/nixvim";
   inputs.nixvim.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nvf.url = "github:NotAShelf/nvf";
