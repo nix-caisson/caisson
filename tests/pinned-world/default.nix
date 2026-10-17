@@ -66,6 +66,8 @@ let
       registered."caisson/colmena"
       registered."caisson/caisson-disko"
       registered."caisson/disko"
+      registered."caisson/caisson-facter"
+      registered."caisson/facter"
       registered."caisson/darwin"
       registered."caisson/terranix"
       registered."caisson/system-manager"
@@ -82,6 +84,7 @@ let
   expectedCaissonNames = [
     "caisson-colmena"
     "caisson-disko"
+    "caisson-facter"
     "callConsumerFlake"
     "callFlake"
     "colmena"
@@ -92,6 +95,7 @@ let
     "elide"
     "eval-weight"
     "evalManifest"
+    "facter"
     "finalizeTop"
     "flake-parts"
     "hjem"
@@ -471,6 +475,8 @@ let
           "caisson/colmena"
           "caisson/caisson-disko"
           "caisson/disko"
+          "caisson/caisson-facter"
+          "caisson/facter"
           "caisson/darwin"
           "caisson/terranix"
           "caisson/system-manager"
@@ -568,6 +574,8 @@ let
       "colmena"
       "caisson-disko"
       "disko"
+      "caisson-facter"
+      "facter"
       "darwin"
       "terranix"
       "system-manager"
@@ -1525,6 +1533,100 @@ let
         builtins.map (package: package.pname or "") machine.config.users.users.probe.packages
       )
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
+
+    # A machine inside a caisson-facter configuration and one inside a
+    # facter configuration, from the report of nixpkgs' facter test, get
+    # from nixpkgs' `hardware.facter` module what a NixOS configuration
+    # that sets `hardware.facter.reportPath` itself gets: the same
+    # report and the same kernel modules for the initrd. The
+    # caisson-facter configuration refuses a report of a version it does
+    # not know, and a hardware an assertion refuses.
+    facterHandsTheReportToNixpkgs =
+      let
+        reportPath = "${inputs.nixpkgs}/nixos/tests/facter/facter.json";
+        machine = {
+          boot.loader.grub.enable = false;
+          fileSystems."/" = {
+            device = "none";
+            fsType = "tmpfs";
+          };
+          system.stateVersion = "25.05";
+        };
+        upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+          system = "x86_64-linux";
+          modules = [
+            machine
+            { hardware.facter.reportPath = reportPath; }
+          ];
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-facter.configurations.native = lib.caisson.caisson-facter.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    facter.reportPath = reportPath;
+                    caisson.nixos.configurations.native = lib.caisson.nixos.mkConfiguration {
+                      configModule = machine;
+                    };
+                  };
+              };
+              caisson.facter.configurations.upstream = lib.caisson.facter.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    inherit reportPath;
+                    caisson.nixos.configurations.upstream = lib.caisson.nixos.mkConfiguration {
+                      configModule = machine;
+                    };
+                  };
+              };
+            };
+        };
+        native = top.nixosConfigurations.native.config;
+        compatible = top.nixosConfigurations.upstream.config;
+        kernelModules = config: builtins.sort builtins.lessThan config.boot.initrd.availableKernelModules;
+        hardwareOf =
+          configModule:
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-facter.configurations.probe = lib.caisson.caisson-facter.mkConfiguration {
+                  inherit configModule;
+                };
+              };
+          }).caisson.manifest.children.caisson-facter.probe.outputs;
+        throws = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
+      in
+      builtins.toJSON native.hardware.facter.report
+      == builtins.toJSON upstream.config.hardware.facter.report
+      && compatible.hardware.facter.reportPath == upstream.config.hardware.facter.reportPath
+      && kernelModules upstream.config != [ ]
+      && kernelModules native == kernelModules upstream.config
+      && kernelModules compatible == kernelModules upstream.config
+      &&
+        builtins.attrNames top.nixosConfigurations == [
+          "native"
+          "upstream"
+        ]
+      && (hardwareOf { facter.reportPath = reportPath; }).report.version == 1
+      && throws (hardwareOf { facter.report.version = 99; }).report
+      &&
+        throws
+          (hardwareOf {
+            facter.reportPath = reportPath;
+            assertions = [
+              {
+                assertion = false;
+                message = "refused";
+              }
+            ];
+          }).hash;
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the
