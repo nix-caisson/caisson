@@ -16,22 +16,28 @@
 # homes declared inside it import by default. caisson's `default`
 # NixOS module does that, through `caisson.forChildren`. A home that
 # passes `moduleImports` selects its modules itself, and gets this
-# module only if it lists it.
+# module only if it lists it. A system-manager configuration does the
+# same with this file, registered also as `system-manager-parent`.
 #
 # The module reads the machine through the manifest of the home, so it
-# can only be imported by a home that has a NixOS configuration above
-# it.
+# can only be imported by a home that has a NixOS or system-manager
+# configuration above it.
 { ... }:
 # `lib` is the library of the home, and `config` is the configuration
 # of the home.
 { lib, config, ... }:
 let
-  # The configuration of the NixOS configuration the home is declared
-  # inside. The home reads the childless evaluation of the NixOS
-  # configuration, which is the evaluation that leaves out the
-  # configurations declared inside it. The home is one of those
-  # configurations, so it cannot read an evaluation that includes it.
-  machine = lib.caisson.evalManifest.nearest.nixos.value.config;
+  # The configuration of the machine the home is declared inside, the
+  # nearest NixOS or system-manager configuration above it. The home
+  # reads the childless evaluation of the machine, which is the
+  # evaluation that leaves out the configurations declared inside it.
+  # The home is one of those configurations, so it cannot read an
+  # evaluation that includes it.
+  machine =
+    (lib.caisson.integrations.nearestOf [
+      "nixos"
+      "system-manager"
+    ] lib.caisson.evalManifest).value.config;
 
   # The account of the user of the home, when the NixOS configuration
   # declares one in `users.users`. It is null when the NixOS
