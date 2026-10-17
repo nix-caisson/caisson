@@ -25,3 +25,23 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix flake check -L
+  # The darwin integration's machine, built on macOS: what evaluation on
+  # Linux cannot show, that the system it evaluates builds on darwin.
+  # `nix flake check` on the Linux runner checks only x86_64-linux; this
+  # job builds the one check at aarch64-darwin.
+  darwin-build:
+    runs-on: macos-latest
+    env:
+      HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+      - if: env.HAVE_CACHIX == 'true'
+        uses: cachix/cachix-action@v17
+        with:
+          name: caisson
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: nix build -L '.#checks.aarch64-darwin.darwin-system'

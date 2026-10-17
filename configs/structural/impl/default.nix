@@ -28,6 +28,7 @@
         colmena
         caisson-disko
         disko
+        darwin
         terranix
         system-manager
         ;

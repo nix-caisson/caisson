@@ -31,6 +31,7 @@
           "caisson-colmena"
           "caisson-disko"
           "colmena"
+          "darwin"
           "disko"
           "flake-parts"
           "home-manager"

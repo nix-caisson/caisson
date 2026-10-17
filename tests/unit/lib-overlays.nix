@@ -113,6 +113,7 @@ let
   integrationNames = [
     "nixos"
     "nixos-minimal"
+    "darwin"
     "home-manager"
     "home-manager-minimal"
     "flake-parts"
@@ -5262,12 +5263,14 @@ in
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"
+                    "darwin"
                     "home-manager"
                     "home-manager-minimal"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
                     "nixos-minimal"
+                    "darwin"
                     "home-manager"
                     "home-manager-minimal"
                   ];
