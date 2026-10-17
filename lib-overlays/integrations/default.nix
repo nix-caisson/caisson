@@ -777,7 +777,7 @@
       # Where the profile is depends on the configuration above. Inside
       # a machine it is a profile of the system,
       # `/nix/var/nix/profiles/caisson/<kind>/<name>`, which the machine
-      # activates as root. Inside a home or an hjem configuration, or as
+      # activates as root. Inside a home or a hjem configuration, or as
       # a top, it is a profile of the user,
       # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
       # names `$HOME` and not `$XDG_STATE_HOME`: the units of a machine
