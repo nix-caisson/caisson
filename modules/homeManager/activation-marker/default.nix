@@ -7,8 +7,8 @@
 #
 # A step of the activation of the home writes the identity of the
 # childless evaluation of the home, its activation package without the
-# configurations declared inside it, into a file in the state directory
-# of the user, `$XDG_STATE_HOME/caisson/markers/home-manager-<name>.json`.
+# configurations declared inside it, into a file in the home directory
+# of the user, `$HOME/.local/state/caisson/markers/home-manager-<name>.json`.
 # A configuration declared inside the home, such as an nvf
 # configuration, compares that file with the identity it was built for
 # when it is activated by hand. The step runs after the files of the

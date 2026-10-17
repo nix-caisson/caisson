@@ -18,6 +18,12 @@
 # configuration is published as `nixvimConfigurations.<system>.<name>`,
 # the evaluated configuration, under the name nixvim's flake publishes
 # its own configurations under.
+#
+# A nixvim configuration is kept in a Nix profile of its own, as an nvf
+# configuration is (`lib.caisson.integrations.profileOf`): its output
+# `activationPackage` holds `activate`, and the configuration it is
+# declared inside activates it with the module `profile-activation` of
+# its class.
 {
   mkLibOverlay,
   ...
@@ -132,10 +138,27 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
+          package = value.config.build.package;
+          kept = selection.profileOf {
+            inherit pkgs manifest package;
+            kind = "nixvim";
+            # The programs the Neovim has in `bin`: `nvim`, and `vi`
+            # and `vim` when nixvim adds them.
+            programs = [
+              "nvim"
+            ]
+            ++ (if value.config.viAlias or false then [ "vi" ] else [ ])
+            ++ (if value.config.vimAlias or false then [ "vim" ] else [ ]);
+            variable = "CAISSON_NVIM_PROFILE";
+            warn = value.config.caisson.drift.warn or true;
+          };
         in
         {
           inherit value;
-          outputs.package = value.config.build.package;
+          outputs = {
+            inherit package;
+            inherit (kept) activationPackage profile;
+          };
         };
 
       # A nixvim configuration is published as
@@ -156,6 +179,12 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A nixvim configuration is activated into its profile. Its
+          # identity is its Neovim.
+          activation = {
+            identity = manifest: manifest.outputs.package.outPath;
+            marker = manifest: "${manifest.outputs.profile.path}.marker.json";
+          };
           evaluate = evaluate args;
         };
 
