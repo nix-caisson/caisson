@@ -61,6 +61,7 @@ let
       registered."caisson/nixos"
       registered."caisson/nixos-minimal"
       registered."caisson/home-manager"
+      registered."caisson/hjem"
       registered."caisson/caisson-colmena"
       registered."caisson/colmena"
       registered."caisson/caisson-disko"
@@ -93,6 +94,7 @@ let
     "evalManifest"
     "finalizeTop"
     "flake-parts"
+    "hjem"
     "home-manager"
     "importApply"
     "integrations"
@@ -464,6 +466,7 @@ let
           "caisson/nixos"
           "caisson/nixos-minimal"
           "caisson/home-manager"
+          "caisson/hjem"
           "caisson/caisson-colmena"
           "caisson/colmena"
           "caisson/caisson-disko"
@@ -560,6 +563,7 @@ let
       "nixos"
       "nixos-minimal"
       "home-manager"
+      "hjem"
       "caisson-colmena"
       "colmena"
       "caisson-disko"
@@ -884,6 +888,7 @@ let
       hiveLib.caisson.nixos ? mkTopConfiguration
       && hiveLib.caisson.darwin ? mkTopConfiguration
       && hiveLib.caisson.home-manager ? mkTopConfiguration
+      && hiveLib.caisson.hjem ? mkTopConfiguration
       && hiveLib.caisson.structural ? mkTopConfiguration
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
       && !(hiveLib.caisson.caisson-colmena ? mkTopConfiguration)
@@ -1402,6 +1407,75 @@ let
       && probe.toplevel.drvPath == upstream.system.drvPath
       && probe.configuration.config.nixpkgs.hostPlatform.system == "aarch64-darwin"
       && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
+
+    # An hjem configuration that is a top gives what hjem's standalone
+    # CLI reads from a file: the version 3 manifest of the user's files,
+    # with targets in the user's home directory, and the packages. The
+    # manifest of the evaluation sits under `caisson.manifest`, behind an
+    # `outPath`, so the JSON the CLI reads holds a string in its place.
+    hjemTopIsWhatHjemsCliReads =
+      let
+        probe = import ../hjem-system { inherit inputs; };
+        top = probe.standalone;
+        targets = builtins.map (file: file.target) top.manifest.files;
+      in
+      top.manifest.version == 3
+      &&
+        builtins.sort builtins.lessThan targets == [
+          "/home/probe/.config/probe/greeting"
+          "/home/probe/.config/probe/settings"
+        ]
+      && builtins.all (file: file.type == "symlink") top.manifest.files
+      && builtins.map (package: package.pname) top.packages == [ "hello" ]
+      && builtins.toJSON top.caisson == builtins.toJSON "caisson manifest: read caisson.manifest"
+      && top.caisson.manifest.type == "hjem";
+
+    # An hjem configuration inside a NixOS machine takes the home
+    # directory of the account the machine declares, and its manifest is
+    # the one hjem's own NixOS module makes from the same user module,
+    # the systemd user unit of the user included. The machine activates
+    # it with the template units hjem's NixOS module writes, which read
+    # the manifest file from the directory of this generation, installs
+    # the user's packages, and the top publishes it as
+    # `hjemConfigurations.probe`.
+    hjemInsideNixosIsActivated =
+      let
+        probe = import ../hjem-system { inherit inputs; };
+        inner = probe.inner;
+        machine = probe.top.nixosConfigurations.probe-machine;
+        services = machine.config.systemd.services;
+        upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+          inherit (probe) system;
+          modules = [
+            inputs.hjem.nixosModules.default
+            probe.machine
+            { hjem.users.probe = probe.machineUser; }
+          ];
+        };
+        hjemLib = import "${inputs.hjem}/lib.nix" {
+          inherit (probe.pkgs) lib;
+          inherit (probe) pkgs;
+        };
+        upstreamManifest = probe.lib.caisson.hjem.manifestOf hjemLib upstream.config.hjem.users.probe;
+        targets = builtins.map (file: file.target) inner.outputs.manifest.files;
+        target = machine.config.systemd.targets.hjem;
+      in
+      inner.value.config.directory == "/home/probe"
+      && builtins.toJSON inner.outputs.manifest == builtins.toJSON upstreamManifest
+      && builtins.elem "/home/probe/.config/systemd/user/probe.service" targets
+      && builtins.all (name: services ? ${name}) [
+        "hjem-prepare"
+        "hjem-activate@"
+        "hjem-reload@"
+        "hjem-update-state@"
+        "hjem-cleanup"
+      ]
+      && builtins.elem "hjem-activate@probe.service" target.requires
+      && probe.pkgs.lib.strings.hasInfix "hjem-manifests" services."hjem-activate@".script
+      && builtins.elem "hello" (
+        builtins.map (package: package.pname or "") machine.config.users.users.probe.packages
+      )
+      && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
     terranixConfigurationEvaluatesEndToEnd =
       let

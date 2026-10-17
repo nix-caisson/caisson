@@ -178,6 +178,43 @@
                     };
                   in
                   builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
+                # The manifest file of an hjem configuration inside a NixOS
+                # machine and the units that activate it, built. Building
+                # the manifest file checks it against hjem's own schema
+                # with `cue vet`, so the file the machine activates is one
+                # hjem's CLI accepts. Building the units runs shellcheck
+                # on their scripts.
+                hjem-system =
+                  let
+                    probe = import (self.outPath + "/tests/hjem-system") {
+                      inputs = inputs // {
+                        caisson = self;
+                      };
+                    };
+                    units = probe.top.nixosConfigurations.probe-machine.config.systemd.units;
+                  in
+                  pkgs.linkFarm "hjem-system" (
+                    [
+                      {
+                        name = "manifest-probe.json";
+                        path = probe.inner.outputs.manifestFile;
+                      }
+                    ]
+                    ++
+                      builtins.map
+                        (name: {
+                          inherit name;
+                          path = units.${name}.unit;
+                        })
+                        [
+                          "hjem.target"
+                          "hjem-prepare.service"
+                          "hjem-activate@.service"
+                          "hjem-reload@.service"
+                          "hjem-update-state@.service"
+                          "hjem-cleanup.service"
+                        ]
+                  );
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the

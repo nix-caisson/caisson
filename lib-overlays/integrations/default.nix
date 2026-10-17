@@ -410,23 +410,41 @@
       # The module that declares the options `configurationsModuleOf`
       # declares, for several integrations at once. The core module of
       # caisson imports it once, for all the integrations of caisson.
+      # The types of the options are built once for all of them.
       configurationsModuleFor = names: {
         key = "caisson-configurations:${builtins.concatStringsSep "," names}";
         imports = [
           (
             { lib, options, ... }:
+            let
+              types = configurationsTypesOf lib;
+            in
             {
-              options.caisson = genAttrs names (name: configurationsOptionsOf { inherit lib options; } name);
+              options.caisson = genAttrs names (
+                name: configurationsOptionsOf { inherit lib options types; } name
+              );
             }
           )
         ];
       };
 
+      # The types of `caisson.<name>.configurations` and
+      # `caisson.<name>.exported`, the same for every integration.
+      configurationsTypesOf = lib: {
+        configurations = lib.types.lazyAttrsOf lib.types.raw;
+        exported = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
+      };
+
       # The options `caisson.<name>.configurations` and
       # `caisson.<name>.exported` of the integration `name`, in the
-      # evaluation whose `lib` and `options` are given.
+      # evaluation whose `lib` and `options` are given, with `types` from
+      # `configurationsTypesOf`.
       configurationsOptionsOf =
-        { lib, options }:
+        {
+          lib,
+          options,
+          types ? configurationsTypesOf lib,
+        }:
         name:
         let
           manifest = lib.caisson-core.evalManifest;
@@ -483,7 +501,7 @@
         in
         {
           exported = lib.mkOption {
-            type = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
+            type = types.exported;
             default = configurations: configurations;
             defaultText = lib.literalMD "every configuration declared";
             description = ''
@@ -495,7 +513,7 @@
             '';
           };
           configurations = lib.mkOption {
-            type = lib.types.lazyAttrsOf lib.types.raw;
+            type = types.configurations;
             default = { };
             apply = builtins.mapAttrs finalize;
             description = ''
@@ -531,11 +549,20 @@
       # integration's `evaluate` returns: the values of its
       # `caisson.<integration>.configurations` options, which finalize
       # each entry when read. An integration with none declared is left
-      # out.
+      # out. An option with no definition but its default, whose highest
+      # priority is the priority of an option default, is not read at
+      # all, which spares merging it in every evaluation for every
+      # integration the evaluation could hold.
       childrenOf =
         { options, config }:
+        let
+          optionDefaultPriority = 1500;
+          declaring = builtins.filter (
+            name: options.caisson.${name}.configurations.highestPrio < optionDefaultPriority
+          ) (integrationsIn options);
+        in
         filterAttrs (_: declared: declared != { }) (
-          genAttrs (integrationsIn options) (name: config.caisson.${name}.configurations)
+          genAttrs declaring (name: config.caisson.${name}.configurations)
         );
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";

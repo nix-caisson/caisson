@@ -34,6 +34,7 @@
           "darwin"
           "disko"
           "flake-parts"
+          "hjem"
           "home-manager"
           "nixos"
           "nixpkgs"
