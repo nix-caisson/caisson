@@ -48,9 +48,14 @@ let
   isActivatedHere =
     entry:
     entry.manifest.type == "hjem"
-    && !(builtins.any (segment: segment.type == "nixos" || segment.type == "darwin") (
-      lib.lists.init entry.path
-    ))
+    && !(builtins.any (
+      segment:
+      builtins.elem segment.type [
+        "nixos"
+        "darwin"
+        "system-manager"
+      ]
+    ) (lib.lists.init entry.path))
     && entry.manifest.system == evalManifest.system;
 
   users =
