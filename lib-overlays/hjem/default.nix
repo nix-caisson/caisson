@@ -130,10 +130,13 @@
               null;
 
           # The machine the configuration is declared inside, when there
-          # is one: the childless evaluation of the nearest NixOS
-          # configuration above it, which hjem's modules receive as
-          # `osConfig`, null when there is none.
-          machine = manifest.nearest.nixos or null;
+          # is one: the childless evaluation of the nearest NixOS or
+          # darwin configuration above it, which hjem's modules receive
+          # as `osConfig`, null when there is none.
+          machine = selection.nearestOf [
+            "nixos"
+            "darwin"
+          ] manifest;
           osConfig = if machine != null then machine.value.config else null;
 
           # A user hjem's NixOS module embeds also imports hjem's
@@ -143,7 +146,7 @@
           # a NixOS machine that has `utils` gets the same; the minimal
           # NixOS evaluator gives none.
           machineArgs = if machine != null then (machine.value._module or { }).args or { } else { };
-          nixosUser = machineArgs ? utils;
+          nixosUser = machine != null && machine.type == "nixos" && machineArgs ? utils;
 
           # What hjem's OS modules set on a user that caisson sets too:
           # the user's name from the name the configuration is declared
@@ -169,9 +172,13 @@
                 hjem-lib = hjemLib;
                 name = if name != null then name else "hjem";
               }
+              # hjem's OS modules hand a user the options of the machine
+              # as `osOptions`, and the NixOS module also hands it `utils`.
+              // lib.optionalAttrs (machine != null) {
+                osOptions = machine.value.options;
+              }
               // lib.optionalAttrs nixosUser {
                 inherit (machineArgs) utils;
-                osOptions = machine.value.options;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
               modules = [

@@ -6,9 +6,11 @@
 # tree itself.
 #
 # The composition is at aarch64-darwin, with a package config whose set
-# there is nixpkgs at aarch64-darwin, and with nixpkgs and nix-darwin
-# declared as its ecosystems. A structural top declares the machine
-# `probe` from `machine`. Evaluating it needs no Mac: the package set
+# there is nixpkgs at aarch64-darwin, and with nixpkgs, nix-darwin,
+# home-manager and hjem declared as its ecosystems. A structural top declares the machine
+# `probe` from `machine`, and the machine `family`, which is `machine`
+# with a home and an hjem configuration for the user `probe` declared
+# inside it. Evaluating them needs no Mac: the package set
 # and the derivations are evaluated for aarch64-darwin wherever the
 # evaluation runs. Building the system needs a darwin builder.
 { inputs }:
@@ -24,7 +26,12 @@ let
     systems = [ system ];
     projects.caisson = inputs.caisson;
     defaultEcosystemSrc = {
-      inherit (inputs) nixpkgs nix-darwin;
+      inherit (inputs)
+        nixpkgs
+        nix-darwin
+        home-manager
+        hjem
+        ;
     };
     pkgSets = _lib: {
       default =
@@ -62,6 +69,16 @@ let
     };
   };
 
+  # A home and an hjem configuration for the user `probe`.
+  home = {
+    home.stateVersion = "25.05";
+    home.file.".probe".text = "home";
+  };
+  hjemUser = {
+    files.".config/probe/greeting".text = "hjem";
+    packages = [ pkgs.hello ];
+  };
+
   top = lib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
@@ -70,11 +87,28 @@ let
         caisson.darwin.configurations.probe = lib.caisson.darwin.mkConfiguration {
           configModule = machine;
         };
+        # The same machine, with the home and the hjem configuration of
+        # `probe` declared inside it.
+        caisson.darwin.configurations.family = lib.caisson.darwin.mkConfiguration {
+          configModule =
+            { lib, ... }:
+            {
+              imports = [ machine ];
+              caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
+                configModule = home;
+              };
+              caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
+                configModule = hjemUser;
+              };
+            };
+        };
       };
   };
 in
 {
   inherit
+    hjemUser
+    home
     lib
     machine
     pkgs
@@ -84,4 +118,8 @@ in
   # The machine as darwin-rebuild reads it, and the system it builds.
   configuration = top.darwinConfigurations.probe;
   toplevel = top.darwinConfigurations.probe.system;
+  # The machine with the home and the hjem configuration, and the
+  # manifests of the two inside it.
+  family = top.darwinConfigurations.family;
+  familyManifest = top.caisson.manifest.children.system.${system}.children.darwin.family;
 }
