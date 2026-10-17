@@ -39,6 +39,15 @@
 # The module reads the hjem configurations from the full evaluation of
 # the NixOS configuration; in the childless evaluation, and in an
 # evaluation without systemd options, it defines nothing.
+#
+# The same module is registered for the `systemManager` class, under
+# the same name, and a system-manager machine activates the hjem
+# configurations declared inside it the same way. system-manager has no
+# `system.extraDependencies`, so there the module keeps no extra
+# dependencies in the system. The module reads
+# `config.caisson.exports.configurations`, which the core module
+# declares; it imports the core module of the class of the evaluation,
+# read from its manifest.
 { closure-lib, ... }:
 {
   config,
@@ -52,17 +61,33 @@ let
 
   # True when this evaluation declares the options the module defines.
   hasUnits =
-    options ? systemd
-    && options.systemd ? services
-    && options.systemd ? targets
-    && options ? users
-    && options ? system
-    && options.system ? extraDependencies;
+    options ? systemd && options.systemd ? services && options.systemd ? targets && options ? users;
+
+  # True when the evaluation keeps extra dependencies in the system.
+  hasExtraDependencies = options ? system && options.system ? extraDependencies;
+
+  # The core module of the class of this evaluation: of the
+  # `systemManager` class in a system-manager evaluation, else of the
+  # `nixos` class. The registered core modules of the two classes are
+  # one file under two names, so a module imports the one its
+  # evaluation already holds.
+  coreModule =
+    if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
+      closure-lib.caisson.modules.systemManager.core
+    else
+      closure-lib.caisson.modules.nixos.core;
+
+  # The integrations whose configurations are machines.
+  machineTypes = [
+    "nixos"
+    "darwin"
+    "system-manager"
+  ];
 
   isActivatedHere =
     entry:
     entry.manifest.type == "hjem"
-    && !(builtins.any (segment: segment.type == "nixos") (lib.lists.init entry.path))
+    && !(builtins.any (segment: builtins.elem segment.type machineTypes) (lib.lists.init entry.path))
     && entry.manifest.system == evalManifest.system;
 
   # What the units need of each enabled hjem configuration.
@@ -119,9 +144,9 @@ let
   );
 in
 {
-  # The module reads `config.caisson.exports.configurations`. The core
-  # module declares that option.
-  imports = [ closure-lib.caisson.modules.nixos.core ];
+  # The core module of the class of this evaluation, which declares
+  # `config.caisson.exports.configurations`.
+  imports = [ coreModule ];
 
   # `optionalAttrs` and not `mkIf` decides whether the options are
   # defined at all: NixOS refuses a definition, even under `mkIf false`,
@@ -131,7 +156,7 @@ in
       assertions = [
         {
           assertion = repeated == [ ];
-          message = "caisson: this NixOS configuration activates more than one hjem configuration for ${lib.concatStringsSep ", " repeated}.";
+          message = "caisson: this machine activates more than one hjem configuration for ${lib.concatStringsSep ", " repeated}.";
         }
       ];
 
@@ -142,7 +167,9 @@ in
         }) users
       );
 
-      system.extraDependencies = builtins.concatMap (user: user.extraDependencies) users;
+      system = lib.optionalAttrs hasExtraDependencies {
+        extraDependencies = builtins.concatMap (user: user.extraDependencies) users;
+      };
 
       systemd.targets.hjem = {
         description = "hjem file management";
