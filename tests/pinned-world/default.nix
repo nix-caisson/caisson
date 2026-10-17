@@ -719,20 +719,25 @@ let
         undeclared = machineWithHomes.homeConfigurations."undeclared@probe";
         systemUnit = machine.systemd.services.home-manager-declared;
         userUnit = machine.systemd.user.services.home-manager-undeclared;
-        # The comparison is made on plain strings: a string that
-        # refers to a store path cannot be searched for.
-        plain = builtins.unsafeDiscardStringContext;
+        # The script of the unit runs `activate` of the activation
+        # package of the home: the string context of the script records
+        # that it refers to the activation package, and the script runs
+        # an `activate`.
         runs =
           unit: home:
-          pkgs.lib.hasInfix (plain "${home.activationPackage}/activate") (
-            plain unit.serviceConfig.ExecStart.text
-          );
+          let
+            script = unit.serviceConfig.ExecStart.text;
+          in
+          builtins.elem home.activationPackage.drvPath (builtins.attrNames (builtins.getContext script))
+          && pkgs.lib.hasInfix "/activate" script;
       in
       systemUnit.serviceConfig.User == "declared"
       && systemUnit.unitConfig.RequiresMountsFor == "/home/declared"
       && runs systemUnit declared
+      && !(runs systemUnit undeclared)
       && userUnit.unitConfig.ConditionUser == "undeclared"
       && runs userUnit undeclared
+      && !(runs userUnit declared)
       && !(machine.systemd.services ? home-manager-undeclared)
       && !(machine.systemd.user.services ? home-manager-declared)
       && builtins.isString machine.system.build.toplevel.drvPath;
