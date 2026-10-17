@@ -1403,10 +1403,59 @@ let
           ];
         };
       in
-      builtins.attrNames probe.top.darwinConfigurations == [ "probe" ]
+      builtins.attrNames probe.top.darwinConfigurations == [
+        "family"
+        "probe"
+      ]
       && probe.toplevel.drvPath == upstream.system.drvPath
       && probe.configuration.config.nixpkgs.hostPlatform.system == "aarch64-darwin"
       && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
+
+    # A home and an hjem configuration inside a darwin machine take the
+    # home directory and the user ID from the account the machine
+    # declares, and the machine activates both. Its `postActivation`
+    # step runs the activation of the home as the user, as
+    # home-manager's nix-darwin module does, and it installs hjem's
+    # launchd agent in `/Library/LaunchAgents`, which applies a manifest
+    # equal to the one hjem's nix-darwin module makes from the same user
+    # module. The home is published as `probe@family`.
+    darwinActivatesItsHomes =
+      let
+        probe = import ../darwin-system { inherit inputs; };
+        config = probe.family.config;
+        homeManifest = probe.familyManifest.children.system.${probe.system}.children.home-manager.probe;
+        hjemManifest = probe.familyManifest.children.system.${probe.system}.children.hjem.probe;
+        upstream = inputs.nix-darwin.lib.darwinSystem {
+          inherit (probe) pkgs;
+          modules = [
+            { nixpkgs.hostPlatform = probe.system; }
+            inputs.hjem.darwinModules.default
+            probe.machine
+            { hjem.users.probe = probe.hjemUser; }
+          ];
+        };
+        hjemLib = import "${inputs.hjem}/lib.nix" {
+          inherit (probe.pkgs) lib;
+          inherit (probe) pkgs;
+        };
+        upstreamManifest = probe.lib.caisson.hjem.manifestOf hjemLib upstream.config.hjem.users.probe;
+        postActivation = config.system.activationScripts.postActivation.text;
+        hasInfix = probe.pkgs.lib.strings.hasInfix;
+      in
+      homeManifest.value.config.home.homeDirectory == "/Users/probe"
+      && homeManifest.value.config.home.uid == 501
+      && hasInfix "-activation-probe" postActivation
+      && hasInfix "launchctl asuser" postActivation
+      && hjemManifest.value.config.directory == "/Users/probe"
+      && builtins.toJSON hjemManifest.outputs.manifest == builtins.toJSON upstreamManifest
+      && config.launchd.agents.hjem-activate.serviceConfig.Label == "org.hjem.activate"
+      && config.launchd.user.agents == { }
+      && hasInfix "gui/\${uid}/org.hjem.activate" postActivation
+      && builtins.elem "hello" (
+        builtins.map (package: package.pname or "") config.users.users.probe.packages
+      )
+      && builtins.attrNames probe.top.homeConfigurations == [ "probe@family" ]
+      && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
     # An hjem configuration that is a top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,

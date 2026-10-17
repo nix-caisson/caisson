@@ -290,11 +290,26 @@
         # same machine on any host; building it needs a darwin builder,
         # so the darwin job of the workflow builds it on a macOS runner.
         flake.checks.aarch64-darwin.darwin-system =
-          (import (self.outPath + "/tests/darwin-system") {
-            inputs = inputs // {
-              caisson = self;
+          let
+            probe = import (self.outPath + "/tests/darwin-system") {
+              inputs = inputs // {
+                caisson = self;
+              };
             };
-          }).toplevel;
+          in
+          # The bare machine, and the machine with a home and an hjem
+          # configuration inside it, whose system holds the activation
+          # of the home and the launchd agents of hjem.
+          probe.pkgs.linkFarm "darwin-system" [
+            {
+              name = "probe";
+              path = probe.toplevel;
+            }
+            {
+              name = "family";
+              path = probe.family.system;
+            }
+          ];
       };
   };
 
