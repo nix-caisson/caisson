@@ -28,7 +28,7 @@ The layer users reach for: the integrations (`structural`,
 `flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
 `home-manager-minimal`, `darwin`, `hjem`, `caisson-colmena`, `colmena`,
 `caisson-disko`, `disko`, `caisson-facter`, `facter`, `terranix`,
-`system-manager`, `treefmt`, `nvf`), each
+`system-manager`, `treefmt`, `nvf`, `nixvim`), each
 a library overlay
 contributing its `lib.caisson` namespace, registering its module
 class where it has a class (`nixos-minimal` and `home-manager-minimal`

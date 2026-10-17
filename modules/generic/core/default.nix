@@ -40,6 +40,7 @@
           "home-manager"
           "nixos"
           "nixpkgs"
+          "nixvim"
           "nvf"
           "structural"
           "system-manager"

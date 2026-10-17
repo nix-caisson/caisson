@@ -21,6 +21,8 @@
   inputs.system-manager.inputs.nixpkgs.follows = "nixpkgs";
   inputs.disko.url = "github:nix-community/disko";
   inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nixvim.url = "github:nix-community/nixvim";
+  inputs.nixvim.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nvf.url = "github:NotAShelf/nvf";
   inputs.nvf.inputs.nixpkgs.follows = "nixpkgs";
   inputs.hjem.url = "github:feel-co/hjem";

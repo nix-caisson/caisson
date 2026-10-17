@@ -73,6 +73,7 @@ let
       registered."caisson/system-manager"
       registered."caisson/treefmt"
       registered."caisson/nvf"
+      registered."caisson/nixvim"
       registered."caisson/structural"
       # Last, so its value replaces the pin the overlays carry while
       # its position stays where the first import placed it.
@@ -119,6 +120,7 @@ let
     "nixos"
     "nixos-minimal"
     "nixpkgs"
+    "nixvim"
     "nvf"
     "pins"
     "pkgOverlays"
@@ -486,6 +488,7 @@ let
           "caisson/system-manager"
           "caisson/treefmt"
           "caisson/nvf"
+          "caisson/nixvim"
           "caisson/structural"
         ];
 
@@ -587,6 +590,7 @@ let
       "system-manager"
       "treefmt"
       "nvf"
+      "nixvim"
     ];
 
     minimalNixosSystemEvaluates =
@@ -1727,6 +1731,39 @@ let
         drvPaths top.nixosConfigurations.workstation.config.environment.systemPackages
       )
       && builtins.elem upstream.drvPath (drvPaths top.homeConfigurations.alice.config.home.packages);
+
+    # A nixvim configuration is published as
+    # `nixvimConfigurations.<system>.<name>`, and its package is the one
+    # nixvim's own `evalNixvim` builds from the same module on the same
+    # package set.
+    nixvimIsTheNeovimNixvimBuilds =
+      let
+        module = {
+          opts.number = true;
+          globals.mapleader = " ";
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixvim.configurations.editor = lib.caisson.nixvim.mkConfiguration {
+                ecosystemSrc = inputs.nixvim;
+                configModule = module;
+              };
+            };
+        };
+        upstream = inputs.nixvim.lib.evalNixvim {
+          modules = [
+            module
+            { nixpkgs.pkgs = pkgs; }
+          ];
+        };
+      in
+      builtins.attrNames top.nixvimConfigurations == [ "x86_64-linux" ]
+      &&
+        top.nixvimConfigurations.x86_64-linux.editor.config.build.package.drvPath
+        == upstream.config.build.package.drvPath;
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the

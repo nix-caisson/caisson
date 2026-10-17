@@ -128,6 +128,7 @@ let
     "system-manager"
     "treefmt"
     "nvf"
+    "nixvim"
   ];
 
 in
@@ -5393,6 +5394,7 @@ in
                     "facter"
                     "treefmt"
                     "nvf"
+                    "nixvim"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5407,6 +5409,7 @@ in
                     "facter"
                     "treefmt"
                     "nvf"
+                    "nixvim"
                   ];
                 in
                 signature ? configModule
