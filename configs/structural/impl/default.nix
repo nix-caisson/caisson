@@ -36,6 +36,7 @@
         system-manager
         treefmt
         nvf
+        nixvim
         ;
     };
 
