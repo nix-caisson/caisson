@@ -9,7 +9,7 @@
 # there is nixpkgs at aarch64-darwin, and with nixpkgs, nix-darwin,
 # home-manager and hjem declared as its ecosystems. A structural top declares the machine
 # `probe` from `machine`, and the machine `family`, which is `machine`
-# with a home and an hjem configuration for the user `probe` declared
+# with a home and a hjem configuration for the user `probe` declared
 # inside it. Evaluating them needs no Mac: the package set
 # and the derivations are evaluated for aarch64-darwin wherever the
 # evaluation runs. Building the system needs a darwin builder.
@@ -69,7 +69,7 @@ let
     };
   };
 
-  # A home and an hjem configuration for the user `probe`.
+  # A home and a hjem configuration for the user `probe`.
   home = {
     home.stateVersion = "25.05";
     home.file.".probe".text = "home";

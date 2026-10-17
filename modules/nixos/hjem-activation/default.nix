@@ -3,12 +3,12 @@
 # A NixOS module with which a machine activates the hjem configurations
 # declared inside it.
 #
-# Activating an hjem configuration means applying its manifest with
+# Activating a hjem configuration means applying its manifest with
 # hjem's CLI: `hjem internal activate` links the user's files and
 # replaces those of the previous generation, whose manifest is kept in
 # `/var/lib/hjem/manifest-<user>.json`. hjem has a NixOS module that
 # does this for the users it embeds. caisson does not use that NixOS
-# module. An hjem configuration declared inside a NixOS configuration
+# module. A hjem configuration declared inside a NixOS configuration
 # is a caisson configuration, and this module writes the units hjem's
 # NixOS module writes, under the same names. Each template unit has an
 # instance for each user:

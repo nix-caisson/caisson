@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# An hjem module for an hjem configuration declared inside a NixOS or
+# A hjem module for a hjem configuration declared inside a NixOS or
 # system-manager configuration. It sets the home directory of the user
 # from the account the machine declares, as hjem's NixOS module does for
 # the users it embeds, and refuses a user the machine has no account
@@ -11,12 +11,12 @@
 # configurations declared inside it import by default; caisson's
 # `default` module of either class does that, through
 # `caisson.forChildren`. The module is registered as `nixos-parent` and,
-# for the same file, as `system-manager-parent`. An hjem configuration
+# for the same file, as `system-manager-parent`. A hjem configuration
 # that passes `moduleImports` selects its modules itself, and gets this
 # module only if it lists it.
 #
 # The module reads the machine through the manifest of the hjem
-# configuration, so it can only be imported by an hjem configuration
+# configuration, so it can only be imported by a hjem configuration
 # that has a NixOS or system-manager configuration above it.
 { ... }:
 # `lib` is the library of the hjem configuration, and `config` is its
