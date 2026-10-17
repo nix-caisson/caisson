@@ -40,6 +40,7 @@
           "home-manager"
           "nixos"
           "nixpkgs"
+          "nvf"
           "structural"
           "system-manager"
           "terranix"

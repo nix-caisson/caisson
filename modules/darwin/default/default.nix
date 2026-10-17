@@ -28,6 +28,7 @@
         (mkModule ./caisson)
         closure-lib.caisson.modules.darwin.home-manager-activation
         closure-lib.caisson.modules.darwin.hjem-activation
+        closure-lib.caisson.modules.darwin.nvf-package
       ]
     else
       [ ];

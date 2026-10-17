@@ -41,6 +41,7 @@ namespaces=(
   terranix
   system-manager
   treefmt
+  nvf
 )
 
 failures=0

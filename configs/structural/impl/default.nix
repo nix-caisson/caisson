@@ -35,6 +35,7 @@
         terranix
         system-manager
         treefmt
+        nvf
         ;
     };
 
