@@ -218,6 +218,10 @@
           perSystem = true;
           defaultPkgs = null;
           inherit exportsTo;
+          # A system-manager configuration is activated on a machine;
+          # the configurations with an activation declared inside it
+          # check its marker.
+          activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate args;
         };
 
