@@ -126,6 +126,7 @@ let
     "facter"
     "terranix"
     "system-manager"
+    "treefmt"
   ];
 
 in
@@ -2969,6 +2970,74 @@ in
         };
       };
 
+      # An output whose entries are keyed by system is published under
+      # the system of each entry first, and named within it from the
+      # path without its systems; with `single`, it holds the entry named
+      # `default` at each system. An entry with no system is refused
+      # there.
+      "test: an output keyed by system publishes each entry under its system" = {
+        expr =
+          let
+            entryAt =
+              system: name: extra:
+              {
+                attrset = "packages";
+                value = "${name} at ${system}";
+                manifest = { };
+                bySystem = true;
+                inherit system;
+                path = [
+                  {
+                    type = "system";
+                    name = system;
+                  }
+                  {
+                    type = "treefmt";
+                    inherit name;
+                  }
+                ];
+              }
+              // extra;
+            publish = myLib.caisson.integrations.publish;
+            refused = entries: !(builtins.tryEval (builtins.deepSeq (publish entries) true)).success;
+          in
+          {
+            named = publish [
+              (entryAt "x86_64-linux" "a" { })
+              (entryAt "x86_64-linux" "b" { })
+              (entryAt "aarch64-linux" "a" { })
+            ];
+            single = publish [
+              (entryAt "x86_64-linux" "default" {
+                attrset = "formatter";
+                single = true;
+              })
+              (entryAt "aarch64-linux" "default" {
+                attrset = "formatter";
+                single = true;
+              })
+            ];
+            withoutSystem = refused [
+              (entryAt "x86_64-linux" "a" { })
+              (entryAt "x86_64-linux" "b" { system = null; })
+            ];
+          };
+        expected = {
+          named.packages = {
+            x86_64-linux = {
+              a = "a at x86_64-linux";
+              b = "b at x86_64-linux";
+            };
+            aarch64-linux.a = "a at aarch64-linux";
+          };
+          single.formatter = {
+            x86_64-linux = "default at x86_64-linux";
+            aarch64-linux = "default at aarch64-linux";
+          };
+          withoutSystem = true;
+        };
+      };
+
       # A `lib` the caller passes in `specialArgs` takes precedence
       # over the `lib` the composition sets, the way every other special
       # argument does.
@@ -5321,6 +5390,7 @@ in
                     "system-manager"
                     "caisson-facter"
                     "facter"
+                    "treefmt"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5333,6 +5403,7 @@ in
                     "system-manager"
                     "caisson-facter"
                     "facter"
+                    "treefmt"
                   ];
                 in
                 signature ? configModule
