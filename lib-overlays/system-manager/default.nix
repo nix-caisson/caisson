@@ -212,7 +212,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "system-manager";
-          # A system-manager configuration is evaluated at a system: it
+          # A system-manager configuration is evaluated per system: it
           # has an evaluation for every system in force where it is
           # declared.
           perSystem = true;

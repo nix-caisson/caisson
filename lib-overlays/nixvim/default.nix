@@ -151,7 +151,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "nixvim";
-          # A nixvim configuration is evaluated at a system: it has an
+          # A nixvim configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
