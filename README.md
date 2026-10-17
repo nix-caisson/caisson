@@ -130,6 +130,8 @@ source by.
 | `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |
 | `caisson-disko` | `disko` | disk layouts, with the NixOS configurations installed onto each declared inside it; a machine gets the layout's file systems and no disko scripts; the disko integration we recommend for new configurations |
 | `disko` | `disko` | disk layouts written as disko reads them, whose machines import disko's NixOS module, so disko's command, `disko-install` and its image builder work on them |
+| `caisson-facter` | none | the hardware of a machine, a nixos-facter report checked against the report versions caisson knows and extended with a project's own options, with the NixOS configurations that run on it declared inside it; a machine gets the report through nixpkgs' `hardware.facter` |
+| `facter` | none | a `facter.json` as nixos-facter writes it, with the NixOS configurations that run on it declared inside it; a machine gets it as `hardware.facter.reportPath` |
 | `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 

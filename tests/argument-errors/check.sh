@@ -36,6 +36,8 @@ namespaces=(
   caisson-colmena
   caisson-disko
   disko
+  caisson-facter
+  facter
   terranix
   system-manager
 )
