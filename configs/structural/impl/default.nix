@@ -34,6 +34,7 @@
         darwin
         terranix
         system-manager
+        treefmt
         ;
     };
 

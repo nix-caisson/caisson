@@ -43,6 +43,7 @@
           "structural"
           "system-manager"
           "terranix"
+          "treefmt"
         ])
       ]
     else

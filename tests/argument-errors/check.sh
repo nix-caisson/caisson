@@ -40,6 +40,7 @@ namespaces=(
   facter
   terranix
   system-manager
+  treefmt
 )
 
 failures=0
