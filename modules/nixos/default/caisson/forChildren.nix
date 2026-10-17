@@ -4,16 +4,10 @@
 #
 # A configuration gives things to the configurations declared inside
 # it through the options under `caisson.forChildren`. This file adds
-# two home-manager modules, `nixos-parent` and `nixos-source-marker`,
-# to the modules that a home declared inside this NixOS configuration
-# imports by default, and the hjem module `nixos-parent` to those of a
-# hjem configuration declared inside it.
-#
-# `nixos-source-marker` is the module caisson registers as
-# `modules/homeManager/nixos-source-marker`. It adds a step to the
-# activation of the home. The step prints a warning if the home was
-# built for a NixOS configuration that differs from the machine that
-# is running.
+# the home-manager module `nixos-parent` to the modules that a home
+# declared inside this NixOS configuration imports by default, and the
+# hjem module `nixos-parent` to those of a hjem configuration declared
+# inside it.
 #
 # `nixos-parent` is the module caisson registers as
 # `modules/homeManager/nixos-parent`. It sets the options of a home
@@ -35,7 +29,6 @@
 {
   caisson.forChildren.extraDefaultModuleImports.homeManager = _lib: [
     closure-lib.caisson.modules.homeManager.nixos-parent
-    closure-lib.caisson.modules.homeManager.nixos-source-marker
   ];
 
   # The hjem module `nixos-parent` sets the home directory of a hjem

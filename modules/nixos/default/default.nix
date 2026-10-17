@@ -15,19 +15,19 @@
 # machine's account.
 #
 # It also holds what a NixOS configuration does for the homes declared
-# inside it, in three parts:
+# inside it, in two parts:
 #
-# - `./caisson/forChildren.nix` gives each of those homes two
-#   home-manager modules. The first module sets the options of the
-#   home that come from the machine. The second module prints a
-#   warning when the home is activated on a machine that differs from
-#   the machine the home was built for.
+# - `./caisson/forChildren.nix` gives each of those homes the
+#   home-manager module `nixos-parent`, which sets the options of the
+#   home that come from the machine.
 # - The registered module `home-manager-activation` writes the
 #   systemd units that activate those homes on the machine.
-# - The registered module `home-manager-source-marker` writes a file
-#   on the machine. The file names the NixOS configuration the
-#   machine is running. The warning of the second module compares
-#   against that file.
+#
+# The registered module `activation-marker` writes a file on the
+# machine that names what the machine applied. Every configuration with
+# an activation declared inside the machine, a home among them, compares
+# against that file when it is activated by hand, and warns when it was
+# built for a different machine.
 #
 # The parts read options of caisson's core module. The core module
 # leaves its options out when the library of the evaluation is not a
@@ -42,7 +42,7 @@
         (mkModule ./caisson)
         closure-lib.caisson.modules.nixos.home-manager-activation
         closure-lib.caisson.modules.nixos.hjem-activation
-        closure-lib.caisson.modules.nixos.home-manager-source-marker
+        closure-lib.caisson.modules.nixos.activation-marker
       ]
     else
       [ ];

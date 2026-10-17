@@ -4008,9 +4008,9 @@ in
       };
 
       # A NixOS configuration with a home declared inside it writes the
-      # file `caisson-home-manager/source.json` under `/etc`. The file
-      # holds a store path. The store path is the system of the
-      # machine with the homes left out.
+      # file `caisson/marker.json` under `/etc`. The file holds a store
+      # path. The store path is the system of the machine with the
+      # configurations declared inside it left out.
       #
       # The stub of NixOS puts the number of system units into the
       # store path of a system. The machine `laptop` has one home, and
@@ -4022,7 +4022,8 @@ in
       #
       # The machine `outer` has a machine `image` declared inside it,
       # and `image` has a home. That home belongs to `image`. So
-      # `image` writes the file, and `outer` does not.
+      # `image` writes the file, and `outer` does not: `image` is
+      # applied on its own host, so it checks no marker of `outer`.
       "test: a NixOS configuration with homes records the system it runs without them" = {
         expr =
           let
@@ -4056,7 +4057,7 @@ in
                   };
                 };
             };
-            file = "caisson-home-manager/source.json";
+            file = "caisson/marker.json";
             recordOf =
               name:
               let
@@ -4073,13 +4074,13 @@ in
           };
         expected = {
           laptop = {
-            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+            identity = "/nix/store/stub-system-with-0-units";
           };
           laptopBuilds = "/nix/store/stub-system-with-1-units";
           bare = null;
           outer = null;
           image = {
-            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+            identity = "/nix/store/stub-system-with-0-units";
           };
         };
       };

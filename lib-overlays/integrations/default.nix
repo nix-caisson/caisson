@@ -265,19 +265,37 @@
       # one output. It is recorded on the manifest, and applied where
       # the configuration is passed up (`entriesOf`). Null for a
       # configuration that is not published under a name.
+      #
+      # `activation` is given by an integration whose configurations
+      # are activated on a machine or for a user: NixOS, darwin and
+      # system-manager machines, homes, hjem configurations. It holds
+      # two functions of a manifest of the configuration. `identity`
+      # returns the store path that names what the activation applies,
+      # computed from the childless evaluation, or null where there is
+      # none. `standsAlone`, when true, says the configuration is
+      # applied on its own, as a machine is on its own host, so that it
+      # checks no configuration above it. `marker` returns the path of the file the activation
+      # writes that identity into, as shell text, which may name
+      # variables such as `$HOME`. It is recorded on the manifest. A
+      # configuration with an activation declared beneath one checks
+      # the marker of the nearest such configuration above it when it
+      # is activated (`driftCheckOf`). Null for a configuration that is
+      # not activated.
       mkModuleConfiguration =
         {
           type,
           perSystem ? false,
           defaultPkgs ? null,
           exportsTo ? null,
+          activation ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
-            // (if exportsTo == null then { } else { inherit exportsTo; });
+            // (if exportsTo == null then { } else { inherit exportsTo; })
+            // (if activation == null then { } else { inherit activation; });
           evaluate =
             view:
             let
@@ -597,6 +615,137 @@
             found
         ) null types;
 
+      # The nearest configuration above `manifest` that has an
+      # activation (`mkModuleConfiguration`'s `activation`), as its
+      # childless manifest, or null when there is none. A home inside a
+      # NixOS machine finds the machine; an nvf configuration inside
+      # that home finds the home.
+      activatingAncestorOf =
+        manifest:
+        let
+          found = builtins.filter (ancestor: (ancestor.activation or null) != null) (
+            manifest.ancestors or [ ]
+          );
+        in
+        if found == [ ] then null else last found;
+
+      # The `activation` of a machine: a NixOS, darwin or system-manager
+      # configuration. Its identity is its system, `toplevel`, null for
+      # a configuration that builds none, as the nixos-minimal
+      # integration can produce. Its marker is a file under `/etc`,
+      # which the module `activation-marker` of its class writes.
+      #
+      # A machine is activated on its own host. A machine declared
+      # inside another, such as an image, is applied on a different host
+      # than the machine above, and the marker under `/etc` that it
+      # finds there is its own, so it checks nothing above it:
+      # `standsAlone`.
+      machineActivation = {
+        standsAlone = true;
+        identity =
+          manifest: if (manifest.outputs or { }) ? toplevel then manifest.outputs.toplevel.outPath else null;
+        marker = _manifest: "/etc/caisson/marker.json";
+      };
+
+      # The file name of the marker of a configuration activated for a
+      # user: the integration and the name the configuration is declared
+      # under, with the characters the shell would read inside double
+      # quotes, and the path separator, replaced.
+      markerFileName =
+        manifest:
+        "${manifest.type}-${
+          builtins.replaceStrings [ "/" "\"" "$" "`" "\\" ] [ "_" "_" "_" "_" "_" ] (
+            manifest.name or "default"
+          )
+        }.json";
+
+      # What the activation of the configuration of `manifest` writes
+      # into its marker: the identity of its childless evaluation, as a
+      # plain string, so that the marker does not depend on that
+      # evaluation. `path` is the shell text of the path of the marker.
+      # Null when the configuration has no activation or no identity.
+      markerOf =
+        manifest:
+        let
+          activation = manifest.activation or null;
+          childless = manifest.childlessManifest or manifest;
+          identity = if activation == null then null else activation.identity childless;
+        in
+        if identity == null then
+          null
+        else
+          {
+            path = activation.marker childless;
+            identity = builtins.unsafeDiscardStringContext identity;
+            text = builtins.toJSON { identity = builtins.unsafeDiscardStringContext identity; };
+          };
+
+      # True when `entry`, an entry of `caisson.exports.configurations`
+      # of the configuration of `manifest`, checks the marker of that
+      # configuration when it is activated: the entry has an activation,
+      # and the configuration is the nearest one above it that has an
+      # activation.
+      checksMarkerOf =
+        manifest: entry:
+        let
+          ancestor = activatingAncestorOf entry.manifest;
+        in
+        (entry.manifest.activation or null) != null
+        && !(entry.manifest.activation.standsAlone or false)
+        && ancestor != null
+        && builtins.length (ancestor.ancestors or [ ]) == builtins.length (manifest.ancestors or [ ]);
+
+      # The shell text with which the activation of the configuration of
+      # `manifest` checks for drift: it compares the marker of the
+      # nearest configuration above with an activation against the
+      # identity of that configuration as this configuration was built
+      # for it, and prints a warning to standard error when the marker is
+      # missing or names another identity. It does not stop the
+      # activation. When that configuration activates this one, its
+      # marker already belongs to the generation being activated, and
+      # the check prints nothing. Empty when there is no such
+      # configuration, or it has no identity. `jq` is the path of a jq
+      # executable, and `optionText` names the option that turns the
+      # warning off, for the message.
+      driftCheckOf =
+        { jq, optionText }:
+        manifest:
+        let
+          ancestor =
+            if (manifest.activation.standsAlone or false) then null else activatingAncestorOf manifest;
+          expected = if ancestor == null then null else ancestor.activation.identity ancestor;
+          marker = ancestor.activation.marker ancestor;
+          above = "the ${ancestor.type} configuration `${ancestor.name or "(unnamed)"}`";
+          self = "the ${manifest.type} configuration `${manifest.name or "(unnamed)"}`";
+          # The identity, quoted for the shell. A store path holds no
+          # single quote, so quoting it whole is enough.
+          escaped = "'${builtins.unsafeDiscardStringContext expected}'";
+        in
+        if expected == null then
+          ""
+        else
+          ''
+            _caissonMarker="${marker}"
+            if [ ! -f "$_caissonMarker" ]; then
+              echo "WARNING: $_caissonMarker does not exist." >&2
+              echo "  ${self} is declared inside ${above}," >&2
+              echo "  and the activation of ${above} has not recorded what it applied." >&2
+              echo "  Activate ${above} as this configuration was built with it," >&2
+              echo "  or set ${optionText} to false in ${self}." >&2
+            else
+              _caissonApplied="$(${jq} -r '.identity // empty' < "$_caissonMarker")"
+              if [ "$_caissonApplied" != ${escaped} ]; then
+                echo "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied." >&2
+                echo "  applied (configurations declared inside it left out):" >&2
+                echo "    ''${_caissonApplied:-unknown}" >&2
+                echo "  built for (configurations declared inside it left out):" >&2
+                echo "    "${escaped} >&2
+                echo "  Activate ${above} as this configuration was built with it," >&2
+                echo "  or set ${optionText} to false in ${self}." >&2
+              fi
+            fi
+          '';
+
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
       # How a configuration is published: the exports its manifest
@@ -895,6 +1044,12 @@
             integrationsIn
             integrationsDeclaringIn
             nearestOf
+            activatingAncestorOf
+            machineActivation
+            markerFileName
+            markerOf
+            checksMarkerOf
+            driftCheckOf
             mkEvaluation
             publish
             topValue
