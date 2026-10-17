@@ -163,7 +163,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "nvf";
-          # An nvf configuration is evaluated at a system: it has an
+          # An nvf configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;

@@ -113,8 +113,8 @@ in
     user
     ;
   # The machine and the hjem configuration `probe` inside it, as their
-  # manifests. A configuration evaluated at a system sits under that
-  # system in the manifest of its parent.
+  # manifests. Each evaluation of a configuration evaluated per system
+  # sits under its system in the manifest of its parent.
   machineManifest = top.caisson.manifest.children.system.${system}.children.nixos.probe-machine;
   inner =
     top.caisson.manifest.children.system.${system}.children.nixos.probe-machine.children.system.${system}.children.hjem.probe;
