@@ -178,7 +178,7 @@
                     };
                   in
                   builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
-                # The manifest file of an hjem configuration inside a NixOS
+                # The manifest file of a hjem configuration inside a NixOS
                 # machine and the units that activate it, built. Building
                 # the manifest file checks it against hjem's own schema
                 # with `cue vet`, so the file the machine activates is one
@@ -297,7 +297,7 @@
               };
             };
           in
-          # The bare machine, and the machine with a home and an hjem
+          # The bare machine, and the machine with a home and a hjem
           # configuration inside it, whose system holds the activation
           # of the home and the launchd agents of hjem.
           probe.pkgs.linkFarm "darwin-system" [

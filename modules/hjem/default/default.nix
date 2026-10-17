@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The `default` hjem module caisson registers. An hjem configuration
+# The `default` hjem module caisson registers. A hjem configuration
 # imports every registered module named `default` unless it passes
 # `moduleImports`, so this is what it gets from caisson when it does not
 # select its modules itself:

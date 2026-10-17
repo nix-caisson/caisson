@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# An hjem module for the profiles declared inside an hjem configuration:
+# A hjem module for the profiles declared inside a hjem configuration:
 # the configurations that are programs a person runs, such as an nvf or
 # nixvim Neovim, each kept in a profile of the user,
 # `$HOME/.local/state/caisson/profiles/<kind>/<name>`

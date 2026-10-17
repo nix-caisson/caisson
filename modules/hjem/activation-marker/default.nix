@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# An hjem module with which an hjem configuration records what it
+# A hjem module with which a hjem configuration records what it
 # applied, so that the configurations declared inside it can detect
-# drift. It is the counterpart, for an hjem configuration, of the
+# drift. It is the counterpart, for a hjem configuration, of the
 # machine module `activation-marker`: see there for why.
 #
 # The module adds a file to the files of the configuration,

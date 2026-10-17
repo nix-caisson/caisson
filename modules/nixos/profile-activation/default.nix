@@ -13,7 +13,7 @@
 # changes it, and the profile is put back to what the machine declares
 # each time.
 #
-# A profile declared inside an hjem configuration inside the machine is
+# A profile declared inside a hjem configuration inside the machine is
 # a profile of the hjem user. hjem's activation has no step a
 # configuration can add, so the machine activates it, with a unit
 # `caisson-profile-<user>-<kind>-<name>` that runs as the user after the
@@ -24,7 +24,7 @@
 # programs with which a shell chooses among the profiles of the system
 # (`lib.caisson.integrations.profileShimsOf`): `nvim` runs the Neovim of
 # the profile `$CAISSON_NVIM_PROFILE` names, and of the default profile
-# of the machine when it is unset. A home or an hjem configuration sets
+# of the machine when it is unset. A home or a hjem configuration sets
 # the variable to its own profile.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
