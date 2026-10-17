@@ -2,9 +2,21 @@
 #
 # The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
-# system-manager flake.
+# system-manager flake. A system-manager configuration is the system
+# of a machine running another Linux distribution, evaluated at every
+# system in force where it is declared, and published as
+# `systemConfigs.<name>`, the system `system-manager switch --flake`
+# reads.
+#
+# system-manager builds its package set itself, from the nixpkgs its
+# flake pins, at `nixpkgs.hostPlatform`, which caisson defaults to the
+# system of the evaluation. The package sets of the composition at
+# that system reach the modules as the `pkgSets` argument, and the
+# composed library as the `lib` argument. `makeSystemConfig` runs its
+# own module system on its own library, so `lib` in the modules is
+# the composed library while system-manager merges and checks the
+# options with its own.
 {
-  closure-inputs,
   mkLibOverlay,
   ...
 }:
@@ -23,7 +35,7 @@
   overlay =
     final: prev:
     let
-      selection = final.caisson.integrations;
+      context = "lib.caisson.system-manager.mkConfiguration";
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "system-manager";
@@ -35,68 +47,19 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
           ecosystemSrc
         else
-          throw "lib.caisson.system-manager.mkConfiguration requires `ecosystemSrc.lib.makeSystemConfig`.";
+          throw "${context} requires `ecosystemSrc.lib.makeSystemConfig`.";
 
-      mkCommonArgs =
-        {
-          configModule,
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          specialArgs ? { },
-          pkgSets ? null,
-          ...
-        }:
+      # system-manager imports selected NixOS modules from the nixpkgs
+      # input pinned in its flake; current nixos-unstable restructured
+      # nixos/modules/config/nix.nix in ways system-manager's module set
+      # does not absorb. They are bridged here, where every
+      # system-manager evaluation composes. Delete the bridge when
+      # upstream absorbs the restructure: each half fails loudly
+      # (duplicate declaration / unused disable) when its reason
+      # disappears.
+      compatModulesFor =
+        src:
         let
-          registry = final.caisson.modules.systemManager or { };
-          # The framework module of the class: every registered `core`, forced.
-          coreModules = selection.coreModules registry;
-          selectedModules = moduleImports registry ++ extraModuleImports registry;
-          # system-manager instantiates nixpkgs itself from
-          # `nixpkgs.hostPlatform`; a supplied package set seeds that
-          # platform (an explicit hostPlatform wins) and is passed as
-          # the `pkgSets` module argument.
-          pkgSetsModule =
-            if pkgSets != null && pkgSets ? pkgs then
-              [
-                {
-                  _file = "caisson-system-manager:pkgSets";
-                  nixpkgs.hostPlatform = final.mkDefault pkgSets.pkgs.stdenv.hostPlatform.system;
-                }
-              ]
-            else
-              [ ];
-        in
-        {
-          modules = coreModules ++ selectedModules ++ pkgSetsModule ++ [ configModule ];
-          # Framework defaults first; the values the caller passed win
-          # on conflict.
-          specialArgs = {
-            inputs = closure-inputs;
-          }
-          // (if pkgSets != null then { inherit pkgSets; } else { })
-          // specialArgs;
-        };
-
-      # makeSystemConfig's arguments, composed from the caisson arguments,
-      # plus the compatibility bridge below.
-      compose =
-        args:
-        let
-          src = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
-            explicit = args.ecosystemSrc or null;
-            manifest = final.caisson-core.libManifest or { };
-          });
-          common = mkCommonArgs args;
-
-          # system-manager imports selected NixOS modules from the
-          # nixpkgs input pinned in its flake; current nixos-unstable
-          # restructured nixos/modules/config/nix.nix in ways
-          # system-manager's module set (tip 48d4734) does not absorb.
-          # They are bridged here, where every system-manager eval
-          # composes.
-          # Delete the bridge when upstream absorbs the restructure: each
-          # half fails loudly (duplicate declaration / unused disable)
-          # when its reason disappears.
           smNixpkgs = src.inputs.nixpkgs;
           nixosNixModuleText = builtins.readFile "${smNixpkgs}/nixos/modules/config/nix.nix";
 
@@ -159,67 +122,152 @@
               )
             ];
           };
+        in
+        final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
+        ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
 
-          compatModules =
-            final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
-            ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
+      # The evaluator's call, on the view being evaluated:
+      # `makeSystemConfig` over the framework modules, the selection,
+      # the configuration's module and the bridge, at the
+      # configuration's system. `ecosystemArgs`, which only the twin's
+      # pattern admits, is merged over the call last; everything
+      # `makeSystemConfig` takes (modules, overlays, specialArgs,
+      # allowUnsupportedNixpkgs) can be set or replaced there.
+      evaluate =
+        args:
+        { lib, manifest }:
+        let
+          selection = lib.caisson.integrations;
+          src = assertSystemManagerEcosystemSrc (resolveEcosystemSrc {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          });
+
+          name = manifest.name or null;
+          inherit (manifest) system;
+          what =
+            if name != null then
+              "the system-manager configuration `${name}` at ${system}"
+            else
+              "this system-manager configuration at ${system}";
+
+          # The package sets available to the configuration, each at the
+          # system of the evaluation.
+          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+
+          registry = lib.caisson.modules.systemManager or { };
+          frameworkModules = selection.frameworkModules "systemManager" registry;
+          moduleImports = selection.moduleImportsOf "systemManager" { inherit lib manifest; } args;
+
+          # The configuration's module: the module passed, else the
+          # configuration registered under the configuration's name
+          # (`configs/systemManager/<name>`), else none.
+          registered = lib.caisson.configs.systemManager or { };
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else if name != null then
+              registered.${name} or null
+            else
+              null;
+
+          systemModule =
+            { lib, ... }:
+            {
+              _file = "caisson-system-manager:system";
+              nixpkgs.hostPlatform = lib.mkDefault system;
+            };
+
+          value = src.lib.makeSystemConfig (
+            {
+              modules =
+                frameworkModules
+                ++ moduleImports registry
+                ++ (if configModule == null then [ ] else [ configModule ])
+                ++ [ systemModule ]
+                ++ compatModulesFor src;
+              specialArgs = {
+                inherit lib pkgSets;
+              }
+              // (if (args.specialArgs or null) != null then args.specialArgs else { });
+            }
+            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
+          );
         in
         {
-          inherit src;
-          ecosystemArgs = {
-            inherit (common) specialArgs;
-            modules = common.modules ++ compatModules;
-          };
+          inherit value;
+          # What `system-manager switch` activates: the system itself.
+          outputs.toplevel = value;
         };
 
-      # Everything makeSystemConfig takes (modules, overlays,
-      # specialArgs, allowUnsupportedNixpkgs) can be set or replaced
-      # through the twin's `ecosystemArgs`.
-      evaluate = composed: callArgs: composed.src.lib.makeSystemConfig callArgs;
+      # A system-manager configuration is published as
+      # `systemConfigs.<name>`, which `system-manager switch --flake`
+      # reads, with `default` as the name it reads when none is given.
+      exportsTo = {
+        attrset = "systemConfigs";
+        value = manifest: manifest.value;
+      };
 
-      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+      configuration =
+        args:
+        final.caisson.integrations.mkModuleConfiguration {
+          type = "system-manager";
+          # A system-manager configuration is evaluated at a system: it
+          # has an evaluation for every system in force where it is
+          # declared.
+          perSystem = true;
+          defaultPkgs = null;
+          inherit exportsTo;
+          evaluate = evaluate args;
+        };
 
-      integration = selection.mkIntegration {
+      integration = final.caisson.integrations.mkIntegration {
         name = "system-manager";
         class = "systemManager";
-        # `mkCommonArgs` destructures `configModule` without a default
-        # and supplies the value of every optional argument left out;
-        # system-manager instantiates nixpkgs itself, so `pkgSets` is
-        # optional.
+        # A system-manager configuration that is a top, as a tool reads
+        # it: the system, or the systems by system where several are in
+        # force.
+        top = final.caisson.integrations.topValue;
+        # What these return is a configuration, a function of
+        # `{ name, parent }`: a parent that declares it under
+        # `caisson.system-manager.configurations.<name>` finalizes it,
+        # and `mkTopConfiguration` finalizes it at a top. system-manager
+        # builds its own package set, so there is no `defaultPkgs`.
         mkConfiguration =
           {
-            # The configuration's module. Further modules of the class
-            # are selected with `moduleImports`, from the registry.
-            configModule,
-            # The package sets, handed to the modules as the `pkgSets`
-            # special argument; `pkgSets.pkgs` seeds
-            # `nixpkgs.hostPlatform`.
-            pkgSets ? null,
+            # The configuration's module. When absent, the configuration
+            # registered under the configuration's name
+            # (`lib.caisson.configs.systemManager.<name>`), if any.
+            # Further modules of the class are selected with
+            # `moduleImports`, from the registry.
+            configModule ? null,
             # The system-manager flake; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
             # The selection over the systemManager class of the
-            # registry; every entry named `default` when absent.
+            # registry. It replaces the default of the class, which is
+            # every entry named `default` followed by what the
+            # configurations above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
             extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
-            # supplies; system-manager names these `extraSpecialArgs`.
+            # supplies.
             specialArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
           {
-            configModule,
-            pkgSets ? null,
+            configModule ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
       };
     in
     {

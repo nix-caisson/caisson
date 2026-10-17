@@ -1,9 +1,24 @@
 # SPDX-License-Identifier: MIT
 #
 # The terranix integration: it owns the `terranix` class and
-# evaluates it with `terranixConfiguration` from the terranix flake.
+# evaluates it with `terranixConfiguration` from the terranix flake. A
+# terranix configuration is a Terraform configuration written as
+# modules, evaluated at every system in force where it is declared,
+# on the package set selected for it.
+#
+# Its output is `json`, the `config.tf.json` file Terraform reads,
+# which is also the value: `terranixConfiguration` returns that file
+# with the evaluated `config` in its `passthru`. A configuration is
+# published as `terranixConfigurations.<name>`, the name terranix's
+# flake-parts module gives its configurations.
+#
+# terranix runs its own module system on the library of its package
+# set, so the composed library reaches the modules as the `lib`
+# argument while terranix merges and checks the options with its own.
+# terranix returns only the configuration Terraform reads and its
+# `_meta`, so caisson reads its own options through `_meta.caisson`,
+# and a terranix configuration holds no configurations beneath it.
 {
-  closure-inputs,
   mkLibOverlay,
   ...
 }:
@@ -22,7 +37,7 @@
   overlay =
     final: prev:
     let
-      selection = final.caisson.integrations;
+      context = "lib.caisson.terranix.mkConfiguration";
 
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
         name = "terranix";
@@ -34,98 +49,164 @@
         if ecosystemSrc ? lib && ecosystemSrc.lib ? terranixConfiguration then
           ecosystemSrc
         else
-          throw "lib.caisson.terranix requires `ecosystemSrc.lib.terranixConfiguration`.";
+          throw "${context} requires `ecosystemSrc.lib.terranixConfiguration`.";
 
-      # terranixConfiguration's arguments, composed from the caisson
-      # arguments: pkgSets.pkgs is `pkgs`, the selected class modules
-      # and the config module are `modules`, and specialArgs becomes
-      # terranix's `extraArgs` (framework defaults first; the values the
-      # caller passed win on conflict).
-      compose =
-        {
-          ecosystemSrc ? null,
-          configModule,
-          moduleImports ? selection.defaultModuleImports,
-          extraModuleImports ? (_registry: [ ]),
-          specialArgs ? { },
-          pkgSets ? null,
-          ...
-        }:
+      # The evaluator's call, on the view being evaluated:
+      # `terranixConfiguration` over the framework modules, the
+      # selection and the configuration's module, on the package set
+      # selected for the configuration. `ecosystemArgs`, which only the
+      # twin's pattern admits, is merged over the call last; everything
+      # `terranixConfiguration` takes (`pkgs`, `modules`, `extraArgs`,
+      # `strip_nulls`) can be set or replaced there.
+      evaluate =
+        args:
+        { lib, manifest }:
         let
+          selection = lib.caisson.integrations;
           src = assertTerranixEcosystemSrc (resolveEcosystemSrc {
-            explicit = ecosystemSrc;
-            manifest = final.caisson-core.libManifest or { };
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
           });
-          registry = final.caisson.modules.terranix or { };
-          # The framework module of the class: every registered `core`, forced.
-          coreModules = selection.coreModules registry;
-          selectedModules = moduleImports registry ++ extraModuleImports registry;
+
+          name = manifest.name or null;
+          inherit (manifest) system;
+          what =
+            if name != null then
+              "the terranix configuration `${name}` at ${system}"
+            else
+              "this terranix configuration at ${system}";
+
+          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
+
+          registry = lib.caisson.modules.terranix or { };
+          frameworkModules = selection.frameworkModules "terranix" registry;
+          moduleImports = selection.moduleImportsOf "terranix" { inherit lib manifest; } args;
+
+          # The configuration's module: the module passed, else the
+          # configuration registered under the configuration's name
+          # (`configs/terranix/<name>`), else none.
+          registered = lib.caisson.configs.terranix or { };
+          configModule =
+            if (args.configModule or null) != null then
+              args.configModule
+            else if name != null then
+              registered.${name} or null
+            else
+              null;
+
+          # terranix returns the configuration with the keys Terraform
+          # reads alone, and `_meta`, the metadata it passes through
+          # without rendering it. caisson's options reach the result
+          # there.
+          metaModule =
+            { config, ... }:
+            {
+              _file = "caisson-terranix:meta";
+              _meta.caisson = config.caisson;
+            };
+
+          value = src.lib.terranixConfiguration (
+            {
+              inherit pkgs;
+              modules =
+                frameworkModules
+                ++ moduleImports registry
+                ++ (if configModule == null then [ ] else [ configModule ])
+                ++ [ metaModule ];
+              # terranix names the special arguments `extraArgs`.
+              extraArgs = {
+                inherit lib pkgSets;
+              }
+              // (if (args.specialArgs or null) != null then args.specialArgs else { });
+            }
+            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
+          );
         in
         {
-          inherit src;
-          ecosystemArgs = (if pkgSets != null && pkgSets ? pkgs then { pkgs = pkgSets.pkgs; } else { }) // {
-            modules = coreModules ++ selectedModules ++ [ configModule ];
-            extraArgs = {
-              inputs = closure-inputs;
-            }
-            // (if pkgSets != null then { inherit pkgSets; } else { })
-            // specialArgs;
-          };
+          inherit value;
+          # What Terraform reads: the `config.tf.json` file.
+          outputs.json = value;
+          # caisson's options, from `_meta`. terranix keeps the options
+          # of the evaluation to itself, so a terranix configuration
+          # holds no configurations beneath it.
+          config.caisson = value._meta.caisson;
+          options = { };
         };
 
-      # terranix evaluates against a package set, `pkgs` or a set it
-      # instantiates for `system`. The composed call carries `pkgs` from
-      # `pkgSets.pkgs`; the twin may supply either in `ecosystemArgs`.
-      evaluate =
-        composed: callArgs:
-        if !(callArgs ? pkgs || callArgs ? system) then
-          throw "lib.caisson.terranix: terranixConfiguration needs a package set; pass `pkgSets.pkgs`, or `pkgs` or `system` in `ecosystemArgs`."
-        else
-          composed.src.lib.terranixConfiguration callArgs;
+      # A terranix configuration is published as
+      # `terranixConfigurations.<name>`, its `config.tf.json` file.
+      exportsTo = {
+        attrset = "terranixConfigurations";
+        value = manifest: manifest.value;
+      };
 
-      evaluation = selection.mkEvaluation { inherit compose evaluate; };
+      configuration =
+        args:
+        final.caisson.integrations.mkModuleConfiguration {
+          type = "terranix";
+          # A terranix configuration is evaluated at a system: it has an
+          # evaluation for every system in force where it is declared.
+          perSystem = true;
+          defaultPkgs = args.defaultPkgs or null;
+          inherit exportsTo;
+          evaluate = evaluate args;
+        };
 
-      integration = selection.mkIntegration {
+      integration = final.caisson.integrations.mkIntegration {
         name = "terranix";
         class = "terranix";
-        # `compose` destructures `configModule` without a default and
-        # supplies the value of every optional argument left out.
-        # `pkgSets` is optional here: the evaluator step accepts a
-        # package set from `ecosystemArgs` instead, and reports the
-        # miss when neither arrives.
+        # A terranix configuration that is a top, as a tool reads it:
+        # the `config.tf.json` file, or the files by system where
+        # several systems are in force.
+        top = final.caisson.integrations.topValue;
+        # What these return is a configuration, a function of
+        # `{ name, parent }`: a parent that declares it under
+        # `caisson.terranix.configurations.<name>` finalizes it, and
+        # `mkTopConfiguration` finalizes it at a top.
         mkConfiguration =
           {
-            # The configuration's module. Further modules of the class
-            # are selected with `moduleImports`, from the registry.
-            configModule,
-            # The package sets; `pkgSets.pkgs` is the `pkgs` terranix
-            # evaluates against, in place of `system`.
-            pkgSets ? null,
+            # The configuration's module. When absent, the configuration
+            # registered under the configuration's name
+            # (`lib.caisson.configs.terranix.<name>`), if any. Further
+            # modules of the class are selected with `moduleImports`,
+            # from the registry.
+            configModule ? null,
             # The terranix flake; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
-            # The selection over the terranix class of the registry;
-            # every entry named `default` when absent.
+            # The package set the configuration runs on: a function
+            # that receives the package sets available where it is
+            # declared, by package config name, each at the system of
+            # the evaluation, and returns the set to run on. When
+            # absent, the selection of the nearest configuration above,
+            # and the set named `default` where none above selects.
+            defaultPkgs ? null,
+            # The selection over the terranix class of the registry. It
+            # replaces the default of the class, which is every entry
+            # named `default` followed by what the configurations
+            # above added.
             moduleImports ? null,
+            # A selection added to that selection, whichever it is.
             extraModuleImports ? null,
             # Extra module arguments, merged over those the framework
             # supplies; terranix names these `extraArgs`.
             specialArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
           {
-            configModule,
-            pkgSets ? null,
+            configModule ? null,
             ecosystemSrc ? null,
+            defaultPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
           }@args:
-          evaluation args;
+          configuration args;
       };
     in
     {

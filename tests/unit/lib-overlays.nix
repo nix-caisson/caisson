@@ -1716,12 +1716,15 @@ in
       # Test compositions register caisson's real terranix integration
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
-      # registration.
+      # registration. A terranix configuration is evaluated at each
+      # system the composition declares, here one, so a top is the
+      # value of that evaluation: what the stub returns.
       mkResolutionLib =
         extra:
         caisson.mkLib (
           {
             sources = mockSources;
+            systems = [ "x86_64-linux" ];
             libOverlays = _lib: {
               terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
             };
@@ -1735,9 +1738,8 @@ in
           let
             myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "declared";
       };
@@ -1747,10 +1749,9 @@ in
           let
             myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             ecosystemSrc = terranixStub "explicit";
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "explicit";
       };
@@ -1764,9 +1765,8 @@ in
               };
             };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "input";
       };
@@ -1781,9 +1781,8 @@ in
               defaultEcosystemSrc.terranix = terranixStub "declared";
             };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "declared";
       };
@@ -1791,9 +1790,8 @@ in
       "test: a full miss throws at the adapter" = {
         expr =
           builtins.tryEval
-            ((mkResolutionLib { }).caisson.terranix.mkConfiguration {
+            ((mkResolutionLib { }).caisson.terranix.mkTopConfiguration {
               configModule = { };
-              pkgSets.pkgs = { };
             }).stubbed;
         expected = {
           success = false;
@@ -5292,11 +5290,12 @@ in
 
       # The entry points whose constructor returns a configuration take
       # `configModule` as optional: each finds the configuration
-      # registered under the name of the configuration. The nixos and
-      # home-manager entry points take no `pkgSets`: a NixOS
-      # configuration and a home take their package sets from the
-      # composition.
-      "test: every entry point takes configModule, optional where it is found by name, and pkgSets except on nixos and home-manager" =
+      # registered under the name of the configuration. The entry points
+      # of the configurations evaluated at a system take no `pkgSets`:
+      # those configurations take their package sets from the
+      # composition. The structural, colmena, disko and flake-parts
+      # entry points take `pkgSets` and hand it to their modules.
+      "test: every entry point takes configModule, optional where it is found by name, and pkgSets where its configurations do not take sets from the composition" =
         {
           expr = builtins.listToAttrs (
             builtins.map (name: {
@@ -5316,6 +5315,8 @@ in
                     "hjem"
                     "home-manager"
                     "home-manager-minimal"
+                    "terranix"
+                    "system-manager"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5324,6 +5325,8 @@ in
                     "hjem"
                     "home-manager"
                     "home-manager-minimal"
+                    "terranix"
+                    "system-manager"
                   ];
                 in
                 signature ? configModule
