@@ -234,15 +234,14 @@
             home.username = lib.mkDefault name;
           };
 
-          # The NixOS configuration the home is declared inside, when
-          # there is one. It is the nearest NixOS configuration above
-          # the home, so a structural configuration between the two
-          # changes nothing. The manifest holds the childless
-          # evaluation of that NixOS configuration, which is the
-          # evaluation that leaves out the configurations declared
-          # inside it. The home is one of those, so the full
+          # The machine the home is declared inside, when there is one:
+          # the nearest NixOS or darwin configuration above the home, so
+          # a structural configuration between the two changes nothing.
+          # The manifest holds the childless evaluation of that machine,
+          # which is the evaluation that leaves out the configurations
+          # declared inside it. The home is one of those, so the full
           # evaluation would depend on the home.
-          machine = manifest.nearest.nixos or null;
+          machine = selection.nearestOf machineTypes manifest;
 
           # home-manager hands a home the configuration of its machine
           # as the module argument `osConfig`, and null when the home
@@ -287,6 +286,8 @@
           # home-manager also hands a home inside a machine the class
           # of the machine, as `osClass`. A home with no machine gets
           # no such argument from home-manager, so none is added here.
+          # home-manager's nix-darwin module also hands a home the
+          # machine as `darwinConfig`.
           #
           # home-manager's legacy argument `nixosConfig` is left at
           # null, the value home-manager gives it in a home with no
@@ -294,7 +295,8 @@
           # `nixosConfig.home-manager`, an option that only
           # home-manager's NixOS module declares, and caisson does not
           # use that module.
-          // (if machine != null then { osClass = "nixos"; } else { })
+          // (if machine != null then { osClass = machine.type; } else { })
+          // (if machine != null && machine.type == "darwin" then { darwinConfig = osConfig; } else { })
           // (if (args.specialArgs or null) != null then args.specialArgs else { });
           # The module tree the evaluation reads: home-manager's
           # module list, its module files and the `modulesPath` special
@@ -469,27 +471,37 @@
           };
         };
 
+      # The integrations whose configurations are machines a home can
+      # be declared inside.
+      machineTypes = [
+        "nixos"
+        "darwin"
+      ];
+
       # A home is published as `homeConfigurations.<name>`, the
       # evaluated home, which is what the home-manager CLI reads. A
-      # home beneath a NixOS configuration is named `<user>@<host>`,
-      # the name it is passed up under and the name that NixOS
-      # configuration is declared under, which is where the CLI looks
-      # (`$USER@$(hostname)`); a home with no NixOS configuration above
-      # it keeps its name.
+      # home beneath a NixOS or darwin configuration is named
+      # `<user>@<host>`, the name it is passed up under and the name
+      # that machine is declared under, which is where the CLI looks
+      # (`$USER@$(hostname)`); a home with no machine above it keeps
+      # its name.
       exportsTo = {
         attrset = "homeConfigurations";
         value = manifest: manifest.value;
         name =
           { name, manifest }:
           let
-            host = (manifest.nearest.nixos or { }).name or null;
+            machine = final.caisson.integrations.nearestOf machineTypes manifest;
+            host = if machine == null then null else machine.name or null;
           in
           if host == null then
             { value = name; }
           else
             {
               value = "${name}@${host}";
-              description = "named ${name}@${host} from its name and the name of the NixOS configuration it is under";
+              description = "named ${name}@${host} from its name and the name of the ${
+                { nixos = "NixOS"; }.${machine.type} or machine.type
+              } configuration it is under";
             };
       };
 

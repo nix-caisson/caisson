@@ -120,7 +120,7 @@ source by.
 | `flake-parts` | `flake-parts` | flake outputs |
 | `nixpkgs` | `nixpkgs` | package sets and overlays |
 | `nixos` | `nixpkgs` | NixOS configurations |
-| `darwin` | `nix-darwin` | macOS machines, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads |
+| `darwin` | `nix-darwin` | macOS machines, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the homes and hjem configurations declared inside them |
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |

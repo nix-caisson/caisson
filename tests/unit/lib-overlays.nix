@@ -761,6 +761,54 @@ in
         declared = [ "nixos" ];
       };
     };
+
+    # The machine of a home is the nearest NixOS or darwin configuration
+    # above it: of the nearest ancestor of each integration, the one with
+    # the most ancestors.
+    "test: nearestOf finds the nearest ancestor of the given integrations" = {
+      expr =
+        let
+          outer = {
+            name = "outer";
+            ancestors = [ "lib" ];
+          };
+          inner = {
+            name = "inner";
+            ancestors = [
+              "lib"
+              "outer"
+            ];
+          };
+          nearestOf = lib.caisson.integrations.nearestOf [
+            "nixos"
+            "darwin"
+          ];
+        in
+        {
+          nearer =
+            (nearestOf {
+              nearest = {
+                nixos = outer;
+                darwin = inner;
+              };
+            }).name;
+          nearerFirst =
+            (nearestOf {
+              nearest = {
+                nixos = inner;
+                darwin = outer;
+              };
+            }).name;
+          one = (nearestOf { nearest.darwin = outer; }).name;
+          other = nearestOf { nearest.structural = inner; };
+        };
+      expected = {
+        nearer = "inner";
+        nearerFirst = "inner";
+        one = "outer";
+        other = null;
+      };
+    };
   };
 
   mkLib = {

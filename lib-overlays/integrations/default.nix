@@ -565,6 +565,26 @@
           genAttrs declaring (name: config.caisson.${name}.configurations)
         );
 
+      # The nearest configuration above `manifest` whose integration is
+      # one of `types`, null when there is none. The manifest records
+      # the nearest ancestor of each integration; of those, the nearest
+      # is the one with the most ancestors itself. A home reads its
+      # machine this way, which is a NixOS or a darwin configuration.
+      nearestOf =
+        types: manifest:
+        builtins.foldl' (
+          found: type:
+          let
+            candidate = (manifest.nearest or { }).${type} or null;
+          in
+          if candidate == null then
+            found
+          else if found == null || builtins.length candidate.ancestors > builtins.length found.ancestors then
+            candidate
+          else
+            found
+        ) null types;
+
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
       # How a configuration is published: the `exportsTo` its
@@ -811,6 +831,7 @@
             entriesOf
             configurationsModuleFor
             integrationsIn
+            nearestOf
             mkEvaluation
             publish
             topValue
