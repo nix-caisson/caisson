@@ -21,15 +21,17 @@ shift
 flags=("$@")
 
 # Every entry point takes `configModule`. The structural, caisson-colmena,
-# caisson-disko, disko, flake-parts, nixos, nixos-minimal, home-manager
-# and home-manager-minimal entry points require nothing: each finds the
-# configuration registered under the name of the configuration. The others require
-# `configModule`, and take `pkgSets`, which the nixos and home-manager
-# entry points do not: a NixOS configuration and a home take their
-# package sets from the composition.
+# caisson-disko, disko, flake-parts, nixos, nixos-minimal, darwin,
+# home-manager and home-manager-minimal entry points require nothing:
+# each finds the configuration registered under the name of the
+# configuration. The others require `configModule`, and take `pkgSets`,
+# which the nixos, darwin and home-manager entry points do not: a NixOS
+# configuration, a darwin configuration and a home take their package
+# sets from the composition.
 namespaces=(
   nixos
   nixos-minimal
+  darwin
   home-manager
   home-manager-minimal
   flake-parts
@@ -89,13 +91,13 @@ missing="function '[^']*%s' called without required argument '(configModule|pkgS
 # The arguments a call passes beside the wrong argument.
 given_for() {
   case "$1" in
-    nixos | nixos-minimal | home-manager | home-manager-minimal) printf 'configModule = { };' ;;
+    nixos | nixos-minimal | darwin | home-manager | home-manager-minimal) printf 'configModule = { };' ;;
     *) printf 'configModule = { }; pkgSets.pkgs = { };' ;;
   esac
 }
 requires_nothing() {
   case "$1" in
-    structural | caisson-colmena | caisson-disko | disko | flake-parts | nixos | nixos-minimal | home-manager | home-manager-minimal) return 0 ;;
+    structural | caisson-colmena | caisson-disko | disko | flake-parts | nixos | nixos-minimal | darwin | home-manager | home-manager-minimal) return 0 ;;
     *) return 1 ;;
   esac
 }

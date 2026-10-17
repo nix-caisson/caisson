@@ -21,5 +21,7 @@
   inputs.system-manager.inputs.nixpkgs.follows = "nixpkgs";
   inputs.disko.url = "github:nix-community/disko";
   inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nix-darwin.url = "github:nix-darwin/nix-darwin";
+  inputs.nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
   outputs = { ... }: { };
 }

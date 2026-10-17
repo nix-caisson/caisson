@@ -2,8 +2,8 @@
 #
 # The pinned-world suite: caisson, the tree this file lives in,
 # composed with concrete pinned versions of the upstream world
-# (nixpkgs, home-manager, colmena, disko, terranix, system-manager,
-# read from tests/dependencies) and exercised end to end. Every upstream
+# (nixpkgs, home-manager, colmena, disko, nix-darwin, terranix,
+# system-manager, read from tests/dependencies) and exercised end to end. Every upstream
 # expectation caisson relies on is held by a probe here, so a pin
 # that moves and breaks an expectation fails at evaluation, in this
 # suite, rather than in a consumer.
@@ -65,6 +65,7 @@ let
       registered."caisson/colmena"
       registered."caisson/caisson-disko"
       registered."caisson/disko"
+      registered."caisson/darwin"
       registered."caisson/terranix"
       registered."caisson/system-manager"
       registered."caisson/structural"
@@ -84,6 +85,7 @@ let
     "callFlake"
     "colmena"
     "configs"
+    "darwin"
     "disko"
     "ecosystemSrc"
     "elide"
@@ -466,6 +468,7 @@ let
           "caisson/colmena"
           "caisson/caisson-disko"
           "caisson/disko"
+          "caisson/darwin"
           "caisson/terranix"
           "caisson/system-manager"
           "caisson/structural"
@@ -561,6 +564,7 @@ let
       "colmena"
       "caisson-disko"
       "disko"
+      "darwin"
       "terranix"
       "system-manager"
     ];
@@ -878,6 +882,7 @@ let
     # `top`.
     onlyAnIntegrationWithATopHasMkTopConfiguration =
       hiveLib.caisson.nixos ? mkTopConfiguration
+      && hiveLib.caisson.darwin ? mkTopConfiguration
       && hiveLib.caisson.home-manager ? mkTopConfiguration
       && hiveLib.caisson.structural ? mkTopConfiguration
       && hiveLib.caisson.flake-parts ? mkTopConfiguration
@@ -1374,6 +1379,29 @@ let
       builtins.attrNames named.nixosConfigurations == [ "nas-1" ]
       && named.nixosConfigurations.nas-1.config.networking.hostName == "nas-1"
       && renamed.nixosConfigurations.nas-1.config.networking.hostName == "storage";
+
+    # A darwin configuration evaluates at aarch64-darwin on any host, and
+    # builds the system nix-darwin's `darwinSystem` builds from the same
+    # module and the same package set. It is published as
+    # `darwinConfigurations.<name>` with `system` beside `config`, which
+    # is what `darwin-rebuild` reads, and it runs on the package set the
+    # composition declares. nix-darwin records no nixpkgs revision for a
+    # package set it did not build, with caisson as with `darwinSystem`.
+    darwinBuildsWhatDarwinSystemBuilds =
+      let
+        probe = import ../darwin-system { inherit inputs; };
+        upstream = inputs.nix-darwin.lib.darwinSystem {
+          inherit (probe) pkgs;
+          modules = [
+            { nixpkgs.hostPlatform = probe.system; }
+            probe.machine
+          ];
+        };
+      in
+      builtins.attrNames probe.top.darwinConfigurations == [ "probe" ]
+      && probe.toplevel.drvPath == upstream.system.drvPath
+      && probe.configuration.config.nixpkgs.hostPlatform.system == "aarch64-darwin"
+      && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
 
     terranixConfigurationEvaluatesEndToEnd =
       let
