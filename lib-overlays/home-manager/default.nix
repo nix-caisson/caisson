@@ -516,6 +516,17 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A home is activated for its user. Its identity is its
+          # activation package; its marker is a file in the state
+          # directory of the user, which the home-manager module
+          # `activation-marker` writes. The configurations with an
+          # activation declared inside the home check it.
+          activation = {
+            identity = manifest: manifest.outputs.activationPackage.outPath;
+            marker =
+              manifest:
+              "\${XDG_STATE_HOME:-$HOME/.local/state}/caisson/markers/${selection.markerFileName manifest}";
+          };
           evaluate = evaluation variant args;
         };
 
