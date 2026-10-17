@@ -135,6 +135,9 @@ source by.
 | `treefmt` | `treefmt-nix` | the formatters of a tree, as treefmt-nix modules; the configuration named `default` is published as the `formatter.<system>` that `nix fmt` runs |
 | `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns; a NixOS machine, a darwin machine, a home or an hjem configuration installs the Neovim of an nvf configuration declared inside it |
 | `nixvim` | `nixvim` | a Neovim written as nixvim modules, published as `nixvimConfigurations.<system>.<name>` |
+| `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `default` is published as `topology.<system>` |
+| `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `packages.<system>.<name>`, the JSON `kubectl apply -f` reads |
+| `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |
 | `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 

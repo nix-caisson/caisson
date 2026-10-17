@@ -74,6 +74,9 @@ let
       registered."caisson/treefmt"
       registered."caisson/nvf"
       registered."caisson/nixvim"
+      registered."caisson/topology"
+      registered."caisson/kubenix"
+      registered."caisson/nixidy"
       registered."caisson/structural"
       # Last, so its value replaces the pin the overlays carry while
       # its position stays where the first import placed it.
@@ -105,6 +108,7 @@ let
     "home-manager"
     "importApply"
     "integrations"
+    "kubenix"
     "libManifest"
     "libOverlays"
     "manifestOf"
@@ -117,6 +121,7 @@ let
     "mkPkgOverlay"
     "mkPkgOverlays"
     "modules"
+    "nixidy"
     "nixos"
     "nixos-minimal"
     "nixpkgs"
@@ -130,6 +135,7 @@ let
     "structural"
     "system-manager"
     "terranix"
+    "topology"
     "treefmt"
   ];
 
@@ -489,6 +495,9 @@ let
           "caisson/treefmt"
           "caisson/nvf"
           "caisson/nixvim"
+          "caisson/topology"
+          "caisson/kubenix"
+          "caisson/nixidy"
           "caisson/structural"
         ];
 
@@ -591,6 +600,9 @@ let
       "treefmt"
       "nvf"
       "nixvim"
+      "topology"
+      "kubenix"
+      "nixidy"
     ];
 
     minimalNixosSystemEvaluates =
@@ -1814,6 +1826,130 @@ let
       &&
         top.nixvimConfigurations.x86_64-linux.editor.config.build.package.drvPath
         == upstream.config.build.package.drvPath;
+
+    # A topology configuration with two machines declared inside it reads
+    # them as nix-topology reads NixOS configurations evaluated with its
+    # NixOS module: the same nodes, and the same rendered diagram. It is
+    # published as `topology.<system>` under the name `default`, and its
+    # machines as `nixosConfigurations`.
+    topologyReadsTheMachinesDeclaredInside =
+      let
+        machine = {
+          boot.loader.grub.enable = false;
+          fileSystems."/" = {
+            device = "none";
+            fsType = "tmpfs";
+          };
+          system.stateVersion = "25.05";
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.topology.configurations.default = lib.caisson.topology.mkConfiguration {
+                ecosystemSrc = inputs.nix-topology;
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.alpha = lib.caisson.nixos.mkConfiguration {
+                      configModule = machine;
+                    };
+                    caisson.nixos.configurations.beta = lib.caisson.nixos.mkConfiguration {
+                      configModule = machine;
+                    };
+                  };
+              };
+            };
+        };
+        upstreamMachine =
+          hostName:
+          import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+            system = "x86_64-linux";
+            modules = [
+              machine
+              "${inputs.nix-topology}/nixos/module.nix"
+              { networking.hostName = hostName; }
+            ];
+          };
+        upstream = import inputs.nix-topology {
+          pkgs = pkgs.extend (import "${inputs.nix-topology}/pkgs/default.nix");
+          modules = [
+            {
+              nixosConfigurations = {
+                alpha = upstreamMachine "alpha";
+                beta = upstreamMachine "beta";
+              };
+            }
+          ];
+        };
+        topology = top.topology.x86_64-linux;
+      in
+      builtins.attrNames top.nixosConfigurations == [
+        "alpha"
+        "beta"
+      ]
+      && builtins.attrNames topology.config.nodes == builtins.attrNames upstream.config.nodes
+      && builtins.elem "alpha" (builtins.attrNames topology.config.nodes)
+      && topology.config.output.drvPath == upstream.config.output.drvPath;
+
+    # A kubenix configuration is published as `packages.<system>.<name>`,
+    # its result, which is the result kubenix's own `evalModules` gives
+    # the same module on the same package set.
+    kubenixIsTheResultKubenixBuilds =
+      let
+        module =
+          { kubenix, ... }:
+          {
+            imports = [ kubenix.modules.k8s ];
+            kubernetes.resources.configMaps.demo.data.greeting = "hello";
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.kubenix.configurations.cluster = lib.caisson.kubenix.mkConfiguration {
+                ecosystemSrc = inputs.kubenix;
+                configModule = module;
+              };
+            };
+        };
+        upstream = import "${inputs.kubenix}/lib/eval-modules.nix" { inherit pkgs; } { inherit module; };
+      in
+      top.packages.x86_64-linux.cluster.drvPath == upstream.config.kubernetes.result.drvPath;
+
+    # A nixidy configuration is published as
+    # `nixidyEnvs.<system>.<name>`, and its rendered environment is the
+    # one nixidy's own `mkEnv` renders from the same module on the same
+    # package set.
+    nixidyIsTheEnvironmentNixidyRenders =
+      let
+        module = {
+          nixidy.target.repository = "https://example.com/manifests.git";
+          nixidy.target.branch = "main";
+          applications.demo = {
+            namespace = "demo";
+            resources.configMaps.demo.data.greeting = "hello";
+          };
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixidy.configurations.prod = lib.caisson.nixidy.mkConfiguration {
+                ecosystemSrc = inputs.nixidy;
+                configModule = module;
+              };
+            };
+        };
+        upstream = inputs.nixidy.lib.mkEnv {
+          inherit pkgs;
+          modules = [ module ];
+        };
+      in
+      top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath;
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the
