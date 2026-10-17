@@ -71,6 +71,7 @@ let
       registered."caisson/darwin"
       registered."caisson/terranix"
       registered."caisson/system-manager"
+      registered."caisson/treefmt"
       registered."caisson/structural"
       # Last, so its value replaces the pin the overlays carry while
       # its position stays where the first import placed it.
@@ -125,6 +126,7 @@ let
     "structural"
     "system-manager"
     "terranix"
+    "treefmt"
   ];
 
   expectedCoreNames = [
@@ -480,6 +482,7 @@ let
           "caisson/darwin"
           "caisson/terranix"
           "caisson/system-manager"
+          "caisson/treefmt"
           "caisson/structural"
         ];
 
@@ -579,6 +582,7 @@ let
       "darwin"
       "terranix"
       "system-manager"
+      "treefmt"
     ];
 
     minimalNixosSystemEvaluates =
@@ -1627,6 +1631,37 @@ let
               }
             ];
           }).hash;
+
+    # A treefmt configuration declared under the name `default` is
+    # published as `formatter.<system>`, and its wrapper is the
+    # derivation treefmt-nix's own `mkWrapper` builds from the same
+    # module on the same package set. Its outputs carry the
+    # configuration file and the check over a source tree.
+    treefmtIsTheFormatterTreefmtNixBuilds =
+      let
+        module = {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.treefmt.configurations.default = lib.caisson.treefmt.mkConfiguration {
+                ecosystemSrc = inputs.treefmt-nix;
+                configModule = module;
+              };
+            };
+        };
+        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.treefmt.default;
+        upstream = inputs.treefmt-nix.lib.mkWrapper pkgs module;
+      in
+      builtins.attrNames top.formatter == [ "x86_64-linux" ]
+      && top.formatter.x86_64-linux.drvPath == upstream.drvPath
+      && evaluation.outputs.programs ? nixfmt
+      && builtins.isString evaluation.outputs.configFile.drvPath
+      && builtins.isString (evaluation.outputs.check ./.).drvPath;
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the

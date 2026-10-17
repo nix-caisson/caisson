@@ -253,7 +253,10 @@
       # declared under: a function of `{ name, manifest }`, the name
       # the configuration is passed up under and its manifest,
       # returning `value`, the name to publish it under, and
-      # optionally `description`, a sentence saying what it did. It is
+      # optionally `description`, a sentence saying what it did. It may
+      # carry `single`, for an output that holds the one configuration
+      # named `default`, and `bySystem`, for an output keyed by the
+      # system of each evaluation first (`packages.<system>.<name>`). It is
       # recorded on the manifest, and applied where the configuration
       # is passed up (`entriesOf`). Null for a configuration that is
       # not published under a name.
@@ -623,6 +626,8 @@
           inherit manifest;
           inherit (exportsTo) attrset;
           single = exportsTo.single or false;
+          bySystem = exportsTo.bySystem or false;
+          system = manifest.system or null;
           value = exportsTo.value manifest;
           path = init prefix ++ [
             (
@@ -716,6 +721,12 @@
       # of the entry named `default`, the entry whose `exportsTo` says
       # `single`. Any other entry for that output is refused, since the
       # output has no names to hold it under.
+      #
+      # An output whose entries' `exportsTo` says `bySystem` is keyed by
+      # the system of each evaluation first, as flakes key `packages`
+      # and `formatter`: `<attrset>.<system>`, holding the entries
+      # evaluated at that system, named by the rules above over their
+      # paths without the systems on them, or the single value there.
       publish =
         entries:
         let
@@ -724,6 +735,33 @@
             attrset:
             let
               members = builtins.filter (entry: entry.attrset == attrset) entries;
+              keyed = builtins.filter (entry: entry.bySystem or false) members;
+              systems = unique (builtins.map (entry: entry.system) keyed);
+              withoutSystems =
+                entry: entry // { path = builtins.filter (segment: segment.type != "system") entry.path; };
+            in
+            if keyed == [ ] then
+              publishMembers attrset members
+            else if builtins.length keyed != builtins.length members || builtins.elem null systems then
+              throw ''
+                ${attrset}: this output is keyed by system, and these configurations
+                would be published there without a system:
+                ${builtins.concatStringsSep "\n" (
+                  builtins.map (entry: "  ${showPath entry.path}") (
+                    builtins.filter (entry: !(entry.bySystem or false) || entry.system == null) members
+                  )
+                )}
+              ''
+            else
+              genAttrs systems (
+                system:
+                publishMembers "${attrset}.${system}" (
+                  builtins.map withoutSystems (builtins.filter (entry: entry.system == system) keyed)
+                )
+              );
+          publishMembers =
+            attrset: members:
+            let
               names = builtins.map displayName (
                 final.caisson-core.elide (builtins.map (entry: entry.path) members)
               );
