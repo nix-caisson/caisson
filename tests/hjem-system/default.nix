@@ -7,11 +7,11 @@
 #
 # The composition is at x86_64-linux, with a package config whose set
 # there is nixpkgs, and with nixpkgs and hjem declared as its
-# ecosystems. `user` is an hjem module with a file and a package.
-# `standalone` is an hjem configuration that is a top, for the user
+# ecosystems. `user` is a hjem module with a file and a package.
+# `standalone` is a hjem configuration that is a top, for the user
 # `probe` with the home directory it sets itself. `top` is a structural
 # top holding a NixOS machine `probe-machine`, which declares the
-# account of `probe` and an hjem configuration `probe` from
+# account of `probe` and a hjem configuration `probe` from
 # `machineUser`, which is `user` with a systemd user unit.
 { inputs }:
 let

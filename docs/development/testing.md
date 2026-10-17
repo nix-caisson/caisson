@@ -28,7 +28,7 @@ plumbing works.
   configuration, a NixOS system with homes declared inside it, a
   colmena hive, disk layouts with the machines installed onto them, a
   darwin machine evaluated at aarch64-darwin with and without a home
-  and an hjem configuration inside it, hjem configurations on
+  and a hjem configuration inside it, hjem configurations on
   their own and inside a NixOS machine, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
   overlays. The `hjem-system` check builds the manifest file of the hjem
