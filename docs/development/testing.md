@@ -23,13 +23,17 @@ plumbing works.
 ## Pinned-World Suite
 
 - **Scope:** caisson composed with concrete pinned versions of the upstream
-  world (nixpkgs, home-manager, colmena, disko, nix-darwin, terranix,
-  system-manager) and exercised end to end: a home configuration, a
-  NixOS system with homes declared inside it, a colmena hive, disk
-  layouts with the machines installed onto them, a darwin machine
-  evaluated at aarch64-darwin, a terranix and a system-manager
+  world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem,
+  terranix, system-manager) and exercised end to end: a home
+  configuration, a NixOS system with homes declared inside it, a
+  colmena hive, disk layouts with the machines installed onto them, a
+  darwin machine evaluated at aarch64-darwin, hjem configurations on
+  their own and inside a NixOS machine, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
-  overlays. The darwin machine of the suite is also the one check at
+  overlays. The `hjem-system` check builds the manifest file of the hjem
+  configuration inside the machine, which checks it against hjem's
+  schema, and the units that activate it, which runs shellcheck on
+  their scripts. The darwin machine of the suite is also the one check at
   aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in

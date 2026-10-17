@@ -114,6 +114,7 @@ let
     "nixos"
     "nixos-minimal"
     "darwin"
+    "hjem"
     "home-manager"
     "home-manager-minimal"
     "flake-parts"
@@ -5264,6 +5265,7 @@ in
                     "nixos"
                     "nixos-minimal"
                     "darwin"
+                    "hjem"
                     "home-manager"
                     "home-manager-minimal"
                   ];
@@ -5271,6 +5273,7 @@ in
                     "nixos"
                     "nixos-minimal"
                     "darwin"
+                    "hjem"
                     "home-manager"
                     "home-manager-minimal"
                   ];

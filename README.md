@@ -18,7 +18,7 @@
   <a href="https://github.com/nix-caisson/caisson/actions/workflows/drift.yml"><img alt="drift" src="https://github.com/nix-caisson/caisson/actions/workflows/drift.yml/badge.svg?branch=main&event=schedule"></a>
 </p>
 
-<p align="center"><sub>The drift badge reports the daily run of the pinned-world suite against the current upstreams (nixpkgs, home-manager, colmena, terranix, system-manager); red means an upstream moved and broke an expectation caisson holds.</sub></p>
+<p align="center"><sub>The drift badge reports the daily run of the pinned-world suite against the current upstreams (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem, terranix, system-manager); red means an upstream moved and broke an expectation caisson holds.</sub></p>
 
 ---
 
@@ -124,6 +124,7 @@ source by.
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
+| `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS configuration they are declared inside, or applied with `hjem standalone` |
 | `terranix` | `terranix` | Terranix and Terraform configurations |
 | `caisson-colmena` | `colmena` | colmena configurations whose machines are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
 | `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |

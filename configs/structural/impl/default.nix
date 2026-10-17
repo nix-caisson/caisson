@@ -24,6 +24,7 @@
         nixos-minimal
         home-manager
         home-manager-minimal
+        hjem
         caisson-colmena
         colmena
         caisson-disko
