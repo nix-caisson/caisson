@@ -23,8 +23,8 @@
 # NixOS configuration passes up: the homes declared inside it, also
 # through a structural configuration, that its
 # `caisson.home-manager.exported` selector selects. It leaves out two
-# kinds. A home declared inside a NixOS configuration that is itself
-# inside this one belongs to that inner machine. A home evaluated for
+# kinds. A home declared inside a machine that is itself inside this
+# one belongs to that inner machine. A home evaluated for
 # a system other than the system of this machine cannot run here.
 #
 # Which unit
@@ -69,6 +69,15 @@
 # that has no systemd options and no assertions. A NixOS configuration
 # of that kind cannot run units, so there the module also defines
 # nothing.
+#
+# The same module is registered for the `systemManager` class, under
+# the same name, and a system-manager machine activates the homes
+# declared inside it the same way: system-manager declares
+# `users.users` and runs the units, and starts those wanted by
+# `multi-user.target` with `system-manager.target`. The module reads
+# `config.caisson.exports.configurations`, which the core module
+# declares; it imports the core module of the class of the evaluation,
+# read from its manifest.
 { closure-lib, ... }:
 {
   config,
@@ -89,6 +98,24 @@ let
     && options.systemd ? user
     && options ? users;
 
+  # The core module of the class of this evaluation: of the
+  # `systemManager` class in a system-manager evaluation, else of the
+  # `nixos` class. The registered core modules of the two classes are
+  # one file under two names, so a module imports the one its
+  # evaluation already holds.
+  coreModule =
+    if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
+      closure-lib.caisson.modules.systemManager.core
+    else
+      closure-lib.caisson.modules.nixos.core;
+
+  # The integrations whose configurations are machines.
+  machineTypes = [
+    "nixos"
+    "darwin"
+    "system-manager"
+  ];
+
   # True for an entry this machine activates. `entry.path` is the path
   # from this NixOS configuration to the configuration of the entry, a
   # list of `{ type, name }` segments.
@@ -98,9 +125,9 @@ let
       above = lib.lists.init entry.path;
     in
     entry.manifest.type == "home-manager"
-    # A NixOS configuration on the path is a machine inside this
-    # machine, and the home belongs to it.
-    && !(builtins.any (segment: segment.type == "nixos") above)
+    # A machine on the path is a machine inside this machine, and the
+    # home belongs to it.
+    && !(builtins.any (segment: builtins.elem segment.type machineTypes) above)
     && entry.manifest.system == evalManifest.system;
 
   # What the units need of each home.
@@ -225,9 +252,9 @@ let
   );
 in
 {
-  # The module reads `config.caisson.exports.configurations`. The core
-  # module declares that option.
-  imports = [ closure-lib.caisson.modules.nixos.core ];
+  # The core module of the class of this evaluation, which declares
+  # `config.caisson.exports.configurations`.
+  imports = [ coreModule ];
 
   options.caisson.home-manager.activation.usersDeclaredElsewhere = lib.mkOption {
     type = lib.types.listOf lib.types.str;
@@ -265,11 +292,11 @@ in
         {
           assertion = withoutAccount == [ ];
           message = ''
-            caisson: this NixOS configuration has a home whose user has no account in `users.users`.
+            caisson: this machine has a home whose user has no account in `users.users`.
             ${lib.concatMapStringsSep "\n" (
               home: "  the home `${home.name}` is for the user `${home.username}`"
             ) withoutAccount}
-            Check `home.username` of the home, and that the home is declared inside the right NixOS configuration.
+            Check `home.username` of the home, and that the home is declared inside the right machine.
             If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
           '';
         }
@@ -283,7 +310,7 @@ in
         {
           assertion = repeated == [ ];
           message = ''
-            caisson: this NixOS configuration activates more than one home for the same user.
+            caisson: this machine activates more than one home for the same user.
             ${lib.concatMapStringsSep "\n" (
               username:
               "  ${username}: ${

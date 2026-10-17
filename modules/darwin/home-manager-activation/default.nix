@@ -51,7 +51,14 @@ let
       above = lib.lists.init entry.path;
     in
     entry.manifest.type == "home-manager"
-    && !(builtins.any (segment: segment.type == "nixos" || segment.type == "darwin") above)
+    && !(builtins.any (
+      segment:
+      builtins.elem segment.type [
+        "nixos"
+        "darwin"
+        "system-manager"
+      ]
+    ) above)
     && entry.manifest.system == evalManifest.system;
 
   homes = builtins.map (entry: {

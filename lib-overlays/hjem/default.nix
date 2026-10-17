@@ -130,12 +130,15 @@
               null;
 
           # The machine the configuration is declared inside, when there
-          # is one: the childless evaluation of the nearest NixOS or
-          # darwin configuration above it, which hjem's modules receive
-          # as `osConfig`, null when there is none.
+          # is one: the childless evaluation of the nearest NixOS,
+          # darwin or system-manager configuration above it, which hjem's
+          # modules receive as `osConfig`, null when there is none. A
+          # system-manager evaluation is its system, with the
+          # configuration and the options in its `passthru`.
           machine = selection.nearestOf [
             "nixos"
             "darwin"
+            "system-manager"
           ] manifest;
           osConfig = if machine != null then machine.value.config else null;
 
@@ -143,10 +146,21 @@
           # `modules/nixos/systemd.nix`, which declares the user's
           # systemd units and links them into the user's files, with the
           # `utils` and the options of the machine. A configuration inside
-          # a NixOS machine that has `utils` gets the same; the minimal
-          # NixOS evaluator gives none.
-          machineArgs = if machine != null then (machine.value._module or { }).args or { } else { };
-          nixosUser = machine != null && machine.type == "nixos" && machineArgs ? utils;
+          # a NixOS or system-manager machine that has `utils` gets the
+          # same; the minimal NixOS evaluator gives none.
+          machineArgs =
+            if machine == null then
+              { }
+            else
+              (machine.value._module or { }).args
+                or (((machine.value.options or { })._module or { }).args.value or { });
+          nixosUser =
+            machine != null
+            && builtins.elem machine.type [
+              "nixos"
+              "system-manager"
+            ]
+            && machineArgs ? utils;
 
           # What hjem's OS modules set on a user that caisson sets too:
           # the user's name from the name the configuration is declared
