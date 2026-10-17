@@ -18,7 +18,10 @@ let
 
   manifest = lib.caisson-core.evalManifest;
 
-  integrations = lib.caisson.integrations.integrationsIn options;
+  # The integrations whose configurations a module of this evaluation
+  # declares. An integration with none declared passes nothing up,
+  # whatever its `exported` selects, so it is not read.
+  integrations = lib.caisson.integrations.integrationsDeclaringIn options;
 
   isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
