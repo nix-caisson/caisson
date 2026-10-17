@@ -1784,7 +1784,11 @@ let
             inherit pkgs;
             modules = [ module ];
           }).neovim;
-        drvPaths = packages: builtins.map (package: package.drvPath) packages;
+        machine = top.nixosConfigurations.workstation.config;
+        home = top.homeConfigurations.alice.config;
+        unit = machine.systemd.services.caisson-profile-nvf-machine-editor;
+        names = packages: builtins.map (package: package.name or "") packages;
+        topProfile = top.caisson.manifest.children.system.x86_64-linux.children.nvf.editor.outputs.profile;
         published = top.nvfConfigurations.x86_64-linux.editor;
       in
       # The configuration is published in the shape `neovimConfiguration`
@@ -1794,10 +1798,24 @@ let
       && published.config.vim.viAlias
       && published.options ? vim
       && !(top ? packages)
-      && builtins.elem upstream.drvPath (
-        drvPaths top.nixosConfigurations.workstation.config.environment.systemPackages
+      # The machine activates the profile of the system as root, at boot
+      # and at a switch, and lets a shell choose it with `nvim`.
+      && unit.wantedBy == [ "multi-user.target" ]
+      && !(unit.serviceConfig ? User)
+      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
+        names machine.environment.systemPackages
       )
-      && builtins.elem upstream.drvPath (drvPaths top.homeConfigurations.alice.config.home.packages);
+      # The home activates its own profile, after its files are linked,
+      # and chooses it for its shells.
+      && pkgs.lib.hasInfix "/activate" home.home.activation.caissonProfiles.data
+      &&
+        home.home.sessionVariables.CAISSON_NVIM_PROFILE
+        == "$HOME/.local/state/caisson/profiles/nvf/home-editor"
+      # The top's own profile is a profile of the user, and it points at
+      # the Neovim nvf builds.
+      && topProfile.scope == "user"
+      && topProfile.path == "$HOME/.local/state/caisson/profiles/nvf/editor"
+      && topProfile.package.drvPath == upstream.drvPath;
 
     # A nixvim configuration is published as
     # `nixvimConfigurations.<system>.<name>`, and its package is the one
@@ -1961,11 +1979,11 @@ let
       top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath;
 
     # A system-manager machine activates the home, the hjem configuration
-    # and the nvf configuration declared inside it, as a NixOS machine
+    # and the nvf configurations declared inside it, as a NixOS machine
     # does: the home and the hjem configuration take their directory from
     # the account the machine declares, the machine writes the units that
-    # activate them, installs the packages of the hjem user and the
-    # Neovim, and the home is published as `probe@box`.
+    # activate them and the profiles, installs the packages of the hjem
+    # user, and the home is published as `probe@box`.
     systemManagerActivatesWhatIsDeclaredInside =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -1993,10 +2011,14 @@ let
                     caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
                       ecosystemSrc = inputs.hjem;
                       configModule =
-                        { pkgs, ... }:
+                        { lib, pkgs, ... }:
                         {
                           files.".config/probe/greeting".text = "hello";
                           packages = [ pkgs.hello ];
+                          caisson.nvf.configurations.hjem-editor = lib.caisson.nvf.mkConfiguration {
+                            ecosystemSrc = inputs.nvf;
+                            configModule.vim.vimAlias = true;
+                          };
                         };
                     };
                     caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
@@ -2012,8 +2034,9 @@ let
           top.caisson.manifest.children.system.x86_64-linux.children.system-manager.box.children.system.x86_64-linux.children;
         home = children.home-manager.probe.value.config;
         hjem = children.hjem.probe.value.config;
-        neovim = children.nvf.editor.outputs.neovim;
         names = packages: builtins.map (package: package.name or "") packages;
+        systemUnit = box.systemd.services.caisson-profile-nvf-editor;
+        hjemUnit = box.systemd.services.caisson-profile-probe-nvf-hjem-editor;
       in
       home.home.homeDirectory == "/home/probe"
       # The machine records what it applied, and the home compares
@@ -2023,7 +2046,17 @@ let
       && hjem.directory == "/home/probe"
       && box.systemd.services ? home-manager-probe
       && box.systemd.services ? "hjem-activate@"
-      && builtins.elem neovim.name (names box.environment.systemPackages)
+      # The machine activates its profile of the system as root, and the
+      # profile inside the hjem configuration as its user, after hjem
+      # applies the configuration; hjem chooses the profile of the user.
+      && systemUnit.wantedBy == [ "multi-user.target" ]
+      && !(systemUnit.serviceConfig ? User)
+      && hjemUnit.serviceConfig.User == "probe"
+      && builtins.elem "hjem-activate@probe.service" hjemUnit.after
+      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (names box.environment.systemPackages)
+      &&
+        hjem.environment.sessionVariables.CAISSON_NVIM_PROFILE
+        == "/home/probe/.local/state/caisson/profiles/nvf/hjem-editor"
       && builtins.elem pkgs.hello.name (names box.users.users.probe.packages)
       && builtins.attrNames top.homeConfigurations == [ "probe@box" ];
 

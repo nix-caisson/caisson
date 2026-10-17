@@ -17,11 +17,15 @@
 # `neovimConfiguration` returns. A configuration is published as
 # `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration`
 # returns: `neovim`, `config` and `options`. `packages` is the package
-# scope of the project itself, and caisson publishes nothing there. A home, an hjem configuration or a NixOS
-# configuration installs the Neovim of an nvf configuration declared
-# inside it, with the modules `nvf-package` of their classes, which
-# caisson's default modules of those classes import; each is
-# `packagesModule` for the option of its class that takes packages.
+# scope of the project itself, and caisson publishes nothing there.
+#
+# An nvf configuration is kept in a Nix profile of its own, the way a
+# home keeps its generations (`lib.caisson.integrations.profileOf`):
+# its output `activationPackage` holds `activate`, which points the
+# profile at the Neovim, and `profile` says where the profile is. A
+# machine, a home or an hjem configuration activates the nvf
+# configurations declared inside it each time it is activated itself,
+# with the module `profile-activation` of its class.
 {
   mkLibOverlay,
   ...
@@ -146,50 +150,28 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
+          neovim = value.config.vim.build.finalPackage;
+          kept = selection.profileOf {
+            inherit pkgs manifest;
+            kind = "nvf";
+            package = neovim;
+            # The programs the Neovim has in `bin`: `nvim`, and `vi`
+            # and `vim` when nvf adds them.
+            programs = [
+              "nvim"
+            ]
+            ++ (if value.config.vim.viAlias then [ "vi" ] else [ ])
+            ++ (if value.config.vim.vimAlias then [ "vim" ] else [ ]);
+            variable = "CAISSON_NVIM_PROFILE";
+            warn = value.config.caisson.drift.warn or true;
+          };
         in
         {
           inherit value;
-          outputs.neovim = value.config.vim.build.finalPackage;
-        };
-
-      # The module, for a class that installs packages, that installs the
-      # Neovim of each nvf configuration declared inside a configuration
-      # of that class: the nvf configurations it passes up, evaluated at
-      # its system, with no configuration but structural ones between
-      # them and it. `option` is the path of the option of the class
-      # that takes the packages, such as `[ "environment" "systemPackages" ]`.
-      #
-      # The module reads the configurations from the full evaluation, so
-      # in the childless evaluation it defines nothing; and in an
-      # evaluation that does not declare the option, or whose library is
-      # not a caisson composition, it defines nothing either.
-      packagesModule =
-        option:
-        {
-          config,
-          lib,
-          options,
-          ...
-        }:
-        let
-          manifest = lib.caisson-core.evalManifest or null;
-          installedHere =
-            entry:
-            entry.manifest.type == "nvf"
-            && builtins.all (segment: segment.type == "structural" || segment.type == "system") (
-              lib.lists.init entry.path
-            )
-            && entry.manifest.system == (manifest.system or null);
-          neovims = builtins.map (entry: entry.manifest.outputs.neovim) (
-            builtins.filter installedHere (config.caisson.exports.configurations or [ ])
-          );
-        in
-        {
-          config = lib.optionalAttrs (lib.hasAttrByPath option options) (
-            lib.mkIf (manifest != null && !manifest.childless && neovims != [ ]) (
-              lib.setAttrByPath option neovims
-            )
-          );
+          outputs = {
+            inherit neovim;
+            inherit (kept) activationPackage profile;
+          };
         };
 
       # An nvf configuration is published as
@@ -213,6 +195,12 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # An nvf configuration is activated into its profile. Its
+          # identity is its Neovim.
+          activation = {
+            identity = manifest: manifest.outputs.neovim.outPath;
+            marker = manifest: "${manifest.outputs.profile.path}.marker.json";
+          };
           evaluate = evaluate args;
         };
 
@@ -270,9 +258,6 @@
             ecosystemArgs ? null,
           }@args:
           configuration args;
-        extra = {
-          inherit packagesModule;
-        };
       };
     in
     {
