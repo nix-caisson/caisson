@@ -7,7 +7,7 @@
 # it through the options under `caisson.forChildren`. This file adds the
 # home-manager module `system-manager-parent` to the modules that a home
 # declared inside this system-manager configuration imports by default,
-# and the hjem module `system-manager-parent` to those of an hjem
+# and the hjem module `system-manager-parent` to those of a hjem
 # configuration declared inside it. Each sets the options that come from
 # the machine: the home directory from the account of the user that the
 # machine declares in `users.users`, and for a home the user ID and the

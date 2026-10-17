@@ -23,7 +23,7 @@
 # home keeps its generations (`lib.caisson.integrations.profileOf`):
 # its output `activationPackage` holds `activate`, which points the
 # profile at the Neovim, and `profile` says where the profile is. A
-# machine, a home or an hjem configuration activates the nvf
+# machine, a home or a hjem configuration activates the nvf
 # configurations declared inside it each time it is activated itself,
 # with the module `profile-activation` of its class.
 {

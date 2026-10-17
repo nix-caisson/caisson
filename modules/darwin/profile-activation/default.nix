@@ -6,7 +6,7 @@
 #
 # A step of the machine's `postActivation` script runs `activate` of
 # each profile of the system as root, and of each profile declared
-# inside an hjem configuration inside the machine as its user, through
+# inside a hjem configuration inside the machine as its user, through
 # `launchctl asuser` and `sudo`, after the hjem agents are restarted. A
 # profile inside a home is activated by the home. The machine installs
 # the programs that choose among the profiles of the system in
