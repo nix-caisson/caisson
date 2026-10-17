@@ -29,6 +29,8 @@
         colmena
         caisson-disko
         disko
+        caisson-facter
+        facter
         darwin
         terranix
         system-manager

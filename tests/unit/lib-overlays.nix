@@ -122,6 +122,8 @@ let
     "caisson-colmena"
     "caisson-disko"
     "disko"
+    "caisson-facter"
+    "facter"
     "terranix"
     "system-manager"
   ];
@@ -5317,6 +5319,8 @@ in
                     "home-manager-minimal"
                     "terranix"
                     "system-manager"
+                    "caisson-facter"
+                    "facter"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5327,6 +5331,8 @@ in
                     "home-manager-minimal"
                     "terranix"
                     "system-manager"
+                    "caisson-facter"
+                    "facter"
                   ];
                 in
                 signature ? configModule
