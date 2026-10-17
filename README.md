@@ -124,7 +124,7 @@ source by.
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
-| `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS configuration they are declared inside, or applied with `hjem standalone` |
+| `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS, darwin or system-manager configuration they are declared inside, or applied with `hjem standalone` |
 | `terranix` | `terranix` | Terraform configurations written as terranix modules, published as `terranixConfigurations` of the `config.tf.json` files Terraform reads |
 | `caisson-colmena` | `colmena` | colmena configurations whose machines are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
 | `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |
@@ -138,7 +138,7 @@ source by.
 | `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `default` is published as `topology.<system>` |
 | `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `packages.<system>.<name>`, the JSON `kubectl apply -f` reads |
 | `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |
-| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads |
+| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the homes and hjem configurations declared inside them, and install the Neovim of the nvf configurations declared inside them |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`

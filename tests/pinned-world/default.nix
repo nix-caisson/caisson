@@ -1901,6 +1901,69 @@ let
       in
       top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath;
 
+    # A system-manager machine activates the home, the hjem configuration
+    # and the nvf configuration declared inside it, as a NixOS machine
+    # does: the home and the hjem configuration take their directory from
+    # the account the machine declares, the machine writes the units that
+    # activate them, installs the packages of the hjem user and the
+    # Neovim, and the home is published as `probe@box`.
+    systemManagerActivatesWhatIsDeclaredInside =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.system-manager.configurations.box = lib.caisson.system-manager.mkConfiguration {
+                ecosystemSrc = inputs.system-manager;
+                configModule =
+                  { lib, ... }:
+                  {
+                    system-manager.allowAnyDistro = true;
+                    users.groups.probe.gid = 5000;
+                    users.users.probe = {
+                      isNormalUser = true;
+                      uid = 5000;
+                      group = "probe";
+                      home = "/home/probe";
+                    };
+                    caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
+                      ecosystemSrc = inputs.home-manager;
+                      configModule.home.stateVersion = "25.05";
+                    };
+                    caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
+                      ecosystemSrc = inputs.hjem;
+                      configModule =
+                        { pkgs, ... }:
+                        {
+                          files.".config/probe/greeting".text = "hello";
+                          packages = [ pkgs.hello ];
+                        };
+                    };
+                    caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
+                      ecosystemSrc = inputs.nvf;
+                      configModule.vim.viAlias = true;
+                    };
+                  };
+              };
+            };
+        };
+        box = top.systemConfigs.box.config;
+        children =
+          top.caisson.manifest.children.system.x86_64-linux.children.system-manager.box.children.system.x86_64-linux.children;
+        home = children.home-manager.probe.value.config;
+        hjem = children.hjem.probe.value.config;
+        neovim = children.nvf.editor.outputs.neovim;
+        names = packages: builtins.map (package: package.name or "") packages;
+      in
+      home.home.homeDirectory == "/home/probe"
+      && hjem.directory == "/home/probe"
+      && box.systemd.services ? home-manager-probe
+      && box.systemd.services ? "hjem-activate@"
+      && builtins.elem neovim.name (names box.environment.systemPackages)
+      && builtins.elem pkgs.hello.name (names box.users.users.probe.packages)
+      && builtins.attrNames top.homeConfigurations == [ "probe@box" ];
+
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the
     # evaluated configuration in its `passthru`, and its modules get the

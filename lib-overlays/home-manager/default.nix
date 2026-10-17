@@ -235,7 +235,8 @@
           };
 
           # The machine the home is declared inside, when there is one:
-          # the nearest NixOS or darwin configuration above the home, so
+          # the nearest NixOS, darwin or system-manager configuration
+          # above the home, so
           # a structural configuration between the two changes nothing.
           # The manifest holds the childless evaluation of that machine,
           # which is the evaluation that leaves out the configurations
@@ -476,6 +477,7 @@
       machineTypes = [
         "nixos"
         "darwin"
+        "system-manager"
       ];
 
       # A home is published as `homeConfigurations.<name>`, the
