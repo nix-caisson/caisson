@@ -464,7 +464,7 @@ let
       builtins.all evaluates [
         "default"
         "home-manager-activation"
-        "home-manager-source-marker"
+        "activation-marker"
       ];
 
     composesTheCaissonLibrary =
@@ -737,10 +737,9 @@ let
       && !(machine.systemd.user.services ? home-manager-declared)
       && builtins.isString machine.system.build.toplevel.drvPath;
 
-    # The same machine writes the file
-    # `/etc/caisson-home-manager/source.json`. The file holds a store
-    # path. The store path is the system of the machine with the homes
-    # left out.
+    # The same machine writes the file `/etc/caisson/marker.json`. The
+    # file holds a store path. The store path is the system of the
+    # machine with the configurations declared inside it left out.
     #
     # The system that the machine builds has the units of the homes in
     # it. So the store path in the file must differ from the system
@@ -748,7 +747,8 @@ let
     #
     # Each home computes the same store path. The activation of each
     # home has a step that compares that store path with the file. The
-    # script of the step must therefore contain the store path.
+    # script of the step must therefore contain the store path and the
+    # path of the file.
     aMachineRecordsWhatItsHomesCompareAgainst =
       let
         machine = machineWithHomes.nixosConfigurations.probe.config;
@@ -758,16 +758,17 @@ let
         ];
         # fromJSON refuses a string that refers to a store path.
         record = builtins.fromJSON (
-          builtins.unsafeDiscardStringContext machine.environment.etc."caisson-home-manager/source.json".text
+          builtins.unsafeDiscardStringContext machine.environment.etc."caisson/marker.json".text
         );
-        base = record.baseSystemOutPath;
+        base = record.identity;
         comparesAgainstIt =
           home:
-          pkgs.lib.hasInfix base (
-            builtins.unsafeDiscardStringContext home.config.home.activation.caissonMachineDrift.data
-          );
+          let
+            step = builtins.unsafeDiscardStringContext home.config.home.activation.caissonDrift.data;
+          in
+          pkgs.lib.hasInfix base step && pkgs.lib.hasInfix "/etc/caisson/marker.json" step;
       in
-      builtins.attrNames record == [ "baseSystemOutPath" ]
+      builtins.attrNames record == [ "identity" ]
       && pkgs.lib.hasPrefix builtins.storeDir base
       && base != builtins.unsafeDiscardStringContext machine.system.build.toplevel.outPath
       && builtins.all comparesAgainstIt homes;
@@ -2011,6 +2012,10 @@ let
         names = packages: builtins.map (package: package.name or "") packages;
       in
       home.home.homeDirectory == "/home/probe"
+      # The machine records what it applied, and the home compares
+      # against it when activated by hand, as inside a NixOS machine.
+      && box.environment.etc ? "caisson/marker.json"
+      && pkgs.lib.hasInfix "/etc/caisson/marker.json" home.home.activation.caissonDrift.data
       && hjem.directory == "/home/probe"
       && box.systemd.services ? home-manager-probe
       && box.systemd.services ? "hjem-activate@"

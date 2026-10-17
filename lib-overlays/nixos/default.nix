@@ -114,6 +114,10 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A NixOS configuration is activated on a machine; the
+          # configurations with an activation declared inside it check
+          # its marker.
+          activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate variant args;
         };
 
