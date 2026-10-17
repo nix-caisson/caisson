@@ -33,6 +33,7 @@
         closure-lib.caisson.modules.systemManager.home-manager-activation
         closure-lib.caisson.modules.systemManager.hjem-activation
         closure-lib.caisson.modules.systemManager.nvf-package
+        closure-lib.caisson.modules.systemManager.activation-marker
       ]
     else
       [ ];
