@@ -226,7 +226,7 @@
 
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
-      # configuration at a system, as caisson-core.mkConfiguration
+      # configuration per system, as caisson-core.mkConfiguration
       # takes them. `evaluate` is the evaluator step of the
       # integration: it takes the view being evaluated, `{ lib,
       # manifest }`, and returns `value`, the evaluation as the
@@ -462,7 +462,7 @@
               } child;
               # The integration of what was declared: of the
               # manifest, or of the evaluations of a configuration
-              # evaluated at a system, null where it has none.
+              # evaluated per system, null where it has none.
               declaredType =
                 if isManifest finalized then
                   finalized.type
@@ -803,7 +803,7 @@
         genAttrs attrsets publishIn;
 
       # What a tool reads from a top that is a configuration evaluated
-      # at a system, given its evaluations by system. They are named
+      # per system, given its evaluations by system. They are named
       # like anything published, by `caisson-core.elide` over their
       # paths; the top is addressed by the file that returns it, so the
       # name of the top is left out of each. Where that leaves a single

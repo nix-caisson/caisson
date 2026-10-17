@@ -37,7 +37,7 @@ let
         integration: config.caisson.${integration}.exported config.caisson.${integration}.configurations
       );
 
-  # The manifests passed up: a configuration evaluated at a system
+  # The manifests passed up: a configuration evaluated per system
   # stands for each of its evaluations.
   exported = builtins.concatMap (
     integration:
