@@ -738,17 +738,17 @@ let
       && builtins.isString machine.system.build.toplevel.drvPath;
 
     # The same machine writes the file `/etc/caisson/marker.json`. The
-    # file holds a store path. The store path is the system of the
-    # machine with the configurations declared inside it left out.
+    # file holds the digest of the system of the machine with the
+    # configurations declared inside it left out.
     #
     # The system that the machine builds has the units of the homes in
-    # it. So the store path in the file must differ from the system
-    # that the machine builds.
+    # it. So the digest in the file is the digest of the childless
+    # system, and not of the system that the machine builds.
     #
-    # Each home computes the same store path. The activation of each
-    # home has a step that compares that store path with the file. The
-    # script of the step must therefore contain the store path and the
-    # path of the file.
+    # Each home computes the same digest. The activation of each home
+    # has a step that compares that digest with the file. The script of
+    # the step must therefore contain the digest and the path of the
+    # file.
     aMachineRecordsWhatItsHomesCompareAgainst =
       let
         machine = machineWithHomes.nixosConfigurations.probe.config;
@@ -756,21 +756,20 @@ let
           machineWithHomes.homeConfigurations."declared@probe"
           machineWithHomes.homeConfigurations."undeclared@probe"
         ];
-        # fromJSON refuses a string that refers to a store path.
-        record = builtins.fromJSON (
-          builtins.unsafeDiscardStringContext machine.environment.etc."caisson/marker.json".text
-        );
-        base = record.identity;
+        record = builtins.fromJSON machine.environment.etc."caisson/marker.json".text;
+        digest = record.identity;
+        childless =
+          machineWithHomes.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.childlessManifest.outputs.toplevel;
         comparesAgainstIt =
           home:
           let
-            step = builtins.unsafeDiscardStringContext home.config.home.activation.caissonDrift.data;
+            step = home.config.home.activation.caissonDrift.data;
           in
-          pkgs.lib.hasInfix base step && pkgs.lib.hasInfix "/etc/caisson/marker.json" step;
+          pkgs.lib.hasInfix digest step && pkgs.lib.hasInfix "/etc/caisson/marker.json" step;
       in
       builtins.attrNames record == [ "identity" ]
-      && pkgs.lib.hasPrefix builtins.storeDir base
-      && base != builtins.unsafeDiscardStringContext machine.system.build.toplevel.outPath
+      && digest == builtins.hashString "sha256" childless.outPath
+      && digest != builtins.hashString "sha256" machine.system.build.toplevel.outPath
       && builtins.all comparesAgainstIt homes;
 
     # A NixOS configuration can be evaluated alone, with
