@@ -8,7 +8,7 @@ in
 
     export.enabled = lib.mkEnableOption "lib overlay export";
     exported = lib.mkOption {
-      type = lib.types.functionTo (lib.types.attrsOf types.libOverlay);
+      type = lib.types.functionTo types.libOverlays;
       description = ''
         Function that selects which registered library overlays to
         export. Receives the set of overlays registered via `mkLib` and
