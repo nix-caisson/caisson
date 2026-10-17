@@ -17,6 +17,14 @@
 # `neovimConfiguration` returns. A configuration is published as
 # `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration`
 # returns: `neovim`, `config` and `options`.
+#
+# An nvf configuration is kept in a Nix profile of its own, the way a
+# home keeps its generations (`lib.caisson.integrations.profileOf`):
+# its output `activationPackage` holds `activate`, which points the
+# profile at the Neovim, and `profile` says where the profile is. A
+# machine, a home or a hjem configuration activates the nvf
+# configurations declared inside it each time it is activated itself,
+# with the module `profile-activation` of its class.
 {
   mkLibOverlay,
   ...
@@ -141,10 +149,28 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
+          neovim = value.config.vim.build.finalPackage;
+          kept = selection.profileOf {
+            inherit pkgs manifest;
+            kind = "nvf";
+            package = neovim;
+            # The programs the Neovim has in `bin`: `nvim`, and `vi`
+            # and `vim` when nvf adds them.
+            programs = [
+              "nvim"
+            ]
+            ++ (if value.config.vim.viAlias then [ "vi" ] else [ ])
+            ++ (if value.config.vim.vimAlias then [ "vim" ] else [ ]);
+            variable = "CAISSON_NVIM_PROFILE";
+            warn = value.config.caisson.drift.warn or true;
+          };
         in
         {
           inherit value;
-          outputs.neovim = value.config.vim.build.finalPackage;
+          outputs = {
+            inherit neovim;
+            inherit (kept) activationPackage profile;
+          };
         };
 
       # An nvf configuration is published as
@@ -168,6 +194,12 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # An nvf configuration is activated into its profile. Its
+          # identity is its Neovim.
+          activation = {
+            identity = manifest: manifest.outputs.neovim.outPath;
+            marker = manifest: "${manifest.outputs.profile.path}.marker.json";
+          };
           evaluate = evaluate args;
         };
 

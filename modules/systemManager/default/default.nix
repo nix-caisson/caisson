@@ -17,6 +17,13 @@
 #   `hjem-activation`, the same modules a NixOS machine uses, write the
 #   systemd units that activate the homes and the hjem configurations
 #   when the machine is activated.
+# - The registered module `profile-activation`, the same module a NixOS
+#   machine uses, activates the profile of each nvf or nixvim
+#   configuration declared inside the machine, and lets a shell choose
+#   among them.
+# - The registered module `activation-marker` records what the machine
+#   applied, for the configurations declared inside it to check for
+#   drift.
 #
 # The parts read options of caisson's core module. The core module
 # leaves its options out when the library of the evaluation is not a
@@ -30,6 +37,7 @@
         (mkModule ./caisson)
         closure-lib.caisson.modules.systemManager.home-manager-activation
         closure-lib.caisson.modules.systemManager.hjem-activation
+        closure-lib.caisson.modules.systemManager.profile-activation
         closure-lib.caisson.modules.systemManager.activation-marker
       ]
     else

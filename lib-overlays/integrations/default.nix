@@ -753,6 +753,184 @@
             fi
           '';
 
+      # A name a configuration is declared under, with the characters
+      # the shell would read inside double quotes, and the path
+      # separator, replaced, for use in a path.
+      safeName =
+        name:
+        builtins.replaceStrings [ "/" "\"" "$" "`" "\\" ] [ "_" "_" "_" "_" "_" ] (
+          if name == null then "default" else name
+        );
+
+      # A configuration that is a program a person runs, such as a
+      # Neovim, kept in a Nix profile of its own, the way a home keeps
+      # its generations in the home-manager profile.
+      #
+      # `activationPackage` holds `activate`, which checks for drift
+      # against the nearest configuration above with an activation
+      # (`driftCheckOf`, when `warn`), and points the profile at
+      # `package` with `nix-env --profile`, which also makes the
+      # profile a garbage-collector root. When the profile already
+      # points at `package`, it changes nothing, so activating the same
+      # generation again adds no generation to the profile.
+      #
+      # Where the profile is depends on the configuration above. Inside
+      # a machine it is a profile of the system,
+      # `/nix/var/nix/profiles/caisson/<kind>/<name>`, which the machine
+      # activates as root. Inside a home or an hjem configuration, or as
+      # a top, it is a profile of the user,
+      # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
+      # names `$HOME` and not `$XDG_STATE_HOME`: the units of a machine
+      # run without `$XDG_STATE_HOME`, and a shell may set it, and the
+      # profile must be the same file for both. The
+      # configuration above activates it each time it is activated
+      # itself, so activating the configuration above puts the profile
+      # back to what that configuration declares.
+      #
+      # `profile` is what the configuration above reads from the
+      # manifest: the shell text of the path of the profile, whether it
+      # is a profile of the system or of the user, the `package` the
+      # profile points at, the `programs` the
+      # package has in `bin`, and `variable`, the name of the variable a
+      # shell sets to choose which profile of this sort it runs
+      # (`profileShimsOf`).
+      profileOf =
+        {
+          pkgs,
+          manifest,
+          kind,
+          package,
+          programs,
+          variable,
+          warn ? true,
+        }:
+        let
+          ancestor = activatingAncestorOf manifest;
+          ofSystem = ancestor != null && (ancestor.activation.standsAlone or false);
+          name = safeName (manifest.name or null);
+          path =
+            if ofSystem then
+              "/nix/var/nix/profiles/caisson/${kind}/${name}"
+            else
+              "$HOME/.local/state/caisson/profiles/${kind}/${name}";
+          check =
+            if warn then
+              driftCheckOf {
+                jq = "${pkgs.jq}/bin/jq";
+                optionText = "`caisson.drift.warn`";
+              } manifest
+            else
+              "";
+        in
+        {
+          activationPackage = pkgs.writeTextFile {
+            name = "${kind}-${name}-activation";
+            destination = "/activate";
+            executable = true;
+            text = ''
+              #!${pkgs.runtimeShell}
+              set -eu
+              ${check}
+              profile="${path}"
+              ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$profile")"
+              if [ "$(${pkgs.coreutils}/bin/readlink -f "$profile" 2>/dev/null || true)" != '${package}' ]; then
+                ${pkgs.nix}/bin/nix-env --profile "$profile" --set '${package}'
+              fi
+            '';
+          };
+          profile = {
+            inherit
+              path
+              programs
+              variable
+              kind
+              name
+              package
+              ;
+            scope = if ofSystem then "system" else "user";
+          };
+        };
+
+      # The entries of `caisson.exports.configurations` of the
+      # configuration of `manifest` that it activates as profiles
+      # (`profileOf`): those with a `profile`, evaluated for the system
+      # of the configuration, whose nearest configuration above with an
+      # activation is this one. A profile inside a home inside this
+      # machine is the home's to activate, and is left out.
+      profilesActivatedBy =
+        manifest: configurations:
+        builtins.filter (
+          entry:
+          (entry.manifest.outputs or { }) ? profile
+          && (entry.manifest.system or null) == (manifest.system or null)
+          && checksMarkerOf manifest entry
+        ) configurations;
+
+      # For each variable the profiles in `entries` are chosen with, the
+      # profile a configuration runs when a shell sets no other, and the
+      # programs of all of them. The profile is the one `selected` names
+      # for the variable, as `<kind>/<name>`, or the only one. `what`
+      # names the configuration, for the message when several profiles
+      # share a variable and `selected` names none of them.
+      profileChoicesOf =
+        { selected, what }:
+        entries:
+        let
+          variables = unique (builtins.map (entry: entry.manifest.outputs.profile.variable) entries);
+          choiceOf =
+            variable:
+            let
+              sharing = builtins.filter (entry: entry.manifest.outputs.profile.variable == variable) entries;
+              nameOf = entry: "${entry.manifest.outputs.profile.kind}/${entry.manifest.outputs.profile.name}";
+              named = builtins.filter (entry: nameOf entry == selected.${variable}) sharing;
+              chosen =
+                if selected ? ${variable} then
+                  if named != [ ] then
+                    builtins.head named
+                  else
+                    throw "caisson: ${what} selects `${selected.${variable}}` with `caisson.profiles.selected.${variable}`, and its profiles for that variable are ${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}."
+                else if builtins.length sharing == 1 then
+                  builtins.head sharing
+                else
+                  throw "caisson: ${what} activates several profiles chosen with `${variable}` (${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}). Set `caisson.profiles.selected.${variable}` to the one a shell runs when it sets no other.";
+            in
+            {
+              inherit chosen;
+              programs = unique (builtins.concatMap (entry: entry.manifest.outputs.profile.programs) sharing);
+            };
+        in
+        genAttrs variables choiceOf;
+
+      # The programs with which a configuration that activates profiles
+      # (`profileOf`) lets a shell choose among them: for each program,
+      # an executable of that name that runs the program of the profile
+      # the variable names, read each time it runs, and of `fallback`
+      # when the variable is unset. A configuration sets the variable to
+      # its default, a configuration declared inside it sets it to its
+      # own, and a shell can `export` another. `fallback` is shell text,
+      # which may name variables such as `$HOME`.
+      profileShimsOf =
+        {
+          pkgs,
+          variable,
+          programs,
+          fallback,
+        }:
+        pkgs.runCommand "caisson-profile-shims-${variable}" { } (
+          ''
+            mkdir -p "$out/bin"
+          ''
+          + builtins.concatStringsSep "" (
+            builtins.map (program: ''
+              cat > "$out/bin/${program}" <<'EOF'
+              #!${pkgs.runtimeShell}
+              exec "''${${variable}:-${fallback}}/bin/${program}" "$@"
+              EOF
+              chmod +x "$out/bin/${program}"
+            '') programs
+          )
+        );
+
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
       # How a configuration is published: the exports its manifest
@@ -1057,6 +1235,11 @@
             markerOf
             checksMarkerOf
             driftCheckOf
+            safeName
+            profileOf
+            profileShimsOf
+            profilesActivatedBy
+            profileChoicesOf
             mkEvaluation
             publish
             topValue

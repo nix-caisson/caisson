@@ -23,6 +23,10 @@
 # - The registered module `home-manager-activation` writes the
 #   systemd units that activate those homes on the machine.
 #
+# The registered module `profile-activation` activates the profile of
+# each nvf or nixvim configuration declared inside the machine, and
+# installs the programs with which a shell chooses among them.
+#
 # The registered module `activation-marker` writes a file on the
 # machine that names what the machine applied. Every configuration with
 # an activation declared inside the machine, a home among them, compares
@@ -42,6 +46,7 @@
         (mkModule ./caisson)
         closure-lib.caisson.modules.nixos.home-manager-activation
         closure-lib.caisson.modules.nixos.hjem-activation
+        closure-lib.caisson.modules.nixos.profile-activation
         closure-lib.caisson.modules.nixos.activation-marker
       ]
     else
