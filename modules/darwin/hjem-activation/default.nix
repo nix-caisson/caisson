@@ -87,6 +87,15 @@ let
     esac
   '';
 
+  # The start of the applications agent, which runs no hjem CLI: it
+  # exits for a user no hjem configuration here names.
+  requireUser = ''
+    case "$USER" in
+      ${lib.concatMapStringsSep " | " (user: lib.escapeShellArg user.user) users}) ;;
+      *) exit 0 ;;
+    esac
+  '';
+
   activateLabel = "org.hjem.activate";
   appsLabel = "org.nix.link-nix-apps";
 
@@ -180,7 +189,7 @@ in
               set -euo pipefail
 
               USER="$(id -un)"
-              ${selectUser}
+              ${requireUser}
               GROUP="$(id -gn)"
               DEST="$HOME/Applications/Nix User Apps"
               PROFILE="/etc/profiles/per-user/$USER"
