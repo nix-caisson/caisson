@@ -16,7 +16,8 @@
 # The output is `result`, the resources as a JSON file, which
 # `kubectl apply -f` reads; it is the `kubernetes.result` of kubenix's
 # `k8s` module, so a configuration that imports that module has it. A
-# configuration is published as `packages.<system>.<name>`, its result.
+# configuration is published as `kubenixConfigurations.<system>.<name>`,
+# the evaluation, whose `config.kubernetes.result` is the result.
 {
   mkLibOverlay,
   ...
@@ -155,11 +156,13 @@
         };
 
       # A kubenix configuration is published as
-      # `packages.<system>.<name>`, its result.
+      # `kubenixConfigurations.<system>.<name>`, the evaluation kubenix's
+      # `evalModules` returns, whose `config.kubernetes.result` is its
+      # result.
       exportsTo = {
-        attrset = "packages";
+        attrset = "kubenixConfigurations";
         bySystem = true;
-        value = manifest: manifest.outputs.result;
+        value = manifest: manifest.value;
       };
 
       configuration =
