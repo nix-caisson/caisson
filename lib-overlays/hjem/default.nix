@@ -2,7 +2,7 @@
 #
 # The hjem integration: it owns the `hjem` class, hjem's class for the
 # files and packages of a user. An hjem configuration is the home of a
-# user, evaluated at every system in force where it is declared.
+# user, evaluated per system, once for each system in force where it is declared.
 #
 # hjem itself evaluates a user only inside its NixOS and nix-darwin
 # modules, as a submodule of `hjem.users`; its standalone CLI evaluates

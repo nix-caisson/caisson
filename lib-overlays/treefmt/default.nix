@@ -3,7 +3,7 @@
 # The treefmt integration: it owns the `treefmt` class, the class of
 # treefmt-nix's modules. A treefmt configuration is the formatters of a
 # tree: `programs.<name>.enable` and `settings`, as treefmt-nix writes
-# them. It is evaluated at every system in force where it is declared,
+# them. It is evaluated per system, once for each system in force where it is declared,
 # on the package set selected for it.
 #
 # treefmt-nix evaluates its modules with `evalModules` on the library of
