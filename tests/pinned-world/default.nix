@@ -1563,8 +1563,11 @@ let
 
     # A system-manager configuration that is a top is its system, built
     # at the system of the evaluation, and its modules get the composed
-    # library. Declared under a structural top under the name `default`,
-    # it is published as `systemConfigs.default`, which
+    # library. It runs on the package set caisson selects, the set named
+    # `default`, and its userborn is built on that set. A configuration
+    # that sets `nixpkgs.overlays`, which that set leaves without effect,
+    # is refused. Declared under a structural top under the name
+    # `default`, it is published as `systemConfigs.default`, which
     # `system-manager switch --flake` reads when no name is given.
     systemManagerConfigEvaluatesEndToEnd =
       let
@@ -1578,6 +1581,16 @@ let
           ecosystemSrc = inputs.system-manager;
           configModule = module;
         };
+        withOverlay = hiveLib.caisson.system-manager.mkTopConfiguration {
+          ecosystemSrc = inputs.system-manager;
+          configModule = {
+            imports = [ module ];
+            nixpkgs.overlays = [ (_final: _prev: { }) ];
+          };
+        };
+        runsOn = system.config.nixpkgs.pkgs;
+        userborn =
+          (import "${inputs.system-manager.inputs.userborn}/nix/packages" { inherit pkgs; }).userborn;
         published = hiveLib.caisson.structural.mkTopConfiguration {
           moduleImports = _modules: [ ];
           configModule =
@@ -1598,6 +1611,13 @@ let
         (if builtins.isString platform then platform else platform.system) == "x86_64-linux"
       )
       && system.config.environment.etc.composed.text == "true"
+      # The pins make the nixpkgs of system-manager follow the nixpkgs
+      # of this suite, so a set system-manager built itself would have
+      # the same path and packages. Only the set the composition
+      # declares has the probe.
+      && (runsOn.pinnedWorldProbe or null) == "the set the composition declares"
+      && system.config.services.userborn.package.drvPath == userborn.drvPath
+      && !(builtins.tryEval withOverlay.drvPath).success
       && published.systemConfigs.default.drvPath == system.drvPath;
 
     # The ecosystem-args twins take the evaluator's arguments in
