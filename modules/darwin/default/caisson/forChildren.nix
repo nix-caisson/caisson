@@ -7,7 +7,7 @@
 # it through the options under `caisson.forChildren`. This file adds
 # the home-manager module `darwin-parent` to the modules that a home
 # declared inside this darwin configuration imports by default, and
-# the hjem module `darwin-parent` to those of an hjem configuration
+# the hjem module `darwin-parent` to those of a hjem configuration
 # declared inside it. Each sets the options that come from the machine:
 # the home directory from the account of the user, and for a home the
 # user ID and the Nix of the machine.

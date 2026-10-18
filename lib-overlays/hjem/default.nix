@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The hjem integration: it owns the `hjem` class, hjem's class for the
-# files and packages of a user. An hjem configuration is the home of a
+# files and packages of a user. A hjem configuration is the home of a
 # user, evaluated at every system in force where it is declared.
 #
 # hjem itself evaluates a user only inside its NixOS and nix-darwin
@@ -52,7 +52,7 @@
         context = "caisson.hjem";
       };
 
-      # An hjem source: the hjem flake or source tree, which holds the
+      # A hjem source: the hjem flake or source tree, which holds the
       # user module and hjem's library.
       assertHjemSrc =
         ecosystemSrc:
@@ -66,7 +66,7 @@
         then
           ecosystemSrc
         else
-          throw "${context} requires `ecosystemSrc` to be an hjem flake or source tree (holding modules/common/user.nix and lib.nix).";
+          throw "${context} requires `ecosystemSrc` to be a hjem flake or source tree (holding modules/common/user.nix and lib.nix).";
 
       # The manifest of an evaluated user, as hjem's OS modules write
       # it: version 3, with an entry for every enabled file of the
@@ -232,7 +232,7 @@
           };
         };
 
-      # An hjem configuration is published as
+      # A hjem configuration is published as
       # `hjemConfigurations.<name>`, with `manifest` and `packages`,
       # which is what `hjem standalone switch --flake` reads.
       exportsTo = {
@@ -242,7 +242,7 @@
         };
       };
 
-      # What a reader of a file gets from an hjem configuration that is
+      # What a reader of a file gets from a hjem configuration that is
       # a top: `manifest` and `packages`, which `hjem standalone switch
       # --config` reads, and the manifest of the evaluation under
       # `caisson.manifest`. hjem's CLI serializes the whole value with
@@ -273,7 +273,7 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "hjem";
-          # An hjem configuration is evaluated at a system: it has an
+          # A hjem configuration is evaluated at a system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;

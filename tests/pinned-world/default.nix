@@ -1411,7 +1411,7 @@ let
       && probe.configuration.config.nixpkgs.hostPlatform.system == "aarch64-darwin"
       && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
 
-    # A home and an hjem configuration inside a darwin machine take the
+    # A home and a hjem configuration inside a darwin machine take the
     # home directory and the user ID from the account the machine
     # declares, and the machine activates both. Its `postActivation`
     # step runs the activation of the home as the user, as
@@ -1457,7 +1457,7 @@ let
       && builtins.attrNames probe.top.homeConfigurations == [ "probe@family" ]
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
-    # An hjem configuration that is a top gives what hjem's standalone
+    # A hjem configuration that is a top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
     # with targets in the user's home directory, and the packages. The
     # manifest of the evaluation sits under `caisson.manifest`, behind an
@@ -1479,7 +1479,7 @@ let
       && builtins.toJSON top.caisson == builtins.toJSON "caisson manifest: read caisson.manifest"
       && top.caisson.manifest.type == "hjem";
 
-    # An hjem configuration inside a NixOS machine takes the home
+    # A hjem configuration inside a NixOS machine takes the home
     # directory of the account the machine declares, and its manifest is
     # the one hjem's own NixOS module makes from the same user module,
     # the systemd user unit of the user included. The machine activates
