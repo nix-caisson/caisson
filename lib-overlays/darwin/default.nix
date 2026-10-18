@@ -2,8 +2,8 @@
 #
 # The darwin integration: it owns the `darwin` class and evaluates it
 # with nix-darwin's `eval-config.nix`, over the composed library. A
-# darwin configuration is a macOS machine, evaluated at every system
-# in force where it is declared, as a NixOS configuration is, and
+# darwin configuration is a macOS machine, evaluated per system,
+# once for each system in force where it is declared, as a NixOS configuration is, and
 # published as `darwinConfigurations.<name>`, the value `darwin-rebuild`
 # reads: the evaluated configuration with its `system` beside it.
 #
@@ -159,11 +159,15 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "darwin";
-          # A darwin configuration is evaluated at a system: it has an
+          # A darwin configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A darwin configuration is activated on a machine; the
+          # configurations with an activation declared inside it check
+          # its marker.
+          activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate args;
         };
 

@@ -30,17 +30,25 @@
         (closure-lib.caisson.integrations.configurationsModuleFor [
           "caisson-colmena"
           "caisson-disko"
+          "caisson-facter"
           "colmena"
           "darwin"
           "disko"
+          "facter"
           "flake-parts"
           "hjem"
           "home-manager"
+          "kubenix"
+          "nixidy"
           "nixos"
           "nixpkgs"
+          "nixvim"
+          "nvf"
           "structural"
           "system-manager"
           "terranix"
+          "topology"
+          "treefmt"
         ])
       ]
     else

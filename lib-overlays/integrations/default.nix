@@ -226,7 +226,7 @@
 
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
-      # configuration at a system, as caisson-core.mkConfiguration
+      # configuration per system, as caisson-core.mkConfiguration
       # takes them. `evaluate` is the evaluator step of the
       # integration: it takes the view being evaluated, `{ lib,
       # manifest }`, and returns `value`, the evaluation as the
@@ -253,23 +253,49 @@
       # declared under: a function of `{ name, manifest }`, the name
       # the configuration is passed up under and its manifest,
       # returning `value`, the name to publish it under, and
-      # optionally `description`, a sentence saying what it did. It is
-      # recorded on the manifest, and applied where the configuration
-      # is passed up (`entriesOf`). Null for a configuration that is
-      # not published under a name.
+      # optionally `description`, a sentence saying what it did. It may
+      # carry `single`, for an output that holds the one configuration
+      # named `default`, and `bySystem`, for an output keyed by the
+      # system of each evaluation first (`packages.<system>.<name>`). It
+      # may carry `only`, a function of the manifest that says whether
+      # the configuration is published there at all; a configuration it
+      # leaves out is still passed up.
+      # `exportsTo` may also be a list of such exports, for an
+      # integration whose configurations are published in more than
+      # one output. It is recorded on the manifest, and applied where
+      # the configuration is passed up (`entriesOf`). Null for a
+      # configuration that is not published under a name.
+      #
+      # `activation` is given by an integration whose configurations
+      # are activated on a machine or for a user: NixOS, darwin and
+      # system-manager machines, homes, hjem configurations. It holds
+      # two functions of a manifest of the configuration. `identity`
+      # returns the store path that names what the activation applies,
+      # computed from the childless evaluation, or null where there is
+      # none. `standsAlone`, when true, says the configuration is
+      # applied on its own, as a machine is on its own host, so that it
+      # checks no configuration above it. `marker` returns the path of the file the activation
+      # writes that identity into, as shell text, which may name
+      # variables such as `$HOME`. It is recorded on the manifest. A
+      # configuration with an activation declared beneath one checks
+      # the marker of the nearest such configuration above it when it
+      # is activated (`driftCheckOf`). Null for a configuration that is
+      # not activated.
       mkModuleConfiguration =
         {
           type,
           perSystem ? false,
           defaultPkgs ? null,
           exportsTo ? null,
+          activation ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
-            // (if exportsTo == null then { } else { inherit exportsTo; });
+            // (if exportsTo == null then { } else { inherit exportsTo; })
+            // (if activation == null then { } else { inherit activation; });
           evaluate =
             view:
             let
@@ -459,7 +485,7 @@
               } child;
               # The integration of what was declared: of the
               # manifest, or of the evaluations of a configuration
-              # evaluated at a system, null where it has none.
+              # evaluated per system, null where it has none.
               declaredType =
                 if isManifest finalized then
                   finalized.type
@@ -544,25 +570,29 @@
           declared ? configurations && declared ? exported
         ) (builtins.attrNames (options.caisson or { }));
 
+      # Of `integrationsIn options`, the integrations whose
+      # `caisson.<integration>.configurations` a module of the evaluation
+      # defines: those whose highest priority is above the priority of
+      # an option default. The others hold no configurations, so neither
+      # their configurations nor their `exported` selector is read, which
+      # spares merging those options in every evaluation for every
+      # integration the evaluation could hold.
+      integrationsDeclaringIn =
+        options:
+        builtins.filter (name: options.caisson.${name}.configurations.highestPrio < 1500) (
+          integrationsIn options
+        );
+
       # The configurations an evaluated configuration declares beneath
       # it, by integration and then name, as the `children` an
       # integration's `evaluate` returns: the values of its
       # `caisson.<integration>.configurations` options, which finalize
       # each entry when read. An integration with none declared is left
-      # out. An option with no definition but its default, whose highest
-      # priority is the priority of an option default, is not read at
-      # all, which spares merging it in every evaluation for every
-      # integration the evaluation could hold.
+      # out.
       childrenOf =
         { options, config }:
-        let
-          optionDefaultPriority = 1500;
-          declaring = builtins.filter (
-            name: options.caisson.${name}.configurations.highestPrio < optionDefaultPriority
-          ) (integrationsIn options);
-        in
         filterAttrs (_: declared: declared != { }) (
-          genAttrs declaring (name: config.caisson.${name}.configurations)
+          genAttrs (integrationsDeclaringIn options) (name: config.caisson.${name}.configurations)
         );
 
       # The nearest configuration above `manifest` whose integration is
@@ -585,12 +615,343 @@
             found
         ) null types;
 
+      # The nearest configuration above `manifest` that has an
+      # activation (`mkModuleConfiguration`'s `activation`), as its
+      # childless manifest, or null when there is none. A home inside a
+      # NixOS machine finds the machine; an nvf configuration inside
+      # that home finds the home.
+      activatingAncestorOf =
+        manifest:
+        let
+          found = builtins.filter (ancestor: (ancestor.activation or null) != null) (
+            manifest.ancestors or [ ]
+          );
+        in
+        if found == [ ] then null else last found;
+
+      # The `activation` of a machine: a NixOS, darwin or system-manager
+      # configuration. Its identity is its system, `toplevel`, null for
+      # a configuration that builds none, as the nixos-minimal
+      # integration can produce. Its marker is a file under `/etc`,
+      # which the module `activation-marker` of its class writes.
+      #
+      # A machine is activated on its own host. A machine declared
+      # inside another, such as an image, is applied on a different host
+      # than the machine above, and the marker under `/etc` that it
+      # finds there is its own, so it checks nothing above it:
+      # `standsAlone`.
+      machineActivation = {
+        standsAlone = true;
+        identity =
+          manifest: if (manifest.outputs or { }) ? toplevel then manifest.outputs.toplevel.outPath else null;
+        marker = _manifest: "/etc/caisson/marker.json";
+      };
+
+      # The file name of the marker of a configuration activated for a
+      # user: the integration and the name the configuration is declared
+      # under, with the characters the shell would read inside double
+      # quotes, and the path separator, replaced.
+      markerFileName =
+        manifest:
+        "${manifest.type}-${
+          builtins.replaceStrings [ "/" "\"" "$" "`" "\\" ] [ "_" "_" "_" "_" "_" ] (
+            manifest.name or "default"
+          )
+        }.json";
+
+      # The digest a marker holds for an identity: the SHA-256 of its
+      # store path. Computing the store path evaluates the childless
+      # evaluation and builds nothing, and the digest refers to no store
+      # path, so a marker that holds it depends on nothing. The digest
+      # is compared, never read as a path.
+      digestOf = identity: builtins.hashString "sha256" identity;
+
+      # What the activation of the configuration of `manifest` writes
+      # into its marker: the digest of the identity of its childless
+      # evaluation (`digestOf`). `path` is the shell text of the path of
+      # the marker. Null when the configuration has no activation or no
+      # identity.
+      markerOf =
+        manifest:
+        let
+          activation = manifest.activation or null;
+          childless = manifest.childlessManifest or manifest;
+          identity = if activation == null then null else activation.identity childless;
+        in
+        if identity == null then
+          null
+        else
+          {
+            path = activation.marker childless;
+            identity = digestOf identity;
+            text = builtins.toJSON { identity = digestOf identity; };
+          };
+
+      # True when `entry`, an entry of `caisson.exports.configurations`
+      # of the configuration of `manifest`, checks the marker of that
+      # configuration when it is activated: the entry has an activation,
+      # and the configuration is the nearest one above it that has an
+      # activation.
+      checksMarkerOf =
+        manifest: entry:
+        let
+          ancestor = activatingAncestorOf entry.manifest;
+        in
+        (entry.manifest.activation or null) != null
+        && !(entry.manifest.activation.standsAlone or false)
+        && ancestor != null
+        && builtins.length (ancestor.ancestors or [ ]) == builtins.length (manifest.ancestors or [ ]);
+
+      # The shell text with which the activation of the configuration of
+      # `manifest` checks for drift: it compares the marker of the
+      # nearest configuration above with an activation against the
+      # identity of that configuration as this configuration was built
+      # for it, and prints a warning to standard error when the marker is
+      # missing or names another identity. It does not stop the
+      # activation. When that configuration activates this one, its
+      # marker already belongs to the generation being activated, and
+      # the check prints nothing. Empty when there is no such
+      # configuration, or it has no identity. `jq` is the path of a jq
+      # executable, and `optionText` names the option that turns the
+      # warning off, for the message.
+      driftCheckOf =
+        { jq, optionText }:
+        manifest:
+        let
+          ancestor =
+            if (manifest.activation.standsAlone or false) then null else activatingAncestorOf manifest;
+          expected = if ancestor == null then null else ancestor.activation.identity ancestor;
+          marker = ancestor.activation.marker ancestor;
+          above = "the ${ancestor.type} configuration `${ancestor.name or "(unnamed)"}`";
+          self = "the ${manifest.type} configuration `${manifest.name or "(unnamed)"}`";
+          # The digest of the identity, quoted for the shell. A digest is
+          # hexadecimal, so quoting it whole is enough.
+          escaped = "'${digestOf expected}'";
+        in
+        if expected == null then
+          ""
+        else
+          ''
+            _caissonMarker="${marker}"
+            if [ ! -f "$_caissonMarker" ]; then
+              echo "WARNING: $_caissonMarker does not exist." >&2
+              echo "  ${self} is declared inside ${above}," >&2
+              echo "  and the activation of ${above} has not recorded what it applied." >&2
+              echo "  Activate ${above} as this configuration was built with it," >&2
+              echo "  or set ${optionText} to false in ${self}." >&2
+            else
+              _caissonApplied="$(${jq} -r '.identity // empty' < "$_caissonMarker")"
+              if [ "$_caissonApplied" != ${escaped} ]; then
+                echo "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied." >&2
+                echo "  digest of the version applied (configurations declared inside it left out):" >&2
+                echo "    ''${_caissonApplied:-unknown}" >&2
+                echo "  digest of the version built for (configurations declared inside it left out):" >&2
+                echo "    "${escaped} >&2
+                echo "  Activate ${above} as this configuration was built with it," >&2
+                echo "  or set ${optionText} to false in ${self}." >&2
+              fi
+            fi
+          '';
+
+      # A name a configuration is declared under, with the characters
+      # the shell would read inside double quotes, and the path
+      # separator, replaced, for use in a path.
+      safeName =
+        name:
+        builtins.replaceStrings [ "/" "\"" "$" "`" "\\" ] [ "_" "_" "_" "_" "_" ] (
+          if name == null then "default" else name
+        );
+
+      # A configuration that is a program a person runs, such as a
+      # Neovim, kept in a Nix profile of its own, the way a home keeps
+      # its generations in the home-manager profile.
+      #
+      # `activationPackage` holds `activate`, which checks for drift
+      # against the nearest configuration above with an activation
+      # (`driftCheckOf`, when `warn`), and points the profile at
+      # `package` with `nix-env --profile`, which also makes the
+      # profile a garbage-collector root. When the profile already
+      # points at `package`, it changes nothing, so activating the same
+      # generation again adds no generation to the profile.
+      #
+      # Where the profile is depends on the configuration above. Inside
+      # a machine it is a profile of the system,
+      # `/nix/var/nix/profiles/caisson/<kind>/<name>`, which the machine
+      # activates as root. Inside a home or a hjem configuration, or as
+      # a top, it is a profile of the user,
+      # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
+      # names `$HOME` and not `$XDG_STATE_HOME`: the units of a machine
+      # run without `$XDG_STATE_HOME`, and a shell may set it, and the
+      # profile must be the same file for both. The
+      # configuration above activates it each time it is activated
+      # itself, so activating the configuration above puts the profile
+      # back to what that configuration declares.
+      #
+      # `profile` is what the configuration above reads from the
+      # manifest: the shell text of the path of the profile, whether it
+      # is a profile of the system or of the user, the `package` the
+      # profile points at, the `programs` the
+      # package has in `bin`, and `variable`, the name of the variable a
+      # shell sets to choose which profile of this sort it runs
+      # (`profileShimsOf`).
+      profileOf =
+        {
+          pkgs,
+          manifest,
+          kind,
+          package,
+          programs,
+          variable,
+          warn ? true,
+        }:
+        let
+          ancestor = activatingAncestorOf manifest;
+          ofSystem = ancestor != null && (ancestor.activation.standsAlone or false);
+          name = safeName (manifest.name or null);
+          path =
+            if ofSystem then
+              "/nix/var/nix/profiles/caisson/${kind}/${name}"
+            else
+              "$HOME/.local/state/caisson/profiles/${kind}/${name}";
+          check =
+            if warn then
+              driftCheckOf {
+                jq = "${pkgs.jq}/bin/jq";
+                optionText = "`caisson.drift.warn`";
+              } manifest
+            else
+              "";
+        in
+        {
+          activationPackage = pkgs.writeTextFile {
+            name = "${kind}-${name}-activation";
+            destination = "/activate";
+            executable = true;
+            text = ''
+              #!${pkgs.runtimeShell}
+              set -eu
+              ${check}
+              profile="${path}"
+              ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$profile")"
+              if [ "$(${pkgs.coreutils}/bin/readlink -f "$profile" 2>/dev/null || true)" != '${package}' ]; then
+                ${pkgs.nix}/bin/nix-env --profile "$profile" --set '${package}'
+              fi
+            '';
+          };
+          profile = {
+            inherit
+              path
+              programs
+              variable
+              kind
+              name
+              package
+              ;
+            scope = if ofSystem then "system" else "user";
+          };
+        };
+
+      # The entries of `caisson.exports.configurations` of the
+      # configuration of `manifest` that it activates as profiles
+      # (`profileOf`): those with a `profile`, evaluated for the system
+      # of the configuration, whose nearest configuration above with an
+      # activation is this one. A profile inside a home inside this
+      # machine is the home's to activate, and is left out.
+      profilesActivatedBy =
+        manifest: configurations:
+        builtins.filter (
+          entry:
+          (entry.manifest.outputs or { }) ? profile
+          && (entry.manifest.system or null) == (manifest.system or null)
+          && checksMarkerOf manifest entry
+        ) configurations;
+
+      # For each variable the profiles in `entries` are chosen with, the
+      # profile a configuration runs when a shell sets no other, and the
+      # programs of all of them. The profile is the one `selected` names
+      # for the variable, as `<kind>/<name>`, or the only one. `what`
+      # names the configuration, for the message when several profiles
+      # share a variable and `selected` names none of them.
+      profileChoicesOf =
+        { selected, what }:
+        entries:
+        let
+          variables = unique (builtins.map (entry: entry.manifest.outputs.profile.variable) entries);
+          choiceOf =
+            variable:
+            let
+              sharing = builtins.filter (entry: entry.manifest.outputs.profile.variable == variable) entries;
+              nameOf = entry: "${entry.manifest.outputs.profile.kind}/${entry.manifest.outputs.profile.name}";
+              named = builtins.filter (entry: nameOf entry == selected.${variable}) sharing;
+              chosen =
+                if selected ? ${variable} then
+                  if named != [ ] then
+                    builtins.head named
+                  else
+                    throw "caisson: ${what} selects `${selected.${variable}}` with `caisson.profiles.selected.${variable}`, and its profiles for that variable are ${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}."
+                else if builtins.length sharing == 1 then
+                  builtins.head sharing
+                else
+                  throw "caisson: ${what} activates several profiles chosen with `${variable}` (${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}). Set `caisson.profiles.selected.${variable}` to the one a shell runs when it sets no other.";
+            in
+            {
+              inherit chosen;
+              programs = unique (builtins.concatMap (entry: entry.manifest.outputs.profile.programs) sharing);
+            };
+        in
+        genAttrs variables choiceOf;
+
+      # The programs with which a configuration that activates profiles
+      # (`profileOf`) lets a shell choose among them: for each program,
+      # an executable of that name that runs the program of the profile
+      # the variable names, read each time it runs, and of `fallback`
+      # when the variable is unset. A configuration sets the variable to
+      # its default, a configuration declared inside it sets it to its
+      # own, and a shell can `export` another. `fallback` is shell text,
+      # which may name variables such as `$HOME`.
+      profileShimsOf =
+        {
+          pkgs,
+          variable,
+          programs,
+          fallback,
+        }:
+        pkgs.runCommand "caisson-profile-shims-${variable}" { } (
+          ''
+            mkdir -p "$out/bin"
+          ''
+          + builtins.concatStringsSep "" (
+            builtins.map (program: ''
+              cat > "$out/bin/${program}" <<'EOF'
+              #!${pkgs.runtimeShell}
+              exec "''${${variable}:-${fallback}}/bin/${program}" "$@"
+              EOF
+              chmod +x "$out/bin/${program}"
+            '') programs
+          )
+        );
+
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
-      # How a configuration is published: the `exportsTo` its
-      # manifest records, or null for a configuration that is not
-      # published under a name (structural, flake-parts).
-      exportsToOf = manifest: manifest.exportsTo or null;
+      # How a configuration is published: the exports its manifest
+      # records in `exportsTo`, as a list, empty for a configuration
+      # that is not published under a name (structural, flake-parts).
+      # An integration may give one export or a list of them; an export
+      # with `only` applies to the configurations whose manifest it
+      # holds true for.
+      exportsOf =
+        manifest:
+        let
+          recorded = manifest.exportsTo or null;
+          all =
+            if recorded == null then
+              [ ]
+            else if builtins.isList recorded then
+              recorded
+            else
+              [ recorded ];
+        in
+        builtins.filter (exportsTo: (exportsTo.only or (_: true)) manifest) all;
 
       showPath =
         path:
@@ -602,9 +963,8 @@
       # its path, on which the name its `exportsTo` gives, where it
       # gives one, stands in place of that name.
       entryOf =
-        prefix: manifest:
+        prefix: manifest: exportsTo:
         let
-          exportsTo = exportsToOf manifest;
           leaf = last prefix;
           named =
             if exportsTo ? name then
@@ -619,6 +979,8 @@
           inherit manifest;
           inherit (exportsTo) attrset;
           single = exportsTo.single or false;
+          bySystem = exportsTo.bySystem or false;
+          system = manifest.system or null;
           value = exportsTo.value manifest;
           path = init prefix ++ [
             (
@@ -648,8 +1010,9 @@
       # declared beneath it, nested ones included: for each, its
       # manifest, the output attribute set it is published under, the
       # value published, and its path from here, a list of
-      # `{ type, name }` segments. A configuration evaluated at a
-      # system has that system above its name on the path. `selected`
+      # `{ type, name }` segments. An evaluation of a configuration
+      # evaluated per system has its system above its name on the
+      # path. `selected`
       # is what each integration's `exported` selected, by integration
       # and then name, each value a manifest or the evaluations of a
       # configuration by system. A configuration whose manifest
@@ -692,7 +1055,7 @@
             in
             builtins.concatMap (
               { prefix, manifest }:
-              (if exportsToOf manifest == null then [ ] else [ (entryOf prefix manifest) ])
+              builtins.map (entryOf prefix manifest) (exportsOf manifest)
               ++ builtins.map (entry: entry // { path = prefix ++ entry.path; }) (
                 manifest.outputs.exports.configurations or [ ]
               )
@@ -712,6 +1075,12 @@
       # of the entry named `default`, the entry whose `exportsTo` says
       # `single`. Any other entry for that output is refused, since the
       # output has no names to hold it under.
+      #
+      # An output whose entries' `exportsTo` says `bySystem` is keyed by
+      # the system of each evaluation first, as flakes key `packages`
+      # and `formatter`: `<attrset>.<system>`, holding the entries
+      # evaluated at that system, named by the rules above over their
+      # paths without the systems on them, or the single value there.
       publish =
         entries:
         let
@@ -720,6 +1089,33 @@
             attrset:
             let
               members = builtins.filter (entry: entry.attrset == attrset) entries;
+              keyed = builtins.filter (entry: entry.bySystem or false) members;
+              systems = unique (builtins.map (entry: entry.system) keyed);
+              withoutSystems =
+                entry: entry // { path = builtins.filter (segment: segment.type != "system") entry.path; };
+            in
+            if keyed == [ ] then
+              publishMembers attrset members
+            else if builtins.length keyed != builtins.length members || builtins.elem null systems then
+              throw ''
+                ${attrset}: this output is keyed by system, and these configurations
+                would be published there without a system:
+                ${builtins.concatStringsSep "\n" (
+                  builtins.map (entry: "  ${showPath entry.path}") (
+                    builtins.filter (entry: !(entry.bySystem or false) || entry.system == null) members
+                  )
+                )}
+              ''
+            else
+              genAttrs systems (
+                system:
+                publishMembers "${attrset}.${system}" (
+                  builtins.map withoutSystems (builtins.filter (entry: entry.system == system) keyed)
+                )
+              );
+          publishMembers =
+            attrset: members:
+            let
               names = builtins.map displayName (
                 final.caisson-core.elide (builtins.map (entry: entry.path) members)
               );
@@ -761,7 +1157,7 @@
         genAttrs attrsets publishIn;
 
       # What a tool reads from a top that is a configuration evaluated
-      # at a system, given its evaluations by system. They are named
+      # per system, given its evaluations by system. They are named
       # like anything published, by `caisson-core.elide` over their
       # paths; the top is addressed by the file that returns it, so the
       # name of the top is left out of each. Where that leaves a single
@@ -831,7 +1227,19 @@
             entriesOf
             configurationsModuleFor
             integrationsIn
+            integrationsDeclaringIn
             nearestOf
+            activatingAncestorOf
+            machineActivation
+            markerFileName
+            markerOf
+            checksMarkerOf
+            driftCheckOf
+            safeName
+            profileOf
+            profileShimsOf
+            profilesActivatedBy
+            profileChoicesOf
             mkEvaluation
             publish
             topValue

@@ -122,8 +122,16 @@ let
     "caisson-colmena"
     "caisson-disko"
     "disko"
+    "caisson-facter"
+    "facter"
     "terranix"
     "system-manager"
+    "treefmt"
+    "nvf"
+    "nixvim"
+    "topology"
+    "kubenix"
+    "nixidy"
   ];
 
 in
@@ -1716,12 +1724,15 @@ in
       # Test compositions register caisson's real terranix integration
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
-      # registration.
+      # registration. A terranix configuration is evaluated at each
+      # system the composition declares, here one, so a top is the
+      # value of that evaluation: what the stub returns.
       mkResolutionLib =
         extra:
         caisson.mkLib (
           {
             sources = mockSources;
+            systems = [ "x86_64-linux" ];
             libOverlays = _lib: {
               terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
             };
@@ -1735,9 +1746,8 @@ in
           let
             myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "declared";
       };
@@ -1747,10 +1757,9 @@ in
           let
             myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             ecosystemSrc = terranixStub "explicit";
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "explicit";
       };
@@ -1764,9 +1773,8 @@ in
               };
             };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "input";
       };
@@ -1781,9 +1789,8 @@ in
               defaultEcosystemSrc.terranix = terranixStub "declared";
             };
           in
-          (myLib.caisson.terranix.mkConfiguration {
+          (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
-            pkgSets.pkgs = { };
           }).stubbed;
         expected = "declared";
       };
@@ -1791,9 +1798,8 @@ in
       "test: a full miss throws at the adapter" = {
         expr =
           builtins.tryEval
-            ((mkResolutionLib { }).caisson.terranix.mkConfiguration {
+            ((mkResolutionLib { }).caisson.terranix.mkTopConfiguration {
               configModule = { };
-              pkgSets.pkgs = { };
             }).stubbed;
         expected = {
           success = false;
@@ -2969,6 +2975,74 @@ in
         };
       };
 
+      # An output whose entries are keyed by system is published under
+      # the system of each entry first, and named within it from the
+      # path without its systems; with `single`, it holds the entry named
+      # `default` at each system. An entry with no system is refused
+      # there.
+      "test: an output keyed by system publishes each entry under its system" = {
+        expr =
+          let
+            entryAt =
+              system: name: extra:
+              {
+                attrset = "packages";
+                value = "${name} at ${system}";
+                manifest = { };
+                bySystem = true;
+                inherit system;
+                path = [
+                  {
+                    type = "system";
+                    name = system;
+                  }
+                  {
+                    type = "treefmt";
+                    inherit name;
+                  }
+                ];
+              }
+              // extra;
+            publish = myLib.caisson.integrations.publish;
+            refused = entries: !(builtins.tryEval (builtins.deepSeq (publish entries) true)).success;
+          in
+          {
+            named = publish [
+              (entryAt "x86_64-linux" "a" { })
+              (entryAt "x86_64-linux" "b" { })
+              (entryAt "aarch64-linux" "a" { })
+            ];
+            single = publish [
+              (entryAt "x86_64-linux" "default" {
+                attrset = "formatter";
+                single = true;
+              })
+              (entryAt "aarch64-linux" "default" {
+                attrset = "formatter";
+                single = true;
+              })
+            ];
+            withoutSystem = refused [
+              (entryAt "x86_64-linux" "a" { })
+              (entryAt "x86_64-linux" "b" { system = null; })
+            ];
+          };
+        expected = {
+          named.packages = {
+            x86_64-linux = {
+              a = "a at x86_64-linux";
+              b = "b at x86_64-linux";
+            };
+            aarch64-linux.a = "a at aarch64-linux";
+          };
+          single.formatter = {
+            x86_64-linux = "default at x86_64-linux";
+            aarch64-linux = "default at aarch64-linux";
+          };
+          withoutSystem = true;
+        };
+      };
+
       # A `lib` the caller passes in `specialArgs` takes precedence
       # over the `lib` the composition sets, the way every other special
       # argument does.
@@ -3934,21 +4008,22 @@ in
       };
 
       # A NixOS configuration with a home declared inside it writes the
-      # file `caisson-home-manager/source.json` under `/etc`. The file
-      # holds a store path. The store path is the system of the
-      # machine with the homes left out.
+      # file `caisson/marker.json` under `/etc`. The file holds the digest
+      # of the store path of the system of the machine with the
+      # configurations declared inside it left out.
       #
       # The stub of NixOS puts the number of system units into the
       # store path of a system. The machine `laptop` has one home, and
       # `laptop` declares the account of that home. The system of
-      # `laptop` therefore has one unit. The store path in the file
-      # must be the system with no units.
+      # `laptop` therefore has one unit. The digest in the file must be
+      # that of the system with no units.
       #
       # The machine `bare` has no home, and writes no file.
       #
       # The machine `outer` has a machine `image` declared inside it,
       # and `image` has a home. That home belongs to `image`. So
-      # `image` writes the file, and `outer` does not.
+      # `image` writes the file, and `outer` does not: `image` is
+      # applied on its own host, so it checks no marker of `outer`.
       "test: a NixOS configuration with homes records the system it runs without them" = {
         expr =
           let
@@ -3982,7 +4057,7 @@ in
                   };
                 };
             };
-            file = "caisson-home-manager/source.json";
+            file = "caisson/marker.json";
             recordOf =
               name:
               let
@@ -3999,13 +4074,13 @@ in
           };
         expected = {
           laptop = {
-            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
           };
           laptopBuilds = "/nix/store/stub-system-with-1-units";
           bare = null;
           outer = null;
           image = {
-            baseSystemOutPath = "/nix/store/stub-system-with-0-units";
+            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
           };
         };
       };
@@ -5292,11 +5367,12 @@ in
 
       # The entry points whose constructor returns a configuration take
       # `configModule` as optional: each finds the configuration
-      # registered under the name of the configuration. The nixos and
-      # home-manager entry points take no `pkgSets`: a NixOS
-      # configuration and a home take their package sets from the
-      # composition.
-      "test: every entry point takes configModule, optional where it is found by name, and pkgSets except on nixos and home-manager" =
+      # registered under the name of the configuration. The entry points
+      # of the configurations evaluated per system take no `pkgSets`:
+      # those configurations take their package sets from the
+      # composition. The structural, colmena, disko and flake-parts
+      # entry points take `pkgSets` and hand it to their modules.
+      "test: every entry point takes configModule, optional where it is found by name, and pkgSets where its configurations do not take sets from the composition" =
         {
           expr = builtins.listToAttrs (
             builtins.map (name: {
@@ -5316,6 +5392,16 @@ in
                     "hjem"
                     "home-manager"
                     "home-manager-minimal"
+                    "terranix"
+                    "system-manager"
+                    "caisson-facter"
+                    "facter"
+                    "treefmt"
+                    "nvf"
+                    "nixvim"
+                    "topology"
+                    "kubenix"
+                    "nixidy"
                   ];
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
@@ -5324,6 +5410,16 @@ in
                     "hjem"
                     "home-manager"
                     "home-manager-minimal"
+                    "terranix"
+                    "system-manager"
+                    "caisson-facter"
+                    "facter"
+                    "treefmt"
+                    "nvf"
+                    "nixvim"
+                    "topology"
+                    "kubenix"
+                    "nixidy"
                   ];
                 in
                 signature ? configModule

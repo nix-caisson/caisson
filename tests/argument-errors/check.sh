@@ -20,14 +20,10 @@ lib_expr="$1"
 shift
 flags=("$@")
 
-# Every entry point takes `configModule`. The structural, caisson-colmena,
-# caisson-disko, disko, flake-parts, nixos, nixos-minimal, darwin, hjem,
-# home-manager and home-manager-minimal entry points require nothing:
-# each finds the configuration registered under the name of the
-# configuration. The others require `configModule`, and take `pkgSets`,
-# which the nixos, darwin, hjem and home-manager entry points do not: a
-# NixOS configuration, a darwin configuration, an hjem configuration and
-# a home take their package sets from the composition.
+# Every entry point takes `configModule` and requires nothing: each
+# finds the configuration registered under the name of the
+# configuration. None takes `pkgSets`; the configurations take their
+# package sets from the composition.
 namespaces=(
   nixos
   nixos-minimal
@@ -40,8 +36,16 @@ namespaces=(
   caisson-colmena
   caisson-disko
   disko
+  caisson-facter
+  facter
   terranix
   system-manager
+  treefmt
+  nvf
+  nixvim
+  topology
+  kubenix
+  nixidy
 )
 
 failures=0
@@ -87,31 +91,14 @@ check() {
   fi
 }
 
-missing="function '[^']*%s' called without required argument '(configModule|pkgSets)'"
-
-# The arguments a call passes beside the wrong argument.
-given_for() {
-  case "$1" in
-    nixos | nixos-minimal | darwin | hjem | home-manager | home-manager-minimal) printf 'configModule = { };' ;;
-    *) printf 'configModule = { }; pkgSets.pkgs = { };' ;;
-  esac
-}
-requires_nothing() {
-  case "$1" in
-    structural | caisson-colmena | caisson-disko | disko | flake-parts | nixos | nixos-minimal | darwin | hjem | home-manager | home-manager-minimal) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 unexpected="function '[^']*%s' called with unexpected argument 'bogus'"
 
+# The arguments a call passes beside the wrong argument.
+given='configModule = { };'
+
 for ns in "${namespaces[@]}"; do
-  given=$(given_for "$ns")
   for fn in mkConfiguration mkConfigurationWithEcosystemArgs; do
     ep="lib.caisson.$ns.$fn"
-    if ! requires_nothing "$ns"; then
-      # shellcheck disable=SC2059
-      check "$ns.$fn { }" "$ep { }" "$(printf "$missing" "$fn")"
-    fi
     # shellcheck disable=SC2059
     check "$ns.$fn { bogus, ... }" \
       "$ep { bogus = 1; $given }" "$(printf "$unexpected" "$fn")"
@@ -138,6 +125,11 @@ check "nixos.mkConfiguration { pkgSets, ... }" \
 check "home-manager.mkConfiguration { pkgSets, ... }" \
   "lib.caisson.home-manager.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
   "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
+for ns in terranix system-manager; do
+  check "$ns.mkConfiguration { pkgSets, ... }" \
+    "lib.caisson.$ns.mkConfiguration { configModule = { }; pkgSets.pkgs = { }; }" \
+    "function '[^']*mkConfiguration' called with unexpected argument 'pkgSets'"
+done
 
 # The upstream-compatible colmena entry points take the hive in place of
 # `configModule`, and require it.

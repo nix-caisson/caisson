@@ -109,11 +109,15 @@
         variant: args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "nixos";
-          # A NixOS configuration is evaluated at a system: it has an
+          # A NixOS configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A NixOS configuration is activated on a machine; the
+          # configurations with an activation declared inside it check
+          # its marker.
+          activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate variant args;
         };
 
@@ -135,7 +139,7 @@
         # `mkTopConfiguration` finalizes it at a top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # configuration is evaluated at every system in force where it
+        # configuration is evaluated per system, once for each system in force where it
         # is declared, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.

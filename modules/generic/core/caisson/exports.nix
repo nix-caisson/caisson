@@ -13,7 +13,7 @@ in
   options.caisson.exports = {
 
     libOverlays = lib.mkOption {
-      type = lib.types.attrsOf types.libOverlay;
+      type = types.libOverlays;
       description = "The registered library overlays `caisson.libOverlays.exported` selected, merged with what lies beneath.";
     };
 
@@ -35,7 +35,7 @@ in
     };
 
     pkgOverlays = lib.mkOption {
-      type = lib.types.attrsOf types.pkgOverlay;
+      type = types.pkgOverlays;
       description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what lies beneath.";
     };
 

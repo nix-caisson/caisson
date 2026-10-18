@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The hjem integration: it owns the `hjem` class, hjem's class for the
-# files and packages of a user. An hjem configuration is the home of a
-# user, evaluated at every system in force where it is declared.
+# files and packages of a user. A hjem configuration is the home of a
+# user, evaluated per system, once for each system in force where it is declared.
 #
 # hjem itself evaluates a user only inside its NixOS and nix-darwin
 # modules, as a submodule of `hjem.users`; its standalone CLI evaluates
@@ -52,7 +52,7 @@
         context = "caisson.hjem";
       };
 
-      # An hjem source: the hjem flake or source tree, which holds the
+      # A hjem source: the hjem flake or source tree, which holds the
       # user module and hjem's library.
       assertHjemSrc =
         ecosystemSrc:
@@ -66,7 +66,7 @@
         then
           ecosystemSrc
         else
-          throw "${context} requires `ecosystemSrc` to be an hjem flake or source tree (holding modules/common/user.nix and lib.nix).";
+          throw "${context} requires `ecosystemSrc` to be a hjem flake or source tree (holding modules/common/user.nix and lib.nix).";
 
       # The manifest of an evaluated user, as hjem's OS modules write
       # it: version 3, with an entry for every enabled file of the
@@ -130,12 +130,15 @@
               null;
 
           # The machine the configuration is declared inside, when there
-          # is one: the childless evaluation of the nearest NixOS or
-          # darwin configuration above it, which hjem's modules receive
-          # as `osConfig`, null when there is none.
+          # is one: the childless evaluation of the nearest NixOS,
+          # darwin or system-manager configuration above it, which hjem's
+          # modules receive as `osConfig`, null when there is none. A
+          # system-manager evaluation is its system, with the
+          # configuration and the options in its `passthru`.
           machine = selection.nearestOf [
             "nixos"
             "darwin"
+            "system-manager"
           ] manifest;
           osConfig = if machine != null then machine.value.config else null;
 
@@ -143,10 +146,21 @@
           # `modules/nixos/systemd.nix`, which declares the user's
           # systemd units and links them into the user's files, with the
           # `utils` and the options of the machine. A configuration inside
-          # a NixOS machine that has `utils` gets the same; the minimal
-          # NixOS evaluator gives none.
-          machineArgs = if machine != null then (machine.value._module or { }).args or { } else { };
-          nixosUser = machine != null && machine.type == "nixos" && machineArgs ? utils;
+          # a NixOS or system-manager machine that has `utils` gets the
+          # same; the minimal NixOS evaluator gives none.
+          machineArgs =
+            if machine == null then
+              { }
+            else
+              (machine.value._module or { }).args
+                or (((machine.value.options or { })._module or { }).args.value or { });
+          nixosUser =
+            machine != null
+            && builtins.elem machine.type [
+              "nixos"
+              "system-manager"
+            ]
+            && machineArgs ? utils;
 
           # What hjem's OS modules set on a user that caisson sets too:
           # the user's name from the name the configuration is declared
@@ -232,7 +246,7 @@
           };
         };
 
-      # An hjem configuration is published as
+      # A hjem configuration is published as
       # `hjemConfigurations.<name>`, with `manifest` and `packages`,
       # which is what `hjem standalone switch --flake` reads.
       exportsTo = {
@@ -242,7 +256,7 @@
         };
       };
 
-      # What a reader of a file gets from an hjem configuration that is
+      # What a reader of a file gets from a hjem configuration that is
       # a top: `manifest` and `packages`, which `hjem standalone switch
       # --config` reads, and the manifest of the evaluation under
       # `caisson.manifest`. hjem's CLI serializes the whole value with
@@ -273,13 +287,29 @@
         args:
         final.caisson.integrations.mkModuleConfiguration {
           type = "hjem";
-          # An hjem configuration is evaluated at a system: it has an
+          # A hjem configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A hjem configuration is activated for its user. Its
+          # identity is its manifest file; its marker is a file in the
+          # directory of the user, which the hjem module
+          # `activation-marker` adds to the files of the configuration.
+          # The configurations with an activation declared inside it
+          # check the marker.
+          activation = {
+            identity = manifest: manifest.outputs.manifestFile.outPath;
+            marker =
+              manifest:
+              "${manifest.value.config.directory}/${markerDirectory}/${final.caisson.integrations.markerFileName manifest}";
+          };
           evaluate = evaluate args;
         };
+
+      # The directory, relative to the directory of the user, that holds
+      # the marker of a hjem configuration.
+      markerDirectory = ".local/state/caisson/markers";
 
       integration = final.caisson.integrations.mkIntegration {
         name = "hjem";

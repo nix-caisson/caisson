@@ -4,7 +4,7 @@
 # contributes the declared home-manager's library to the composition
 # as `lib.hm`, and evaluates the class over the composed library with
 # home-manager's module list. A home is a configuration: it is
-# evaluated at every system in force where it is declared, on the
+# evaluated per system, once for each system in force where it is declared, on the
 # package set in force there, and a top publishes it under
 # `homeConfigurations`.
 #
@@ -235,7 +235,8 @@
           };
 
           # The machine the home is declared inside, when there is one:
-          # the nearest NixOS or darwin configuration above the home, so
+          # the nearest NixOS, darwin or system-manager configuration
+          # above the home, so
           # a structural configuration between the two changes nothing.
           # The manifest holds the childless evaluation of that machine,
           # which is the evaluation that leaves out the configurations
@@ -476,6 +477,7 @@
       machineTypes = [
         "nixos"
         "darwin"
+        "system-manager"
       ];
 
       # A home is published as `homeConfigurations.<name>`, the
@@ -509,11 +511,22 @@
         variant: args:
         selection.mkModuleConfiguration {
           type = "home-manager";
-          # A home is evaluated at a system: it has an evaluation for
+          # A home is evaluated per system: it has an evaluation for
           # every system in force where it is declared.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # A home is activated for its user. Its identity is its
+          # activation package; its marker is a file under
+          # `$HOME/.local/state`, named by `$HOME` and not by
+          # `$XDG_STATE_HOME`, which a unit of the machine and a shell
+          # may see differently. The home-manager module
+          # `activation-marker` writes. The configurations with an
+          # activation declared inside the home check it.
+          activation = {
+            identity = manifest: manifest.outputs.activationPackage.outPath;
+            marker = manifest: "$HOME/.local/state/caisson/markers/${selection.markerFileName manifest}";
+          };
           evaluate = evaluation variant args;
         };
 
@@ -531,7 +544,7 @@
         # `caisson.home-manager.configurations.<name>` finalizes it,
         # and `mkTopConfiguration` finalizes it at a top.
         # `lib.caisson.home-manager-minimal` takes the same arguments.
-        # The home is evaluated at every system in force where it is
+        # The home is evaluated per system, once for each system in force where it is
         # declared, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.

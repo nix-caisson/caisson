@@ -3,7 +3,7 @@
 # A darwin module with which a macOS machine activates the hjem
 # configurations declared inside it.
 #
-# Activating an hjem configuration means applying its manifest with
+# Activating a hjem configuration means applying its manifest with
 # hjem's CLI. hjem has a nix-darwin module that does this for the users
 # it embeds, with a launchd agent, `org.hjem.activate`, that applies the
 # manifest of the user it runs for and keeps the state in
@@ -48,9 +48,14 @@ let
   isActivatedHere =
     entry:
     entry.manifest.type == "hjem"
-    && !(builtins.any (segment: segment.type == "nixos" || segment.type == "darwin") (
-      lib.lists.init entry.path
-    ))
+    && !(builtins.any (
+      segment:
+      builtins.elem segment.type [
+        "nixos"
+        "darwin"
+        "system-manager"
+      ]
+    ) (lib.lists.init entry.path))
     && entry.manifest.system == evalManifest.system;
 
   users =
