@@ -20,7 +20,8 @@
 # takes a source tree and builds a derivation that fails when the tree
 # is not formatted. The configuration declared under the name `default`
 # is published as `formatter.<system>`, its wrapper, which `nix fmt`
-# reads.
+# reads, and as `checks.<system>.treefmt`, its check over the root of
+# the tree (`mkLib`'s `root`), which `nix flake check` builds.
 {
   mkLibOverlay,
   ...
@@ -138,14 +139,31 @@
           };
         };
 
-      # The configuration named `default` is published as
-      # `formatter.<system>`, which `nix fmt` reads.
-      exportsTo = {
-        attrset = "formatter";
-        single = true;
-        bySystem = true;
-        value = manifest: manifest.outputs.wrapper;
-      };
+      # Only the configuration named `default` is published: as
+      # `formatter.<system>`, its wrapper, which `nix fmt` reads, and,
+      # in a tree that knows its root, as `checks.<system>.treefmt`,
+      # its check over that tree, which fails `nix flake check` when
+      # the tree is not formatted.
+      isDefault = manifest: (manifest.name or null) == "default";
+      exportsTo = [
+        {
+          attrset = "formatter";
+          single = true;
+          bySystem = true;
+          only = isDefault;
+          value = manifest: manifest.outputs.wrapper;
+        }
+        {
+          attrset = "checks";
+          bySystem = true;
+          only = manifest: isDefault manifest && (manifest.root or null) != null;
+          name = _: {
+            value = "treefmt";
+            description = "named `treefmt`, the check of the configuration named `default`";
+          };
+          value = manifest: manifest.outputs.check manifest.root;
+        }
+      ];
 
       configuration =
         args:

@@ -256,10 +256,15 @@
       # optionally `description`, a sentence saying what it did. It may
       # carry `single`, for an output that holds the one configuration
       # named `default`, and `bySystem`, for an output keyed by the
-      # system of each evaluation first (`packages.<system>.<name>`). It is
-      # recorded on the manifest, and applied where the configuration
-      # is passed up (`entriesOf`). Null for a configuration that is
-      # not published under a name.
+      # system of each evaluation first (`packages.<system>.<name>`). It
+      # may carry `only`, a function of the manifest that says whether
+      # the configuration is published there at all; a configuration it
+      # leaves out is still passed up.
+      # `exportsTo` may also be a list of such exports, for an
+      # integration whose configurations are published in more than
+      # one output. It is recorded on the manifest, and applied where
+      # the configuration is passed up (`entriesOf`). Null for a
+      # configuration that is not published under a name.
       mkModuleConfiguration =
         {
           type,
@@ -594,10 +599,25 @@
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
-      # How a configuration is published: the `exportsTo` its
-      # manifest records, or null for a configuration that is not
-      # published under a name (structural, flake-parts).
-      exportsToOf = manifest: manifest.exportsTo or null;
+      # How a configuration is published: the exports its manifest
+      # records in `exportsTo`, as a list, empty for a configuration
+      # that is not published under a name (structural, flake-parts).
+      # An integration may give one export or a list of them; an export
+      # with `only` applies to the configurations whose manifest it
+      # holds true for.
+      exportsOf =
+        manifest:
+        let
+          recorded = manifest.exportsTo or null;
+          all =
+            if recorded == null then
+              [ ]
+            else if builtins.isList recorded then
+              recorded
+            else
+              [ recorded ];
+        in
+        builtins.filter (exportsTo: (exportsTo.only or (_: true)) manifest) all;
 
       showPath =
         path:
@@ -609,9 +629,8 @@
       # its path, on which the name its `exportsTo` gives, where it
       # gives one, stands in place of that name.
       entryOf =
-        prefix: manifest:
+        prefix: manifest: exportsTo:
         let
-          exportsTo = exportsToOf manifest;
           leaf = last prefix;
           named =
             if exportsTo ? name then
@@ -701,7 +720,7 @@
             in
             builtins.concatMap (
               { prefix, manifest }:
-              (if exportsToOf manifest == null then [ ] else [ (entryOf prefix manifest) ])
+              builtins.map (entryOf prefix manifest) (exportsOf manifest)
               ++ builtins.map (entry: entry // { path = prefix ++ entry.path; }) (
                 manifest.outputs.exports.configurations or [ ]
               )
