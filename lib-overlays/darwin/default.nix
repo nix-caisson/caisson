@@ -2,8 +2,8 @@
 #
 # The darwin integration: it owns the `darwin` class and evaluates it
 # with nix-darwin's `eval-config.nix`, over the composed library. A
-# darwin configuration is a macOS machine, evaluated at every system
-# in force where it is declared, as a NixOS configuration is, and
+# darwin configuration is a macOS machine, evaluated per system,
+# once for each system in force where it is declared, as a NixOS configuration is, and
 # published as `darwinConfigurations.<name>`, the value `darwin-rebuild`
 # reads: the evaluated configuration with its `system` beside it.
 #

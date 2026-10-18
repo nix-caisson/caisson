@@ -3,7 +3,7 @@
 # The terranix integration: it owns the `terranix` class and
 # evaluates it with `terranixConfiguration` from the terranix flake. A
 # terranix configuration is a Terraform configuration written as
-# modules, evaluated at every system in force where it is declared,
+# modules, evaluated per system, once for each system in force where it is declared,
 # on the package set selected for it.
 #
 # Its output is `json`, the `config.tf.json` file Terraform reads,

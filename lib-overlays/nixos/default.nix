@@ -135,7 +135,7 @@
         # `mkTopConfiguration` finalizes it at a top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # configuration is evaluated at every system in force where it
+        # configuration is evaluated per system, once for each system in force where it
         # is declared, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.
