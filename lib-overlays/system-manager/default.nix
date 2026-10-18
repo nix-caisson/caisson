@@ -3,19 +3,35 @@
 # The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
 # system-manager flake. A system-manager configuration is the system
-# of a machine running another Linux distribution, evaluated at every
-# system in force where it is declared, and published as
+# of a machine running another Linux distribution, evaluated per
+# system, once for each system in force where it is declared, and
+# published as
 # `systemConfigs.<name>`, the system `system-manager switch --flake`
 # reads.
 #
-# system-manager builds its package set itself, from the nixpkgs its
-# flake pins, at `nixpkgs.hostPlatform`, which caisson defaults to the
-# system of the evaluation. The package sets of the composition at
-# that system reach the modules as the `pkgSets` argument, and the
-# composed library as the `lib` argument. `makeSystemConfig` runs its
-# own module system on its own library, so `lib` in the modules is
-# the composed library while system-manager merges and checks the
-# options with its own.
+# A system-manager configuration runs on the package set selected for
+# it (`defaultPkgs`, else the set named `default`), as every other
+# integration does, and on the nixpkgs the composition declares, as a
+# NixOS configuration does. system-manager's flake publishes
+# `makeSystemConfig` from `nix/lib.nix` called with the nixpkgs it pins;
+# caisson calls the same file with the composition's nixpkgs and the
+# composed library, as the NixOS integration calls
+# `nixos/lib/eval-config.nix`, so the library, the NixOS modules
+# system-manager imports and the evaluation all come from there.
+#
+# `makeSystemConfig` makes `pkgs` itself, as a `_module.args` entry that
+# imports its nixpkgs, and declares `nixpkgs.pkgs` read-only with that
+# argument as its default. caisson hands the selected set in as the
+# `pkgs` special argument instead. The module system takes a special
+# argument before `_module.args`, so the selected set is the `pkgs` of
+# every module and `nixpkgs.pkgs`. `userborn`, which `makeSystemConfig` takes from the
+# userborn flake system-manager pins, is built from that same source on
+# the selected set. The options `nixpkgs.overlays` and `nixpkgs.config`
+# would then change nothing, so a configuration that sets them is
+# refused, as one whose `nixpkgs.hostPlatform` differs from the system
+# of the selected set is; package configs and package overlays are
+# declared on `mkLib`. The package sets of the composition at the
+# system reach the modules as the `pkgSets` argument.
 {
   mkLibOverlay,
   ...
@@ -42,15 +58,28 @@
         context = "caisson.system-manager";
       };
 
+      # The nixpkgs the evaluation runs on: the one the composition
+      # declares, as for a NixOS configuration.
+      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
+        name = "nixpkgs";
+        context = "caisson.system-manager";
+      };
+
+      # A system-manager source: the system-manager flake, which holds
+      # `nix/lib.nix` and pins the userborn flake its modules run.
       assertSystemManagerEcosystemSrc =
         ecosystemSrc:
-        if ecosystemSrc ? lib && ecosystemSrc.lib ? makeSystemConfig then
+        if
+          builtins.isAttrs ecosystemSrc
+          && (ecosystemSrc.inputs or { }) ? userborn
+          && builtins.pathExists "${ecosystemSrc}/nix/lib.nix"
+        then
           ecosystemSrc
         else
-          throw "${context} requires `ecosystemSrc.lib.makeSystemConfig`.";
+          throw "${context} requires `ecosystemSrc` to be the system-manager flake (with its inputs, holding nix/lib.nix).";
 
       # system-manager imports selected NixOS modules from the nixpkgs
-      # input pinned in its flake; current nixos-unstable restructured
+      # the evaluation runs on; current nixos-unstable restructured
       # nixos/modules/config/nix.nix in ways system-manager's module set
       # does not absorb. They are bridged here, where every
       # system-manager evaluation composes. Delete the bridge when
@@ -58,10 +87,9 @@
       # (duplicate declaration / unused disable) when its reason
       # disappears.
       compatModulesFor =
-        src:
+        { src, nixpkgsSrc }:
         let
-          smNixpkgs = src.inputs.nixpkgs;
-          nixosNixModuleText = builtins.readFile "${smNixpkgs}/nixos/modules/config/nix.nix";
+          nixosNixModuleText = builtins.readFile "${nixpkgsSrc}/nixos/modules/config/nix.nix";
 
           # (1) That module now defines `services.displayManager.hiddenUsers`
           # (hiding nixbld users from display managers), an option nothing
@@ -130,9 +158,10 @@
       # `makeSystemConfig` over the framework modules, the selection,
       # the configuration's module and the bridge, at the
       # configuration's system. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last; everything
-      # `makeSystemConfig` takes (modules, overlays, specialArgs,
-      # allowUnsupportedNixpkgs) can be set or replaced there.
+      # pattern admits, is merged over the call last; `modules`,
+      # `specialArgs` and `allowUnsupportedNixpkgs` can be set or
+      # replaced there. `overlays` is refused: the selected set is the
+      # package set, so an overlay passed there would change nothing.
       evaluate =
         args:
         { lib, manifest }:
@@ -152,8 +181,29 @@
               "this system-manager configuration at ${system}";
 
           # The package sets available to the configuration, each at the
-          # system of the evaluation.
+          # system of the evaluation, and the set it runs on: the
+          # selection in force at its manifest, applied to those.
           pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
+
+          nixpkgsSrc = resolveNixpkgsSrc {
+            explicit = null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+
+          # `makeSystemConfig` from system-manager's `nix/lib.nix`, called
+          # as system-manager's flake calls it, with the composition's
+          # nixpkgs and the composed library in place of its own.
+          systemManagerLib = import "${src}/nix/lib.nix" {
+            nixpkgs = nixpkgsSrc;
+            inherit lib;
+            inherit (src.inputs) userborn;
+          };
+
+          # The userborn system-manager pins, built on the selected set.
+          userborn = (import "${src.inputs.userborn}/nix/packages" { inherit pkgs; }).userborn;
+
+          ecosystemArgs = if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { };
 
           registry = lib.caisson.modules.systemManager or { };
           frameworkModules = selection.frameworkModules "systemManager" registry;
@@ -171,28 +221,59 @@
             else
               null;
 
+          # The platform of the selected set, and the refusals of what
+          # the selected set makes ineffective.
           systemModule =
-            { lib, ... }:
+            { config, lib, ... }:
             {
               _file = "caisson-system-manager:system";
-              nixpkgs.hostPlatform = lib.mkDefault system;
+              nixpkgs.hostPlatform = lib.mkDefault pkgs.stdenv.hostPlatform.system;
+              assertions = [
+                {
+                  assertion = config.nixpkgs.overlays == [ ] && config.nixpkgs.config == { };
+                  message = "caisson: ${what} sets `nixpkgs.overlays` or `nixpkgs.config`, which have no effect: it runs on the package set caisson selects. Declare package configs and package overlays on `mkLib`, and select a set with `defaultPkgs`.";
+                }
+                {
+                  assertion =
+                    (
+                      if builtins.isString config.nixpkgs.hostPlatform then
+                        config.nixpkgs.hostPlatform
+                      else
+                        config.nixpkgs.hostPlatform.system or null
+                    ) == pkgs.stdenv.hostPlatform.system;
+                  message = "caisson: ${what} sets `nixpkgs.hostPlatform` to a platform other than that of the package set it runs on, ${pkgs.stdenv.hostPlatform.system}.";
+                }
+              ];
             };
 
-          value = src.lib.makeSystemConfig (
-            {
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [ systemModule ]
-                ++ compatModulesFor src;
-              specialArgs = {
-                inherit lib pkgSets;
-              }
-              // (if (args.specialArgs or null) != null then args.specialArgs else { });
-            }
-            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
-          );
+          value =
+            if (ecosystemArgs.overlays or [ ]) != [ ] then
+              throw "${context}: ${what} passes `overlays` in `ecosystemArgs`, which have no effect: it runs on the package set caisson selects. Declare package overlays on `mkLib`."
+            else
+              systemManagerLib.makeSystemConfig (
+                {
+                  modules =
+                    frameworkModules
+                    ++ moduleImports registry
+                    ++ (if configModule == null then [ ] else [ configModule ])
+                    ++ [ systemModule ]
+                    ++ compatModulesFor { inherit src nixpkgsSrc; };
+                  # The module system takes a special argument before an
+                  # entry of `_module.args`, so `pkgs` and `userborn`
+                  # here are the ones every module receives, and the
+                  # default of the read-only `nixpkgs.pkgs`.
+                  specialArgs = {
+                    inherit
+                      lib
+                      pkgSets
+                      pkgs
+                      userborn
+                      ;
+                  }
+                  // (if (args.specialArgs or null) != null then args.specialArgs else { });
+                }
+                // ecosystemArgs
+              );
         in
         {
           inherit value;
@@ -216,7 +297,7 @@
           # has an evaluation for every system in force where it is
           # declared.
           perSystem = true;
-          defaultPkgs = null;
+          defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
           evaluate = evaluate args;
         };
@@ -231,8 +312,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.system-manager.configurations.<name>` finalizes it,
-        # and `mkTopConfiguration` finalizes it at a top. system-manager
-        # builds its own package set, so there is no `defaultPkgs`.
+        # and `mkTopConfiguration` finalizes it at a top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -244,6 +324,13 @@
             # The system-manager flake; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
+            # The package set the configuration runs on: a function
+            # that receives the package sets available where it is
+            # declared, by package config name, each at the system of
+            # the evaluation, and returns the set to run on. When
+            # absent, the selection of the nearest configuration above,
+            # and the set named `default` where none above selects.
+            defaultPkgs ? null,
             # The selection over the systemManager class of the
             # registry. It replaces the default of the class, which is
             # every entry named `default` followed by what the
@@ -262,6 +349,7 @@
           {
             configModule ? null,
             ecosystemSrc ? null,
+            defaultPkgs ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
