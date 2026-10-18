@@ -1893,9 +1893,11 @@ let
       && builtins.elem "alpha" (builtins.attrNames topology.config.nodes)
       && topology.config.output.drvPath == upstream.config.output.drvPath;
 
-    # A kubenix configuration is published as `packages.<system>.<name>`,
-    # its result, which is the result kubenix's own `evalModules` gives
-    # the same module on the same package set.
+    # A kubenix configuration is published as
+    # `kubenixConfigurations.<system>.<name>`, its evaluation, whose
+    # result is the result kubenix's own `evalModules` gives the same
+    # module on the same package set. Nothing is published in
+    # `packages`, the package scope of the project itself.
     kubenixIsTheResultKubenixBuilds =
       let
         module =
@@ -1917,7 +1919,9 @@ let
         };
         upstream = import "${inputs.kubenix}/lib/eval-modules.nix" { inherit pkgs; } { inherit module; };
       in
-      top.packages.x86_64-linux.cluster.drvPath == upstream.config.kubernetes.result.drvPath;
+      top.kubenixConfigurations.x86_64-linux.cluster.config.kubernetes.result.drvPath
+      == upstream.config.kubernetes.result.drvPath
+      && !(top ? packages);
 
     # A nixidy configuration is published as
     # `nixidyEnvs.<system>.<name>`, and its rendered environment is the
