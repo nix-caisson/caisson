@@ -292,7 +292,7 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # An hjem configuration is activated for its user. Its
+          # A hjem configuration is activated for its user. Its
           # identity is its manifest file; its marker is a file in the
           # directory of the user, which the hjem module
           # `activation-marker` adds to the files of the configuration.
@@ -308,7 +308,7 @@
         };
 
       # The directory, relative to the directory of the user, that holds
-      # the marker of an hjem configuration.
+      # the marker of a hjem configuration.
       markerDirectory = ".local/state/caisson/markers";
 
       integration = final.caisson.integrations.mkIntegration {
