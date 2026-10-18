@@ -1636,32 +1636,74 @@ let
     # published as `formatter.<system>`, and its wrapper is the
     # derivation treefmt-nix's own `mkWrapper` builds from the same
     # module on the same package set. Its outputs carry the
-    # configuration file and the check over a source tree.
+    # configuration file and the check over a source tree. In a tree
+    # that knows its root, its check over the root is published as
+    # `checks.<system>.treefmt`; a tree without a root publishes no
+    # check. A configuration under another name is published nowhere,
+    # and is found through the manifest.
     treefmtIsTheFormatterTreefmtNixBuilds =
       let
         module = {
           projectRootFile = "flake.nix";
           programs.nixfmt.enable = true;
         };
-        top = hiveLib.caisson.structural.mkTopConfiguration {
-          moduleImports = _modules: [ ];
-          configModule =
-            { lib, ... }:
-            {
-              caisson.treefmt.configurations.default = lib.caisson.treefmt.mkConfiguration {
-                ecosystemSrc = inputs.treefmt-nix;
-                configModule = module;
+        declares =
+          { lib, ... }:
+          {
+            caisson.treefmt.configurations.default = lib.caisson.treefmt.mkConfiguration {
+              ecosystemSrc = inputs.treefmt-nix;
+              configModule = module;
+            };
+            caisson.treefmt.configurations.docs = lib.caisson.treefmt.mkConfiguration {
+              ecosystemSrc = inputs.treefmt-nix;
+              configModule = {
+                projectRootFile = "book.toml";
+                programs.nixfmt.enable = true;
               };
             };
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = declares;
         };
-        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.treefmt.default;
+        root = {
+          outPath = ./.;
+        };
+        rootedLib = core.mkLib (
+          declaresPkgs
+          // {
+            sources = { };
+            inherit root;
+            projects.caisson = inputs.caisson;
+            defaultEcosystemSrc = {
+              inherit (inputs) nixpkgs;
+            };
+          }
+        );
+        rooted = rootedLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = declares;
+        };
+        children = top.caisson.manifest.children.system.x86_64-linux.children.treefmt;
+        evaluation = children.default;
+        rootedEvaluation = rooted.caisson.manifest.children.system.x86_64-linux.children.treefmt.default;
         upstream = inputs.treefmt-nix.lib.mkWrapper pkgs module;
       in
       builtins.attrNames top.formatter == [ "x86_64-linux" ]
       && top.formatter.x86_64-linux.drvPath == upstream.drvPath
       && evaluation.outputs.programs ? nixfmt
       && builtins.isString evaluation.outputs.configFile.drvPath
-      && builtins.isString (evaluation.outputs.check ./.).drvPath;
+      && builtins.isString (evaluation.outputs.check ./.).drvPath
+      # The tree without a root publishes no check; the tree with one
+      # publishes the check of `default` over it, and nothing else.
+      && !(top ? checks)
+      && builtins.attrNames rooted.checks == [ "x86_64-linux" ]
+      && builtins.attrNames rooted.checks.x86_64-linux == [ "treefmt" ]
+      && rooted.checks.x86_64-linux.treefmt.drvPath == (rootedEvaluation.outputs.check root).drvPath
+      && rooted.formatter.x86_64-linux.drvPath == upstream.drvPath
+      # The configuration `docs` is evaluated, and only the manifest
+      # holds it.
+      && builtins.isString children.docs.outputs.wrapper.drvPath;
 
     # A terranix configuration that is a top is its `config.tf.json`
     # file, built from the package set of the composition with the
