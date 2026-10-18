@@ -2,8 +2,8 @@
 #
 # The nixvim integration: it owns the `nixvim` class, the class of
 # nixvim's modules. A nixvim configuration is a Neovim, written as
-# nixvim modules (`plugins.*`, `opts`, `keymaps`), evaluated at every
-# system in force where it is declared, on the package set selected for
+# nixvim modules (`plugins.*`, `opts`, `keymaps`), evaluated per
+# system, once for each system in force where it is declared, on the package set selected for
 # it.
 #
 # nixvim evaluates its modules with `evalNixvim`: `evalModules` over

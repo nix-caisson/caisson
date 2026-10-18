@@ -4,7 +4,7 @@
 # kubenix's modules. A kubenix configuration is a set of Kubernetes
 # resources written as kubenix modules, which import the kubenix modules
 # they use from the `kubenix` argument (`kubenix.modules.k8s`). It is
-# evaluated at every system in force where it is declared, on the
+# evaluated per system, once for each system in force where it is declared, on the
 # package set selected for it.
 #
 # kubenix evaluates its modules with its `evalModules`: `evalModules` on

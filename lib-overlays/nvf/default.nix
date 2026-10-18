@@ -2,7 +2,7 @@
 #
 # The nvf integration: it owns the `nvf` class, the class of nvf's
 # modules. An nvf configuration is a Neovim, written as nvf modules
-# (`vim.*`), evaluated at every system in force where it is declared,
+# (`vim.*`), evaluated per system, once for each system in force where it is declared,
 # on the package set selected for it.
 #
 # nvf evaluates its modules with `neovimConfiguration`, on nixpkgs'

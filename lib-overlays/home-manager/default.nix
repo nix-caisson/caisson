@@ -4,7 +4,7 @@
 # contributes the declared home-manager's library to the composition
 # as `lib.hm`, and evaluates the class over the composed library with
 # home-manager's module list. A home is a configuration: it is
-# evaluated at every system in force where it is declared, on the
+# evaluated per system, once for each system in force where it is declared, on the
 # package set in force there, and a top publishes it under
 # `homeConfigurations`.
 #
@@ -544,7 +544,7 @@
         # `caisson.home-manager.configurations.<name>` finalizes it,
         # and `mkTopConfiguration` finalizes it at a top.
         # `lib.caisson.home-manager-minimal` takes the same arguments.
-        # The home is evaluated at every system in force where it is
+        # The home is evaluated per system, once for each system in force where it is
         # declared, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.

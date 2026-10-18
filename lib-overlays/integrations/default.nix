@@ -991,8 +991,9 @@
       # declared beneath it, nested ones included: for each, its
       # manifest, the output attribute set it is published under, the
       # value published, and its path from here, a list of
-      # `{ type, name }` segments. A configuration evaluated at a
-      # system has that system above its name on the path. `selected`
+      # `{ type, name }` segments. An evaluation of a configuration
+      # evaluated per system has its system above its name on the
+      # path. `selected`
       # is what each integration's `exported` selected, by integration
       # and then name, each value a manifest or the evaluations of a
       # configuration by system. A configuration whose manifest

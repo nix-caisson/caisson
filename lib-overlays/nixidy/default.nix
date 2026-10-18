@@ -3,7 +3,7 @@
 # The nixidy integration: it owns the `nixidy` class, the class of
 # nixidy's modules. A nixidy configuration is an environment of Argo CD
 # applications, written as nixidy modules (`applications.*`,
-# `nixidy.target`). It is evaluated at every system in force where it
+# `nixidy.target`). It is evaluated per system, once for each system in force where it
 # is declared, on the package set selected for it.
 #
 # caisson evaluates it with nixidy's own `mkEnv`, the function the
