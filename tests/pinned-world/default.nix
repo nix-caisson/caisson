@@ -1709,8 +1709,9 @@ let
       # holds it.
       && builtins.isString children.docs.outputs.wrapper.drvPath;
 
-    # An nvf configuration is published as `packages.<system>.<name>`,
-    # and its Neovim is the one nvf's own `neovimConfiguration` builds
+    # An nvf configuration is published as
+    # `nvfConfigurations.<system>.<name>`, and its Neovim is the one
+    # nvf's own `neovimConfiguration` builds
     # from the same module on the same package set. A NixOS machine and
     # a home with an nvf configuration declared inside them install that
     # Neovim.
@@ -1763,8 +1764,15 @@ let
             modules = [ module ];
           }).neovim;
         drvPaths = packages: builtins.map (package: package.drvPath) packages;
+        published = top.nvfConfigurations.x86_64-linux.editor;
       in
-      top.packages.x86_64-linux.editor.drvPath == upstream.drvPath
+      # The configuration is published in the shape `neovimConfiguration`
+      # returns, and nothing is published in `packages`, the package
+      # scope of the project itself.
+      published.neovim.drvPath == upstream.drvPath
+      && published.config.vim.viAlias
+      && published.options ? vim
+      && !(top ? packages)
       && builtins.elem upstream.drvPath (
         drvPaths top.nixosConfigurations.workstation.config.environment.systemPackages
       )

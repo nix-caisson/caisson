@@ -15,7 +15,9 @@
 #
 # The output is `neovim`, the wrapped Neovim, the `neovim` that
 # `neovimConfiguration` returns. A configuration is published as
-# `packages.<system>.<name>`. A home, an hjem configuration or a NixOS
+# `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration`
+# returns: `neovim`, `config` and `options`. `packages` is the package
+# scope of the project itself, and caisson publishes nothing there. A home, an hjem configuration or a NixOS
 # configuration installs the Neovim of an nvf configuration declared
 # inside it, with the modules `nvf-package` of their classes, which
 # caisson's default modules of those classes import; each is
@@ -190,12 +192,16 @@
           );
         };
 
-      # An nvf configuration is published as `packages.<system>.<name>`,
-      # its Neovim.
+      # An nvf configuration is published as
+      # `nvfConfigurations.<system>.<name>`, in the shape
+      # `neovimConfiguration` returns.
       exportsTo = {
-        attrset = "packages";
+        attrset = "nvfConfigurations";
         bySystem = true;
-        value = manifest: manifest.outputs.neovim;
+        value = manifest: {
+          inherit (manifest.outputs) neovim;
+          inherit (manifest.value) config options;
+        };
       };
 
       configuration =
