@@ -32,6 +32,10 @@ let
   # and as a shell glob under the root to a disk tarball, so each
   # pattern is a path from the root.
   units = [
+    # The SSH server restarts in a loop without the host keys cloud-init
+    # would generate, and the test does not use it.
+    "ssh.service"
+    "sshd.service"
     "systemd-firstboot.service"
     "auditd.service"
     "audit-rules.service"
@@ -62,6 +66,26 @@ let
     "etc/systemd/system/*.wants/${unit}"
   ]) units;
 
+  # A unit that prints the pending jobs and the failed units of the boot
+  # to the console a minute after it starts, which the driver shows with
+  # the rest of the boot. The driver gives up on a boot that has not
+  # finished after two minutes and shows nothing of the state of
+  # systemd, so this is what tells why. The unit is active from its
+  # start, so it holds back no boot.
+  bootReport = ''
+    mkdir -p $out/etc/systemd/system/multi-user.target.wants
+    cat > $out/etc/systemd/system/caisson-boot-report.service <<'UNIT'
+    [Unit]
+    Description=Report the pending jobs and the failed units of the boot
+
+    [Service]
+    Type=simple
+    ExecStart=/bin/sh -c 'sleep 60; { echo "caisson-boot-report: jobs"; systemctl list-jobs --no-pager; echo "caisson-boot-report: failed"; systemctl --failed --no-pager; } > /dev/console 2>&1'
+    UNIT
+    ln -sf ../caisson-boot-report.service \
+      $out/etc/systemd/system/multi-user.target.wants/caisson-boot-report.service
+  '';
+
   cloudImage =
     {
       name,
@@ -73,13 +97,22 @@ let
       inherit name excludePatterns;
       cloudImg = pkgs.fetchurl { inherit url hash; };
       cloudImgFormat = format;
+      extraSetup = bootReport;
     };
+
+  # An image of the driver, built again with the boot report.
+  driverImage =
+    name:
+    let
+      config = driverImages.${name}.rootfs.passthru.rootFsConfig;
+    in
+    buildRootfs (config // { extraSetup = (config.extraSetup or "") + bootReport; });
 in
 {
-  ubuntu-22_04 = driverImages.ubuntu-22_04.rootfs;
-  ubuntu-24_04 = driverImages.ubuntu-24_04.rootfs;
-  ubuntu-26_04 = driverImages.ubuntu-26_04.rootfs;
-  debian-13 = driverImages.debian-13.rootfs;
+  ubuntu-22_04 = driverImage "ubuntu-22_04";
+  ubuntu-24_04 = driverImage "ubuntu-24_04";
+  ubuntu-26_04 = driverImage "ubuntu-26_04";
+  debian-13 = driverImage "debian-13";
 
   debian-12 = cloudImage {
     name = "debian-12";
