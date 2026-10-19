@@ -3,8 +3,9 @@
 # A hjem module for a hjem configuration declared inside a darwin
 # configuration. It sets the home directory of the user from the
 # account the machine declares, as hjem's nix-darwin module does for
-# the users it embeds, and refuses a user the machine has no account
-# for.
+# the users it embeds. It refuses a user the machine has no account
+# for, and a user whose account sets no home directory, which
+# nix-darwin leaves at `null` until the machine sets it.
 #
 # caisson does not use hjem's nix-darwin module. A darwin configuration
 # adds this module to the modules that the hjem configurations declared
@@ -32,10 +33,24 @@ in
           assertion = config.enable -> account != null;
           message = "The hjem user `${config.user}` has no account in `users.users` of the darwin configuration it is declared inside.";
         }
+        {
+          assertion = config.enable && account != null -> account.home != null;
+          message = "The account of the hjem user `${config.user}` sets no home directory in `users.users.${config.user}.home` of the darwin configuration it is declared inside.";
+        }
       ];
     }
-    (lib.mkIf (account != null) {
-      directory = lib.mkDefault account.home;
-    })
+    # When the machine gives no home directory, reading `directory`
+    # fails with the message of the assertion that refuses the user, in
+    # case it is read before the assertions are checked.
+    {
+      directory = lib.mkDefault (
+        if account == null then
+          throw "caisson: the hjem user `${config.user}` has no account in `users.users` of the darwin configuration it is declared inside."
+        else if account.home == null then
+          throw "caisson: the account of the hjem user `${config.user}` sets no home directory in `users.users.${config.user}.home` of the darwin configuration it is declared inside."
+        else
+          account.home
+      );
+    }
   ];
 }

@@ -22,7 +22,8 @@
 # machine that is itself inside this one, and those evaluated for
 # another system. It expects the machine to declare the account of the
 # user of each home in `users.users`, as home-manager's nix-darwin
-# module does, and refuses a home whose user has none.
+# module does. It refuses a home whose user has no account, and a home
+# whose user's account sets no home directory.
 #
 # The step runs `activate` with no driver version, as caisson's NixOS
 # activation does: the script also updates the home-manager profile of
@@ -70,6 +71,12 @@ let
 
   withoutAccount = builtins.filter (home: !(config.users.users ? ${home.username})) homes;
 
+  # nix-darwin leaves the home directory of an account at `null` until
+  # the machine sets it, and a home needs one.
+  withoutHomeDirectory = builtins.filter (
+    home: config.users.users ? ${home.username} && config.users.users.${home.username}.home == null
+  ) homes;
+
   usernames = builtins.map (home: home.username) homes;
   repeated = lib.lists.unique (
     builtins.filter (username: lib.lists.count (other: other == username) usernames > 1) usernames
@@ -104,6 +111,16 @@ in
             home: "  the home `${home.name}` is for the user `${home.username}`"
           ) withoutAccount}
           Declare the account in `users.users`, or check `home.username` of the home.
+        '';
+      }
+      {
+        assertion = withoutHomeDirectory == [ ];
+        message = ''
+          caisson: this darwin configuration has a home whose user's account sets no home directory.
+          ${lib.concatMapStringsSep "\n" (
+            home: "  the home `${home.name}` is for the user `${home.username}`"
+          ) withoutHomeDirectory}
+          Set `users.users.<user>.home`, which nix-darwin leaves at `null`.
         '';
       }
       {
