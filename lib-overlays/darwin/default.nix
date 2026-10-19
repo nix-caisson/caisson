@@ -59,7 +59,7 @@
 
       # The evaluator's call, on the view being evaluated: eval-config
       # over the framework modules, the selection, the configuration's
-      # module and the settings of `darwinSystem`, at the
+      # module and the settings of `darwinSystem`, for the
       # configuration's system. `ecosystemArgs`, which only the twin's
       # pattern admits, is merged over the call last.
       evaluate =
@@ -84,7 +84,7 @@
 
           # The package sets available to the configuration, each for the
           # system of the evaluation, and the one it runs on.
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
           registry = lib.caisson.modules.darwin or { };
@@ -130,7 +130,7 @@
                 ++ moduleImports registry
                 ++ (if configModule == null then [ ] else [ configModule ])
                 ++ [ darwinSystemModule ];
-              # The package sets at the configuration's system, by
+              # The package sets for the configuration's system, by
               # config name, and the composed library, which is what
               # the modules receive as `lib`.
               specialArgs = {

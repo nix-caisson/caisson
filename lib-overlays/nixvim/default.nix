@@ -82,7 +82,7 @@
             else
               "this nixvim configuration for ${system}";
 
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
           # The composed library extended with the overlay nixvim

@@ -4,8 +4,8 @@
 # nix-topology's modules. A topology configuration is the diagram of a
 # network of machines: the NixOS configurations declared inside it,
 # whose `topology` options nix-topology reads, and the modules of the
-# class, which add nodes and networks of their own. It is evaluated at
-# every system in force where it is declared, on the package set
+# class, which add nodes and networks of their own. It is evaluated per
+# system, for every system in force where it is declared, on the package set
 # selected for it.
 #
 # nix-topology evaluates its modules with `evalModules` over its
@@ -83,7 +83,7 @@
             else
               "this topology configuration for ${system}";
 
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = (selection.pkgSetOf { inherit context what; } manifest pkgSets).extend (
             import "${src}/pkgs/default.nix"
           );
@@ -104,7 +104,7 @@
             else
               null;
 
-          # The NixOS configurations declared inside, at this system, as
+          # The NixOS configurations declared inside, for this system, as
           # the configurations nix-topology reads. They are read in the
           # full evaluation; the childless evaluation reads none.
           machinesModule =

@@ -1886,7 +1886,7 @@ in
             {
               imports = [ probeModule ];
               seenLib.name = lib.caisson-core.evalManifest.name;
-              seenLib.at = lib.caisson-core.evalManifest.system;
+              seenLib.system = lib.caisson-core.evalManifest.system;
             }
           );
         };
@@ -2411,7 +2411,7 @@ in
             systemType = system.type;
             type = machine.type;
             name = machine.value.config.seenLib.name;
-            at = machine.value.config.seenLib.at;
+            seenSystem = machine.value.config.seenLib.system;
             beneath = builtins.map (ancestor: ancestor.type) machine.ancestors;
             nearest = builtins.attrNames machine.nearest;
             outputs = builtins.attrNames machine.outputs;
@@ -2422,7 +2422,7 @@ in
           systemType = "system";
           type = "nixos";
           name = "machine";
-          at = "x86_64-linux";
+          seenSystem = "x86_64-linux";
           beneath = [
             "lib"
             "structural"

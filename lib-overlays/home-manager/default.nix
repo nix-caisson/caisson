@@ -201,7 +201,7 @@
 
           # The package sets available to the home, each for the system
           # of the evaluation, by package config name.
-          pkgSets = integrations.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = integrations.pkgSetsForSystem { inherit context what; } manifest system;
 
           # The set the home runs on: the selection in force at its
           # manifest, applied to those.

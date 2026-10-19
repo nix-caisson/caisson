@@ -35,7 +35,7 @@ let
 
   # The package sets available to the configuration, each for the
   # system of the evaluation, by package config name.
-  pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+  pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
 
   # The set the configuration runs on: the selection in force at its
   # manifest, applied to those.
@@ -82,7 +82,7 @@ in
   # Framework defaults first; the caller's win on conflict, as is
   # normal in the Nix ecosystem.
   specialArgs = {
-    # The package sets at the configuration's system, by config name.
+    # The package sets for the configuration's system, by config name.
     inherit pkgSets;
     # The `lib` argument every module receives. `evalModules` builds
     # that argument from the `lib` its `lib/modules.nix` closed
