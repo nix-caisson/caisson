@@ -21,7 +21,7 @@
 # machine, of each home and of the hjem configuration names the version,
 # and the Neovims of v2 have `vim`. The test activates v1, v2 and v1
 # again and checks after each step the files, the profiles and the
-# units. It checks that activating v1 again puts the profiles of
+# units. It checks that activating v2 and v1 puts the profiles of
 # `alice` and of the system back after they are changed by hand, and
 # that the activation of the home of `carol` in v2, run by hand while
 # the machine runs v1, warns of the drift.
@@ -230,10 +230,14 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
     is_at("v1")
     machine.fail("systemctl cat home-manager-erin.service")
 
-    # Activating v1 again puts the profiles of the system and of `alice`
-    # back after they are changed by hand.
+    # system-manager restarts a unit when it changes, so the profiles
+    # are activated again when the version changes. After they are
+    # changed by hand, activating v2 and then v1 puts the declared
+    # Neovims back.
     change_by_hand("${profile}", "root")
     change_by_hand(profile_of("alice", "hjem-editor"), "alice")
+    activate("${v2}")
+    is_at("v2")
     activate("${v1}")
     is_at("v1")
     restored = target_of("${profile}")

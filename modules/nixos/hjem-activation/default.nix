@@ -42,7 +42,8 @@
 #
 # The same module is registered for the `systemManager` class, under
 # the same name, and a system-manager machine activates the hjem
-# configurations declared inside it the same way. system-manager has no
+# configurations declared inside it the same way, with the units
+# written for each user rather than as templates (`perUser` below). system-manager has no
 # `system.extraDependencies`, so there the module keeps no extra
 # dependencies in the system. The module reads
 # `config.caisson.exports.configurations`, which the core module
@@ -136,6 +137,26 @@ let
     esac
   '';
 
+  # The template units of hjem, as the machine writes them. On NixOS
+  # they are templates, `hjem-activate@` and so on, with an instance for
+  # each user, which `hjem.target` requires; a switch stops and starts
+  # `hjem.target` (`X-StopOnReconfiguration`), which runs the instances
+  # again. system-manager does neither: it reloads a changed unit by its
+  # name, which fails for a template, and it does not stop
+  # `hjem.target`. So on system-manager the units are written for each
+  # user under the name of the instance, `hjem-activate@<user>` and so
+  # on, where `%i` is still the user. Their scripts name the manifests
+  # of this generation, so a unit changes when the files of a user
+  # change, and system-manager restarts it.
+  perUser =
+    templates:
+    if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
+      lib.concatMapAttrs (
+        name: unit: lib.genAttrs (builtins.map (user: "${name}${user.user}") users) (_: unit)
+      ) templates
+    else
+      templates;
+
   # The users that more than one hjem configuration names, which would
   # both write the files of that user.
   names = builtins.map (user: user.user) users;
@@ -198,6 +219,8 @@ in
           unitConfig.RefuseManualStart = true;
         };
 
+      }
+      // perUser {
         "hjem-activate@" = {
           description = "Link files for %i from their manifest";
           enableStrictShellChecks = true;
@@ -273,7 +296,8 @@ in
               --state "${oldManifests}/manifest-$1.json"
           '';
         };
-
+      }
+      // {
         hjem-cleanup = {
           description = "Cleanup disabled users' manifests";
           enableStrictShellChecks = true;

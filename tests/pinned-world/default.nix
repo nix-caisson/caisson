@@ -2754,7 +2754,10 @@ let
       && pkgs.lib.hasInfix "/etc/caisson/marker.json" home.home.activation.caissonDrift.data
       && hjem.directory == "/home/probe"
       && box.systemd.services ? home-manager-probe
-      && box.systemd.services ? "hjem-activate@"
+      # system-manager cannot reload a template, so the units of hjem are
+      # written for the user.
+      && box.systemd.services ? "hjem-activate@probe"
+      && !(box.systemd.services ? "hjem-activate@")
       # The machine activates its profile of the system as root, and the
       # profile inside the hjem configuration as its user, after hjem
       # applies the configuration; hjem chooses the profile of the user.
