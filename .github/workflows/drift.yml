@@ -39,6 +39,20 @@ jobs:
       - run: nix build -L '.#checks.x86_64-linux.drift-message'
       - run: nix build -L '.#checks.x86_64-linux.activation-vm'
   system-manager-container:
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - arch
+          - debian-12
+          - debian-13
+          - fedora-43
+          - fedora-44
+          - rocky-9
+          - rocky-10
+          - ubuntu-22_04
+          - ubuntu-24_04
+          - ubuntu-26_04
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -51,7 +65,7 @@ jobs:
             use-cgroups = true
             extra-system-features = uid-range
       - run: nix flake update --flake ./tests/dependencies
-      - run: nix build -L '.#containerTests.x86_64-linux.system-manager'
+      - run: nix build -L '.#containerTests.x86_64-linux.system-manager-${{ matrix.distro }}'
   darwin:
     runs-on: macos-latest
     steps:

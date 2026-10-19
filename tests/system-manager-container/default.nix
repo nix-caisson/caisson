@@ -2,16 +2,18 @@
 #
 # A test of what a system-manager machine activates, run with
 # system-manager's container test driver
-# (`system-manager.lib.containerTest.makeContainerTest`) in an Ubuntu
-# container, through sequences of changes. `inputs` is the dependency
-# pool of the checks partition with `caisson` set to the tree itself.
+# (`system-manager.lib.containerTest.makeContainerTest`) in a container
+# of a distribution, through sequences of changes. `inputs` is the
+# dependency pool of the checks partition with `caisson` set to the tree
+# itself; `distro` names a distribution of `distros.nix` beside this
+# file, whose root filesystem the container runs.
 #
 # The driver runs the container with systemd-nspawn in the build
 # sandbox, which needs the `uid-range` system feature, so Nix must run
 # with `auto-allocate-uids = true`. The test is therefore not among the
 # checks `nix flake check` builds: it is the output
-# `containerTests.x86_64-linux.system-manager`, which CI builds with
-# that setting.
+# `containerTests.x86_64-linux.system-manager-<distro>`, which CI builds
+# with that setting, for each distribution.
 #
 # The machine comes in the versions v1 and v2, which caisson evaluates
 # separately (`topOf` below). It declares the profiles of
@@ -25,7 +27,7 @@
 # `alice` and of the system back after they are changed by hand, and
 # that the activation of the home of `carol` in v2, run by hand while
 # the machine runs v1, warns of the drift.
-{ inputs }:
+{ inputs, distro }:
 let
   core = inputs.caisson.lib.caisson-core;
 
@@ -151,7 +153,8 @@ let
 in
 inputs.system-manager.lib.containerTest.makeContainerTest {
   hostPkgs = pkgs;
-  name = "caisson-system-manager";
+  name = "caisson-system-manager-${distro}";
+  rootfs = (import ./distros.nix { inherit inputs pkgs; }).${distro};
   toplevel = v1;
   extraPathsToRegister = [
     v2

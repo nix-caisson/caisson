@@ -301,18 +301,34 @@
               };
           };
 
-        # A system-manager machine activated in an Ubuntu container,
-        # through sequences of changes (tests/system-manager-container).
-        # The container runs in the build sandbox only where Nix runs
-        # with `auto-allocate-uids = true`, so the test is not a check
-        # `nix flake check` builds; the workflow builds it by name.
-        flake.containerTests.x86_64-linux.system-manager =
-          import (self.outPath + "/tests/system-manager-container")
-            {
-              inputs = inputs // {
-                caisson = self;
-              };
+        # A system-manager machine activated in a container of each
+        # distribution of tests/system-manager-container/distros.nix,
+        # through sequences of changes, as
+        # `system-manager-<distribution>`. The container runs in the
+        # build sandbox only where Nix runs with
+        # `auto-allocate-uids = true`, so the tests are not checks
+        # `nix flake check` builds; the workflow builds them by name.
+        flake.containerTests.x86_64-linux =
+          let
+            testInputs = inputs // {
+              caisson = self;
             };
+            distros = builtins.attrNames (
+              import (self.outPath + "/tests/system-manager-container/distros.nix") {
+                inputs = testInputs;
+                pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+              }
+            );
+          in
+          builtins.listToAttrs (
+            builtins.map (distro: {
+              name = "system-manager-${distro}";
+              value = import (self.outPath + "/tests/system-manager-container") {
+                inputs = testInputs;
+                inherit distro;
+              };
+            }) distros
+          );
 
         # A macOS machine declared through the darwin integration, built:
         # the system `darwin-rebuild` would build for it. It is the only
