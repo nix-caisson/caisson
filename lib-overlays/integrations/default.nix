@@ -700,7 +700,19 @@
         (entry.manifest.activation or null) != null
         && !(entry.manifest.activation.standsAlone or false)
         && ancestor != null
-        && builtins.length (ancestor.ancestors or [ ]) == builtins.length (manifest.ancestors or [ ]);
+        && placeOf ancestor == placeOf manifest;
+
+      # Where a configuration is in the tree: the integration and the name
+      # of each configuration from the top down to it, the nodes of the
+      # systems included. Configurations at the same depth have
+      # different places, such as a home and a hjem configuration inside
+      # the same machine, and the childless and the full manifest of a
+      # configuration have the same place.
+      placeOf =
+        manifest:
+        builtins.map (node: "${node.type or "lib"}/${toString (node.name or "")}") (
+          (manifest.ancestors or [ ]) ++ [ manifest ]
+        );
 
       # The shell text with which the activation of the configuration of
       # `manifest` checks for drift: it compares the marker of the

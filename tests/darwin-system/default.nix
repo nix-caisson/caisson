@@ -103,12 +103,13 @@ let
     }).caisson.manifest;
   standaloneHjem = standaloneHjemOf "v1";
 
-  # A macOS machine for the runner of the workflow, which activates it
-  # there, in a version. It declares the nvf configuration `editor`, a
-  # profile of the system, and a hjem configuration for `runner`, the
-  # account of the runner, with a file that names the version and the
-  # nvf configuration `hjem-editor` inside it. The Neovims of v2 also
-  # have `vim`. nix-darwin manages neither Nix nor zsh here, so
+  # A top holding a macOS machine for the runner of the workflow, which
+  # activates it there, in a version. The machine declares the nvf
+  # configuration `editor`, a profile of the system, a home for
+  # `runner`, the account of the runner, and a hjem configuration for
+  # `runner` with the nvf configuration `hjem-editor` inside it. A file
+  # of the machine, of the home and of the hjem configuration each names
+  # the version, and the Neovims of v2 also have `vim`. nix-darwin manages neither Nix nor zsh here, so
   # activating the machine leaves the Nix and the `/etc/zshrc` of the
   # runner as they are.
   runnerMachineOf =
@@ -136,8 +137,19 @@ let
                   home = "/Users/runner";
                   uid = 501;
                 };
+                # A file of the machine itself, so that the machine
+                # without the configurations declared inside it, which
+                # the home checks for drift, differs between the
+                # versions.
+                environment.etc."probe/version".text = version;
                 caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
                   configModule = editor;
+                };
+                caisson.home-manager.configurations.runner = lib.caisson.home-manager.mkConfiguration {
+                  configModule = {
+                    home.stateVersion = "25.05";
+                    home.file.".config/probe/hm-version".text = version;
+                  };
                 };
                 caisson.hjem.configurations.runner = lib.caisson.hjem.mkConfiguration {
                   configModule =
@@ -152,7 +164,7 @@ let
               };
           };
         };
-    }).darwinConfigurations.runner-machine;
+    });
 
   top = lib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];

@@ -223,11 +223,11 @@
                     caisson = self;
                   };
                 };
-                # A machine that activates a profile declared inside it,
-                # booted in a VM: the unit puts the profile in place at
-                # boot, and puts it back at the next boot after it is
-                # changed by hand.
-                profile-vm = import (self.outPath + "/tests/profile-vm") {
+                # A machine booted in a VM that activates the homes, the
+                # hjem configurations and the profiles declared inside
+                # it, and a standalone hjem configuration, each through
+                # sequences of changes (tests/activation-vm).
+                activation-vm = import (self.outPath + "/tests/activation-vm") {
                   inputs = inputs // {
                     caisson = self;
                   };
@@ -350,11 +350,21 @@
             # (tests/darwin-system/runner-machine.sh).
             {
               name = "runner-machine/v1";
-              path = (probe.runnerMachineOf "v1").system;
+              path = (probe.runnerMachineOf "v1").darwinConfigurations.runner-machine.system;
             }
             {
               name = "runner-machine/v2";
-              path = (probe.runnerMachineOf "v2").system;
+              path = (probe.runnerMachineOf "v2").darwinConfigurations.runner-machine.system;
+            }
+            # The activation package of the home of `runner` in each
+            # version, which the script runs by hand.
+            {
+              name = "runner-machine/home-v1";
+              path = (probe.runnerMachineOf "v1").homeConfigurations."runner@runner-machine".activationPackage;
+            }
+            {
+              name = "runner-machine/home-v2";
+              path = (probe.runnerMachineOf "v2").homeConfigurations."runner@runner-machine".activationPackage;
             }
           ];
       };

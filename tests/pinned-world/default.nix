@@ -2619,6 +2619,74 @@ let
       in
       top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath;
 
+    # A machine activates the profile inside a hjem configuration as the
+    # user of that hjem configuration and of no other. The machine here
+    # holds hjem configurations for `alice` and `bob` and a home for
+    # `carol`, each with a profile inside it, and a profile of the
+    # system. The configurations inside the machine are at the same
+    # depth, so a machine that matched a profile to the configuration
+    # above it by depth would activate each profile for every user. The
+    # machine writes a unit for the profile of the system, and a unit
+    # for the profile of each hjem user, as that user; the home activates its
+    # profile itself.
+    profilesBelongToTheConfigurationAboveThem =
+      let
+        probe = import ../hjem-system { inherit inputs; };
+        editor =
+          lib:
+          lib.caisson.nvf.mkConfiguration {
+            ecosystemSrc = inputs.nvf;
+            configModule.vim.viAlias = true;
+          };
+        withEditor =
+          name:
+          { lib, ... }:
+          {
+            caisson.nvf.configurations.${name} = editor lib;
+          };
+        top = probe.lib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.probe-machine = lib.caisson.nixos.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ probe.machine ];
+                    users.users.alice.isNormalUser = true;
+                    users.users.bob.isNormalUser = true;
+                    users.users.carol.isNormalUser = true;
+                    caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/system-editor";
+                    caisson.nvf.configurations.system-editor = editor lib;
+                    caisson.hjem.configurations = {
+                      alice = lib.caisson.hjem.mkConfiguration { configModule = withEditor "alice-editor"; };
+                      bob = lib.caisson.hjem.mkConfiguration { configModule = withEditor "bob-editor"; };
+                    };
+                    caisson.home-manager.configurations.carol = lib.caisson.home-manager.mkConfiguration {
+                      ecosystemSrc = inputs.home-manager;
+                      configModule = {
+                        imports = [ (withEditor "carol-editor") ];
+                        home.stateVersion = "25.05";
+                      };
+                    };
+                  };
+              };
+            };
+        };
+        services = top.nixosConfigurations.probe-machine.config.systemd.services;
+        profileUnits = builtins.filter (name: probe.pkgs.lib.hasPrefix "caisson-profile-" name) (
+          builtins.attrNames services
+        );
+      in
+      profileUnits == [
+        "caisson-profile-alice-nvf-alice-editor"
+        "caisson-profile-bob-nvf-bob-editor"
+        "caisson-profile-nvf-system-editor"
+      ]
+      && services.caisson-profile-alice-nvf-alice-editor.serviceConfig.User == "alice"
+      && services.caisson-profile-bob-nvf-bob-editor.serviceConfig.User == "bob";
+
     # A system-manager machine activates the home, the hjem configuration
     # and the nvf configurations declared inside it, as a NixOS machine
     # does: the home and the hjem configuration take their directory from
