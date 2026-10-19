@@ -215,6 +215,15 @@
                           "hjem-cleanup.service"
                         ]
                   );
+                # A machine that activates a profile declared inside it,
+                # booted in a VM: the unit puts the profile in place at
+                # boot, and puts it back at the next boot after it is
+                # changed by hand.
+                profile-vm = import (self.outPath + "/tests/profile-vm") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the
