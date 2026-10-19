@@ -18,10 +18,9 @@
 #
 # disko's other form, a NixOS configuration that writes its layout as
 # `disko.devices` and imports disko's NixOS module, is a NixOS
-# configuration with caisson's `disko` NixOS module, and needs no
-# integration. A NixOS configuration installed onto a layout that is a
-# configuration of its own is declared inside a caisson-disko
-# configuration.
+# configuration that selects caisson's `disko` NixOS module. A NixOS
+# configuration installed onto a layout that is a configuration of its
+# own is declared inside a caisson-disko configuration.
 {
   mkLibOverlay,
   ...
