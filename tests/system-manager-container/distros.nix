@@ -100,6 +100,9 @@ let
   olderSystemdHangs = unitPatterns [
     "systemd-logind.service"
     "systemd-hostnamed.service"
+    "systemd-networkd.service"
+    "systemd-networkd.socket"
+    "systemd-networkd-wait-online.service"
     "kdump.service"
     "rsyslog.service"
   ];
