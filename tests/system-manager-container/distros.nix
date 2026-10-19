@@ -60,11 +60,7 @@ let
     "usr/lib/systemd/system/sys-kernel-*"
     "usr/lib/systemd/system/tpm-udev.service"
   ]
-  ++ builtins.concatMap (unit: [
-    "usr/lib/systemd/system/${unit}"
-    "usr/lib/systemd/system/*.wants/${unit}"
-    "etc/systemd/system/*.wants/${unit}"
-  ]) units;
+  ++ unitPatterns units;
 
   # A unit that prints the pending jobs and the failed units of the boot
   # to the console a minute after it starts, which the driver shows with
@@ -86,15 +82,39 @@ let
       $out/etc/systemd/system/multi-user.target.wants/caisson-boot-report.service
   '';
 
+  # The patterns that leave out each unit of `names`.
+  unitPatterns =
+    names:
+    builtins.concatMap (unit: [
+      "usr/lib/systemd/system/${unit}"
+      "usr/lib/systemd/system/*.wants/${unit}"
+      "etc/systemd/system/*.wants/${unit}"
+    ]) names;
+
+  # The services that the systemd of Ubuntu 22.04 (249) and of Rocky
+  # Linux 9 (252) starts and never runs in this container: their boot
+  # reports show the start jobs running until the driver gives up, while
+  # the newer distributions start the same services. The test uses none
+  # of them; the unit that applies the files of a hjem user skips the
+  # reload of the units of the user when `loginctl` knows no session.
+  olderSystemdHangs = unitPatterns [
+    "systemd-logind.service"
+    "systemd-hostnamed.service"
+    "kdump.service"
+    "rsyslog.service"
+  ];
+
   cloudImage =
     {
       name,
       url,
       hash,
       format,
+      extraExcludes ? [ ],
     }:
     buildRootfs {
-      inherit name excludePatterns;
+      inherit name;
+      excludePatterns = excludePatterns ++ extraExcludes;
       cloudImg = pkgs.fetchurl { inherit url hash; };
       cloudImgFormat = format;
       extraSetup = bootReport;
@@ -102,17 +122,23 @@ let
 
   # An image of the driver, built again with the boot report.
   driverImage =
-    name:
+    name: extraExcludes:
     let
       config = driverImages.${name}.rootfs.passthru.rootFsConfig;
     in
-    buildRootfs (config // { extraSetup = (config.extraSetup or "") + bootReport; });
+    buildRootfs (
+      config
+      // {
+        excludePatterns = (config.excludePatterns or [ ]) ++ extraExcludes;
+        extraSetup = (config.extraSetup or "") + bootReport;
+      }
+    );
 in
 {
-  ubuntu-22_04 = driverImage "ubuntu-22_04";
-  ubuntu-24_04 = driverImage "ubuntu-24_04";
-  ubuntu-26_04 = driverImage "ubuntu-26_04";
-  debian-13 = driverImage "debian-13";
+  ubuntu-22_04 = driverImage "ubuntu-22_04" olderSystemdHangs;
+  ubuntu-24_04 = driverImage "ubuntu-24_04" [ ];
+  ubuntu-26_04 = driverImage "ubuntu-26_04" [ ];
+  debian-13 = driverImage "debian-13" [ ];
 
   debian-12 = cloudImage {
     name = "debian-12";
@@ -140,6 +166,7 @@ in
     url = "https://dl.rockylinux.org/vault/rocky/9.7/images/x86_64/Rocky-9-GenericCloud-Base-9.7-20251123.2.x86_64.qcow2";
     hash = "sha256-FdgdNDSymBQrL92PtUrvJmJoTbXAgswZHDx5di7WNgw=";
     format = "qcow2";
+    extraExcludes = olderSystemdHangs;
   };
 
   rocky-10 = cloudImage {
