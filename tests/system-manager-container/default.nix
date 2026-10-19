@@ -204,6 +204,7 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
         for line in logs.split("\n"):
             assert "ERROR" not in line, line
         machine.wait_for_unit("system-manager.target")
+        print(machine.execute("sleep 2; journalctl -b --no-pager -o short-monotonic -u caisson-profile-alice-nvf-hjem-editor -u hjem-activate@alice | tail -n 30; readlink -f /home/alice/.local/state/caisson/profiles/nvf/hjem-editor").stdout)
 
     start_all()
     machine.wait_for_unit("multi-user.target")
