@@ -22,6 +22,13 @@
 # after it is changed by hand, and that a boot puts the profiles of the
 # system and of `carol` back.
 #
+# The user `frank` has a home that is a top, with an nvf and a nixvim
+# configuration inside it, which `home-manager switch` would activate.
+# The test runs its activation package as `frank` in v1, v2 and v1
+# again, and checks the profiles and the file after each step, and that
+# activating v1 again puts the nvf profile back after it is changed by
+# hand.
+#
 # The user `bob` has a hjem configuration that is a top, with the nvf
 # configuration `standalone-editor` inside it, applied with
 # `hjem standalone switch`, as on a machine that caisson does not
@@ -56,6 +63,7 @@ let
       inherit (inputs)
         nixpkgs
         nvf
+        nixvim
         hjem
         home-manager
         ;
@@ -151,6 +159,33 @@ let
         };
     };
 
+  # The home of `frank` in a version, a home that is a top, which
+  # `home-manager switch` activates: the activation package of the home.
+  # It holds the nvf configuration `home-editor` and the nixvim
+  # configuration `vim-editor`, and the Neovims of v2 have `vim`.
+  frankOf =
+    version:
+    (lib.caisson.home-manager.mkTopConfiguration {
+      configModule =
+        { lib, ... }:
+        {
+          home.username = "frank";
+          home.homeDirectory = "/home/frank";
+          home.stateVersion = "25.05";
+          home.file.".config/probe/version".text = version;
+          caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/home-editor";
+          caisson.nvf.configurations.home-editor = lib.caisson.nvf.mkConfiguration {
+            configModule = editorOf version;
+          };
+          caisson.nixvim.configurations.vim-editor = lib.caisson.nixvim.mkConfiguration {
+            configModule = {
+              viAlias = true;
+              vimAlias = version == "v2";
+            };
+          };
+        };
+    }).activationPackage;
+
   # What the machine declares in a version. The specialisation `v2`
   # replaces each set of configurations whole, which also removes what
   # v1 has and v2 has not:
@@ -219,6 +254,10 @@ let
             isNormalUser = true;
             uid = 1004;
           };
+          users.users.frank = {
+            isNormalUser = true;
+            uid = 1005;
+          };
           caisson.home-manager.activation.usersDeclaredElsewhere = [ "dave" ];
           caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/editor";
           environment.systemPackages = [ (bobOf "v1").outputs.cli ];
@@ -227,6 +266,8 @@ let
             "caisson/manifest-bob-v2.json".source = bobManifest "v2";
             "caisson/hjem-bob-v2.nix".source = bobNix "v2";
             "caisson/hjem-bob-v1-flake".source = bobFlake "v1";
+            "caisson/home-frank-v1".source = frankOf "v1";
+            "caisson/home-frank-v2".source = frankOf "v2";
           };
           # `hjem standalone switch --config` and `--flake` evaluate with
           # `nix eval`.
@@ -294,13 +335,13 @@ pkgs.testers.runNixOSTest {
     in
     ''
       def as_user(user, command):
-          uid = {"alice": 1000, "bob": 1001, "carol": 1002, "dave": 1003, "erin": 1004}[user]
+          uid = {"alice": 1000, "bob": 1001, "carol": 1002, "dave": 1003, "erin": 1004, "frank": 1005}[user]
           return machine.succeed(
               f"su {user} -c 'XDG_RUNTIME_DIR=/run/user/{uid} {command}'"
           )
 
-      def profile_of(user, name):
-          return f"/home/{user}/.local/state/caisson/profiles/nvf/{name}"
+      def profile_of(user, name, kind="nvf"):
+          return f"/home/{user}/.local/state/caisson/profiles/{kind}/{name}"
 
       def target_of(path):
           return machine.succeed(f"readlink -f {path}").strip()
@@ -430,6 +471,32 @@ pkgs.testers.runNixOSTest {
       as_user("bob", "hjem standalone switch --flake path:/home/bob/hjem-flake")
       holds("${bobProfile}", "v1")
       has_file("bob", "v1")
+
+      # The home of `frank` is a top, activated as `home-manager switch`
+      # activates it, by its activation package, as `frank`: v1, v2 and
+      # v1 again. The nvf and the nixvim profiles inside it follow, and
+      # activating v1 again puts the nvf profile back after it is changed
+      # by hand.
+      def activate_frank(version):
+          as_user("frank", f"/etc/caisson/home-frank-{version}/activate")
+
+      def frank_is_at(version):
+          holds(profile_of("frank", "home-editor"), version)
+          holds(profile_of("frank", "vim-editor", "nixvim"), version)
+          has_file("frank", version)
+
+      activate_frank("v1")
+      frank_is_at("v1")
+      frank_declared = target_of(profile_of("frank", "home-editor"))
+      activate_frank("v2")
+      frank_is_at("v2")
+      activate_frank("v1")
+      frank_is_at("v1")
+      change_by_hand(profile_of("frank", "home-editor"), "frank")
+      activate_frank("v1")
+      frank_is_at("v1")
+      restored = target_of(profile_of("frank", "home-editor"))
+      assert restored == frank_declared, f"the profile of frank is {restored}, not {frank_declared}"
 
       # The profiles of the system and of `carol` are put back when the
       # machine boots.
