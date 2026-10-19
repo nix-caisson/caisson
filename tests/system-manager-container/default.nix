@@ -153,7 +153,9 @@ let
 in
 inputs.system-manager.lib.containerTest.makeContainerTest {
   hostPkgs = pkgs;
-  name = "caisson-system-manager-${distro}";
+  # The name of the container, which systemd-nspawn takes as a host
+  # name, where `_` is not allowed.
+  name = builtins.replaceStrings [ "_" ] [ "-" ] "caisson-system-manager-${distro}";
   rootfs = (import ./distros.nix { inherit inputs pkgs; }).${distro};
   toplevel = v1;
   extraPathsToRegister = [

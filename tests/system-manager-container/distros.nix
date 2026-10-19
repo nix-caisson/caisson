@@ -16,9 +16,33 @@ let
   driverImages = containerTest.distros { inherit pkgs; };
   inherit ((containerTest.makeRootfs { inherit pkgs; })) buildRootfs;
 
-  # The units that cannot run in a container, or that wait for what a
-  # container does not have: cloud-init waits for the data source of a
-  # cloud.
+  # The units that cannot run in a container, or that wait in one for
+  # what it does not have, so that the boot never finishes:
+  #
+  # - cloud-init waits for the data source of a cloud;
+  # - the first-boot wizard of systemd asks on the console for what a
+  #   cloud would have provided;
+  # - audit needs the audit of the kernel;
+  # - systemd-networkd, systemd-resolved and the wait for the network of
+  #   NetworkManager wait for a network the driver does not give;
+  # - the NFS RPC pipe and the SELinux relabel need the kernel.
+  #
+  # `makeRootfs` applies a pattern as a `tar` exclusion to a qcow2 image
+  # and as a shell glob under the root to a disk tarball, so each
+  # pattern is a path from the root.
+  units = [
+    "systemd-firstboot.service"
+    "auditd.service"
+    "audit-rules.service"
+    "systemd-networkd.service"
+    "systemd-networkd.socket"
+    "systemd-networkd-wait-online.service"
+    "systemd-resolved.service"
+    "NetworkManager-wait-online.service"
+    "var-lib-nfs-rpc_pipefs.mount"
+    "rpc_pipefs.target"
+    "selinux-autorelabel-mark.service"
+  ];
   excludePatterns = [
     "etc/systemd/system/network-online.target.wants/*"
     "etc/systemd/system/cloud-init.target.wants/*"
@@ -28,7 +52,12 @@ let
     "usr/lib/systemd/system/proc-sys-fs-binfmt_misc.automount"
     "usr/lib/systemd/system/sys-kernel-*"
     "usr/lib/systemd/system/tpm-udev.service"
-  ];
+  ]
+  ++ builtins.concatMap (unit: [
+    "usr/lib/systemd/system/${unit}"
+    "usr/lib/systemd/system/*.wants/${unit}"
+    "etc/systemd/system/*.wants/${unit}"
+  ]) units;
 
   cloudImage =
     {
