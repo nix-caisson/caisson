@@ -2008,8 +2008,8 @@ let
     # profile when `hjem standalone switch` applies them: the systemd
     # user units `caisson-profiles` on Linux, and the launchd agent
     # `org.caisson.profiles` on macOS, which runs at load, watches the
-    # manifest of the current generation, and runs the script
-    # `caisson-profiles` that activates the profiles. A hjem
+    # manifest of the current generation, and runs the script the files
+    # link at `~/.local/state/caisson/activate-profiles`. A hjem
     # configuration inside a machine carries neither, since the machine
     # activates its profiles.
     hjemStandaloneCarriesItsProfileActivation =
@@ -2079,7 +2079,7 @@ let
       && builtins.elem agentTarget (targetsOf darwin.standaloneHjem.outputs.manifest)
       && hasInfix "/Users/runner/.local/state/hjem/standalone/current/manifest.json" agentText
       && hasInfix "<key>RunAtLoad</key>" agentText
-      && hasInfix "-caisson-profiles</string>" agentText;
+      && hasInfix "<string>/Users/runner/.local/state/caisson/activate-profiles</string>" agentText;
 
     # A hjem configuration inside a NixOS machine takes the home
     # directory of the account the machine declares, and its manifest is
