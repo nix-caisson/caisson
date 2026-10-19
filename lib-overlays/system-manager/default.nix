@@ -156,7 +156,7 @@
 
       # The evaluator's call, on the view being evaluated:
       # `makeSystemConfig` over the framework modules, the selection,
-      # the configuration's module and the bridge, at the
+      # the configuration's module and the bridge, for the
       # configuration's system. `ecosystemArgs`, which only the twin's
       # pattern admits, is merged over the call last; `modules`,
       # `specialArgs` and `allowUnsupportedNixpkgs` can be set or
@@ -183,7 +183,7 @@
           # The package sets available to the configuration, each for the
           # system of the evaluation, and the set it runs on: the
           # selection in force at its manifest, applied to those.
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
           nixpkgsSrc = resolveNixpkgsSrc {

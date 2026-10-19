@@ -55,7 +55,7 @@
         };
 
       # The evaluator's call, on the view being evaluated: eval-config
-      # over the composition, at the configuration's system.
+      # over the composition, for the configuration's system.
       # `baseModules` is passed where the entry point names NixOS'
       # module list itself. `ecosystemArgs`, which only the twin's
       # pattern admits, is merged over the call last.

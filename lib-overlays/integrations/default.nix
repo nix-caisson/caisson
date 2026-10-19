@@ -184,7 +184,7 @@
       # its set for `system`. `context` names the entry point and `what`
       # the configuration, for the message of a config that builds no
       # set for that system.
-      pkgSetsAt =
+      pkgSetsForSystem =
         { context, what }:
         manifest: system:
         builtins.mapAttrs (
@@ -1250,7 +1250,7 @@
             mkModuleConfiguration
             moduleImportsOf
             pkgSetOf
-            pkgSetsAt
+            pkgSetsForSystem
             ;
           coreModules = select "core";
           defaultModuleImports = select "default";

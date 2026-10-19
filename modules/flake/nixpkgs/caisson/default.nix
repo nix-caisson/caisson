@@ -34,7 +34,7 @@ let
   # system has none there. A composition that does not select the
   # nixpkgs integration has no package configs.
   packageConfigs = (lib.caisson.nixpkgs or { }).pkgSets or { };
-  pkgSetsAt =
+  pkgSetsForSystem =
     system:
     builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
       lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) packageConfigs
@@ -67,10 +67,10 @@ in
       {
         _module.args =
           let
-            pkgSets = pkgSetsAt system;
+            pkgSets = pkgSetsForSystem system;
           in
           {
-            # Every package config's set at this system, by config
+            # Every package config's set for this system, by config
             # name, the only place a bare `pkgSets` module argument is
             # set.
             inherit pkgSets;

@@ -108,7 +108,7 @@
             else
               "this hjem configuration for ${system}";
 
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
           hjemLib = import "${src}/lib.nix" { inherit lib pkgs; };

@@ -71,7 +71,7 @@
             else
               "this nixidy configuration for ${system}";
 
-          pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
+          pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
           registry = lib.caisson.modules.nixidy or { };
