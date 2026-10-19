@@ -1029,8 +1029,8 @@ let
       refused "a,b" && refused "@tagged" && refused "";
 
     # A node is one evaluation. A NixOS configuration inside a colmena
-    # configuration that puts two systems in force has an evaluation at
-    # each, and the hive refuses it. The top still publishes both
+    # configuration that puts two systems in force is evaluated per
+    # system, once for each, and the hive refuses it. The top still publishes both
     # evaluations as NixOS configurations, and each evaluates, so it is
     # the hive that refuses them. With one system in force the same
     # tree has one node.
