@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: MIT
 #
 # The disko integration, the upstream-compatible one: it owns the
-# `disko` class. A disko configuration is a disk layout on its own, as
-# disko's standalone form has it: a module that sets `disko.devices`,
-# and a file written for disko's `diskoConfigurations` is the
-# configuration's module as it is.
+# `disko` class. A disko configuration is a standalone disk layout: a
+# module that sets `disko.devices`, and a file written for disko's
+# `diskoConfigurations` is the configuration's module as it is.
 #
-# The layout is evaluated as disko evaluates a layout on its own:
+# The layout is evaluated as disko evaluates a standalone layout:
 # `evalModules` over `disko.devices`, typed with disko's type library,
 # with the framework modules, the selection and the configuration's
 # module beside it. The outputs are the layout product the native
@@ -18,10 +17,9 @@
 #
 # disko's other form, a NixOS configuration that writes its layout as
 # `disko.devices` and imports disko's NixOS module, is a NixOS
-# configuration with caisson's `disko` NixOS module, and needs no
-# integration. A NixOS configuration installed onto a layout that is a
-# configuration of its own is declared inside a caisson-disko
-# configuration.
+# configuration that selects caisson's `disko` NixOS module. A NixOS
+# configuration installed onto a layout that is a separate
+# configuration is declared inside a caisson-disko configuration.
 {
   mkLibOverlay,
   ...
