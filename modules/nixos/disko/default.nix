@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS module that imports disko's own NixOS module, for a NixOS
+# A NixOS module that imports the NixOS module of disko, for a NixOS
 # configuration that writes its disk layout itself, as `disko.devices`,
 # the way disko's NixOS form has it. The machine and its layout are then
 # one configuration, and disko's tools read it as they read any NixOS
