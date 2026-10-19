@@ -106,8 +106,8 @@
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
 
       # A machine colmena deploys is one evaluation. A NixOS
-      # configuration with several systems in force has an evaluation at
-      # each, and publishing would make each of them a node. The
+      # configuration with several systems in force is evaluated per
+      # system, and publishing would make each evaluation a node. The
       # machines evaluated more than once, each with its name and its
       # systems: the NixOS entries grouped by their path without the
       # system segments, where a group has more than one entry.
@@ -155,10 +155,10 @@
         if repeated != [ ] then
           throw ''
             lib.caisson.caisson-colmena: a node is one evaluation of a NixOS configuration,
-            and these NixOS configurations are evaluated at more than one system:
+            and these NixOS configurations are evaluated per system, for more than one system:
             ${builtins.concatStringsSep "\n" (
               builtins.map (
-                machine: "  `${machine.name}` at ${builtins.concatStringsSep ", " machine.systems}"
+                machine: "  `${machine.name}`, for ${builtins.concatStringsSep ", " machine.systems}"
               ) repeated
             )}
             Declare each machine where a single system is in force.
