@@ -161,9 +161,10 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
   testScript = ''
     import time
 
+    # The driver's `execute` returns a `subprocess.CompletedProcess`.
     def wait_until_fails(command, timeout=60):
         for _ in range(timeout):
-            if machine.execute(command)[0] != 0:
+            if machine.execute(command).returncode != 0:
                 return
             time.sleep(1)
         raise Exception(f"`{command}` still succeeds")
