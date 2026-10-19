@@ -82,9 +82,11 @@ let
 
   # A hjem configuration that is a top, applied with
   # `hjem standalone switch`, with the nvf configuration
-  # `standalone-editor` inside it. It is for the user `runner`, the user
-  # of the macOS runner of the workflow, which applies it there.
-  standaloneHjem =
+  # `standalone-editor` inside it, in a version: the Neovim of v2 also
+  # has `vim`. It is for the user `runner`, the user of the macOS runner
+  # of the workflow, which applies it there.
+  standaloneHjemOf =
+    version:
     (lib.caisson.hjem.mkTopConfiguration {
       configModule =
         { lib, ... }:
@@ -92,10 +94,65 @@ let
           user = "runner";
           directory = "/Users/runner";
           caisson.nvf.configurations.standalone-editor = lib.caisson.nvf.mkConfiguration {
-            configModule.vim.viAlias = true;
+            configModule.vim = {
+              viAlias = true;
+              vimAlias = version == "v2";
+            };
           };
         };
     }).caisson.manifest;
+  standaloneHjem = standaloneHjemOf "v1";
+
+  # A macOS machine for the runner of the workflow, which activates it
+  # there, in a version. It declares the nvf configuration `editor`, a
+  # profile of the system, and a hjem configuration for `runner`, the
+  # account of the runner, with a file that names the version and the
+  # nvf configuration `hjem-editor` inside it. The Neovims of v2 also
+  # have `vim`. nix-darwin manages neither Nix nor zsh here, so
+  # activating the machine leaves the Nix and the `/etc/zshrc` of the
+  # runner as they are.
+  runnerMachineOf =
+    version:
+    let
+      editor = {
+        vim.viAlias = true;
+        vim.vimAlias = version == "v2";
+      };
+    in
+    (lib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.darwin.configurations.runner-machine = lib.caisson.darwin.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                system.stateVersion = 6;
+                system.primaryUser = "runner";
+                nix.enable = false;
+                programs.zsh.enable = false;
+                users.users.runner = {
+                  home = "/Users/runner";
+                  uid = 501;
+                };
+                caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
+                  configModule = editor;
+                };
+                caisson.hjem.configurations.runner = lib.caisson.hjem.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      files.".config/probe/version".text = version;
+                      caisson.nvf.configurations.hjem-editor = lib.caisson.nvf.mkConfiguration {
+                        configModule = editor;
+                      };
+                    };
+                };
+              };
+          };
+        };
+    }).darwinConfigurations.runner-machine;
 
   top = lib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
@@ -130,7 +187,9 @@ in
     lib
     machine
     pkgs
+    runnerMachineOf
     standaloneHjem
+    standaloneHjemOf
     system
     top
     ;

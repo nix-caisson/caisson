@@ -215,6 +215,14 @@
                           "hjem-cleanup.service"
                         ]
                   );
+                # The warning of a drift check, printed by a real
+                # activation and compared with the text it is written
+                # to print.
+                drift-message = import (self.outPath + "/tests/drift-message") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # A machine that activates a profile declared inside it,
                 # booted in a VM: the unit puts the profile in place at
                 # boot, and puts it back at the next boot after it is
@@ -309,9 +317,9 @@
           # The bare machine, and the machine with a home and a hjem
           # configuration inside it, whose system holds the activation
           # of the home and the launchd agents of hjem. Beside them, the
-          # manifest of a hjem configuration that is a top and the hjem
-          # CLI, with which the darwin job applies it on the runner
-          # (tests/darwin-system/hjem-standalone.sh).
+          # manifests of a hjem configuration that is a top, in the
+          # versions v1 and v2, and the hjem CLI, with which the darwin job applies
+          # it on the runner (tests/darwin-system/hjem-standalone.sh).
           probe.pkgs.linkFarm "darwin-system" [
             {
               name = "probe";
@@ -322,14 +330,31 @@
               path = probe.family.system;
             }
             {
-              name = "hjem-standalone/manifest.json";
-              path = probe.pkgs.writeText "manifest-runner.json" (
-                builtins.toJSON probe.standaloneHjem.outputs.manifest
+              name = "hjem-standalone/manifest-v1.json";
+              path = probe.pkgs.writeText "manifest-runner-v1.json" (
+                builtins.toJSON (probe.standaloneHjemOf "v1").outputs.manifest
+              );
+            }
+            {
+              name = "hjem-standalone/manifest-v2.json";
+              path = probe.pkgs.writeText "manifest-runner-v2.json" (
+                builtins.toJSON (probe.standaloneHjemOf "v2").outputs.manifest
               );
             }
             {
               name = "hjem-standalone/hjem";
               path = probe.standaloneHjem.outputs.cli;
+            }
+            # The machine for the runner in each version, which the
+            # darwin job activates on the runner
+            # (tests/darwin-system/runner-machine.sh).
+            {
+              name = "runner-machine/v1";
+              path = (probe.runnerMachineOf "v1").system;
+            }
+            {
+              name = "runner-machine/v2";
+              path = (probe.runnerMachineOf "v2").system;
             }
           ];
       };

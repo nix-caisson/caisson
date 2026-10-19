@@ -30,7 +30,8 @@ jobs:
   # `nix flake check` on the Linux runner checks only x86_64-linux; this
   # job builds the check for aarch64-darwin. It then applies the
   # standalone hjem configuration of the check on the runner, which
-  # loads the launchd agent caisson adds to its files.
+  # loads the launchd agent caisson adds to its files, and activates a
+  # machine of the check on the runner, through sequences of changes.
   darwin-build:
     runs-on: macos-latest
     env:
@@ -48,3 +49,4 @@ jobs:
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
       - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"
+      - run: bash tests/darwin-system/runner-machine.sh "$(readlink -f result)"

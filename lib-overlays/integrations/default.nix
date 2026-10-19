@@ -727,6 +727,10 @@
           # The digest of the identity, quoted for the shell. A digest is
           # hexadecimal, so quoting it whole is enough.
           escaped = "'${digestOf expected}'";
+          # A line of the warning, quoted for the shell as it is. The
+          # names in it are in backticks, which the shell would run
+          # inside double quotes.
+          say = text: "echo ${final.escapeShellArg text} >&2";
         in
         if expected == null then
           ""
@@ -735,20 +739,20 @@
             _caissonMarker="${marker}"
             if [ ! -f "$_caissonMarker" ]; then
               echo "WARNING: $_caissonMarker does not exist." >&2
-              echo "  ${self} is declared inside ${above}," >&2
-              echo "  and the activation of ${above} has not recorded what it applied." >&2
-              echo "  Activate ${above} as this configuration was built with it," >&2
-              echo "  or set ${optionText} to false in ${self}." >&2
+              ${say "  ${self} is declared inside ${above},"}
+              ${say "  and the activation of ${above} has not recorded what it applied."}
+              ${say "  Activate ${above} as this configuration was built with it,"}
+              ${say "  or set ${optionText} to false in ${self}."}
             else
               _caissonApplied="$(${jq} -r '.identity // empty' < "$_caissonMarker")"
               if [ "$_caissonApplied" != ${escaped} ]; then
-                echo "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied." >&2
-                echo "  digest of the version applied (configurations declared inside it left out):" >&2
+                ${say "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied."}
+                ${say "  digest of the version applied (configurations declared inside it left out):"}
                 echo "    ''${_caissonApplied:-unknown}" >&2
-                echo "  digest of the version built for (configurations declared inside it left out):" >&2
+                ${say "  digest of the version built for (configurations declared inside it left out):"}
                 echo "    "${escaped} >&2
-                echo "  Activate ${above} as this configuration was built with it," >&2
-                echo "  or set ${optionText} to false in ${self}." >&2
+                ${say "  Activate ${above} as this configuration was built with it,"}
+                ${say "  or set ${optionText} to false in ${self}."}
               fi
             fi
           '';

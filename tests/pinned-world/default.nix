@@ -2066,20 +2066,43 @@ let
           "${units}/caisson-profiles.path"
           "${units}/paths.target.wants/caisson-profiles.path"
         ];
+        script = "/home/probe/.local/state/caisson/activate-profiles";
         agentTarget = "/Users/runner/Library/LaunchAgents/org.caisson.profiles.plist";
         hasInfix = linux.pkgs.lib.strings.hasInfix;
         # The text of the agent, as the derivation that writes it holds
         # it, so that the agent need not be built to be read.
         agentText =
           darwin.standaloneHjem.value.config.files."Library/LaunchAgents/org.caisson.profiles.plist".source.text;
+        # The source of each file of a manifest, by target.
+        sourcesOf =
+          manifest:
+          builtins.listToAttrs (
+            builtins.map (file: {
+              name = file.target;
+              value = file.source;
+            }) manifest.files
+          );
+        v1 = sourcesOf (darwin.standaloneHjemOf "v1").outputs.manifest;
+        v2 = sourcesOf (darwin.standaloneHjemOf "v2").outputs.manifest;
+        runnerScript = "/Users/runner/.local/state/caisson/activate-profiles";
       in
-      builtins.all (target: builtins.elem target (targetsOf standalone.manifest)) unitTargets
-      && !(builtins.any (target: builtins.elem target (targetsOf inside.outputs.manifest)) unitTargets)
+      builtins.all (target: builtins.elem target (targetsOf standalone.manifest)) (
+        unitTargets ++ [ script ]
+      )
+      && !(builtins.any (target: builtins.elem target (targetsOf inside.outputs.manifest)) (
+        unitTargets ++ [ script ]
+      ))
       && !(builtins.elem agentTarget (targetsOf standalone.manifest))
       && builtins.elem agentTarget (targetsOf darwin.standaloneHjem.outputs.manifest)
       && hasInfix "/Users/runner/.local/state/hjem/standalone/current/manifest.json" agentText
       && hasInfix "<key>RunAtLoad</key>" agentText
-      && hasInfix "<string>/Users/runner/.local/state/caisson/activate-profiles</string>" agentText;
+      && hasInfix "<string>${runnerScript}</string>" agentText
+      # systemd and launchd keep what they loaded until they load it
+      # again, which a switch does not make them do. So the agent is the
+      # same file in each version, and only the link to the script of
+      # the version differs.
+      && v1.${agentTarget} == v2.${agentTarget}
+      && v1.${runnerScript} != v2.${runnerScript};
 
     # A hjem configuration inside a NixOS machine takes the home
     # directory of the account the machine declares, and its manifest is
