@@ -1,33 +1,27 @@
 # SPDX-License-Identifier: MIT
 #
 # The disko integration, the upstream-compatible one: it owns the
-# `disko` class. A disko configuration is a disk layout written as
-# disko reads it, a module that sets `disko.devices`, and a file
-# written for disko is the configuration's module as it is. The
-# configuration also declares the NixOS configurations installed onto
-# the layout, under `caisson.nixos.configurations`. The native
-# integration, caisson-disko, keeps disko out of those NixOS
-# configurations instead.
+# `disko` class. A disko configuration is a disk layout on its own, as
+# disko's standalone form has it: a module that sets `disko.devices`,
+# and a file written for disko's `diskoConfigurations` is the
+# configuration's module as it is.
 #
 # The layout is evaluated as disko evaluates a layout on its own:
 # `evalModules` over `disko.devices`, typed with disko's type library,
 # with the framework modules, the selection and the configuration's
 # module beside it. The outputs are the layout product the native
-# integration makes, and the disko source the layout was evaluated
-# with.
-#
-# The default module of the class adds caisson's `disko-layout` NixOS
-# module to the NixOS configurations declared inside the layout. That
-# module imports disko's own NixOS module and defines `disko.devices`
-# from the layout, so a NixOS configuration beneath a disko
-# configuration is what disko's tools expect: disko's command finds
-# `config.disko.devices` and the scripts under `system.build`,
-# `disko-install` overrides the disks, and disko's image builder and
-# install test extend the configuration as they do for any NixOS
-# configuration that imports disko's module.
+# integration makes.
 #
 # A disko configuration is published as `diskoConfigurations.<name>`,
-# as the native integration publishes it.
+# as the native integration publishes it, and disko's command formats
+# and mounts it from there with `disko --flake .#<name>`.
+#
+# disko's other form, a NixOS configuration that writes its layout as
+# `disko.devices` and imports disko's NixOS module, is a NixOS
+# configuration with caisson's `disko` NixOS module, and needs no
+# integration. A NixOS configuration installed onto a layout that is a
+# configuration of its own is declared inside a caisson-disko
+# configuration.
 {
   mkLibOverlay,
   ...
@@ -107,19 +101,13 @@
         in
         {
           value = evaluated;
-          outputs =
-            native.layoutOf {
-              context = "lib.caisson.disko";
-              assertions = [ ];
-              inherit rootMountPoint;
-              devices = evaluated.config.disko.devices;
-              checked = args.checked or false;
-            }
-            // {
-              # The disko source the layout was evaluated with, whose
-              # NixOS module the NixOS configurations beneath import.
-              ecosystemSrc = src;
-            };
+          outputs = native.layoutOf {
+            context = "lib.caisson.disko";
+            assertions = [ ];
+            inherit rootMountPoint;
+            devices = evaluated.config.disko.devices;
+            checked = args.checked or false;
+          };
         };
 
       configuration =
@@ -140,9 +128,7 @@
         mkConfiguration =
           {
             # The disko configuration's module: `disko.devices`, as a
-            # file written for disko sets it, and the NixOS
-            # configurations installed onto the layout under
-            # `caisson.nixos.configurations`. When absent, the
+            # file written for disko sets it. When absent, the
             # configuration registered under the configuration's name
             # (`lib.caisson.configs.disko.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
@@ -151,10 +137,10 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
-            # to each, by package config name, and returns the set to
-            # run on.
+            # The package set the layout's scripts are built with, and
+            # the one the configurations beneath this one run on: a
+            # function that receives the package sets available, by
+            # package config name, and returns the set to run on.
             defaultPkgs ? null,
             # The disko flake or source tree; resolved from the
             # composition's declarations when absent.

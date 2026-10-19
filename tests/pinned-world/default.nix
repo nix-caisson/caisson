@@ -1376,19 +1376,51 @@ let
       in
       fails top.diskoConfigurations.nas-1 && fails top.nixosConfigurations.nas-1.config.fileSystems;
 
-    # A machine installed onto a layout of the upstream-compatible disko
-    # integration carries disko's own NixOS module with the layout, so
-    # it is what disko's tools read: the scripts under `system.build`
-    # and `config.disko.devices`. It is the system NixOS builds from
-    # disko's module and the same layout, with the same format script.
-    # The layout is defined at default priority, so `disko-install`,
-    # which replaces the disks with `mkVMOverride`, still replaces them.
-    diskoMachinesGetDiskosModule =
+    # A disko configuration is a layout on its own, as disko's
+    # standalone form has it. It is published as
+    # `diskoConfigurations.nas-1`, with no machine beside it, and both
+    # disko's evaluator given the published layout and the layout's own
+    # `scripts` output make the format script disko makes from the
+    # layout as written.
+    diskoLayoutsStandAlone =
       let
         top = layoutTop {
           integration = "disko";
-          layout = luksLvmLayout;
-          machine = diskoMachineBase;
+          layout = complexLayout;
+        };
+        upstream = import inputs.disko { inherit (pkgs) lib; };
+        formatOf = layout: (upstream._cliFormat layout pkgs).drvPath;
+        outputs = (layoutManifest "disko" top).outputs;
+      in
+      builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      && !(top ? nixosConfigurations)
+      && formatOf top.diskoConfigurations.nas-1 == formatOf complexLayout
+      && (outputs.scripts pkgs).format.drvPath == formatOf complexLayout;
+
+    # disko's NixOS form: a NixOS configuration that selects caisson's
+    # `disko` NixOS module and writes its layout as `disko.devices`. It
+    # is what disko's tools read, the scripts under `system.build` and
+    # `config.disko.devices`, and it is the system NixOS builds from
+    # disko's module and the same layout, with the same format script.
+    # `disko-install` replaces the disks with `extendModules` and
+    # `mkVMOverride`, and the replacement holds.
+    diskosNixosFormIsANixosConfiguration =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
+                extraModuleImports = modules: [ modules."caisson/disko" ];
+                configModule = {
+                  imports = [
+                    luksLvmLayout
+                    diskoMachineBase
+                  ];
+                };
+              };
+            };
         };
         machine = top.nixosConfigurations.nas-1;
         upstream = upstreamDiskoMachine luksLvmLayout;
@@ -1407,7 +1439,7 @@ let
         };
       in
       builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
-      && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      && !(top ? diskoConfigurations)
       && machine.config.disko.devices.disk ? main
       && machine.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath
       &&
