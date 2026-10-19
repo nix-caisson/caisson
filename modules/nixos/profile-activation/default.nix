@@ -16,9 +16,13 @@
 # A profile declared inside a hjem configuration inside the machine is
 # a profile of the hjem user. hjem's activation has no step a
 # configuration can add, so the machine activates it, with a unit
-# `caisson-profile-<user>-<kind>-<name>` that runs as the user after the
-# hjem configuration is applied. A profile inside a home is activated by
-# the home.
+# `caisson-profile-<user>-<kind>-<name>` that runs as the user after
+# `hjem-activate@<user>` has applied the hjem configuration. The unit is
+# wanted by `hjem.target` and is part of it. The machine starts
+# `hjem.target` at boot, and stops and starts it again at every switch
+# (`X-StopOnReconfiguration`, in the module `hjem-activation`), so the
+# profile is activated each time the files of the user are applied. A
+# profile inside a home is activated by the home.
 #
 # The machine also installs, in `environment.systemPackages`, the
 # programs with which a shell chooses among the profiles of the system
@@ -94,7 +98,8 @@ let
         description = "Activate the ${profile.kind} profile ${profile.name}${
           if user == null then "" else " of ${user}"
         }";
-        wantedBy = [ "multi-user.target" ];
+        wantedBy = if user == null then [ "multi-user.target" ] else [ "hjem.target" ];
+        partOf = if user == null then [ ] else [ "hjem.target" ];
         wants = [ "nix-daemon.socket" ];
         after = [
           "nix-daemon.socket"

@@ -16,6 +16,20 @@
 # profile of the user, so that the programs the machine installs choose
 # the same.
 #
+# A hjem configuration with no machine above it is applied with
+# `hjem standalone switch`, and no machine activates its profiles. On
+# Linux, this module adds to its files the systemd user units that do.
+# The service `caisson-profiles` runs the `activate` of each profile,
+# and is wanted by `default.target`, so it runs when the user's systemd
+# starts. The path unit `caisson-profiles` starts the service when the
+# manifest hjem keeps for the current generation changes,
+# `$XDG_STATE_HOME/hjem/standalone/current/manifest.json` (`%S` in a
+# unit of the user), which `hjem standalone switch` writes at every
+# switch. The units are read by the user's systemd once it reloads, so
+# the switch that first adds them activates the profiles at the next
+# login, or after `systemctl --user daemon-reload` and
+# `systemctl --user start caisson-profiles.path caisson-profiles.service`.
+#
 # caisson's `default` hjem module imports this module. It defines
 # nothing in the childless evaluation.
 { ... }:
@@ -42,6 +56,45 @@ let
     choice:
     builtins.replaceStrings [ "$HOME" ] [ config.directory ]
       choice.chosen.manifest.outputs.profile.path;
+
+  # True when no machine applies this hjem configuration: there is no
+  # configuration above it with an activation.
+  standalone = selection.activatingAncestorOf evalManifest == null;
+
+  onLinux = lib.hasSuffix "-linux" (evalManifest.system or "");
+
+  activateProfiles = pkgs.writeShellScript "caisson-profiles" (
+    lib.concatMapStrings (entry: ''
+      ${entry.manifest.outputs.activationPackage}/activate
+    '') profiles
+  );
+
+  # Each unit is a file named as the unit, so that the links to it in
+  # `default.target.wants` and `paths.target.wants` point at a file of
+  # the same name, which systemd requires of such a link.
+  unitFile = name: text: "${pkgs.writeTextDir name text}/${name}";
+
+  serviceUnit = unitFile "caisson-profiles.service" ''
+    [Unit]
+    Description=Activate the profiles of the hjem configuration
+
+    [Service]
+    Type=oneshot
+    ExecStart=${activateProfiles}
+  '';
+
+  pathUnit = unitFile "caisson-profiles.path" ''
+    [Unit]
+    Description=Activate the profiles of the hjem configuration when hjem switches
+
+    [Path]
+    PathChanged=%S/hjem/standalone/current/manifest.json
+    Unit=caisson-profiles.service
+  '';
+
+  # The directory of the user's systemd units, relative to the home
+  # directory, as hjem's `files` names a file.
+  units = ".config/systemd/user";
 in
 {
   options.caisson.profiles.selected = lib.mkOption {
@@ -59,6 +112,13 @@ in
   };
 
   config = lib.mkIf (!evalManifest.childless && profiles != [ ]) {
+    files = lib.mkIf (standalone && onLinux) {
+      "${units}/caisson-profiles.service".source = serviceUnit;
+      "${units}/default.target.wants/caisson-profiles.service".source = serviceUnit;
+      "${units}/caisson-profiles.path".source = pathUnit;
+      "${units}/paths.target.wants/caisson-profiles.path".source = pathUnit;
+    };
+
     packages = lib.mapAttrsToList (
       variable: choice:
       selection.profileShimsOf {
