@@ -2145,7 +2145,7 @@ let
         "hjem-cleanup"
       ]
       && builtins.elem "hjem-activate@probe.service" target.requires
-      && probe.pkgs.lib.strings.hasInfix "hjem-manifests" services."hjem-activate@".script
+      && probe.pkgs.lib.strings.hasInfix "hjem-activate-step" services."hjem-activate@".script
       && builtins.elem "hello" (
         builtins.map (package: package.pname or "") machine.config.users.users.probe.packages
       )
@@ -2754,10 +2754,13 @@ let
       && pkgs.lib.hasInfix "/etc/caisson/marker.json" home.home.activation.caissonDrift.data
       && hjem.directory == "/home/probe"
       && box.systemd.services ? home-manager-probe
-      # system-manager cannot reload a template, so the units of hjem are
-      # written for the user.
+      # system-manager cannot reload a template and restarts each changed
+      # unit apart, so a single unit for the user runs the steps of hjem
+      # in order.
       && box.systemd.services ? "hjem-activate@probe"
       && !(box.systemd.services ? "hjem-activate@")
+      && !(box.systemd.services ? "hjem-reload@probe")
+      && !(box.systemd.services ? "hjem-update-state@probe")
       # The machine activates its profile of the system as root, and the
       # profile inside the hjem configuration as its user, after hjem
       # applies the configuration; hjem chooses the profile of the user.
