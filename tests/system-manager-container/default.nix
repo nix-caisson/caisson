@@ -177,7 +177,7 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
 
     def change_by_hand(path, user):
         machine.succeed(
-            f"runuser -u {user} -- nix-env --profile {path} --set $(readlink -f /etc/static)"
+            f"runuser -u {user} -- nix-env --profile {path} --set ${v1}"
         )
         machine.fail(f"test -e {path}/bin/nvim")
 
