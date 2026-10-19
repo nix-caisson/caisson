@@ -235,7 +235,7 @@ let
     system.stateVersion = "25.05";
   };
 
-  # The machine NixOS builds from disko's own NixOS module, the layout
+  # The machine NixOS builds from the NixOS module of disko, the layout
   # and `diskoMachineBase`, with no caisson involved. It is named
   # `nas-1`, the host name caisson gives the machine declared as
   # `nas-1`.
@@ -254,35 +254,40 @@ let
   # A top holding a disko configuration of `integration` named
   # `nas-1`, over `layout`. With `machine`, a NixOS module, the layout
   # declares a NixOS configuration named `nas-1` from it, installed onto
-  # the layout.
+  # the layout. `args` are further arguments passed to `mkConfiguration`
+  # for the layout.
   layoutTop =
     {
       integration,
       layout,
       machine ? null,
+      args ? { },
     }:
     hiveLib.caisson.structural.mkTopConfiguration {
       moduleImports = _modules: [ ];
       configModule =
         { lib, ... }:
         {
-          caisson.${integration}.configurations.nas-1 = lib.caisson.${integration}.mkConfiguration {
-            configModule =
-              { lib, ... }:
-              {
-                imports = [ layout ];
-              }
-              // (
-                if machine == null then
-                  { }
-                else
-                  {
-                    caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
-                      configModule = machine;
-                    };
-                  }
-              );
-          };
+          caisson.${integration}.configurations.nas-1 = lib.caisson.${integration}.mkConfiguration (
+            args
+            // {
+              configModule =
+                { lib, ... }:
+                {
+                  imports = [ layout ];
+                }
+                // (
+                  if machine == null then
+                    { }
+                  else
+                    {
+                      caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
+                        configModule = machine;
+                      };
+                    }
+                );
+            }
+          );
         };
     };
 
@@ -1094,6 +1099,93 @@ let
       && !(builtins.tryEval (builtins.attrNames both.colmenaHive.nodes)).success
       && builtins.attrNames one.colmenaHive.nodes == [ "probe" ];
 
+    # colmena's command refuses a hive whose schema version it does not
+    # read. The hive asserts its schema against the schema of the
+    # `makeHive` of the colmena source it is evaluated with, so a colmena
+    # whose schema has moved refuses the hive when it is evaluated. The
+    # colmena here is the pinned colmena with the schema of its
+    # `makeHive` changed.
+    colmenaRefusesAColmenaWithAnotherSchema =
+      let
+        movedSchema = inputs.colmena // {
+          lib = inputs.colmena.lib // {
+            makeHive = hive: inputs.colmena.lib.makeHive hive // { __schema = "v0.0"; };
+          };
+        };
+        topWith =
+          ecosystemSrc:
+          hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                  inherit ecosystemSrc;
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                        configModule = minimalNixosBase;
+                      };
+                    };
+                };
+              };
+          };
+      in
+      (topWith inputs.colmena).colmenaHive.__schema == (inputs.colmena.lib.makeHive { }).__schema
+      && !(builtins.tryEval (topWith movedSchema).colmenaHive).success;
+
+    # `colmena eval` calls the hive's `introspect` with a function of
+    # `{ lib, pkgs, nodes }`. The hive hands it the composed library,
+    # the package set passed as `pkgSets.pkgs`, and the nodes. A hive
+    # given no package set still hands over the library and the nodes,
+    # and refuses when the function reads `pkgs`.
+    colmenaIntrospectHandsOverTheNodes =
+      let
+        probe = {
+          imports = [ minimalNixosBase ];
+          networking.hostName = "probe";
+        };
+        withPkgs = (colmenaTop { inherit probe; }).colmenaHive;
+        withoutPkgs =
+          (hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                        configModule = probe;
+                      };
+                    };
+                };
+              };
+          }).colmenaHive;
+        read =
+          {
+            lib,
+            pkgs,
+            nodes,
+          }:
+          {
+            composed = lib ? caisson-core;
+            hello = pkgs.hello.drvPath;
+            hostNames = builtins.mapAttrs (_: node: node.config.networking.hostName) nodes;
+          };
+        readNodes = { lib, nodes, ... }: lib ? caisson-core && builtins.attrNames nodes == [ "probe" ];
+        readPkgs = { pkgs, ... }: pkgs.hello.drvPath;
+      in
+      withPkgs.introspect read == {
+        composed = true;
+        hello = pkgs.hello.drvPath;
+        hostNames.probe = "probe";
+      }
+      && withoutPkgs.introspect readNodes
+      && !(builtins.tryEval (withoutPkgs.introspect readPkgs)).success;
+
     # A structural configuration groups NixOS configurations so the
     # group can be declared wherever machines are, as a unit. The same
     # group of two machines is declared under a structural top and
@@ -1447,6 +1539,111 @@ let
         == upstream.config.system.build.formatScript.drvPath
       && installed.config.disko.devices.disk.main.device == "/dev/vdz";
 
+    # disko's install test extends a NixOS configuration that imports
+    # the NixOS module of disko. A NixOS configuration that selects
+    # caisson's `disko` NixOS module builds the install test that the
+    # machine NixOS builds from disko's module and the same layout
+    # builds.
+    #
+    # disko's image builder, `diskoImages` and `diskoImagesScript`, fails
+    # to evaluate at the pinned disko and nixpkgs on a machine with no
+    # caisson: disko passes `vmTools` a tree of kernel modules as its
+    # `kernel`, which `vmTools` refuses. The test covers the install
+    # test alone.
+    diskosNixosFormBuildsDiskosInstallTest =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
+                extraModuleImports = modules: [ modules."caisson/disko" ];
+                configModule = {
+                  imports = [
+                    luksLvmLayout
+                    diskoMachineBase
+                  ];
+                };
+              };
+            };
+        };
+        build = top.nixosConfigurations.nas-1.config.system.build;
+        upstream = (upstreamDiskoMachine luksLvmLayout).config.system.build;
+      in
+      build.installTest.drvPath == upstream.installTest.drvPath;
+
+    # The mount point of a layout is the directory its scripts mount it
+    # under, "/mnt" when the layout passes none. A layout of either disko
+    # integration that passes `rootMountPoint` has the mount script disko
+    # makes from the layout as written for that directory, and records
+    # the directory in its outputs.
+    diskoLayoutsMountUnderTheirRootMountPoint =
+      let
+        mountOf =
+          rootMountPoint:
+          (
+            (import inputs.disko {
+              inherit (pkgs) lib;
+              inherit rootMountPoint;
+            })._cliMount
+              complexLayout
+              pkgs
+          ).drvPath;
+        outputsOf =
+          integration: args:
+          (layoutManifest integration (layoutTop {
+            inherit integration args;
+            layout = complexLayout;
+          })).outputs;
+        mountsUnder =
+          integration:
+          let
+            moved = outputsOf integration { rootMountPoint = "/target"; };
+            unmoved = outputsOf integration { };
+          in
+          moved.rootMountPoint == "/target"
+          && (moved.scripts pkgs).mount.drvPath == mountOf "/target"
+          && unmoved.rootMountPoint == "/mnt"
+          && (unmoved.scripts pkgs).mount.drvPath == mountOf "/mnt";
+      in
+      mountOf "/target" != mountOf "/mnt" && mountsUnder "caisson-disko" && mountsUnder "disko";
+
+    # A caisson-disko layout can have several machines installed onto
+    # it, such as a machine and its rescue system. Each is published
+    # under the name it is declared with, and each gets the file
+    # systems of the layout.
+    caissonDiskoLayoutsHoldSeveralMachines =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ luksLvmLayout ];
+                    caisson.nixos.configurations = lib.genAttrs [ "nas-1" "nas-1-rescue" ] (
+                      _hostName: lib.caisson.nixos.mkConfiguration { configModule = diskoMachineBase; }
+                    );
+                  };
+              };
+            };
+        };
+        upstream = upstreamDiskoMachine luksLvmLayout;
+        rootOf = machine: machine.config.fileSystems."/".device;
+      in
+      builtins.attrNames top.nixosConfigurations == [
+        "nas-1"
+        "nas-1-rescue"
+      ]
+      && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
+      && rootOf top.nixosConfigurations.nas-1 == rootOf upstream
+      && rootOf top.nixosConfigurations.nas-1-rescue == rootOf upstream
+      && top.nixosConfigurations.nas-1-rescue.config.networking.hostName == "nas-1-rescue";
+
     # A layout declared inside a colmena configuration passes up the
     # machine installed onto it, so the machine `nas-1` is the node
     # `nas-1` of the hive, and the top publishes it as
@@ -1675,6 +1872,114 @@ let
       && withoutUid.home.home.homeDirectory == "/Users/probe"
       && withoutUid.home.home.uid == null
       && withoutUid.hjem.directory == "/Users/probe";
+
+    # A hjem configuration inside a darwin machine is for a user the
+    # machine declares an account for. The machine here declares the
+    # account `probe` and holds a hjem configuration for `guest`. The
+    # hjem configuration has no home directory, so its manifest fails.
+    # A hjem configuration for `guest` that sets its directory itself is
+    # refused by an assertion that names the user.
+    darwinRefusesHjemUsersWithoutAnAccount =
+      let
+        probe = import ../darwin-system { inherit inputs; };
+        hasInfix = probe.pkgs.lib.strings.hasInfix;
+        fails = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
+        guestWith =
+          hjemUser:
+          (probe.lib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.darwin.configurations.family = lib.caisson.darwin.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ probe.machine ];
+                      caisson.hjem.configurations.guest = lib.caisson.hjem.mkConfiguration {
+                        configModule = hjemUser;
+                      };
+                    };
+                };
+              };
+          })
+          .caisson.manifest.children.system.${probe.system}.children.darwin.family.children.system.${probe.system}.children.hjem.guest;
+        unset = guestWith probe.hjemUser;
+        set = guestWith {
+          imports = [ probe.hjemUser ];
+          directory = "/Users/guest";
+        };
+      in
+      fails unset.outputs.manifest
+      && builtins.any (
+        item: !item.assertion && hasInfix "`guest` has no account" item.message
+      ) set.value.config.assertions;
+
+    # A darwin machine activates the profiles declared inside it in its
+    # `postActivation` step: an nvf configuration declared in the
+    # machine as root, and an nvf configuration declared inside the hjem
+    # configuration of `probe` as that user, through `launchctl asuser`.
+    # The machine installs the program with which a shell chooses the
+    # profile of the system, and the hjem configuration chooses the
+    # profile declared inside it for the shells of its user.
+    darwinActivatesTheProfilesInsideIt =
+      let
+        probe = import ../darwin-system { inherit inputs; };
+        hasInfix = probe.pkgs.lib.strings.hasInfix;
+        nvfConfiguration =
+          lib: module:
+          lib.caisson.nvf.mkConfiguration {
+            ecosystemSrc = inputs.nvf;
+            configModule = module;
+          };
+        top = probe.lib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.darwin.configurations.family = lib.caisson.darwin.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ probe.machine ];
+                    caisson.nvf.configurations.editor = nvfConfiguration lib { vim.viAlias = true; };
+                    caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          imports = [ probe.hjemUser ];
+                          caisson.nvf.configurations.hjem-editor = nvfConfiguration lib { vim.vimAlias = true; };
+                        };
+                    };
+                  };
+              };
+            };
+        };
+        config = top.darwinConfigurations.family.config;
+        inside =
+          top.caisson.manifest.children.system.${probe.system}.children.darwin.family.children.system.${probe.system}.children;
+        ofSystem = inside.nvf.editor.outputs;
+        ofHjem = inside.hjem.probe.children.system.${probe.system}.children.nvf.hjem-editor.outputs;
+        postActivation = config.system.activationScripts.postActivation.text;
+        # The step refers to the activation package: the string context
+        # of the script records it.
+        runs =
+          outputs:
+          builtins.elem outputs.activationPackage.drvPath (
+            builtins.attrNames (builtins.getContext postActivation)
+          );
+        names = packages: builtins.map (package: package.name or "") packages;
+      in
+      runs ofSystem
+      && runs ofHjem
+      && hasInfix "launchctl asuser" postActivation
+      && hasInfix "sudo -u probe --set-home" postActivation
+      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
+        names config.environment.systemPackages
+      )
+      &&
+        inside.hjem.probe.value.config.environment.sessionVariables.CAISSON_NVIM_PROFILE
+        == "/Users/probe/.local/state/caisson/profiles/nvf/hjem-editor";
 
     # A hjem configuration that is a top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
@@ -2033,6 +2338,59 @@ let
       &&
         top.nixvimConfigurations.x86_64-linux.editor.config.build.package.drvPath
         == upstream.config.build.package.drvPath;
+
+    # A nixvim configuration declared inside a NixOS machine is a profile
+    # of the system, as an nvf configuration there is. The machine writes
+    # the unit that activates the profile as root, at boot and at a
+    # switch, and installs the program with which a shell chooses the
+    # profile. The unit runs `activate` of the activation package of the
+    # profile, and the top publishes the configuration with the others.
+    nixvimProfilesInsideAMachineAreActivated =
+      let
+        module = {
+          opts.number = true;
+        };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.workstation = lib.caisson.nixos.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ minimalNixosBase ];
+                    caisson.nixvim.configurations.machine-editor = lib.caisson.nixvim.mkConfiguration {
+                      ecosystemSrc = inputs.nixvim;
+                      configModule = module;
+                    };
+                  };
+              };
+            };
+        };
+        upstream = inputs.nixvim.lib.evalNixvim {
+          modules = [
+            module
+            { nixpkgs.pkgs = pkgs; }
+          ];
+        };
+        machine = top.nixosConfigurations.workstation.config;
+        unit = machine.systemd.services.caisson-profile-nixvim-machine-editor;
+        profile =
+          top.caisson.manifest.children.system.x86_64-linux.children.nixos.workstation.children.system.x86_64-linux.children.nixvim.machine-editor.outputs;
+        names = packages: builtins.map (package: package.name or "") packages;
+      in
+      builtins.attrNames top.nixvimConfigurations.x86_64-linux == [ "machine-editor" ]
+      && profile.package.drvPath == upstream.config.build.package.drvPath
+      && profile.profile.scope == "system"
+      && unit.wantedBy == [ "multi-user.target" ]
+      && !(unit.serviceConfig ? User)
+      && builtins.elem profile.activationPackage.drvPath (
+        builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart)
+      )
+      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
+        names machine.environment.systemPackages
+      );
 
     # A topology configuration with two machines declared inside it reads
     # them as nix-topology reads NixOS configurations evaluated with its
