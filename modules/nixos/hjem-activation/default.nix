@@ -211,7 +211,7 @@ let
   # changes, and system-manager restarts it. It runs a step as the user
   # with `setpriv --reset-env`, which sets the environment of the user
   # from the account and, unlike `runuser`, goes through no PAM
-  # configuration, which another distribution writes in its own way.
+  # configuration, which each distribution writes differently.
   onSystemManager = (lib.caisson-core.evalManifest.type or null) == "system-manager";
 
   # The units `hjem.target` requires for a user.
@@ -261,112 +261,118 @@ in
         extraDependencies = builtins.concatMap (user: user.extraDependencies) users;
       };
 
-      systemd.targets.hjem = {
-        description = "hjem file management";
-        unitConfig.X-StopOnReconfiguration = true;
-        after = [ "local-fs.target" ];
-        wantedBy = [
-          "sysinit-reactivation.target"
-          "multi-user.target"
-        ];
-        before = [ "sysinit-reactivation.target" ];
-        requires = builtins.concatMap unitsOf users ++ [ "hjem-cleanup.service" ];
+      # On system-manager the units of the users depend on nothing that
+      # system-manager could start or stop apart from them: no target and
+      # no unit that prepares the directory of the state.
+      systemd.targets = lib.optionalAttrs (!onSystemManager) {
+        hjem = {
+          description = "hjem file management";
+          unitConfig.X-StopOnReconfiguration = true;
+          after = [ "local-fs.target" ];
+          wantedBy = [
+            "sysinit-reactivation.target"
+            "multi-user.target"
+          ];
+          before = [ "sysinit-reactivation.target" ];
+          requires = builtins.concatMap unitsOf users ++ [ "hjem-cleanup.service" ];
+        };
       };
 
-      systemd.services = {
-        hjem-prepare = {
-          description = "Prepare Hjem manifests directory";
-          enableStrictShellChecks = true;
-          script = "mkdir -p ${oldManifests}";
-          serviceConfig.Type = "oneshot";
-          unitConfig.RefuseManualStart = true;
-        };
-
-      }
-      // (
-        if onSystemManager then
-          builtins.listToAttrs (
-            builtins.map (user: {
-              name = "hjem-activate@${user.user}";
-              value = {
-                description = "Apply the files of %i from their manifest";
+      systemd.services =
+        lib.optionalAttrs (!onSystemManager) {
+          hjem-prepare = {
+            description = "Prepare Hjem manifests directory";
+            enableStrictShellChecks = true;
+            script = "mkdir -p ${oldManifests}";
+            serviceConfig.Type = "oneshot";
+            unitConfig.RefuseManualStart = true;
+          };
+        }
+        // (
+          if onSystemManager then
+            builtins.listToAttrs (
+              builtins.map (user: {
+                name = "hjem-activate@${user.user}";
+                value = {
+                  description = "Apply the files of %i from their manifest";
+                  enableStrictShellChecks = true;
+                  unitConfig.RequiresMountsFor = homeDirectories;
+                  serviceConfig.Type = "oneshot";
+                  wantedBy = [ "multi-user.target" ];
+                  scriptArgs = "%i";
+                  script =
+                    let
+                      asUser = ''${pkgs.util-linux}/bin/setpriv --reuid "$1" --regid "$(${pkgs.coreutils}/bin/id -g "$1")" --init-groups --reset-env --'';
+                    in
+                    ''
+                      mkdir -p ${oldManifests}
+                      ${asUser} ${activateStep} "$1"
+                      ${asUser} ${reloadStep} "$1"
+                      ${updateStateStep} "$1"
+                    ''
+                    + lib.concatMapStrings (entry: ''
+                      ${asUser} ${entry.manifest.outputs.activationPackage}/activate
+                    '') user.profiles;
+                };
+              }) users
+            )
+          else
+            {
+              "hjem-activate@" = {
+                description = "Link files for %i from their manifest";
                 enableStrictShellChecks = true;
                 unitConfig.RequiresMountsFor = homeDirectories;
-                serviceConfig.Type = "oneshot";
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
                 requires = [ "hjem-prepare.service" ];
                 after = [ "hjem-prepare.service" ];
                 scriptArgs = "%i";
-                script =
-                  let
-                    asUser = ''${pkgs.util-linux}/bin/setpriv --reuid "$1" --regid "$(${pkgs.coreutils}/bin/id -g "$1")" --init-groups --reset-env --'';
-                  in
-                  ''
-                    ${asUser} ${activateStep} "$1"
-                    ${asUser} ${reloadStep} "$1"
-                    ${updateStateStep} "$1"
-                  ''
-                  + lib.concatMapStrings (entry: ''
-                    ${asUser} ${entry.manifest.outputs.activationPackage}/activate
-                  '') user.profiles;
+                script = ''exec ${activateStep} "$1"'';
               };
-            }) users
-          )
-        else
-          {
-            "hjem-activate@" = {
-              description = "Link files for %i from their manifest";
-              enableStrictShellChecks = true;
-              unitConfig.RequiresMountsFor = homeDirectories;
-              serviceConfig = {
-                User = "%i";
-                Type = "oneshot";
-              };
-              requires = [ "hjem-prepare.service" ];
-              after = [ "hjem-prepare.service" ];
-              scriptArgs = "%i";
-              script = ''exec ${activateStep} "$1"'';
-            };
 
-            "hjem-reload@" = {
-              description = "Reload systemd user units for %i after Hjem file activation";
-              enableStrictShellChecks = true;
-              serviceConfig = {
-                User = "%i";
-                Type = "oneshot";
+              "hjem-reload@" = {
+                description = "Reload systemd user units for %i after Hjem file activation";
+                enableStrictShellChecks = true;
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
+                unitConfig.RequiresMountsFor = homeDirectories;
+                requires = [ "hjem-activate@%i.service" ];
+                after = [ "hjem-activate@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${reloadStep} "$1"'';
               };
-              unitConfig.RequiresMountsFor = homeDirectories;
-              requires = [ "hjem-activate@%i.service" ];
-              after = [ "hjem-activate@%i.service" ];
-              scriptArgs = "%i";
-              script = ''exec ${reloadStep} "$1"'';
-            };
 
-            "hjem-update-state@" = {
-              description = "Update Hjem state manifest for %i";
-              enableStrictShellChecks = true;
-              serviceConfig.Type = "oneshot";
-              requires = [ "hjem-reload@%i.service" ];
-              unitConfig.RequiresMountsFor = homeDirectories;
-              after = [ "hjem-reload@%i.service" ];
-              scriptArgs = "%i";
-              script = ''exec ${updateStateStep} "$1"'';
-            };
-          }
-      )
-      // {
-        hjem-cleanup = {
-          description = "Cleanup disabled users' manifests";
-          enableStrictShellChecks = true;
-          serviceConfig.Type = "oneshot";
-          after = [ "hjem.target" ];
-          unitConfig.RefuseManualStart = false;
-          script = ''
-            ${lib.getExe (builtins.head users).cli} internal cleanup-state \
-              --state-dir ${oldManifests} \
-              ${lib.concatMapStringsSep " " (user: "--enabled-user ${lib.escapeShellArg user.user}") users}
-          '';
+              "hjem-update-state@" = {
+                description = "Update Hjem state manifest for %i";
+                enableStrictShellChecks = true;
+                serviceConfig.Type = "oneshot";
+                requires = [ "hjem-reload@%i.service" ];
+                unitConfig.RequiresMountsFor = homeDirectories;
+                after = [ "hjem-reload@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${updateStateStep} "$1"'';
+              };
+            }
+        )
+        // {
+          hjem-cleanup = {
+            description = "Cleanup disabled users' manifests";
+            enableStrictShellChecks = true;
+            serviceConfig.Type = "oneshot";
+            after = if onSystemManager then builtins.concatMap unitsOf users else [ "hjem.target" ];
+            wantedBy = lib.optionals onSystemManager [ "multi-user.target" ];
+            unitConfig.RefuseManualStart = false;
+            script = ''
+              ${lib.getExe (builtins.head users).cli} internal cleanup-state \
+                --state-dir ${oldManifests} \
+                ${lib.concatMapStringsSep " " (user: "--enabled-user ${lib.escapeShellArg user.user}") users}
+            '';
+          };
         };
-      };
     }
   );
 }
