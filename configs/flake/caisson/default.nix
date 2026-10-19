@@ -18,6 +18,7 @@
   ];
 
   partitionedAttrs.checks = "checks";
+  partitionedAttrs.containerTests = "checks";
 
   debug = false;
 

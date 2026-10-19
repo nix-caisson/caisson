@@ -12,7 +12,8 @@ name: drift
 # The pinned-world suite (tests/pinned-world) evaluates. The other
 # checks run the upstream tools: the VM test of activation runs
 # home-manager's activation, hjem's CLI and caisson's copies of the
-# units of hjem, and the darwin
+# units of hjem, the container test activates a system-manager machine
+# in an Ubuntu container, and the darwin
 # job applies a standalone hjem configuration and activates a machine on
 # a macOS runner. What they rely on of hjem, such as where
 # `hjem standalone switch` keeps its state, is not part of an interface
@@ -37,6 +38,20 @@ jobs:
       - run: nix build -L '.#checks.x86_64-linux.hjem-system'
       - run: nix build -L '.#checks.x86_64-linux.drift-message'
       - run: nix build -L '.#checks.x86_64-linux.activation-vm'
+  system-manager-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+          extra-conf: |
+            extra-experimental-features = auto-allocate-uids cgroups
+            auto-allocate-uids = true
+            use-cgroups = true
+            extra-system-features = uid-range
+      - run: nix flake update --flake ./tests/dependencies
+      - run: nix build -L '.#containerTests.x86_64-linux.system-manager'
   darwin:
     runs-on: macos-latest
     steps:

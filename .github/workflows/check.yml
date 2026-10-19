@@ -25,6 +25,32 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix flake check -L
+  # A system-manager machine activated in an Ubuntu container
+  # (tests/system-manager-container). system-manager's container test
+  # driver runs the container in the build sandbox, which needs the
+  # `uid-range` system feature, so Nix runs here with
+  # `auto-allocate-uids`.
+  system-manager-container:
+    runs-on: ubuntu-latest
+    env:
+      HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+          extra-conf: |
+            extra-experimental-features = auto-allocate-uids cgroups
+            auto-allocate-uids = true
+            use-cgroups = true
+            extra-system-features = uid-range
+      - if: env.HAVE_CACHIX == 'true'
+        uses: cachix/cachix-action@v17
+        with:
+          name: caisson
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: nix build -L '.#containerTests.x86_64-linux.system-manager'
   # The darwin integration's machine, built on macOS: what evaluation on
   # Linux cannot show, that the system it evaluates builds on darwin.
   # `nix flake check` on the Linux runner checks only x86_64-linux; this
