@@ -28,7 +28,9 @@ jobs:
   # The darwin integration's machine, built on macOS: what evaluation on
   # Linux cannot show, that the system it evaluates builds on darwin.
   # `nix flake check` on the Linux runner checks only x86_64-linux; this
-  # job builds the one check for aarch64-darwin.
+  # job builds the check for aarch64-darwin. It then applies the
+  # standalone hjem configuration of the check on the runner, which
+  # loads the launchd agent caisson adds to its files.
   darwin-build:
     runs-on: macos-latest
     env:
@@ -45,3 +47,4 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
+      - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"

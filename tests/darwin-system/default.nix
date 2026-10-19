@@ -7,7 +7,7 @@
 #
 # The composition is for aarch64-darwin, with a package config whose set
 # there is nixpkgs for aarch64-darwin, and with nixpkgs, nix-darwin,
-# home-manager and hjem declared as its ecosystems. A structural top declares the machine
+# home-manager, hjem and nvf declared as its ecosystems. A structural top declares the machine
 # `probe` from `machine`, and the machine `family`, which is `machine`
 # with a home and a hjem configuration for the user `probe` declared
 # inside it. Evaluating them needs no Mac: the package set
@@ -31,6 +31,7 @@ let
         nix-darwin
         home-manager
         hjem
+        nvf
         ;
     };
     pkgSets = _lib: {
@@ -79,6 +80,23 @@ let
     packages = [ pkgs.hello ];
   };
 
+  # A hjem configuration that is a top, applied with
+  # `hjem standalone switch`, with the nvf configuration
+  # `standalone-editor` inside it. It is for the user `runner`, the user
+  # of the macOS runner of the workflow, which applies it there.
+  standaloneHjem =
+    (lib.caisson.hjem.mkTopConfiguration {
+      configModule =
+        { lib, ... }:
+        {
+          user = "runner";
+          directory = "/Users/runner";
+          caisson.nvf.configurations.standalone-editor = lib.caisson.nvf.mkConfiguration {
+            configModule.vim.viAlias = true;
+          };
+        };
+    }).caisson.manifest;
+
   top = lib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
@@ -112,6 +130,7 @@ in
     lib
     machine
     pkgs
+    standaloneHjem
     system
     top
     ;

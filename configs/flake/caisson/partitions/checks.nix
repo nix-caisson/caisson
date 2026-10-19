@@ -308,7 +308,10 @@
           in
           # The bare machine, and the machine with a home and a hjem
           # configuration inside it, whose system holds the activation
-          # of the home and the launchd agents of hjem.
+          # of the home and the launchd agents of hjem. Beside them, the
+          # manifest of a hjem configuration that is a top and the hjem
+          # CLI, with which the darwin job applies it on the runner
+          # (tests/darwin-system/hjem-standalone.sh).
           probe.pkgs.linkFarm "darwin-system" [
             {
               name = "probe";
@@ -317,6 +320,16 @@
             {
               name = "family";
               path = probe.family.system;
+            }
+            {
+              name = "hjem-standalone/manifest.json";
+              path = probe.pkgs.writeText "manifest-runner.json" (
+                builtins.toJSON probe.standaloneHjem.outputs.manifest
+              );
+            }
+            {
+              name = "hjem-standalone/hjem";
+              path = probe.standaloneHjem.outputs.cli;
             }
           ];
       };

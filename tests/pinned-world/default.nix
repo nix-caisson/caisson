@@ -2003,6 +2003,84 @@ let
       && builtins.toJSON top.caisson == builtins.toJSON "caisson manifest: read caisson.manifest"
       && top.caisson.manifest.type == "hjem";
 
+    # A hjem configuration with no machine above it, with an nvf
+    # configuration inside it, carries in its files what activates the
+    # profile when `hjem standalone switch` applies them: the systemd
+    # user units `caisson-profiles` on Linux, and the launchd agent
+    # `org.caisson.profiles` on macOS, which runs at load, watches the
+    # manifest of the current generation, and runs the script
+    # `caisson-profiles` that activates the profiles. A hjem
+    # configuration inside a machine carries neither, since the machine
+    # activates its profiles.
+    hjemStandaloneCarriesItsProfileActivation =
+      let
+        linux = import ../hjem-system { inherit inputs; };
+        darwin = import ../darwin-system { inherit inputs; };
+        targetsOf = manifest: builtins.map (file: file.target) manifest.files;
+        withEditor =
+          { lib, ... }:
+          {
+            caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
+              ecosystemSrc = inputs.nvf;
+              configModule.vim.viAlias = true;
+            };
+          };
+        standalone = linux.lib.caisson.hjem.mkTopConfiguration {
+          configModule = {
+            imports = [
+              linux.user
+              withEditor
+            ];
+            user = "probe";
+            directory = "/home/probe";
+          };
+        };
+        inside =
+          (linux.lib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.probe-machine = lib.caisson.nixos.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      imports = [ linux.machine ];
+                      caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
+                        configModule = {
+                          imports = [
+                            linux.user
+                            withEditor
+                          ];
+                        };
+                      };
+                    };
+                };
+              };
+          })
+          .caisson.manifest.children.system.${linux.system}.children.nixos.probe-machine.children.system.${linux.system}.children.hjem.probe;
+        units = "/home/probe/.config/systemd/user";
+        unitTargets = [
+          "${units}/caisson-profiles.service"
+          "${units}/default.target.wants/caisson-profiles.service"
+          "${units}/caisson-profiles.path"
+          "${units}/paths.target.wants/caisson-profiles.path"
+        ];
+        agentTarget = "/Users/runner/Library/LaunchAgents/org.caisson.profiles.plist";
+        hasInfix = linux.pkgs.lib.strings.hasInfix;
+        # The text of the agent, as the derivation that writes it holds
+        # it, so that the agent need not be built to be read.
+        agentText =
+          darwin.standaloneHjem.value.config.files."Library/LaunchAgents/org.caisson.profiles.plist".source.text;
+      in
+      builtins.all (target: builtins.elem target (targetsOf standalone.manifest)) unitTargets
+      && !(builtins.any (target: builtins.elem target (targetsOf inside.outputs.manifest)) unitTargets)
+      && !(builtins.elem agentTarget (targetsOf standalone.manifest))
+      && builtins.elem agentTarget (targetsOf darwin.standaloneHjem.outputs.manifest)
+      && hasInfix "/Users/runner/.local/state/hjem/standalone/current/manifest.json" agentText
+      && hasInfix "<key>RunAtLoad</key>" agentText
+      && hasInfix "-caisson-profiles</string>" agentText;
+
     # A hjem configuration inside a NixOS machine takes the home
     # directory of the account the machine declares, and its manifest is
     # the one hjem's own NixOS module makes from the same user module,

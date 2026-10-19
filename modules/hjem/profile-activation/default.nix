@@ -30,6 +30,18 @@
 # login, or after `systemctl --user daemon-reload` and
 # `systemctl --user start caisson-profiles.path caisson-profiles.service`.
 #
+# On macOS, the module adds the launchd agent `org.caisson.profiles` to
+# the files, as `~/Library/LaunchAgents/org.caisson.profiles.plist`. The
+# agent runs the `activate` of each profile when launchd loads it, which
+# it does at login, and when the manifest of the current generation
+# changes. launchd expands no variables in the paths an agent watches,
+# so the agent watches the manifest where hjem keeps it when
+# `XDG_STATE_HOME` is unset,
+# `~/.local/state/hjem/standalone/current/manifest.json`. The switch that
+# first adds the agent activates the profiles at the next login, or
+# after `launchctl bootstrap gui/$(id -u)
+# ~/Library/LaunchAgents/org.caisson.profiles.plist`.
+#
 # caisson's `default` hjem module imports this module. It defines
 # nothing in the childless evaluation.
 { ... }:
@@ -62,6 +74,7 @@ let
   standalone = selection.activatingAncestorOf evalManifest == null;
 
   onLinux = lib.hasSuffix "-linux" (evalManifest.system or "");
+  onDarwin = lib.hasSuffix "-darwin" (evalManifest.system or "");
 
   activateProfiles = pkgs.writeShellScript "caisson-profiles" (
     lib.concatMapStrings (entry: ''
@@ -95,6 +108,15 @@ let
   # The directory of the user's systemd units, relative to the home
   # directory, as hjem's `files` names a file.
   units = ".config/systemd/user";
+
+  agent = pkgs.writeText "org.caisson.profiles.plist" (
+    lib.generators.toPlist { escape = true; } {
+      Label = "org.caisson.profiles";
+      ProgramArguments = [ "${activateProfiles}" ];
+      RunAtLoad = true;
+      WatchPaths = [ "${config.directory}/.local/state/hjem/standalone/current/manifest.json" ];
+    }
+  );
 in
 {
   options.caisson.profiles.selected = lib.mkOption {
@@ -112,12 +134,17 @@ in
   };
 
   config = lib.mkIf (!evalManifest.childless && profiles != [ ]) {
-    files = lib.mkIf (standalone && onLinux) {
-      "${units}/caisson-profiles.service".source = serviceUnit;
-      "${units}/default.target.wants/caisson-profiles.service".source = serviceUnit;
-      "${units}/caisson-profiles.path".source = pathUnit;
-      "${units}/paths.target.wants/caisson-profiles.path".source = pathUnit;
-    };
+    files = lib.mkMerge [
+      (lib.mkIf (standalone && onLinux) {
+        "${units}/caisson-profiles.service".source = serviceUnit;
+        "${units}/default.target.wants/caisson-profiles.service".source = serviceUnit;
+        "${units}/caisson-profiles.path".source = pathUnit;
+        "${units}/paths.target.wants/caisson-profiles.path".source = pathUnit;
+      })
+      (lib.mkIf (standalone && onDarwin) {
+        "Library/LaunchAgents/org.caisson.profiles.plist".source = agent;
+      })
+    ];
 
     packages = lib.mapAttrsToList (
       variable: choice:
