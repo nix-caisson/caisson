@@ -16,10 +16,11 @@ let
   driverImages = containerTest.distros { inherit pkgs; };
   inherit ((containerTest.makeRootfs { inherit pkgs; })) buildRootfs;
 
-  # The units that cannot run in a container, or that wait in one for
-  # what it does not have, so that the boot never finishes:
+  # The units that cannot run in a container, or that wait in a container
+  # for what it does not have, so that the boot never finishes:
   #
-  # - cloud-init waits for the data source of a cloud;
+  # - cloud-init waits for the data source of a cloud, from its units and,
+  #   on Debian 12, from its SysV init scripts, which systemd runs too;
   # - the first-boot wizard of systemd asks on the console for what a
   #   cloud would have provided;
   # - audit needs the audit of the kernel;
@@ -48,6 +49,8 @@ let
     "etc/systemd/system/cloud-init.target.wants/*"
     "etc/systemd/system/multi-user.target.wants/cloud-*"
     "usr/lib/systemd/system/cloud-*"
+    "etc/init.d/cloud-*"
+    "etc/rc*.d/*cloud-*"
     "usr/lib/systemd/system/systemd-remount-fs.service"
     "usr/lib/systemd/system/proc-sys-fs-binfmt_misc.automount"
     "usr/lib/systemd/system/sys-kernel-*"
