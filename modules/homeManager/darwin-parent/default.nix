@@ -32,6 +32,17 @@ let
   # nix-darwin can declare `uid` without a value, so it is read with
   # `tryEval`, as home-manager's nix-darwin module reads it.
   uid = if account == null then null else builtins.tryEval account.uid;
+
+  # Why the machine gives the home no home directory, or null when it
+  # gives one. nix-darwin leaves `home` at `null` until the machine
+  # sets it.
+  missing =
+    if account == null then
+      "declares no account for the user `${config.home.username}` in `users.users`"
+    else if account.home == null then
+      "sets no home directory in `users.users.${config.home.username}.home`, which nix-darwin leaves at `null`"
+    else
+      null;
 in
 {
   config = lib.mkMerge [
@@ -45,9 +56,23 @@ in
       nix.package = lib.mkIf machine.nix.enable machine.nix.package;
     }
 
-    (lib.mkIf (account != null) {
+    (lib.mkIf (missing == null) {
       home.homeDirectory = account.home;
+    })
+    (lib.mkIf (account != null) {
       home.uid = lib.mkIf (uid.success && uid.value != null) uid.value;
+    })
+
+    # When the machine gives no home directory, reading the home
+    # directory fails with a message that says why. home-manager reads
+    # it while it checks the assertions of the home, before the
+    # machine's activation module can refuse the home. A home that sets
+    # its home directory itself replaces this default, and the
+    # activation module refuses that home.
+    (lib.mkIf (missing != null) {
+      home.homeDirectory = lib.mkDefault (
+        throw "caisson: the home of `${config.home.username}` is declared inside a darwin configuration that ${missing}."
+      );
     })
 
     # home-manager leaves its command-line program out of a home that

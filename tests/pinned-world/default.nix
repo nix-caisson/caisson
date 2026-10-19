@@ -1028,6 +1028,72 @@ let
       in
       refused "a,b" && refused "@tagged" && refused "";
 
+    # A node is one evaluation. A NixOS configuration inside a colmena
+    # configuration that puts two systems in force has an evaluation at
+    # each, and the hive refuses it. The top still publishes both
+    # evaluations as NixOS configurations, and each evaluates, so it is
+    # the hive that refuses them. With one system in force the same
+    # tree has one node.
+    colmenaRefusesNodesEvaluatedMoreThanOnce =
+      let
+        systems = [
+          "x86_64-linux"
+          "aarch64-linux"
+        ];
+        twoSystemsLib = core.mkLib {
+          sources = { };
+          inherit systems;
+          projects.caisson = inputs.caisson;
+          defaultEcosystemSrc = {
+            inherit (inputs) nixpkgs colmena;
+          };
+          pkgSets = _lib: {
+            default =
+              { name, parent }:
+              {
+                _type = "caisson-manifest";
+                type = "nixpkgs";
+                inherit name parent;
+                children.nixpkgs = pkgs.lib.genAttrs systems (system: {
+                  _type = "caisson-manifest";
+                  type = "nixpkgs";
+                  name = system;
+                  value = import inputs.nixpkgs { inherit system; };
+                });
+              };
+          };
+        };
+        topAt =
+          inForce:
+          twoSystemsLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.forChildren.systems = inForce;
+                      caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                        configModule = minimalNixosBase;
+                      };
+                    };
+                };
+              };
+          };
+        both = topAt systems;
+        one = topAt [ "x86_64-linux" ];
+      in
+      builtins.attrNames both.nixosConfigurations == [
+        "aarch64-linux/probe"
+        "x86_64-linux/probe"
+      ]
+      && both.nixosConfigurations."aarch64-linux/probe".pkgs.stdenv.hostPlatform.system == "aarch64-linux"
+      && both.nixosConfigurations."x86_64-linux/probe".pkgs.stdenv.hostPlatform.system == "x86_64-linux"
+      && !(builtins.tryEval (builtins.attrNames both.colmenaHive.nodes)).success
+      && builtins.attrNames one.colmenaHive.nodes == [ "probe" ];
+
     # A structural configuration groups NixOS configurations so the
     # group can be declared wherever machines are, as a unit. The same
     # group of two machines is declared under a structural top and
@@ -1493,6 +1559,90 @@ let
       )
       && builtins.attrNames probe.top.homeConfigurations == [ "probe@family" ]
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
+
+    # nix-darwin leaves `users.users.<name>.home` at `null` until the
+    # machine sets it. A darwin machine whose account for `probe` sets
+    # no home directory refuses the home and the hjem configuration of
+    # `probe` declared inside it, where the same machine with the home
+    # directory set evaluates. A home or a hjem configuration that sets
+    # its home directory itself is refused by an assertion of the
+    # machine or of the hjem configuration, which names the user. An
+    # account without `uid` is accepted, as home-manager's nix-darwin
+    # module accepts it, and the home's `home.uid` stays unset.
+    darwinRefusesAccountsWithoutAHomeDirectory =
+      let
+        probe = import ../darwin-system { inherit inputs; };
+        hasInfix = probe.pkgs.lib.strings.hasInfix;
+        fails = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
+        familyWith =
+          {
+            account,
+            home ? probe.home,
+            hjemUser ? probe.hjemUser,
+          }:
+          let
+            top = probe.lib.caisson.structural.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  caisson.darwin.configurations.family = lib.caisson.darwin.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        imports = [ (probe.machine // { users.users.probe = account; }) ];
+                        caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
+                          configModule = home;
+                        };
+                        caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
+                          configModule = hjemUser;
+                        };
+                      };
+                  };
+                };
+            };
+            inside =
+              top.caisson.manifest.children.system.${probe.system}.children.darwin.family.children.system.${probe.system}.children;
+          in
+          {
+            machine = top.darwinConfigurations.family.config;
+            system = top.darwinConfigurations.family.system;
+            home = inside.home-manager.probe.value.config;
+            hjem = inside.hjem.probe.value.config;
+            hjemManifest = builtins.toJSON inside.hjem.probe.outputs.manifest;
+          };
+        refuses =
+          message: assertions:
+          builtins.any (item: !item.assertion && hasInfix message item.message) assertions;
+        complete = familyWith {
+          account = {
+            home = "/Users/probe";
+            uid = 501;
+          };
+        };
+        withoutHome = familyWith { account.uid = 501; };
+        setByUser = familyWith {
+          account.uid = 501;
+          home = {
+            imports = [ probe.home ];
+            home.homeDirectory = "/Users/probe";
+          };
+          hjemUser = {
+            imports = [ probe.hjemUser ];
+            directory = "/Users/probe";
+          };
+        };
+        withoutUid = familyWith { account.home = "/Users/probe"; };
+      in
+      !(fails complete.system.drvPath)
+      && !(fails complete.hjemManifest)
+      && fails withoutHome.system.drvPath
+      && fails withoutHome.hjemManifest
+      && refuses "sets no home directory" setByUser.machine.assertions
+      && refuses "sets no home directory" setByUser.hjem.assertions
+      && withoutUid.home.home.homeDirectory == "/Users/probe"
+      && withoutUid.home.home.uid == null
+      && withoutUid.hjem.directory == "/Users/probe";
 
     # A hjem configuration that is a top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
