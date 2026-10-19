@@ -62,18 +62,24 @@ let
   ofSystem = selection.profilesActivatedBy evalManifest exported;
 
   # The hjem configurations this machine activates, each with the
-  # profiles declared inside it, which the machine passes up as well.
+  # profiles declared inside it, which the machine passes up as well. On
+  # system-manager the unit that applies the files of a hjem user also
+  # activates these profiles (the module `hjem-activation`), so this
+  # module writes no unit for them there.
   hjemUsers =
-    builtins.map
-      (entry: {
-        inherit (entry.manifest.value.config) user;
-        profiles = selection.profilesActivatedBy entry.manifest exported;
-      })
-      (
-        builtins.filter (
-          entry: entry.manifest.type == "hjem" && selection.checksMarkerOf evalManifest entry
-        ) exported
-      );
+    if (evalManifest.type or null) == "system-manager" then
+      [ ]
+    else
+      builtins.map
+        (entry: {
+          inherit (entry.manifest.value.config) user;
+          profiles = selection.profilesActivatedBy entry.manifest exported;
+        })
+        (
+          builtins.filter (
+            entry: entry.manifest.type == "hjem" && selection.checksMarkerOf evalManifest entry
+          ) exported
+        );
 
   # The parts of a unit name: the name of a profile has no `/`
   # (`lib.caisson.integrations.safeName`), and a user name is used as

@@ -2745,7 +2745,9 @@ let
         hjem = children.hjem.probe.value.config;
         names = packages: builtins.map (package: package.name or "") packages;
         systemUnit = box.systemd.services.caisson-profile-nvf-editor;
-        hjemUnit = box.systemd.services.caisson-profile-probe-nvf-hjem-editor;
+        hjemUnit = box.systemd.services."hjem-activate@probe";
+        hjemProfile =
+          children.hjem.probe.children.system.x86_64-linux.children.nvf.hjem-editor.outputs.activationPackage;
       in
       home.home.homeDirectory == "/home/probe"
       # The machine records what it applied, and the home compares
@@ -2756,18 +2758,17 @@ let
       && box.systemd.services ? home-manager-probe
       # system-manager cannot reload a template and restarts each changed
       # unit apart, so a single unit for the user runs the steps of hjem
-      # in order.
-      && box.systemd.services ? "hjem-activate@probe"
+      # in order, and then activates the profile inside the hjem
+      # configuration.
       && !(box.systemd.services ? "hjem-activate@")
       && !(box.systemd.services ? "hjem-reload@probe")
       && !(box.systemd.services ? "hjem-update-state@probe")
-      # The machine activates its profile of the system as root, and the
-      # profile inside the hjem configuration as its user, after hjem
-      # applies the configuration; hjem chooses the profile of the user.
+      && !(box.systemd.services ? caisson-profile-probe-nvf-hjem-editor)
+      && builtins.elem hjemProfile.drvPath (builtins.attrNames (builtins.getContext hjemUnit.script))
+      # The machine activates its profile of the system as root; hjem
+      # chooses the profile of the user.
       && systemUnit.wantedBy == [ "multi-user.target" ]
       && !(systemUnit.serviceConfig ? User)
-      && hjemUnit.serviceConfig.User == "probe"
-      && builtins.elem "hjem-activate@probe.service" hjemUnit.after
       && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (names box.environment.systemPackages)
       &&
         hjem.environment.sessionVariables.CAISSON_NVIM_PROFILE

@@ -102,6 +102,9 @@ let
           extraDependencies
           ;
         inherit (entry.manifest.outputs) manifestFile cli;
+        # The profiles declared inside the hjem configuration, which the
+        # unit of the user activates on system-manager.
+        profiles = lib.caisson.integrations.profilesActivatedBy entry.manifest config.caisson.exports.configurations;
       })
       (
         builtins.filter (entry: isActivatedHere entry && entry.manifest.value.config.enable) (
@@ -199,11 +202,16 @@ let
   # system-manager does neither: it reloads a changed unit by its name,
   # which fails for a template, it restarts each changed unit apart, so
   # the order between the instances does not hold, and it does not stop
-  # `hjem.target`. So on system-manager the machine writes a single unit
-  # for each user, `hjem-activate@<user>`, which runs the steps in order.
-  # Its script names the manifests of this generation, so the unit
-  # changes when the files of a user change, and system-manager restarts
-  # it.
+  # `hjem.target` but restarts it when what it wants changes, which
+  # stops what is part of it. So on system-manager the machine writes a
+  # single unit for each user, `hjem-activate@<user>`, which runs the
+  # steps in order and then activates the profiles declared inside the
+  # hjem configuration, as the user. Its script names the manifests and
+  # the profiles of this generation, so the unit changes when either
+  # changes, and system-manager restarts it. It runs a step as the user
+  # with `setpriv --reset-env`, which sets the environment of the user
+  # from the account and, unlike `runuser`, goes through no PAM
+  # configuration, which another distribution writes in its own way.
   onSystemManager = (lib.caisson-core.evalManifest.type or null) == "system-manager";
 
   # The units `hjem.target` requires for a user.
@@ -288,11 +296,18 @@ in
                 requires = [ "hjem-prepare.service" ];
                 after = [ "hjem-prepare.service" ];
                 scriptArgs = "%i";
-                script = ''
-                  ${pkgs.util-linux}/bin/runuser -u "$1" -- ${activateStep} "$1"
-                  ${pkgs.util-linux}/bin/runuser -u "$1" -- ${reloadStep} "$1"
-                  ${updateStateStep} "$1"
-                '';
+                script =
+                  let
+                    asUser = ''${pkgs.util-linux}/bin/setpriv --reuid "$1" --regid "$(${pkgs.coreutils}/bin/id -g "$1")" --init-groups --reset-env --'';
+                  in
+                  ''
+                    ${asUser} ${activateStep} "$1"
+                    ${asUser} ${reloadStep} "$1"
+                    ${updateStateStep} "$1"
+                  ''
+                  + lib.concatMapStrings (entry: ''
+                    ${asUser} ${entry.manifest.outputs.activationPackage}/activate
+                  '') user.profiles;
               };
             }) users
           )
