@@ -9,8 +9,8 @@
 # It is a function of the view being evaluated: `lib`, the library the
 # evaluation runs on, and `manifest`, the manifest of the evaluation.
 # A NixOS configuration has an evaluation for every system in force
-# where it is declared, so the manifest is that of an evaluation at a
-# system: the name, the system and the package sets come from it.
+# where it is declared, so the manifest is that of the evaluation for
+# one system: the name, the system and the package sets come from it.
 {
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
@@ -29,11 +29,11 @@ let
 
   what =
     if name != null then
-      "the NixOS configuration `${name}` at ${system}"
+      "the NixOS configuration `${name}` for ${system}"
     else
-      "this NixOS configuration at ${system}";
+      "this NixOS configuration for ${system}";
 
-  # The package sets available to the configuration, each at the
+  # The package sets available to the configuration, each for the
   # system of the evaluation, by package config name.
   pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
 

@@ -178,8 +178,8 @@
       # It is a function of the view being evaluated: `lib`, the
       # library of that view, and `manifest`, the manifest of the
       # evaluation. A home has an evaluation for every system in force
-      # where it is declared, so the manifest is that of an evaluation
-      # at a system: the name, the system and the package sets come
+      # where it is declared, so the manifest is that of the evaluation
+      # for one system: the name, the system and the package sets come
       # from it.
       mkCommonArgs =
         {
@@ -197,9 +197,9 @@
           # The system of this evaluation.
           inherit (manifest) system;
 
-          what = if name != null then "the home `${name}` at ${system}" else "this home at ${system}";
+          what = if name != null then "the home `${name}` for ${system}" else "this home for ${system}";
 
-          # The package sets available to the home, each at the system
+          # The package sets available to the home, each for the system
           # of the evaluation, by package config name.
           pkgSets = integrations.pkgSetsAt { inherit context what; } manifest system;
 
@@ -280,7 +280,7 @@
           # conflict. home-manager names these extraSpecialArgs; the
           # caisson name is specialArgs.
           extraSpecialArgs = {
-            # The package sets at the system of the home, by config
+            # The package sets for the system of the home, by config
             # name.
             inherit pkgSets osConfig;
           }
@@ -566,7 +566,7 @@
             # The package set the home runs on: a function that
             # receives the package sets available where it is
             # declared, as an attribute set by package config name,
-            # each at the system of the evaluation, and returns the
+            # each for the system of the evaluation, and returns the
             # set to run on. When absent, the selection of the nearest
             # configuration above, which beneath a NixOS configuration
             # is the set of that configuration, and the set named

@@ -78,11 +78,11 @@
           inherit (manifest) system;
           what =
             if name != null then
-              "the darwin configuration `${name}` at ${system}"
+              "the darwin configuration `${name}` for ${system}"
             else
-              "this darwin configuration at ${system}";
+              "this darwin configuration for ${system}";
 
-          # The package sets available to the configuration, each at the
+          # The package sets available to the configuration, each for the
           # system of the evaluation, and the one it runs on.
           pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
@@ -195,7 +195,7 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each at the system of
+            # declared, by package config name, each for the system of
             # the evaluation, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.

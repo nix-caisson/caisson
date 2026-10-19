@@ -14,7 +14,7 @@
 # composed library, on the selected package set extended with the
 # package overlay of nix-topology, and sets `nixosConfigurations` to
 # the NixOS configurations declared inside the topology configuration,
-# evaluated at its system. Those NixOS configurations get the NixOS
+# evaluated for its system. Those NixOS configurations get the NixOS
 # module of nix-topology by default, through `caisson.forChildren`.
 #
 # The output is `output`, the rendered diagram. The configuration
@@ -79,9 +79,9 @@
           inherit (manifest) system;
           what =
             if name != null then
-              "the topology configuration `${name}` at ${system}"
+              "the topology configuration `${name}` for ${system}"
             else
-              "this topology configuration at ${system}";
+              "this topology configuration for ${system}";
 
           pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
           pkgs = (selection.pkgSetOf { inherit context what; } manifest pkgSets).extend (
@@ -197,7 +197,7 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each at the system of
+            # declared, by package config name, each for the system of
             # the evaluation, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.

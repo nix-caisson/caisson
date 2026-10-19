@@ -89,7 +89,7 @@ let
 
   # Package configs for a composition whose package sets are stand-in
   # values: `pkgSets` on mkLib, declaring a config per name whose set
-  # at x86_64-linux is the value given.
+  # for x86_64-linux is the value given.
   stubPkgSets =
     sets: _lib:
     builtins.mapAttrs (
@@ -1724,7 +1724,7 @@ in
       # Test compositions register caisson's real terranix integration
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
-      # registration. A terranix configuration is evaluated at each
+      # registration. A terranix configuration is evaluated per
       # system the composition declares, here one, so a top is the
       # value of that evaluation: what the stub returns.
       mkResolutionLib =
@@ -2019,7 +2019,7 @@ in
       };
 
       # A NixOS configuration takes its package set from the
-      # composition, at the system the composition declares: the set
+      # composition, for the system the composition declares: the set
       # the `defaultPkgs` argument selects from the available sets, and
       # the set named `default` when nothing selects. Every
       # available set still reaches the modules by config name, as the
@@ -2727,7 +2727,7 @@ in
 
       # The configurations beneath a NixOS configuration, in the tree
       # and at a top: they are in its manifest, under
-      # their system where they are evaluated at one, they see it as
+      # their system where they are evaluated per system, they see it as
       # the nearest NixOS configuration, and a top publishes them with
       # the others.
       "test: a nixos configuration holds configurations beneath it" = {
@@ -2978,16 +2978,16 @@ in
       # An output whose entries are keyed by system is published under
       # the system of each entry first, and named within it from the
       # path without its systems; with `single`, it holds the entry named
-      # `default` at each system. An entry with no system is refused
+      # `default` for each system. An entry with no system is refused
       # there.
       "test: an output keyed by system publishes each entry under its system" = {
         expr =
           let
-            entryAt =
+            entryFor =
               system: name: extra:
               {
                 attrset = "packages";
-                value = "${name} at ${system}";
+                value = "${name} for ${system}";
                 manifest = { };
                 bySystem = true;
                 inherit system;
@@ -3008,36 +3008,36 @@ in
           in
           {
             named = publish [
-              (entryAt "x86_64-linux" "a" { })
-              (entryAt "x86_64-linux" "b" { })
-              (entryAt "aarch64-linux" "a" { })
+              (entryFor "x86_64-linux" "a" { })
+              (entryFor "x86_64-linux" "b" { })
+              (entryFor "aarch64-linux" "a" { })
             ];
             single = publish [
-              (entryAt "x86_64-linux" "default" {
+              (entryFor "x86_64-linux" "default" {
                 attrset = "formatter";
                 single = true;
               })
-              (entryAt "aarch64-linux" "default" {
+              (entryFor "aarch64-linux" "default" {
                 attrset = "formatter";
                 single = true;
               })
             ];
             withoutSystem = refused [
-              (entryAt "x86_64-linux" "a" { })
-              (entryAt "x86_64-linux" "b" { system = null; })
+              (entryFor "x86_64-linux" "a" { })
+              (entryFor "x86_64-linux" "b" { system = null; })
             ];
           };
         expected = {
           named.packages = {
             x86_64-linux = {
-              a = "a at x86_64-linux";
-              b = "b at x86_64-linux";
+              a = "a for x86_64-linux";
+              b = "b for x86_64-linux";
             };
-            aarch64-linux.a = "a at aarch64-linux";
+            aarch64-linux.a = "a for aarch64-linux";
           };
           single.formatter = {
-            x86_64-linux = "default at x86_64-linux";
-            aarch64-linux = "default at aarch64-linux";
+            x86_64-linux = "default for x86_64-linux";
+            aarch64-linux = "default for aarch64-linux";
           };
           withoutSystem = true;
         };
@@ -3182,7 +3182,7 @@ in
           };
         };
       # A composition for homes in a tree: the systems given, the
-      # package configs `default` and `other`, whose set at a system
+      # package configs `default` and `other`, whose set for a system
       # says which it is, NixOS configurations over the stand-in
       # nixpkgs tree, and a home registered under the name `chris`.
       treeLibWith =
@@ -3213,7 +3213,7 @@ in
                     _type = "caisson-manifest";
                     type = "nixpkgs";
                     name = system;
-                    value.marker = "${config} at ${system}";
+                    value.marker = "${config} for ${system}";
                   });
                 }
               );
@@ -3680,16 +3680,16 @@ in
           ];
           alone = {
             user = "chris";
-            set = "default at x86_64-linux";
+            set = "default for x86_64-linux";
             registered = true;
           };
           beneathAMachine = {
             user = "chris";
-            set = "other at x86_64-linux";
+            set = "other for x86_64-linux";
           };
           selecting = {
             user = "someone-else";
-            set = "default at x86_64-linux";
+            set = "default for x86_64-linux";
           };
           aTopHasNoDeclaredName = "";
         };
@@ -4141,13 +4141,13 @@ in
         };
       };
 
-      # Beneath a NixOS configuration at a system, that system is the
-      # one in force, so a home declared there has that evaluation
-      # alone, and each evaluation of the machine publishes its home.
-      # A machine that states other systems for what is beneath it
-      # (`caisson.forChildren.systems`) holds its configurations at
-      # those.
-      "test: a home beneath a machine is evaluated at the system of the machine" = {
+      # Beneath the evaluation of a NixOS configuration for a system,
+      # that system is the one in force, so a home declared there has
+      # that evaluation alone, and each evaluation of the machine
+      # publishes its home. A machine that states other systems for
+      # what is beneath it (`caisson.forChildren.systems`) holds its
+      # configurations for those.
+      "test: a home beneath a machine is evaluated for the system of the machine" = {
         expr =
           let
             lib = treeLibWith [
@@ -5670,7 +5670,7 @@ in
             true;
         expectedError = {
           type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration: this home at x86_64-linux runs on the package set named `default`";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration: this home for x86_64-linux runs on the package set named `default`";
         };
       };
     };

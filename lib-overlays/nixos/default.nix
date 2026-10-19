@@ -160,7 +160,7 @@
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
             # declared, as an attribute set by package config name,
-            # each at the system of the evaluation, and returns the
+            # each for the system of the evaluation, and returns the
             # set to run on. `defaultPkgs = pkgSets: pkgSets.stable;`
             # selects the set of the package config named `stable`.
             # The selection holds for every configuration beneath this

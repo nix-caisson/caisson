@@ -5,7 +5,7 @@
 # dependency pool of the checks partition with `caisson` set to the
 # tree itself.
 #
-# The composition is at x86_64-linux, with a package config whose set
+# The composition is for x86_64-linux, with a package config whose set
 # there is nixpkgs, and with nixpkgs and hjem declared as its
 # ecosystems. `user` is a hjem module with a file and a package.
 # `standalone` is a hjem configuration that is a top, for the user
