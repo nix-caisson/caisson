@@ -142,9 +142,9 @@
 
           # The package set `perSystem` runs on, its `pkgs`: the
           # selection in force at the flake, applied to the package
-          # sets available at each system. A package config that builds
+          # sets available for each system. A package config that builds
           # no set for a system is not among the sets there, and a
-          # flake with no package sets at a system keeps the `pkgs`
+          # flake with no package sets for a system keeps the `pkgs`
           # flake-parts provides. Every available set stays reachable
           # by name, as the `pkgSets` argument of perSystem.
           pkgSetModule = {
@@ -163,7 +163,7 @@
                   lib.mkDefault (
                     selection.pkgSetOf {
                       context = "lib.caisson.flake-parts.mkConfiguration";
-                      what = "the flake at ${system}";
+                      what = "the flake for ${system}";
                     } manifest available
                   )
                 );
@@ -264,7 +264,7 @@
             # mkLib (`pkgSets`) and reach perSystem as `pkgSets`.
             pkgSets ? null,
             # The package set perSystem runs on, its `pkgs`: a function
-            # that receives the package sets available at each system,
+            # that receives the package sets available for each system,
             # as an attribute set by package config name, and returns
             # the set to run on. The
             # selection holds for every configuration beneath the

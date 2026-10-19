@@ -286,7 +286,7 @@
 
         # A macOS machine declared through the darwin integration, built:
         # the system `darwin-rebuild` would build for it. It is the only
-        # check at aarch64-darwin. The pinned-world suite evaluates the
+        # check for aarch64-darwin. The pinned-world suite evaluates the
         # same machine on any host; building it needs a darwin builder,
         # so the darwin job of the workflow builds it on a macOS runner.
         flake.checks.aarch64-darwin.darwin-system =

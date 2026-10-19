@@ -30,7 +30,7 @@
 # would then change nothing, so a configuration that sets them is
 # refused, as one whose `nixpkgs.hostPlatform` differs from the system
 # of the selected set is; package configs and package overlays are
-# declared on `mkLib`. The package sets of the composition at the
+# declared on `mkLib`. The package sets of the composition for the
 # system reach the modules as the `pkgSets` argument.
 {
   mkLibOverlay,
@@ -176,11 +176,11 @@
           inherit (manifest) system;
           what =
             if name != null then
-              "the system-manager configuration `${name}` at ${system}"
+              "the system-manager configuration `${name}` for ${system}"
             else
-              "this system-manager configuration at ${system}";
+              "this system-manager configuration for ${system}";
 
-          # The package sets available to the configuration, each at the
+          # The package sets available to the configuration, each for the
           # system of the evaluation, and the set it runs on: the
           # selection in force at its manifest, applied to those.
           pkgSets = selection.pkgSetsAt { inherit context what; } manifest system;
@@ -330,7 +330,7 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each at the system of
+            # declared, by package config name, each for the system of
             # the evaluation, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.

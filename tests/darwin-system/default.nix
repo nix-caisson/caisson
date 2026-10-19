@@ -5,8 +5,8 @@
 # dependency pool of the checks partition with `caisson` set to the
 # tree itself.
 #
-# The composition is at aarch64-darwin, with a package config whose set
-# there is nixpkgs at aarch64-darwin, and with nixpkgs, nix-darwin,
+# The composition is for aarch64-darwin, with a package config whose set
+# there is nixpkgs for aarch64-darwin, and with nixpkgs, nix-darwin,
 # home-manager and hjem declared as its ecosystems. A structural top declares the machine
 # `probe` from `machine`, and the machine `family`, which is `machine`
 # with a home and a hjem configuration for the user `probe` declared

@@ -181,9 +181,9 @@
 
       # The package sets available to an evaluation, by package config
       # name: the package configs its manifest holds, each projected to
-      # its set at `system`. `context` names the entry point and `what`
+      # its set for `system`. `context` names the entry point and `what`
       # the configuration, for the message of a config that builds no
-      # set at that system.
+      # set for that system.
       pkgSetsAt =
         { context, what }:
         manifest: system:
@@ -1079,7 +1079,7 @@
       # An output whose entries' `exportsTo` says `bySystem` is keyed by
       # the system of each evaluation first, as flakes key `packages`
       # and `formatter`: `<attrset>.<system>`, holding the entries
-      # evaluated at that system, named by the rules above over their
+      # evaluated for that system, named by the rules above over their
       # paths without the systems on them, or the single value there.
       publish =
         entries:

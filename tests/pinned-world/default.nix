@@ -165,7 +165,7 @@ let
   pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
 
   # What a composition declares for the configurations evaluated on
-  # it: the system, and a package config whose set at that system is
+  # it: the system, and a package config whose set for that system is
   # `pkgs`, marked so a configuration can show it runs on this set and
   # not on nixpkgs imported again.
   declaresPkgs = {
@@ -1488,7 +1488,7 @@ let
       && named.nixosConfigurations.nas-1.config.networking.hostName == "nas-1"
       && renamed.nixosConfigurations.nas-1.config.networking.hostName == "storage";
 
-    # A darwin configuration evaluates at aarch64-darwin on any host, and
+    # A darwin configuration evaluates for aarch64-darwin on any host, and
     # builds the system nix-darwin's `darwinSystem` builds from the same
     # module and the same package set. It is published as
     # `darwinConfigurations.<name>` with `system` beside `config`, which
@@ -2246,7 +2246,7 @@ let
       && published.terranixConfigurations.infra.drvPath == terraform.drvPath;
 
     # A system-manager configuration that is a top is its system, built
-    # at the system of the evaluation, and its modules get the composed
+    # for the system of the evaluation, and its modules get the composed
     # library. It runs on the package set caisson selects, the set named
     # `default`, and its userborn is built on that set. A configuration
     # that sets `nixpkgs.overlays`, which that set leaves without effect,

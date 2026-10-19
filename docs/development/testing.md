@@ -27,7 +27,7 @@ plumbing works.
   terranix, system-manager) and exercised end to end: a home
   configuration, a NixOS system with homes declared inside it, a
   colmena hive, disk layouts with the machines installed onto them, a
-  darwin machine evaluated at aarch64-darwin with and without a home
+  darwin machine evaluated for aarch64-darwin with and without a home
   and a hjem configuration inside it, hjem configurations on
   their own and inside a NixOS machine, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
@@ -35,7 +35,7 @@ plumbing works.
   configuration inside the machine, which checks it against hjem's
   schema, and the units that activate it, which runs shellcheck on
   their scripts. The two darwin machines of the suite are also the one
-  check at aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
+  check for aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in
   `tests/dependencies/flake.lock`.
