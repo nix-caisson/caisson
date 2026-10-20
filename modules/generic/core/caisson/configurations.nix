@@ -46,6 +46,34 @@ let
     ) (builtins.attrValues selected.${integration})
   ) (builtins.attrNames selected);
 
+  # What this configuration adds to the export record of what it
+  # passes up, by integration: its `exportNote`, and the files that
+  # define its `exported`. The module system keeps no line for a
+  # definition, so a position here has the file alone. The module
+  # system counts the default of an option among its definitions, at
+  # the priority of `mkOptionDefault`, with the file that declares the
+  # option, so a selector left at its default has no position.
+  defaultPriority = (lib.mkOptionDefault null).priority;
+  levels = lib.genAttrs integrations (
+    integration:
+    let
+      exported = options.caisson.${integration}.exported;
+    in
+    {
+      notes = lib.optional (
+        config.caisson.${integration}.exportNote != null
+      ) config.caisson.${integration}.exportNote;
+      code =
+        if exported.highestPrio >= defaultPriority then
+          [ ]
+        else
+          builtins.map (definition: {
+            inherit (definition) file;
+            line = null;
+          }) exported.definitionsWithLocations;
+    }
+  );
+
   # A registry part of `caisson.exports`, as the configurations passed
   # up export it. A configuration whose integration exports no
   # registries contributes nothing.
@@ -60,6 +88,6 @@ let
 in
 {
   config.caisson.exports = lib.genAttrs [ "libOverlays" "modules" "pkgOverlays" ] passedUp // {
-    configurations = lib.caisson.integrations.entriesOf selected;
+    configurations = lib.caisson.integrations.entriesOf levels selected;
   };
 }

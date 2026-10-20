@@ -54,6 +54,12 @@ in
 
   config = {
     flake = lib.caisson.integrations.publish exports.configurations // {
+      # The manifest of the flake, for the tools that read a top
+      # (`topside --flake`), with the export record of what the flake
+      # publishes, keyed as the outputs are.
+      caisson.manifest = lib.caisson-core.evalManifest // {
+        exportRecord = lib.caisson.integrations.recordOf exports.configurations;
+      };
       # The `lib` output is the composed library of this evaluation.
       #
       # The manifest of this evaluation is in the composed library,
