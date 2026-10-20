@@ -11,10 +11,9 @@
 # PAM configuration and the default services of the distribution, which
 # is what the test runs against.
 #
-# Ubuntu 22.04, Debian 12 and Rocky Linux 9 are not here. Their systemd
-# does not start logind and other services of the distribution in this
-# container, and a test without them would not test the distribution
-# as it ships. The test runs on them in a VM (`vm.nix`).
+# These are the distributions whose systemd starts the services the
+# distribution ships with in this container. The test runs on the
+# others in a VM (`vm.nix`).
 { inputs, pkgs }:
 let
   containerTest = inputs.system-manager.lib.containerTest;

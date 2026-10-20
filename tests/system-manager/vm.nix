@@ -11,8 +11,7 @@
 # the network with DHCP, and mounts the Nix store of the host at
 # `/nix/.ro-store` with an overlay on `/nix/store`.
 #
-# The VM has no Nix installed. The test installs Nix as a host of
-# system-manager has it, with `nix-installer`, in the version
+# The test installs Nix as a host of system-manager has it, with `nix-installer`, in the version
 # system-manager's container test driver installs in a container.
 # `nix-installer` renames what it unpacks into `/nix/store`, which
 # fails across filesystems, so the test first unmounts the overlay. It
@@ -59,10 +58,11 @@ let
 
       start_all()
       machine.wait_for_unit("multi-user.target")
-      # nix-vm-test's unit that grows the root partition onto the larger
-      # disk installs `growpart` first, which needs a network the VM
-      # does not have. The cloud images have `growpart`. Its exit status
-      # 1 means that the partition already fills the disk.
+      # The test grows the root partition onto the larger disk with the
+      # `growpart` of the cloud image. nix-vm-test's unit for that
+      # starts with `apt-get install`, which fails in the VM. An exit
+      # status of 1 from `growpart` means that the partition already
+      # fills the disk.
       machine.succeed(
           "growpart /dev/sda 1 || test $? -eq 1",
           "resize2fs /dev/sda1",

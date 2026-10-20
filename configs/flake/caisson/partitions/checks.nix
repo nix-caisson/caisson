@@ -337,9 +337,9 @@
         # The same machine and sequences in a VM of each distribution
         # below, booted from the cloud image of the distribution with
         # its kernel and its systemd, as
-        # `system-manager-vm-<distribution>`. These are the
-        # distributions whose systemd does not start all of its
-        # services in the container.
+        # `system-manager-vm-<distribution>`. The systemd of these
+        # distributions needs a VM to start logind and the other services
+        # the distribution ships with.
         flake.checks.x86_64-linux = builtins.listToAttrs (
           builtins.map
             (distro: {
