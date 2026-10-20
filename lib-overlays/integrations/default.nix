@@ -263,7 +263,7 @@
       # `exportsTo` may also be a list of such exports, for an
       # integration whose configurations are published in more than
       # one output. It is recorded on the manifest, with
-      # `exportsToPosition`, the file and line where the integration
+      # `exportsToPosition`, the file and line number where the integration
       # wrote it, and applied where the configuration is passed up
       # (`entriesOf`). Null for a configuration that is not published
       # under a name.
@@ -1001,9 +1001,9 @@
         path:
         builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
 
-      # A position as the export record holds it: the file and line of
-      # what `builtins.unsafeGetAttrPos` returns, null when it returns
-      # none.
+      # A position as the export record holds it: the file and the line
+      # number (`line`) of what `builtins.unsafeGetAttrPos` returns, null
+      # when it returns none.
       positionOf = position: if position == null then null else { inherit (position) file line; };
 
       # The entry of a configuration that is passed up under `prefix`,

@@ -48,8 +48,9 @@ let
 
   # What this configuration adds to the export record of what it
   # passes up, by integration: its `exportNote`, and the files that
-  # define its `exported`. The module system keeps no line for a
-  # definition, so a position here has the file alone. The module
+  # define its `exported`. The module system records the file of each
+  # definition of an option but not its line number, so a position
+  # here has the file and a `line` of null. The module
   # system counts the default of an option among its definitions, at
   # the priority of `mkOptionDefault`, with the file that declares the
   # option, so a selector left at its default has no position.
