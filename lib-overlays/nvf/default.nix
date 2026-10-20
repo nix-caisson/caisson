@@ -208,6 +208,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nvf";
+            inherit args;
+          };
           type = "nvf";
           # An nvf configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

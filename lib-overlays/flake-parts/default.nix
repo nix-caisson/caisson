@@ -239,6 +239,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "flake";
+            inherit args;
+          };
           type = "flake-parts";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;

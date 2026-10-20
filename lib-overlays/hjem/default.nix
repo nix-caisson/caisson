@@ -298,6 +298,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "hjem";
+            inherit args;
+          };
           type = "hjem";
           # A hjem configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

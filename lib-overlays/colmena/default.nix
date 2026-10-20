@@ -238,6 +238,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "colmena";
+            inherit args;
+          };
           type = "colmena";
           defaultPkgs = args.defaultPkgs or null;
           inherit (native) exportsTo;

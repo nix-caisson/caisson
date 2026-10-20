@@ -169,6 +169,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "darwin";
+            inherit args;
+          };
           type = "darwin";
           # A darwin configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
