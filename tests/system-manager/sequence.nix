@@ -15,15 +15,16 @@
 # The machine comes in the versions v1 and v2, which caisson evaluates
 # separately (`topOf` below). It declares the profiles of
 # the system `editor` and, in v1 alone, `retired`, a hjem configuration
-# for `alice` with a profile inside it, a home for `carol` with a
-# profile inside it, and in v2 alone a home for `erin`. A file of the
-# machine, of each home and of the hjem configuration names the version,
-# and the Neovims of v2 have `vim`. The test activates v1, v2 and v1
-# again and checks after each step the files, the profiles and the
-# units. It checks that activating v2 and v1 puts the profiles of
-# `alice` and of the system back after they are changed by hand, and
-# that the activation of the home of `carol` in v2, run by hand while
-# the machine runs v1, warns of the drift.
+# for `alice` with a profile inside it, a home-manager configuration for
+# `carol` with a profile inside it, and in v2 alone a home-manager
+# configuration for `erin`. A file of the machine, of each home-manager
+# configuration and of the hjem configuration names the version, and
+# the Neovims of v2 have `vim`. The test activates v1, v2 and v1 again
+# and checks after each step the files, the profiles and the units. It
+# checks that activating v2 and v1 puts the profiles of `alice` and of
+# the system back after they are changed by hand, and that the
+# activation of the home-manager configuration of `carol` in v2, run by
+# hand while the machine runs v1, warns of the drift.
 { inputs }:
 let
   core = inputs.caisson.lib.caisson-core;
@@ -206,8 +207,8 @@ in
     declared = target_of("${profile}")
     alice_declared = target_of(profile_of("alice", "hjem-editor"))
 
-    # v2: everything follows, `retired` is gone, and the home of `erin`
-    # is activated.
+    # v2: everything follows, `retired` is gone, and the home-manager
+    # configuration of `erin` is activated.
     activate("${v2}")
     is_at("v2")
     machine.fail("systemctl cat caisson-profile-nvf-retired.service")
@@ -215,7 +216,8 @@ in
     holds(profile_of("erin", "home-editor"), "v2")
     names("/home/erin/.config/probe/version", "v2")
 
-    # v1 again: everything follows, and the home of `erin` is gone.
+    # v1 again: everything follows, and the home-manager configuration
+    # of `erin` is gone.
     activate("${v1}")
     is_at("v1")
     machine.fail("systemctl cat home-manager-erin.service")
@@ -235,9 +237,10 @@ in
     restored = target_of(profile_of("alice", "hjem-editor"))
     assert restored == alice_declared, f"the profile of alice is {restored}, not {alice_declared}"
 
-    # The activation of the home of `carol` in v2, run by hand while the
-    # machine runs v1, warns of the drift and applies the home; the
-    # activation in v1 is quiet.
+    # The activation of the home-manager configuration of `carol` in v2,
+    # run by hand while the machine runs v1, warns of the drift and
+    # applies the home-manager configuration; the activation in v1 is
+    # quiet.
     out = machine.succeed("runuser -u carol -- ${carolV2}/activate 2>&1")
     assert "was built for a version of the system-manager configuration" in out, out
     names("/home/carol/.config/probe/version", "v2")

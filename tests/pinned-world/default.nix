@@ -367,11 +367,12 @@ let
       };
   };
 
-  # A NixOS configuration with two homes declared inside it, evaluated
-  # with the real home-manager over the real NixOS. The machine
-  # declares the account of the first home. It does not declare the
-  # account of the second, and lists that user as declared elsewhere,
-  # as for an account that systemd-homed manages.
+  # A NixOS configuration with two home-manager configurations
+  # declared inside it, evaluated with the real home-manager over the
+  # real NixOS. The machine declares the account of the first
+  # home-manager configuration. It does not declare the account of the
+  # second, and lists that user as declared elsewhere, as for an
+  # account that systemd-homed manages.
   machineWithHomes = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
@@ -656,9 +657,10 @@ let
 
     homeConfigurationEvaluatesEndToEnd =
       let
-        # A home takes its system and its package set from the
-        # composition, and a top is read as the home-manager CLI
-        # reads it: the evaluated home.
+        # A home-manager configuration takes its system and its
+        # package set from the composition, and a top is read as the
+        # home-manager CLI reads it: the evaluated home-manager
+        # configuration.
         home = hiveLib.caisson.home-manager.mkTopConfiguration {
           ecosystemSrc = inputs.home-manager;
           configModule =
@@ -672,22 +674,26 @@ let
       in
       builtins.isString home.activationPackage.drvPath
       && home.config.home.username == "probe"
-      # The home runs on the package set the composition declares.
+      # The home-manager configuration runs on the package set the
+      # composition declares.
       && home.pkgs.pinnedWorldProbe == "the set the composition declares"
-      # The home-manager command of the home comes from the
-      # home-manager source the home was evaluated with.
+      # The home-manager command of the home-manager configuration
+      # comes from the home-manager source the home-manager
+      # configuration was evaluated with.
       && home.config.programs.home-manager.path == builtins.toString inputs.home-manager;
 
-    # Two homes declared inside a NixOS configuration, evaluated with
-    # the real home-manager over the real NixOS. The machine declares
-    # the account of the first home and not the account of the
-    # second, as with an account that systemd-homed manages.
+    # Two home-manager configurations declared inside a NixOS
+    # configuration, evaluated with the real home-manager over the real
+    # NixOS. The machine declares the account of the first home-manager
+    # configuration and not the account of the second, as with an
+    # account that systemd-homed manages.
     #
-    # Both homes are given the Nix of the machine, and both build an
-    # activation package, which forces home-manager's whole module
-    # tree with the configuration of the machine handed in as
-    # `osConfig`. The first home takes its home directory and its
-    # user ID from the account. The second home sets its home
+    # Each home-manager configuration is given the Nix of the machine,
+    # and each builds an activation package, which forces
+    # home-manager's whole module tree with the configuration of the
+    # machine handed in as `osConfig`. The first home-manager
+    # configuration takes its home directory and its user ID from the
+    # account. The second home-manager configuration sets its home
     # directory itself.
     homesInsideAMachineAreGivenTheMachine =
       let
@@ -710,13 +716,14 @@ let
       && hasTheProgram declared
       && hasTheProgram undeclared;
 
-    # The same machine activates both homes. It writes a system unit
-    # for the home whose account it declares, which runs as that
-    # user, and a user unit for the other home, which runs only for
-    # that user. The script of each unit runs the `activate` program
-    # of the activation package of its home. The system of the
-    # machine evaluates with the units in it, which also checks the
-    # assertions of the machine.
+    # The same machine activates the home-manager configurations
+    # inside it. It writes a system unit for the home-manager
+    # configuration whose account it declares, which runs as that
+    # user, and a user unit for the other home-manager configuration,
+    # which runs only for that user. The script of each unit runs the
+    # `activate` program of the activation package of its home-manager
+    # configuration. The system of the machine evaluates with the
+    # units in it, which also checks the assertions of the machine.
     aMachineActivatesTheHomesInsideIt =
       let
         machine = machineWithHomes.nixosConfigurations.probe.config;
@@ -725,9 +732,9 @@ let
         systemUnit = machine.systemd.services.home-manager-declared;
         userUnit = machine.systemd.user.services.home-manager-undeclared;
         # The script of the unit runs `activate` of the activation
-        # package of the home: the string context of the script records
-        # that it refers to the activation package, and the script runs
-        # an `activate`.
+        # package of the home-manager configuration: the string
+        # context of the script records that it refers to the
+        # activation package, and the script runs an `activate`.
         runs =
           unit: home:
           let
@@ -751,14 +758,15 @@ let
     # file holds the digest of the system of the machine with the
     # configurations declared inside it left out.
     #
-    # The system that the machine builds has the units of the homes in
-    # it. So the digest in the file is the digest of the childless
-    # system, and not of the system that the machine builds.
+    # The system that the machine builds has the units of the
+    # home-manager configurations in it. So the digest in the file is
+    # the digest of the childless system, and not of the system that
+    # the machine builds.
     #
-    # Each home computes the same digest. The activation of each home
-    # has a step that compares that digest with the file. The script of
-    # the step must therefore contain the digest and the path of the
-    # file.
+    # Each home-manager configuration computes the same digest. The
+    # activation of each home-manager configuration has a step that
+    # compares that digest with the file. The script of the step must
+    # therefore contain the digest and the path of the file.
     aMachineRecordsWhatItsHomesCompareAgainst =
       let
         machine = machineWithHomes.nixosConfigurations.probe.config;
@@ -834,16 +842,19 @@ let
       && builtins.isAttrs outputs.images
       && outputs.images != { };
 
-    # The same for a home. A home evaluated alone and the same home
-    # declared inside a structural configuration build the same
-    # activation package.
+    # The same for a home-manager configuration. A home-manager
+    # configuration evaluated alone and the same home-manager
+    # configuration declared inside a structural configuration build
+    # the same activation package.
     #
-    # A home declared inside a machine is given the home directory,
-    # the user ID and the Nix package of the machine, by modules that
-    # the machine passes to its homes by default. A home that passes
-    # `moduleImports` selects its modules itself and gets none of
-    # them. Such a home, inside a machine, must also build the same
-    # activation package as the home evaluated alone.
+    # A home-manager configuration declared inside a machine is given
+    # the home directory, the user ID and the Nix package of the
+    # machine, by modules that the machine passes to its home-manager
+    # configurations by default. A home-manager configuration that
+    # passes `moduleImports` selects its modules itself and gets none
+    # of them. Such a home-manager configuration, inside a machine,
+    # must also build the same activation package as the home-manager
+    # configuration evaluated alone.
     aHomeInsideAParentIsTheSameHome =
       let
         home = {
@@ -1743,14 +1754,15 @@ let
       && probe.configuration.config.nixpkgs.hostPlatform.system == "aarch64-darwin"
       && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
 
-    # A home and a hjem configuration inside a darwin machine take the
-    # home directory and the user ID from the account the machine
-    # declares, and the machine activates both. Its `postActivation`
-    # step runs the activation of the home as the user, as
-    # home-manager's nix-darwin module does, and it installs hjem's
-    # launchd agent in `/Library/LaunchAgents`, which applies a manifest
-    # equal to the one hjem's nix-darwin module makes from the same user
-    # module. The home is published as `probe@family`.
+    # A home-manager configuration and a hjem configuration inside a
+    # darwin machine take the home directory and the user ID from the
+    # account the machine declares, and the machine activates each. Its
+    # `postActivation` step runs the activation of the home-manager
+    # configuration as the user, as home-manager's nix-darwin module
+    # does, and it installs hjem's launchd agent in
+    # `/Library/LaunchAgents`, which applies a manifest equal to the
+    # manifest hjem's nix-darwin module makes from the same user module. The
+    # home-manager configuration is published as `probe@family`.
     darwinActivatesItsHomes =
       let
         probe = import ../darwin-system { inherit inputs; };
@@ -1791,13 +1803,14 @@ let
 
     # nix-darwin leaves `users.users.<name>.home` at `null` until the
     # machine sets it. A darwin machine whose account for `probe` sets
-    # no home directory refuses the home and the hjem configuration of
-    # `probe` declared inside it, where the same machine with the home
-    # directory set evaluates. A home or a hjem configuration that sets
-    # its home directory itself is refused by an assertion of the
-    # machine or of the hjem configuration, which names the user. An
-    # account without `uid` is accepted, as home-manager's nix-darwin
-    # module accepts it, and the home's `home.uid` stays unset.
+    # no home directory refuses the home-manager configuration and the
+    # hjem configuration of `probe` declared inside it, where the same
+    # machine with the home directory set evaluates. A home-manager
+    # configuration or a hjem configuration that sets its home directory
+    # itself is refused by an assertion of the machine or of the hjem
+    # configuration, which names the user. An account without `uid` is
+    # accepted, as home-manager's nix-darwin module accepts it, and the
+    # `home.uid` of the home-manager configuration stays unset.
     darwinRefusesAccountsWithoutAHomeDirectory =
       let
         probe = import ../darwin-system { inherit inputs; };
@@ -2320,8 +2333,8 @@ let
     # `nvfConfigurations.<system>.<name>`, and its Neovim is the one
     # nvf's own `neovimConfiguration` builds
     # from the same module on the same package set. An nvf configuration
-    # declared inside a NixOS machine or a home is published with the
-    # others.
+    # declared inside a NixOS machine or a home-manager configuration is
+    # published with the others.
     nvfIsTheNeovimNvfBuilds =
       let
         module = {
@@ -2395,8 +2408,8 @@ let
       && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
         names machine.environment.systemPackages
       )
-      # The home activates its own profile, after its files are linked,
-      # and chooses it for its shells.
+      # The home-manager configuration activates its profile, after its
+      # files are linked, and chooses it for its shells.
       && pkgs.lib.hasInfix "/activate" home.home.activation.caissonProfiles.data
       &&
         home.home.sessionVariables.CAISSON_NVIM_PROFILE
@@ -2621,14 +2634,14 @@ let
 
     # A machine activates the profile inside a hjem configuration as the
     # user of that hjem configuration and of no other. The machine here
-    # holds hjem configurations for `alice` and `bob` and a home for
-    # `carol`, each with a profile inside it, and a profile of the
-    # system. The configurations inside the machine are at the same
-    # depth, so a machine that matched a profile to the configuration
-    # above it by depth would activate each profile for every user. The
-    # machine writes a unit for the profile of the system, and a unit
-    # for the profile of each hjem user, as that user; the home activates its
-    # profile itself.
+    # holds hjem configurations for `alice` and `bob` and a home-manager
+    # configuration for `carol`, each with a profile inside it, and a
+    # profile of the system. The configurations inside the machine are
+    # at the same depth, so a machine that matched a profile to the
+    # configuration above it by depth would activate each profile for
+    # every user. The machine writes a unit for the profile of the
+    # system, and a unit for the profile of each hjem user, as that
+    # user; the home-manager configuration activates its profile itself.
     profilesBelongToTheConfigurationAboveThem =
       let
         probe = import ../hjem-system { inherit inputs; };
@@ -2687,12 +2700,13 @@ let
       && services.caisson-profile-alice-nvf-alice-editor.serviceConfig.User == "alice"
       && services.caisson-profile-bob-nvf-bob-editor.serviceConfig.User == "bob";
 
-    # A system-manager machine activates the home, the hjem configuration
-    # and the nvf configurations declared inside it, as a NixOS machine
-    # does: the home and the hjem configuration take their directory from
-    # the account the machine declares, the machine writes the units that
-    # activate them and the profiles, installs the packages of the hjem
-    # user, and the home is published as `probe@box`.
+    # A system-manager machine activates the home-manager configuration,
+    # the hjem configuration and the nvf configurations declared inside
+    # it, as a NixOS machine does: the home-manager configuration and the
+    # hjem configuration take their directory from the account the
+    # machine declares, the machine writes the units that activate them
+    # and the profiles, installs the packages of the hjem user, and the
+    # home-manager configuration is published as `probe@box`.
     systemManagerActivatesWhatIsDeclaredInside =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -2750,8 +2764,9 @@ let
           children.hjem.probe.children.system.x86_64-linux.children.nvf.hjem-editor.outputs.activationPackage;
       in
       home.home.homeDirectory == "/home/probe"
-      # The machine records what it applied, and the home compares
-      # against it when activated by hand, as inside a NixOS machine.
+      # The machine records what it applied, and the home-manager
+      # configuration compares against it when activated by hand, as
+      # inside a NixOS machine.
       && box.environment.etc ? "caisson/marker.json"
       && pkgs.lib.hasInfix "/etc/caisson/marker.json" home.home.activation.caissonDrift.data
       && hjem.directory == "/home/probe"

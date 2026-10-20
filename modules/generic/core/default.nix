@@ -19,7 +19,8 @@
 # In an evaluation whose library is not a caisson composition the
 # module declares nothing: a module list that carries it can be handed
 # to an evaluator that runs on a library of its making, as
-# home-manager's NixOS module does for the homes it embeds.
+# home-manager's NixOS module does for the home-manager configurations
+# it embeds.
 { closure-lib, ... }:
 { lib, ... }:
 {

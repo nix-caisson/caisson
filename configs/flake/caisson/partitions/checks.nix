@@ -230,10 +230,11 @@
                     caisson = self;
                   };
                 };
-                # A machine booted in a VM that activates the homes, the
-                # hjem configurations and the profiles declared inside
-                # it, and a standalone hjem configuration, each through
-                # sequences of changes (tests/activation-vm).
+                # A machine booted in a VM that activates the
+                # home-manager configurations, the hjem configurations
+                # and the profiles declared inside it, and a standalone
+                # hjem configuration, each through sequences of changes
+                # (tests/activation-vm).
                 activation-vm = import (self.outPath + "/tests/activation-vm") {
                   inputs = inputs // {
                     caisson = self;
@@ -368,12 +369,14 @@
               };
             };
           in
-          # The bare machine, and the machine with a home and a hjem
-          # configuration inside it, whose system holds the activation
-          # of the home and the launchd agents of hjem. Beside them, the
-          # manifests of a hjem configuration that is a top, in the
-          # versions v1 and v2, and the hjem CLI, with which the darwin job applies
-          # it on the runner (tests/darwin-system/hjem-standalone.sh).
+          # The bare machine, and the machine with a home-manager
+          # configuration and a hjem configuration inside it, whose
+          # system holds the activation of the home-manager
+          # configuration and the launchd agents of hjem. Beside them,
+          # the manifests of a hjem configuration that is a top, in the
+          # versions v1 and v2, and the hjem CLI, with which the darwin
+          # job applies it on the runner
+          # (tests/darwin-system/hjem-standalone.sh).
           probe.pkgs.linkFarm "darwin-system" [
             {
               name = "probe";
@@ -410,8 +413,9 @@
               name = "runner-machine/v2";
               path = (probe.runnerMachineOf "v2").darwinConfigurations.runner-machine.system;
             }
-            # The activation package of the home of `runner` in each
-            # version, which the script runs by hand.
+            # The activation package of the home-manager configuration
+            # of `runner` in each version, which the script runs by
+            # hand.
             {
               name = "runner-machine/home-v1";
               path = (probe.runnerMachineOf "v1").homeConfigurations."runner@runner-machine".activationPackage;

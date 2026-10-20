@@ -2,28 +2,29 @@
 #
 # A NixOS test of what a machine activates, run in a VM, through
 # sequences of changes at each level that activates something: the
-# homes, the hjem configurations and the profiles declared inside the
-# machine, and a standalone hjem configuration. `inputs` is the
-# dependency pool of the checks partition with `caisson` set to the
-# tree itself.
+# home-manager configurations, the hjem configurations and the profiles
+# declared inside the machine, and a standalone hjem configuration.
+# `inputs` is the dependency pool of the checks partition with `caisson`
+# set to the tree itself.
 #
 # The declarations come in the versions v1 and v2. The Neovim of v2
-# has `vim` beside `nvim` and `vi`, and a file of each home and each
-# hjem configuration names the version.
+# has `vim` beside `nvim` and `vi`, and a file of each home-manager
+# configuration and each hjem configuration names the version.
 #
 # The machine declares, in v1 (`declarationsOf` below), the profiles of
 # the system `editor` and `retired`, a hjem configuration for `alice`
-# with a profile inside it, and the homes of `carol` and `dave`, each
-# with a profile inside it. The specialisation `v2` declares v2, which
-# drops `retired` and adds the home of `erin`. The test boots the
-# machine, switches to v2 and back, and checks after each step that the
-# profiles, the files and the units are those of the version the
-# machine runs. It checks that a switch puts the profile of `alice` back
-# after it is changed by hand, and that a boot puts the profiles of the
-# system and of `carol` back.
+# with a profile inside it, and the home-manager configurations of
+# `carol` and `dave`, each with a profile inside it. The specialisation
+# `v2` declares v2, which drops `retired` and adds the home-manager
+# configuration of `erin`. The test boots the machine, switches to v2
+# and back, and checks after each step that the profiles, the files and
+# the units are those of the version the machine runs. It checks that a
+# switch puts the profile of `alice` back after it is changed by hand,
+# and that a boot puts the profiles of the system and of `carol` back.
 #
-# The user `frank` has a home that is a top, with an nvf and a nixvim
-# configuration inside it, which `home-manager switch` would activate.
+# The user `frank` has a home-manager configuration that is a top, with
+# an nvf and a nixvim configuration inside it, which `home-manager
+# switch` would activate.
 # The test runs its activation package as `frank` in v1, v2 and v1
 # again, and checks the profiles and the file after each step, and that
 # activating v1 again puts the nvf profile back after it is changed by
@@ -142,8 +143,9 @@ let
       EOF
     '';
 
-  # A home in a version: the file that names the version, and the nvf
-  # configuration `home-editor` inside it, which the home activates.
+  # A home-manager configuration in a version: the file that names the
+  # version, and the nvf configuration `home-editor` inside it, which
+  # the home-manager configuration activates.
   homeOf =
     version: lib: extra:
     lib.caisson.home-manager.mkConfiguration {
@@ -159,10 +161,11 @@ let
         };
     };
 
-  # The home of `frank` in a version, a home that is a top, which
-  # `home-manager switch` activates: the activation package of the home.
-  # It holds the nvf configuration `home-editor` and the nixvim
-  # configuration `vim-editor`, and the Neovims of v2 have `vim`.
+  # The home-manager configuration of `frank` in a version, a
+  # home-manager configuration that is a top, which `home-manager
+  # switch` activates: the activation package of the home-manager
+  # configuration. It holds the nvf configuration `home-editor` and the
+  # nixvim configuration `vim-editor`, and the Neovims of v2 have `vim`.
   frankOf =
     version:
     (lib.caisson.home-manager.mkTopConfiguration {
@@ -194,9 +197,10 @@ let
   #   profile of the system;
   # - the hjem configuration of `alice` with the nvf configuration
   #   `hjem-editor` inside it;
-  # - the homes of `carol`, whose account the machine declares, and of
-  #   `dave`, whose account is declared elsewhere, and in v2 alone the
-  #   home of `erin`.
+  # - the home-manager configurations of `carol`, whose account the
+  #   machine declares, and of `dave`, whose account is declared
+  #   elsewhere, and in v2 alone the home-manager configuration of
+  #   `erin`.
   declarationsOf =
     version: lib:
     let
@@ -322,8 +326,9 @@ pkgs.testers.runNixOSTest {
     # out of a node by default.
     system.switch.enable = true;
     # The test boots the machine again, and what the first boot added to
-    # the store, such as the environments of the homes, must still be
-    # there, as on a machine whose store is on its disk.
+    # the store, such as the environments of the home-manager
+    # configurations, must still be there, as on a machine whose store
+    # is on its disk.
     virtualisation.writableStoreUseTmpfs = false;
     specialisation.v2.configuration = { lib, ... }: declarationsOf "v2" lib;
   };
@@ -362,8 +367,8 @@ pkgs.testers.runNixOSTest {
           else:
               machine.wait_until_fails(f"test -e {path}/bin/vim", timeout=60)
 
-      # The file of the home or the hjem configuration of `user` names
-      # `version`.
+      # The file of the home-manager configuration or the hjem
+      # configuration of `user` names `version`.
       def has_file(user, version):
           machine.wait_until_succeeds(
               f"grep -qx {version} /home/{user}/.config/probe/version", timeout=60
@@ -373,8 +378,9 @@ pkgs.testers.runNixOSTest {
           machine.succeed(f"{toplevel}/bin/switch-to-configuration test")
 
       # Everything the machine activates is in `version`: the profile of
-      # the system, the hjem configuration of `alice`, the homes of
-      # `carol` and `dave`, and the profiles inside them.
+      # the system, the hjem configuration of `alice`, the home-manager
+      # configurations of `carol` and `dave`, and the profiles inside
+      # them.
       def is_at(version):
           holds("${profile}", version)
           for user, name in [("alice", "hjem-editor"), ("carol", "home-editor"), ("dave", "home-editor")]:
@@ -383,7 +389,8 @@ pkgs.testers.runNixOSTest {
 
       # The machine boots in v1. The account of `dave`, which the machine
       # does not declare, is created, and lingers, so the service manager
-      # of `dave` starts and activates the home with its user unit.
+      # of `dave` starts and activates the home-manager configuration
+      # with its user unit.
       #
       # A switch starts the new units through the active targets, and
       # `multi-user.target` is active only once the boot has reached it,
@@ -413,8 +420,8 @@ pkgs.testers.runNixOSTest {
       assert restored == alice_declared, f"the profile of alice is {restored}, not {alice_declared}"
 
       # The machine switches to v2: everything follows, the unit of the
-      # removed profile `retired` is gone, and the added home of `erin`
-      # is activated.
+      # removed profile `retired` is gone, and the added home-manager
+      # configuration of `erin` is activated.
       switch_to("${v1}/specialisation/v2")
       is_at("v2")
       machine.fail("systemctl cat caisson-profile-nvf-retired.service")
@@ -423,7 +430,7 @@ pkgs.testers.runNixOSTest {
       has_file("erin", "v2")
 
       # And back to v1: everything follows, and the unit of the removed
-      # home of `erin` is gone.
+      # home-manager configuration of `erin` is gone.
       switch_to("${v1}")
       is_at("v1")
       machine.fail("systemctl cat home-manager-erin.service")
@@ -472,11 +479,11 @@ pkgs.testers.runNixOSTest {
       holds("${bobProfile}", "v1")
       has_file("bob", "v1")
 
-      # The home of `frank` is a top, activated as `home-manager switch`
-      # activates it, by its activation package, as `frank`: v1, v2 and
-      # v1 again. The nvf and the nixvim profiles inside it follow, and
-      # activating v1 again puts the nvf profile back after it is changed
-      # by hand.
+      # The home-manager configuration of `frank` is a top, activated as
+      # `home-manager switch` activates it, by its activation package, as
+      # `frank`: v1, v2 and v1 again. The nvf and the nixvim profiles
+      # inside it follow, and activating v1 again puts the nvf profile
+      # back after it is changed by hand.
       def activate_frank(version):
           as_user("frank", f"/etc/caisson/home-frank-{version}/activate")
 

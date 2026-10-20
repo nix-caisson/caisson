@@ -4,18 +4,20 @@
 # Activates the macOS machine `runnerMachineOf` of tests/darwin-system
 # on a macOS machine, through a sequence of changes, and checks after
 # each step the profile of the system, the files of the machine, of the
-# home of `runner` and of the hjem configuration of `runner`, and the
-# profile inside the hjem configuration. The Neovims of v2 have `vim`,
-# those of v1 have not, and each file names the version.
+# home-manager configuration of `runner` and of the hjem configuration
+# of `runner`, and the profile inside the hjem configuration. The
+# Neovims of v2 have `vim`, those of v1 have not, and each file names
+# the version.
 #
 # - v1 is activated: everything is v1;
 # - v2 is activated: everything is v2;
 # - v1 is activated again: everything is v1;
 # - the profile of `runner` and the profile of the system are changed by
 #   hand, and activating v1 again puts the profiles back;
-# - the activation of the home in v2 is run by hand while the machine
-#   runs v1, which warns of the drift and applies the home, and the
-#   activation of the home in v1 is run by hand, which is quiet.
+# - the activation of the home-manager configuration in v2 is run by
+#   hand while the machine runs v1, which warns of the drift and applies
+#   the home-manager configuration, and the activation of the
+#   home-manager configuration in v1 is run by hand, which is quiet.
 #
 # The argument is the output of the check `darwin-system`, which holds
 # the systems of the machine under `runner-machine`. The workflow runs
@@ -108,21 +110,23 @@ is_at v1
 [ "$(readlink -f "$system_profile")" = "$system_declared" ] || fail "the profile of the system was not put back"
 [ "$(readlink -f "$user_profile")" = "$user_declared" ] || fail "the profile of runner was not put back"
 
-# The activation of the home in v2, run by hand while the machine runs
-# v1, warns that the home was built for another version of the machine,
-# and applies the home. The activation of the home in v1 is quiet.
+# The activation of the home-manager configuration in v2, run by hand
+# while the machine runs v1, warns that the home-manager configuration
+# was built for another version of the machine, and applies the
+# home-manager configuration. The activation of the home-manager
+# configuration in v1 is quiet.
 printed="$("$out/runner-machine/home-v2/activate" 2>&1)" \
-  || fail "the activation of the home in v2 failed: $printed"
+  || fail "the activation of the home-manager configuration in v2 failed: $printed"
 case "$printed" in
   *"was built for a version of the darwin configuration"*) ;;
-  *) fail "the activation of the home in v2 printed no warning: $printed" ;;
+  *) fail "the activation of the home-manager configuration in v2 printed no warning: $printed" ;;
 esac
 names "$home_file" v2
 printed="$("$out/runner-machine/home-v1/activate" 2>&1)" \
-  || fail "the activation of the home in v1 failed: $printed"
+  || fail "the activation of the home-manager configuration in v1 failed: $printed"
 case "$printed" in
-  *WARNING*) fail "the activation of the home in v1 warned: $printed" ;;
+  *WARNING*) fail "the activation of the home-manager configuration in v1 warned: $printed" ;;
 esac
 names "$home_file" v1
 
-echo "the machine activates its profiles, its home and the hjem configuration of runner through each activation"
+echo "the machine activates its profiles, its home-manager configuration and the hjem configuration of runner through each activation"

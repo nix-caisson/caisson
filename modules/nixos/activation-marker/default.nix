@@ -5,8 +5,9 @@
 #
 # Why
 #
-# A machine activates the configurations declared inside it: homes,
-# hjem configurations, and the others that have an activation. A user
+# A machine activates the configurations declared inside it:
+# home-manager configurations, hjem configurations, and the others that
+# have an activation. A user
 # can also activate such a configuration by hand, built from the source
 # the user has checked out, for example with `home-manager switch`.
 # That source can describe a different machine than the one that is

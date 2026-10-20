@@ -8,8 +8,9 @@
 # `nixpkgs.pkgs`, so an evaluation carrying NixOS' nixpkgs module has
 # the option that module defines, and an option a configuration reads
 # to show the list reached the evaluation. It also declares the
-# options of a machine that a home declared inside it is given: the
-# accounts under `users.users`, and the Nix the machine runs.
+# options of a machine that a home-manager configuration declared
+# inside it is given: the accounts under `users.users`, and the Nix the
+# machine runs.
 [
   (
     { config, lib, ... }:
@@ -43,9 +44,9 @@
           type = lib.types.str;
           default = "nix-of-the-machine";
         };
-        # The options a machine defines to activate the homes
-        # declared inside it: the systemd units, and the assertions
-        # NixOS checks before it builds a system.
+        # The options a machine defines to activate the home-manager
+        # configurations declared inside it: the systemd units, and the
+        # assertions NixOS checks before it builds a system.
         systemd.services = lib.mkOption {
           type = lib.types.attrsOf lib.types.raw;
           default = { };
@@ -59,8 +60,8 @@
           default = [ ];
         };
         # The files a machine installs under `/etc`. A machine with
-        # homes declared inside it writes a record of which NixOS
-        # configuration it runs there.
+        # home-manager configurations declared inside it writes a
+        # record of which NixOS configuration it runs there.
         environment.etc = lib.mkOption {
           type = lib.types.attrsOf lib.types.raw;
           default = { };
@@ -68,7 +69,8 @@
         # The system the configuration builds. The store path of the
         # stub names how many system units the configuration has, so
         # a test can tell the system of an evaluation that activates
-        # homes from the system of an evaluation that does not.
+        # home-manager configurations from the system of an evaluation
+        # that does not.
         system.build.toplevel = lib.mkOption {
           type = lib.types.raw;
           default = {
@@ -82,8 +84,9 @@
       };
       config.stub.fromBaseModules = true;
       # NixOS hands its modules a set of helpers as the argument
-      # `utils`. The module that activates homes uses the function
-      # that makes a string safe as part of a unit name.
+      # `utils`. The module that activates home-manager configurations
+      # uses the function that makes a string safe as part of a unit
+      # name.
       config._module.args.utils.escapeSystemdPath = name: name;
     }
   )

@@ -7,12 +7,13 @@
 #
 # The composition is for aarch64-darwin, with a package config whose set
 # there is nixpkgs for aarch64-darwin, and with nixpkgs, nix-darwin,
-# home-manager, hjem and nvf declared as its ecosystems. A structural top declares the machine
-# `probe` from `machine`, and the machine `family`, which is `machine`
-# with a home and a hjem configuration for the user `probe` declared
-# inside it. Evaluating them needs no Mac: the package set
-# and the derivations are evaluated for aarch64-darwin wherever the
-# evaluation runs. Building the system needs a darwin builder.
+# home-manager, hjem and nvf declared as its ecosystems. A structural
+# top declares the machine `probe` from `machine`, and the machine
+# `family`, which is `machine` with a home-manager configuration and a
+# hjem configuration for the user `probe` declared inside it.
+# Evaluating them needs no Mac: the package set and the derivations are
+# evaluated for aarch64-darwin wherever the evaluation runs. Building
+# the system needs a darwin builder.
 { inputs }:
 let
   core = inputs.caisson.lib.caisson-core;
@@ -70,7 +71,8 @@ let
     };
   };
 
-  # A home and a hjem configuration for the user `probe`.
+  # A home-manager configuration and a hjem configuration for the user
+  # `probe`.
   home = {
     home.stateVersion = "25.05";
     home.file.".probe".text = "home";
@@ -105,13 +107,14 @@ let
 
   # A top holding a macOS machine for the runner of the workflow, which
   # activates it there, in a version. The machine declares the nvf
-  # configuration `editor`, a profile of the system, a home for
-  # `runner`, the account of the runner, and a hjem configuration for
-  # `runner` with the nvf configuration `hjem-editor` inside it. A file
-  # of the machine, of the home and of the hjem configuration each names
-  # the version, and the Neovims of v2 also have `vim`. nix-darwin manages neither Nix nor zsh here, so
-  # activating the machine leaves the Nix and the `/etc/zshrc` of the
-  # runner as they are.
+  # configuration `editor`, a profile of the system, a home-manager
+  # configuration for `runner`, the account of the runner, and a hjem
+  # configuration for `runner` with the nvf configuration `hjem-editor`
+  # inside it. A file of the machine, of the home-manager configuration
+  # and of the hjem configuration each names the version, and the
+  # Neovims of v2 also have `vim`. nix-darwin manages neither Nix nor
+  # zsh here, so activating the machine leaves the Nix and the
+  # `/etc/zshrc` of the runner as they are.
   runnerMachineOf =
     version:
     let
@@ -139,8 +142,8 @@ let
                 };
                 # A file of the machine itself, so that the machine
                 # without the configurations declared inside it, which
-                # the home checks for drift, differs between the
-                # versions.
+                # the home-manager configuration checks for drift,
+                # differs between the versions.
                 environment.etc."probe/version".text = version;
                 caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
                   configModule = editor;
@@ -174,8 +177,8 @@ let
         caisson.darwin.configurations.probe = lib.caisson.darwin.mkConfiguration {
           configModule = machine;
         };
-        # The same machine, with the home and the hjem configuration of
-        # `probe` declared inside it.
+        # The same machine, with the home-manager configuration and the
+        # hjem configuration of `probe` declared inside it.
         caisson.darwin.configurations.family = lib.caisson.darwin.mkConfiguration {
           configModule =
             { lib, ... }:
@@ -208,8 +211,8 @@ in
   # The machine as darwin-rebuild reads it, and the system it builds.
   configuration = top.darwinConfigurations.probe;
   toplevel = top.darwinConfigurations.probe.system;
-  # The machine with the home and the hjem configuration, and the
-  # manifests of the two inside it.
+  # The machine with the home-manager configuration and the hjem
+  # configuration, and the manifests of the two inside it.
   family = top.darwinConfigurations.family;
   familyManifest = top.caisson.manifest.children.system.${system}.children.darwin.family;
 }

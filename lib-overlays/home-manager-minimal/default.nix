@@ -31,7 +31,7 @@
       # In the tree an evaluation of an alt is a configuration of the
       # integration that owns the class: it is declared under
       # `caisson.home-manager.configurations` and published where
-      # homes are.
+      # home-manager configurations are.
       configuration = over.configuration {
         context = "lib.caisson.home-manager-minimal.mkConfiguration";
         minimal = true;
@@ -72,7 +72,7 @@
               ecosystemArgs ? null,
             }@args:
             configuration args;
-          # A minimal home that is a top, as
+          # A minimal home-manager configuration that is a top, as
           # `lib.caisson.home-manager.mkTopConfiguration` returns it.
           top = final.caisson.integrations.topValue;
         };

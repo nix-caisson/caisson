@@ -22,14 +22,15 @@
 # `hjem.target` at boot, and stops and starts it again at every switch
 # (`X-StopOnReconfiguration`, in the module `hjem-activation`), so the
 # profile is activated each time the files of the user are applied. A
-# profile inside a home is activated by the home.
+# profile inside a home-manager configuration is activated by the
+# home-manager configuration.
 #
 # The machine also installs, in `environment.systemPackages`, the
 # programs with which a shell chooses among the profiles of the system
 # (`lib.caisson.integrations.profileShimsOf`): `nvim` runs the Neovim of
 # the profile `$CAISSON_NVIM_PROFILE` names, and of the default profile
-# of the machine when it is unset. A home or a hjem configuration sets
-# the variable to its own profile.
+# of the machine when it is unset. A home-manager configuration or a
+# hjem configuration sets the variable to its own profile.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
 # under the same name, and the `default` module of each imports it.
