@@ -16,16 +16,21 @@
 # A profile declared inside a hjem configuration inside the machine is
 # a profile of the hjem user. hjem's activation has no step a
 # configuration can add, so the machine activates it, with a unit
-# `caisson-profile-<user>-<kind>-<name>` that runs as the user after the
-# hjem configuration is applied. A profile inside a home is activated by
-# the home.
+# `caisson-profile-<user>-<kind>-<name>` that runs as the user after
+# `hjem-activate@<user>` has applied the hjem configuration. The unit is
+# wanted by `hjem.target` and is part of it. The machine starts
+# `hjem.target` at boot, and stops and starts it again at every switch
+# (`X-StopOnReconfiguration`, in the module `hjem-activation`), so the
+# profile is activated each time the files of the user are applied. A
+# profile inside a home-manager configuration is activated by the
+# home-manager configuration.
 #
 # The machine also installs, in `environment.systemPackages`, the
 # programs with which a shell chooses among the profiles of the system
 # (`lib.caisson.integrations.profileShimsOf`): `nvim` runs the Neovim of
 # the profile `$CAISSON_NVIM_PROFILE` names, and of the default profile
-# of the machine when it is unset. A home or a hjem configuration sets
-# the variable to its own profile.
+# of the machine when it is unset. A home-manager configuration or a
+# hjem configuration sets the variable to its own profile.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
 # under the same name, and the `default` module of each imports it.
@@ -58,18 +63,24 @@ let
   ofSystem = selection.profilesActivatedBy evalManifest exported;
 
   # The hjem configurations this machine activates, each with the
-  # profiles declared inside it, which the machine passes up as well.
+  # profiles declared inside it, which the machine passes up as well. On
+  # system-manager the unit that applies the files of a hjem user also
+  # activates these profiles (the module `hjem-activation`), so this
+  # module writes no unit for them there.
   hjemUsers =
-    builtins.map
-      (entry: {
-        inherit (entry.manifest.value.config) user;
-        profiles = selection.profilesActivatedBy entry.manifest exported;
-      })
-      (
-        builtins.filter (
-          entry: entry.manifest.type == "hjem" && selection.checksMarkerOf evalManifest entry
-        ) exported
-      );
+    if (evalManifest.type or null) == "system-manager" then
+      [ ]
+    else
+      builtins.map
+        (entry: {
+          inherit (entry.manifest.value.config) user;
+          profiles = selection.profilesActivatedBy entry.manifest exported;
+        })
+        (
+          builtins.filter (
+            entry: entry.manifest.type == "hjem" && selection.checksMarkerOf evalManifest entry
+          ) exported
+        );
 
   # The parts of a unit name: the name of a profile has no `/`
   # (`lib.caisson.integrations.safeName`), and a user name is used as
@@ -94,7 +105,8 @@ let
         description = "Activate the ${profile.kind} profile ${profile.name}${
           if user == null then "" else " of ${user}"
         }";
-        wantedBy = [ "multi-user.target" ];
+        wantedBy = if user == null then [ "multi-user.target" ] else [ "hjem.target" ];
+        partOf = if user == null then [ ] else [ "hjem.target" ];
         wants = [ "nix-daemon.socket" ];
         after = [
           "nix-daemon.socket"

@@ -120,7 +120,7 @@ source by.
 | `flake-parts` | `flake-parts` | flake outputs |
 | `nixpkgs` | `nixpkgs` | package sets and overlays |
 | `nixos` | `nixpkgs` | NixOS configurations |
-| `darwin` | `nix-darwin` | macOS machines, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the homes and hjem configurations declared inside them |
+| `darwin` | `nix-darwin` | macOS machines, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the home-manager configurations and hjem configurations declared inside them |
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
@@ -133,12 +133,12 @@ source by.
 | `caisson-facter` | none | the hardware of a machine, a nixos-facter report checked against the report versions caisson knows and extended with a project's options, with the NixOS configurations that run on it declared inside it; a machine gets the report through nixpkgs' `hardware.facter` |
 | `facter` | none | a `facter.json` as nixos-facter writes it, with the NixOS configurations that run on it declared inside it; a machine gets it as `hardware.facter.reportPath` |
 | `treefmt` | `treefmt-nix` | the formatters of a tree, as treefmt-nix modules; the configuration named `default` is published as the `formatter.<system>` that `nix fmt` runs |
-| `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns, kept in a separate Nix profile that the machine, home or hjem configuration it is declared inside activates |
+| `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns, kept in a separate Nix profile that the machine, home-manager configuration or hjem configuration it is declared inside activates |
 | `nixvim` | `nixvim` | a Neovim written as nixvim modules, published as `nixvimConfigurations.<system>.<name>`, kept in a profile as an nvf configuration is |
 | `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `default` is published as `topology.<system>` |
 | `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `kubenixConfigurations.<system>.<name>`, the evaluation, whose `config.kubernetes.result` is the JSON `kubectl apply -f` reads |
 | `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |
-| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the homes and hjem configurations declared inside them, and the profiles of the nvf and nixvim configurations declared inside them |
+| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the home-manager configurations and hjem configurations declared inside them, and the profiles of the nvf and nixvim configurations declared inside them |
 | `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`

@@ -1,19 +1,29 @@
 name: drift
-# The pinned-world suite (tests/pinned-world) against today's upstreams.
-# The pins in tests/dependencies/flake.lock are advanced in the working
-# tree, committing nothing, and the suite check alone is built over
-# them. Red here means an upstream pin moved and broke an expectation
-# caisson holds, not that caisson changed: the committed pins are the
-# last known good and move only in the commit that fixes what the
-# advance broke. The suite check is built alone rather than the whole
-# `nix flake check`, whose eval-weight baseline and formatter would
-# report nixpkgs churn as failures of their own.
+# The checks that hold caisson's expectations of the upstreams, against
+# today's upstreams. The pins in tests/dependencies/flake.lock are
+# advanced in the working tree, committing nothing, and those checks
+# are built over them. Red here means an upstream pin moved and broke an
+# expectation caisson holds, not that caisson changed: the committed
+# pins are the last known good and move only in the commit that fixes
+# what the advance broke. The checks are built by name rather than the
+# whole `nix flake check`, whose eval-weight baseline and formatter
+# would report nixpkgs churn as failures.
+#
+# The pinned-world suite (tests/pinned-world) evaluates. The other
+# checks run the upstream tools: the VM test of activation runs
+# home-manager's activation, hjem's CLI and caisson's copies of the
+# units of hjem, the system-manager tests activate a system-manager
+# machine in containers and VMs of several distributions, and the darwin
+# job applies a standalone hjem configuration and activates a machine on
+# a macOS runner. What they rely on of hjem, such as where
+# `hjem standalone switch` keeps its state, is not part of an interface
+# hjem documents, so only running it shows that it still holds.
 on:
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
 jobs:
-  pinned-world:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -25,3 +35,44 @@ jobs:
           determinate: false
       - run: nix flake update --flake ./tests/dependencies
       - run: nix build -L '.#checks.x86_64-linux.pinned-world'
+      - run: nix build -L '.#checks.x86_64-linux.hjem-system'
+      - run: nix build -L '.#checks.x86_64-linux.drift-message'
+      - run: nix build -L '.#checks.x86_64-linux.activation-vm'
+      - run: nix build -L '.#checks.x86_64-linux.system-manager-vm-ubuntu-22_04'
+      - run: nix build -L '.#checks.x86_64-linux.system-manager-vm-debian-12'
+  system-manager-container:
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - arch
+          - debian-13
+          - fedora-43
+          - fedora-44
+          - rocky-10
+          - ubuntu-24_04
+          - ubuntu-26_04
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+          extra-conf: |
+            extra-experimental-features = auto-allocate-uids cgroups
+            auto-allocate-uids = true
+            use-cgroups = true
+            extra-system-features = uid-range
+      - run: nix flake update --flake ./tests/dependencies
+      - run: nix build -L '.#containerTests.x86_64-linux.system-manager-${{ matrix.distro }}'
+  darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+      - run: nix flake update --flake ./tests/dependencies
+      - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
+      - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"
+      - run: bash tests/darwin-system/runner-machine.sh "$(readlink -f result)"

@@ -11,6 +11,13 @@
     extraInputs = (lib.caisson.pins.flake-compat ../../../../tests/dependencies).sources;
     module =
       { inputs, self, ... }:
+      let
+        # The inputs of the system-manager tests: the dependency pool
+        # with `caisson` set to this tree.
+        testInputs = inputs // {
+          caisson = self;
+        };
+      in
       {
         imports = [ inputs.treefmt-nix.flakeModule ];
         systems = [ "x86_64-linux" ];
@@ -215,11 +222,20 @@
                           "hjem-cleanup.service"
                         ]
                   );
-                # A machine that activates a profile declared inside it,
-                # booted in a VM: the unit puts the profile in place at
-                # boot, and puts it back at the next boot after it is
-                # changed by hand.
-                profile-vm = import (self.outPath + "/tests/profile-vm") {
+                # The warning of a drift check, printed by a real
+                # activation and compared with the text it is written
+                # to print.
+                drift-message = import (self.outPath + "/tests/drift-message") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
+                # A machine booted in a VM that activates the
+                # home-manager configurations, the hjem configurations
+                # and the profiles declared inside it, and a standalone
+                # hjem configuration, each through sequences of changes
+                # (tests/activation-vm).
+                activation-vm = import (self.outPath + "/tests/activation-vm") {
                   inputs = inputs // {
                     caisson = self;
                   };
@@ -293,6 +309,53 @@
               };
           };
 
+        # A system-manager machine activated in a container of each
+        # distribution of tests/system-manager/container-distros.nix,
+        # through sequences of changes, as
+        # `system-manager-<distribution>`. The container runs in the
+        # build sandbox only where Nix runs with
+        # `auto-allocate-uids = true`, so the tests are not checks
+        # `nix flake check` builds; the workflow builds them by name.
+        flake.containerTests.x86_64-linux =
+          let
+            distros = builtins.attrNames (
+              import (self.outPath + "/tests/system-manager/container-distros.nix") {
+                inputs = testInputs;
+                pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+              }
+            );
+          in
+          builtins.listToAttrs (
+            builtins.map (distro: {
+              name = "system-manager-${distro}";
+              value = import (self.outPath + "/tests/system-manager/container.nix") {
+                inputs = testInputs;
+                inherit distro;
+              };
+            }) distros
+          );
+
+        # The same machine and sequences in a VM of each distribution
+        # below, booted from the cloud image of the distribution with
+        # its kernel and its systemd, as
+        # `system-manager-vm-<distribution>`. The systemd of these
+        # distributions needs a VM to start logind and the other services
+        # the distribution ships with.
+        flake.checks.x86_64-linux = builtins.listToAttrs (
+          builtins.map
+            (distro: {
+              name = "system-manager-vm-${distro}";
+              value = import (self.outPath + "/tests/system-manager/vm.nix") {
+                inputs = testInputs;
+                inherit distro;
+              };
+            })
+            [
+              "ubuntu-22_04"
+              "debian-12"
+            ]
+        );
+
         # A macOS machine declared through the darwin integration, built:
         # the system `darwin-rebuild` would build for it. It is the only
         # check for aarch64-darwin. The pinned-world suite evaluates the
@@ -306,9 +369,14 @@
               };
             };
           in
-          # The bare machine, and the machine with a home and a hjem
-          # configuration inside it, whose system holds the activation
-          # of the home and the launchd agents of hjem.
+          # The bare machine, and the machine with a home-manager
+          # configuration and a hjem configuration inside it, whose
+          # system holds the activation of the home-manager
+          # configuration and the launchd agents of hjem. Beside them,
+          # the manifests of a hjem configuration that is a top, in the
+          # versions v1 and v2, and the hjem CLI, with which the darwin
+          # job applies it on the runner
+          # (tests/darwin-system/hjem-standalone.sh).
           probe.pkgs.linkFarm "darwin-system" [
             {
               name = "probe";
@@ -317,6 +385,44 @@
             {
               name = "family";
               path = probe.family.system;
+            }
+            {
+              name = "hjem-standalone/manifest-v1.json";
+              path = probe.pkgs.writeText "manifest-runner-v1.json" (
+                builtins.toJSON (probe.standaloneHjemOf "v1").outputs.manifest
+              );
+            }
+            {
+              name = "hjem-standalone/manifest-v2.json";
+              path = probe.pkgs.writeText "manifest-runner-v2.json" (
+                builtins.toJSON (probe.standaloneHjemOf "v2").outputs.manifest
+              );
+            }
+            {
+              name = "hjem-standalone/hjem";
+              path = probe.standaloneHjem.outputs.cli;
+            }
+            # The machine for the runner in each version, which the
+            # darwin job activates on the runner
+            # (tests/darwin-system/runner-machine.sh).
+            {
+              name = "runner-machine/v1";
+              path = (probe.runnerMachineOf "v1").darwinConfigurations.runner-machine.system;
+            }
+            {
+              name = "runner-machine/v2";
+              path = (probe.runnerMachineOf "v2").darwinConfigurations.runner-machine.system;
+            }
+            # The activation package of the home-manager configuration
+            # of `runner` in each version, which the script runs by
+            # hand.
+            {
+              name = "runner-machine/home-v1";
+              path = (probe.runnerMachineOf "v1").homeConfigurations."runner@runner-machine".activationPackage;
+            }
+            {
+              name = "runner-machine/home-v2";
+              path = (probe.runnerMachineOf "v2").homeConfigurations."runner@runner-machine".activationPackage;
             }
           ];
       };

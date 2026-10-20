@@ -1,44 +1,48 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS module with which a machine activates the homes declared
-# inside it.
+# A NixOS module with which a machine activates the home-manager
+# configurations declared inside it.
 #
-# Activating a home means running the `activate` script of its
-# activation package as the user of the home. The script links the
-# files of the home into the home directory and installs its
-# packages. home-manager has a NixOS module that does this for the
-# homes it embeds. caisson does not use that NixOS module. A home
-# declared inside a NixOS configuration is a caisson configuration,
-# and this module writes the systemd units that activate it, so that
-# switching the machine to a new generation also applies its homes.
+# Activating a home-manager configuration means running the `activate`
+# script of its activation package as the user of the home-manager
+# configuration. The script links the files of the home-manager
+# configuration into the home directory and installs its packages.
+# home-manager has a NixOS module that does this for the home-manager
+# configurations it embeds. caisson does not use that NixOS module. A
+# home-manager configuration declared inside a NixOS configuration is a
+# caisson configuration, and this module writes the systemd units that
+# activate it, so that switching the machine to a new generation also
+# applies its home-manager configurations.
 #
 # caisson's `default` NixOS module imports this module. A NixOS
 # configuration that passes `moduleImports` selects its modules
-# itself, and then its homes are activated only if it lists this
-# module.
+# itself, and then its home-manager configurations are activated only
+# if it lists this module.
 #
-# Which homes
+# Which home-manager configurations
 #
 # The module activates the home-manager configurations that this
-# NixOS configuration passes up: the homes declared inside it, also
-# through a structural configuration, that its
+# NixOS configuration passes up: the home-manager configurations
+# declared inside it, also through a structural configuration, that its
 # `caisson.home-manager.exported` selector selects. It leaves out two
-# kinds. A home declared inside a machine that is itself inside this
-# one belongs to that inner machine. A home evaluated for
-# a system other than the system of this machine cannot run here.
+# kinds. A home-manager configuration declared inside a machine that is
+# itself inside this one belongs to that inner machine. A home-manager
+# configuration evaluated for a system other than the system of this
+# machine cannot run here.
 #
 # Which unit
 #
 # The module expects the machine to declare the account of the user
-# of each home in `users.users`. For such an account, the unit is a
-# system unit named `home-manager-<user>`. It runs as that user during
-# boot, before users can log in. This is the unit home-manager's NixOS
-# module writes.
+# of each home-manager configuration in `users.users`. For such an
+# account, the unit is a system unit named `home-manager-<user>`. It
+# runs as that user during boot, before users can log in. This is the
+# unit home-manager's NixOS module writes.
 #
-# A home whose user has no account in `users.users` is refused, with
-# an assertion that names the home and the user. On most machines such
-# a home is a mistake: a misspelled user name, or a home declared on
-# the wrong machine.
+# A home-manager configuration whose user has no account in
+# `users.users` is refused, with an assertion that names the
+# home-manager configuration and the user. On most machines such a
+# home-manager configuration is a mistake: a misspelled user name, or a
+# home-manager configuration declared on the wrong machine.
 #
 # Some accounts are provided by something other than `users.users`. An
 # account that systemd-homed manages is one. The machine must not
@@ -51,7 +55,7 @@
 # `home-manager-<user>`, with `ConditionUser=<user>`. It runs when the
 # service manager of that user starts, which is at login.
 #
-# The profile of the home
+# The profile of the home-manager configuration
 #
 # Both units run `activate` with no driver version, which is what
 # home-manager calls the legacy behavior: the script also updates the
@@ -60,10 +64,10 @@
 # profile. home-manager's NixOS module passes `--driver-version 1`,
 # which leaves the profile alone.
 #
-# The module reads the homes from the full evaluation of the NixOS
-# configuration. The childless evaluation leaves out the
-# configurations declared inside the NixOS configuration, so there the
-# module defines nothing.
+# The module reads the home-manager configurations from the full
+# evaluation of the NixOS configuration. The childless evaluation
+# leaves out the configurations declared inside the NixOS
+# configuration, so there the module defines nothing.
 #
 # The nixos-minimal integration evaluates NixOS with a module list
 # that has no systemd options and no assertions. A NixOS configuration
@@ -71,11 +75,12 @@
 # nothing.
 #
 # The same module is registered for the `systemManager` class, under
-# the same name, and a system-manager machine activates the homes
-# declared inside it the same way: system-manager declares
-# `users.users` and runs the units, and starts those wanted by
-# `multi-user.target` with `system-manager.target`. The module reads
-# `config.caisson.exports.configurations`, which the core module
+# the same name, and a system-manager machine activates the
+# home-manager configurations declared inside it the same way:
+# system-manager declares `users.users` and runs the units, and starts
+# those wanted by `multi-user.target` with `system-manager.target`. The
+# module reads `config.caisson.exports.configurations`, which the core
+# module
 # declares; it imports the core module of the class of the evaluation,
 # read from its manifest.
 { closure-lib, ... }:
@@ -126,20 +131,21 @@ let
     in
     entry.manifest.type == "home-manager"
     # A machine on the path is a machine inside this machine, and the
-    # home belongs to it.
+    # home-manager configuration belongs to it.
     && !(builtins.any (segment: builtins.elem segment.type machineTypes) above)
     && entry.manifest.system == evalManifest.system;
 
-  # What the units need of each home.
+  # What the units need of each home-manager configuration.
   homes = builtins.map (entry: {
-    # The name the home is published under, for messages.
+    # The name the home-manager configuration is published under, for
+    # messages.
     name = entry.manifest.name;
     inherit (entry.value.config.home) username homeDirectory;
     inherit (entry.value) activationPackage;
   }) (builtins.filter isActivatedHere config.caisson.exports.configurations);
 
-  # True when the machine declares the account of the user of the home
-  # in `users.users`.
+  # True when the machine declares the account of the user of the
+  # home-manager configuration in `users.users`.
   isDeclared = home: config.users.users ? ${home.username};
 
   # The users that have an account on this machine although
@@ -147,9 +153,9 @@ let
   elsewhere = config.caisson.home-manager.activation.usersDeclaredElsewhere;
   isElsewhere = home: builtins.elem home.username elsewhere;
 
-  # The homes whose user has no account the machine knows of: not in
-  # `users.users`, and not listed as declared elsewhere. The module
-  # refuses these.
+  # The home-manager configurations whose user has no account the
+  # machine knows of: not in `users.users`, and not listed as declared
+  # elsewhere. The module refuses these.
   withoutAccount = builtins.filter (home: !(isDeclared home) && !(isElsewhere home)) homes;
 
   # The users that are listed as declared elsewhere and are also in
@@ -164,7 +170,7 @@ let
     description = "Home Manager environment for ${home.username}";
     # The unit is not stopped when its definition changes. The new
     # generation of the machine starts it again, which activates the
-    # new generation of the home.
+    # new generation of the home-manager configuration.
     stopIfChanged = false;
     environment = {
       # Programs that use Qt may run during activation, and they must
@@ -244,8 +250,9 @@ let
       }) selected
     );
 
-  # The users that more than one home names. Two homes for one user
-  # would both write the home directory of that user.
+  # The users that more than one home-manager configuration names.
+  # Several home-manager configurations for the same user would each
+  # write the home directory of that user.
   usernames = builtins.map (home: home.username) homes;
   repeated = lib.lists.unique (
     builtins.filter (username: lib.lists.count (other: other == username) usernames > 1) usernames
@@ -264,18 +271,20 @@ in
       The users that have an account on this machine although
       `users.users` does not declare it.
 
-      A NixOS configuration activates the homes declared inside it.
-      It expects the account of the user of each home in
-      `users.users`, and it refuses a home whose user has no account
-      there, because such a home is usually a mistake: a misspelled
-      user name, or a home declared on the wrong machine.
+      A NixOS configuration activates the home-manager configurations
+      declared inside it. It expects the account of the user of each
+      home-manager configuration in `users.users`, and it refuses a
+      home-manager configuration whose user has no account there,
+      because such a home-manager configuration is usually a mistake:
+      a misspelled user name, or a home-manager configuration declared
+      on the wrong machine.
 
       An account that systemd-homed manages is not in `users.users`.
       systemd-homed keeps the record of the account, and the machine
-      must not declare it a second time. List the user here. The home
-      of a listed user is not refused. It is activated by a user unit
-      that runs when the user logs in, which is when systemd-homed
-      mounts the home directory.
+      must not declare it a second time. List the user here. The
+      home-manager configuration of a listed user is not refused. It
+      is activated by a user unit that runs when the user logs in,
+      which is when systemd-homed mounts the home directory.
 
       A user that is listed here and also declared in `users.users`
       is refused, because the two statements contradict each other.
@@ -292,11 +301,11 @@ in
         {
           assertion = withoutAccount == [ ];
           message = ''
-            caisson: this machine has a home whose user has no account in `users.users`.
+            caisson: this machine has a home-manager configuration whose user has no account in `users.users`.
             ${lib.concatMapStringsSep "\n" (
-              home: "  the home `${home.name}` is for the user `${home.username}`"
+              home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
             ) withoutAccount}
-            Check `home.username` of the home, and that the home is declared inside the right machine.
+            Check `home.username` of the home-manager configuration, and that the home-manager configuration is declared inside the right machine.
             If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
           '';
         }
@@ -310,7 +319,7 @@ in
         {
           assertion = repeated == [ ];
           message = ''
-            caisson: this machine activates more than one home for the same user.
+            caisson: this machine activates more than one home-manager configuration for the same user.
             ${lib.concatMapStringsSep "\n" (
               username:
               "  ${username}: ${

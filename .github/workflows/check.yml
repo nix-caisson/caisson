@@ -25,10 +25,52 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix flake check -L
+  # A system-manager machine activated in a container of each
+  # distribution (tests/system-manager/container.nix). system-manager's
+  # container test driver runs the container in the build sandbox, which
+  # needs the `uid-range` system feature, so Nix runs here with
+  # `auto-allocate-uids`. The list of distributions is that of
+  # tests/system-manager/container-distros.nix. The VMs of the other
+  # distributions are checks, which `nix flake check` builds above.
+  system-manager-container:
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - arch
+          - debian-13
+          - fedora-43
+          - fedora-44
+          - rocky-10
+          - ubuntu-24_04
+          - ubuntu-26_04
+    runs-on: ubuntu-latest
+    env:
+      HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+          extra-conf: |
+            extra-experimental-features = auto-allocate-uids cgroups
+            auto-allocate-uids = true
+            use-cgroups = true
+            extra-system-features = uid-range
+      - if: env.HAVE_CACHIX == 'true'
+        uses: cachix/cachix-action@v17
+        with:
+          name: caisson
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: nix build -L '.#containerTests.x86_64-linux.system-manager-${{ matrix.distro }}'
   # The darwin integration's machine, built on macOS: what evaluation on
   # Linux cannot show, that the system it evaluates builds on darwin.
   # `nix flake check` on the Linux runner checks only x86_64-linux; this
-  # job builds the one check for aarch64-darwin.
+  # job builds the check for aarch64-darwin. It then applies the
+  # standalone hjem configuration of the check on the runner, which
+  # loads the launchd agent caisson adds to its files, and activates a
+  # machine of the check on the runner, through sequences of changes.
   darwin-build:
     runs-on: macos-latest
     env:
@@ -45,3 +87,5 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
+      - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"
+      - run: bash tests/darwin-system/runner-machine.sh "$(readlink -f result)"

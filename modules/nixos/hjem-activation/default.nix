@@ -42,7 +42,8 @@
 #
 # The same module is registered for the `systemManager` class, under
 # the same name, and a system-manager machine activates the hjem
-# configurations declared inside it the same way. system-manager has no
+# configurations declared inside it the same way, with the units
+# written for each user rather than as templates (`perUser` below). system-manager has no
 # `system.extraDependencies`, so there the module keeps no extra
 # dependencies in the system. The module reads
 # `config.caisson.exports.configurations`, which the core module
@@ -101,6 +102,9 @@ let
           extraDependencies
           ;
         inherit (entry.manifest.outputs) manifestFile cli;
+        # The profiles declared inside the hjem configuration, which the
+        # unit of the user activates on system-manager.
+        profiles = lib.caisson.integrations.profilesActivatedBy entry.manifest config.caisson.exports.configurations;
       })
       (
         builtins.filter (entry: isActivatedHere entry && entry.manifest.value.config.enable) (
@@ -135,6 +139,92 @@ let
       *) echo "User '$1' is not configured for hjem" >&2; exit 0 ;;
     esac
   '';
+
+  # The steps of applying the files of a user, each a script that takes
+  # the user: linking the files of the new manifest, given the stored
+  # manifest of the previous generation, as the user; reloading the
+  # systemd units of the user the change touched, as the user; and
+  # storing the new manifest as the state, as root.
+  activateStep = pkgs.writeShellScript "hjem-activate-step" ''
+    set -euo pipefail
+    ${selectUser}
+    "$hjem" internal activate \
+      --manifest "${newManifests}/manifest-$1.json" \
+      --state "${oldManifests}/manifest-$1.json" \
+      --skip-state-update \
+      --prefix "${prefix}" \
+      --json
+  '';
+
+  reloadStep = pkgs.writeShellScript "hjem-reload-step" ''
+    set -euo pipefail
+    export PATH=${
+      lib.makeBinPath [
+        config.systemd.package
+        pkgs.coreutils-full
+      ]
+    }:$PATH
+    ${selectUser}
+    XDG_RUNTIME_DIR=$(loginctl show-user "$1" --property=RuntimePath --value 2>/dev/null || true)
+    if [ -z "$XDG_RUNTIME_DIR" ]; then
+      echo "Could not determine XDG runtime directory for $1. Skipping."
+      exit 0
+    fi
+    export XDG_RUNTIME_DIR
+
+    systemd_status=$(systemctl --user is-system-running 2>&1 || true)
+    if [ "$systemd_status" != "running" ] && [ "$systemd_status" != "degraded" ]; then
+      echo "User systemd for $1 is not running (status: $systemd_status). Skipping."
+      exit 0
+    fi
+
+    "$hjem" internal reload-actions \
+      --old-manifest "${oldManifests}/manifest-$1.json" \
+      --new-manifest "${newManifests}/manifest-$1.json" \
+      --user "$1" \
+      --require-running-systemd
+  '';
+
+  updateStateStep = pkgs.writeShellScript "hjem-update-state-step" ''
+    set -euo pipefail
+    ${selectUser}
+    "$hjem" internal update-state \
+      --manifest "${newManifests}/manifest-$1.json" \
+      --state "${oldManifests}/manifest-$1.json"
+  '';
+
+  # On NixOS the steps are the template units of hjem, `hjem-activate@`,
+  # `hjem-reload@` and `hjem-update-state@`, with an instance for each
+  # user, which `hjem.target` requires and starts in order. A switch
+  # stops and starts `hjem.target` (`X-StopOnReconfiguration`), which
+  # runs the instances again.
+  #
+  # system-manager does neither: it reloads a changed unit by its name,
+  # which fails for a template, it restarts each changed unit apart, so
+  # the order between the instances does not hold, and it does not stop
+  # `hjem.target` but restarts it when what it wants changes, which
+  # stops what is part of it. So on system-manager the machine writes a
+  # single unit for each user, `hjem-activate@<user>`, which runs the
+  # steps in order and then activates the profiles declared inside the
+  # hjem configuration, as the user. Its script names the manifests and
+  # the profiles of this generation, so the unit changes when either
+  # changes, and system-manager restarts it. It runs a step as the user
+  # with `setpriv --reset-env`, which sets the environment of the user
+  # from the account and, unlike `runuser`, goes through no PAM
+  # configuration, which each distribution writes differently.
+  onSystemManager = (lib.caisson-core.evalManifest.type or null) == "system-manager";
+
+  # The units `hjem.target` requires for a user.
+  unitsOf =
+    user:
+    if onSystemManager then
+      [ "hjem-activate@${user.user}.service" ]
+    else
+      [
+        "hjem-activate@${user.user}.service"
+        "hjem-reload@${user.user}.service"
+        "hjem-update-state@${user.user}.service"
+      ];
 
   # The users that more than one hjem configuration names, which would
   # both write the files of that user.
@@ -171,122 +261,118 @@ in
         extraDependencies = builtins.concatMap (user: user.extraDependencies) users;
       };
 
-      systemd.targets.hjem = {
-        description = "hjem file management";
-        unitConfig.X-StopOnReconfiguration = true;
-        after = [ "local-fs.target" ];
-        wantedBy = [
-          "sysinit-reactivation.target"
-          "multi-user.target"
-        ];
-        before = [ "sysinit-reactivation.target" ];
-        requires =
-          builtins.concatMap (user: [
-            "hjem-activate@${user.user}.service"
-            "hjem-reload@${user.user}.service"
-            "hjem-update-state@${user.user}.service"
-          ]) users
-          ++ [ "hjem-cleanup.service" ];
-      };
-
-      systemd.services = {
-        hjem-prepare = {
-          description = "Prepare Hjem manifests directory";
-          enableStrictShellChecks = true;
-          script = "mkdir -p ${oldManifests}";
-          serviceConfig.Type = "oneshot";
-          unitConfig.RefuseManualStart = true;
-        };
-
-        "hjem-activate@" = {
-          description = "Link files for %i from their manifest";
-          enableStrictShellChecks = true;
-          unitConfig.RequiresMountsFor = homeDirectories;
-          serviceConfig = {
-            User = "%i";
-            Type = "oneshot";
-          };
-          requires = [ "hjem-prepare.service" ];
-          after = [ "hjem-prepare.service" ];
-          scriptArgs = "%i";
-          script = ''
-            ${selectUser}
-            "$hjem" internal activate \
-              --manifest "${newManifests}/manifest-$1.json" \
-              --state "${oldManifests}/manifest-$1.json" \
-              --skip-state-update \
-              --prefix "${prefix}" \
-              --json
-          '';
-        };
-
-        "hjem-reload@" = {
-          description = "Reload systemd user units for %i after Hjem file activation";
-          enableStrictShellChecks = true;
-          serviceConfig = {
-            User = "%i";
-            Type = "oneshot";
-          };
-          unitConfig.RequiresMountsFor = homeDirectories;
-          requires = [ "hjem-activate@%i.service" ];
-          after = [ "hjem-activate@%i.service" ];
-          path = [
-            config.systemd.package
-            pkgs.coreutils-full
+      # On system-manager the units of the users depend on nothing that
+      # system-manager could start or stop apart from them: no target and
+      # no unit that prepares the directory of the state.
+      systemd.targets = lib.optionalAttrs (!onSystemManager) {
+        hjem = {
+          description = "hjem file management";
+          unitConfig.X-StopOnReconfiguration = true;
+          after = [ "local-fs.target" ];
+          wantedBy = [
+            "sysinit-reactivation.target"
+            "multi-user.target"
           ];
-          scriptArgs = "%i";
-          script = ''
-            ${selectUser}
-            XDG_RUNTIME_DIR=$(loginctl show-user "$1" --property=RuntimePath --value 2>/dev/null || true)
-            if [ -z "$XDG_RUNTIME_DIR" ]; then
-              echo "Could not determine XDG runtime directory for $1. Skipping."
-              exit 0
-            fi
-            export XDG_RUNTIME_DIR
-
-            systemd_status=$(systemctl --user is-system-running 2>&1 || true)
-            if [ "$systemd_status" != "running" ] && [ "$systemd_status" != "degraded" ]; then
-              echo "User systemd for $1 is not running (status: $systemd_status). Skipping."
-              exit 0
-            fi
-
-            "$hjem" internal reload-actions \
-              --old-manifest "${oldManifests}/manifest-$1.json" \
-              --new-manifest "${newManifests}/manifest-$1.json" \
-              --user "$1" \
-              --require-running-systemd
-          '';
-        };
-
-        "hjem-update-state@" = {
-          description = "Update Hjem state manifest for %i";
-          enableStrictShellChecks = true;
-          serviceConfig.Type = "oneshot";
-          requires = [ "hjem-reload@%i.service" ];
-          unitConfig.RequiresMountsFor = homeDirectories;
-          after = [ "hjem-reload@%i.service" ];
-          scriptArgs = "%i";
-          script = ''
-            ${selectUser}
-            "$hjem" internal update-state \
-              --manifest "${newManifests}/manifest-$1.json" \
-              --state "${oldManifests}/manifest-$1.json"
-          '';
-        };
-
-        hjem-cleanup = {
-          description = "Cleanup disabled users' manifests";
-          enableStrictShellChecks = true;
-          serviceConfig.Type = "oneshot";
-          after = [ "hjem.target" ];
-          unitConfig.RefuseManualStart = false;
-          script = ''
-            ${lib.getExe (builtins.head users).cli} internal cleanup-state \
-              --state-dir ${oldManifests} \
-              ${lib.concatMapStringsSep " " (user: "--enabled-user ${lib.escapeShellArg user.user}") users}
-          '';
+          before = [ "sysinit-reactivation.target" ];
+          requires = builtins.concatMap unitsOf users ++ [ "hjem-cleanup.service" ];
         };
       };
+
+      systemd.services =
+        lib.optionalAttrs (!onSystemManager) {
+          hjem-prepare = {
+            description = "Prepare Hjem manifests directory";
+            enableStrictShellChecks = true;
+            script = "mkdir -p ${oldManifests}";
+            serviceConfig.Type = "oneshot";
+            unitConfig.RefuseManualStart = true;
+          };
+        }
+        // (
+          if onSystemManager then
+            builtins.listToAttrs (
+              builtins.map (user: {
+                name = "hjem-activate@${user.user}";
+                value = {
+                  description = "Apply the files of %i from their manifest";
+                  enableStrictShellChecks = true;
+                  unitConfig.RequiresMountsFor = homeDirectories;
+                  serviceConfig.Type = "oneshot";
+                  wantedBy = [ "multi-user.target" ];
+                  scriptArgs = "%i";
+                  script =
+                    let
+                      asUser = ''${pkgs.util-linux}/bin/setpriv --reuid "$1" --regid "$(${pkgs.coreutils}/bin/id -g "$1")" --init-groups --reset-env --'';
+                    in
+                    ''
+                      mkdir -p ${oldManifests}
+                      ${asUser} ${activateStep} "$1"
+                      ${asUser} ${reloadStep} "$1"
+                      ${updateStateStep} "$1"
+                    ''
+                    + lib.concatMapStrings (entry: ''
+                      ${asUser} ${entry.manifest.outputs.activationPackage}/activate
+                    '') user.profiles;
+                };
+              }) users
+            )
+          else
+            {
+              "hjem-activate@" = {
+                description = "Link files for %i from their manifest";
+                enableStrictShellChecks = true;
+                unitConfig.RequiresMountsFor = homeDirectories;
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
+                requires = [ "hjem-prepare.service" ];
+                after = [ "hjem-prepare.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${activateStep} "$1"'';
+              };
+
+              "hjem-reload@" = {
+                description = "Reload systemd user units for %i after Hjem file activation";
+                enableStrictShellChecks = true;
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
+                unitConfig.RequiresMountsFor = homeDirectories;
+                requires = [ "hjem-activate@%i.service" ];
+                after = [ "hjem-activate@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${reloadStep} "$1"'';
+              };
+
+              "hjem-update-state@" = {
+                description = "Update Hjem state manifest for %i";
+                enableStrictShellChecks = true;
+                serviceConfig.Type = "oneshot";
+                requires = [ "hjem-reload@%i.service" ];
+                unitConfig.RequiresMountsFor = homeDirectories;
+                after = [ "hjem-reload@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${updateStateStep} "$1"'';
+              };
+            }
+        )
+        // {
+          hjem-cleanup = {
+            description = "Cleanup disabled users' manifests";
+            enableStrictShellChecks = true;
+            serviceConfig.Type = "oneshot";
+            after = if onSystemManager then builtins.concatMap unitsOf users else [ "hjem.target" ];
+            wantedBy = lib.optionals onSystemManager [ "multi-user.target" ];
+            unitConfig.RefuseManualStart = false;
+            script = ''
+              ${lib.getExe (builtins.head users).cli} internal cleanup-state \
+                --state-dir ${oldManifests} \
+                ${lib.concatMapStringsSep " " (user: "--enabled-user ${lib.escapeShellArg user.user}") users}
+            '';
+          };
+        };
     }
   );
 }

@@ -10,7 +10,10 @@
 # `~/Library/Application Support/Hjem`, and restarts the agent of each
 # user from the machine's activation script, with `launchctl
 # kickstart`. caisson does not use that nix-darwin module, and this
-# module writes the same agent, script and restart.
+# module writes the same agent and script. For a user who is logged in
+# when the machine is activated, it applies the files in the activation
+# itself and loads the agent of the new generation into the session of
+# the user (`reload` below).
 #
 # hjem's nix-darwin module declares the agent in `launchd.user.agents`,
 # which nix-darwin installs for `system.primaryUser` alone. This module
@@ -104,13 +107,112 @@ let
   activateLabel = "org.hjem.activate";
   appsLabel = "org.nix.link-nix-apps";
 
-  # The activation step that restarts an agent of each user who has a
-  # session, as hjem's nix-darwin module does.
-  kick =
-    label:
+  # The program of the activation agent: it applies the manifest of the
+  # user it runs as.
+  activateProgram = lib.getExe (
+    pkgs.writeShellApplication {
+      name = "hjem-activate";
+      runtimeInputs = [ pkgs.coreutils-full ];
+      text = ''
+        set -euo pipefail
+
+        USER="$(id -un)"
+        ${selectUser}
+        NEW="${newManifests}/manifest-''${USER}.json"
+
+        if [ ! -f "$NEW" ]; then
+          exit 0
+        fi
+
+        STATE_DIR="$HOME/Library/Application Support/Hjem"
+        mkdir -p "$STATE_DIR"
+        CUR="$STATE_DIR/manifest.json"
+
+        "$hjem" internal activate \
+          --manifest "$NEW" \
+          --state "$CUR" \
+          --actions-file "$STATE_DIR/actions.json" \
+          --prefix "${prefix}"
+      '';
+    }
+  );
+
+  # The program of the applications agent.
+  appsProgram = lib.getExe (
+    pkgs.writeShellApplication {
+      name = "link-nix-apps";
+      runtimeInputs = with pkgs; [
+        coreutils-full
+        findutils
+        gnugrep
+        nix
+      ];
+      text = ''
+        set -euo pipefail
+
+        USER="$(id -un)"
+        ${requireUser}
+        GROUP="$(id -gn)"
+        DEST="$HOME/Applications/Nix User Apps"
+        PROFILE="/etc/profiles/per-user/$USER"
+
+        install -d -m 0755 -o "$USER" -g "$GROUP" "$DEST"
+
+        desired="$(mktemp -t desired-apps.XXXXXX)"
+        trap 'rm -f "$desired"' EXIT
+
+        nix-store -qR "$PROFILE" | while IFS= read -r p; do
+          apps="$p/Applications"
+          if [ -d "$apps" ]; then
+            find "$apps" -maxdepth 1 -type d -name "*.app" -print0 \
+            | while IFS= read -r -d "" app; do
+                bname="$(basename "$app")"
+                echo "$bname" >> "$desired"
+                ln -sfn "$app" "$DEST/$bname"
+              done
+          fi
+        done
+
+        sort -u "$desired" -o "$desired"
+
+        find "$DEST" -maxdepth 1 -type l -name "*.app" -print0 \
+        | while IFS= read -r -d "" link; do
+            name="$(basename "$link")"
+            if ! grep -Fxq "$name" "$desired"; then
+              rm -f "$link"
+            fi
+          done
+
+        # Remove broken links
+        find "$DEST" -maxdepth 1 -type l -name "*.app" -print0 \
+          | xargs -0 -I {} bash -c '[[ -e "{}" ]] || rm -f "{}"'
+      '';
+    }
+  );
+
+  # The activation step that applies an agent of each hjem user who has
+  # a session, and loads the agent of this generation into the session.
+  #
+  # nix-darwin installs the agents in `/Library/LaunchAgents` and loads
+  # them as root, which loads them into no session: launchd loads an
+  # agent there into a session when its user logs in. A user who is
+  # logged in when the machine is activated therefore has the agent of
+  # the generation that was current at the login, or none, and
+  # restarting it would apply the files of that generation. So for each
+  # hjem user with a session, the step removes the agent from the
+  # session, runs the program of this generation as the user, which
+  # applies the files before the step returns, and loads the agent of
+  # this generation into the session, where it runs again at the next
+  # login. A user without a session gets the agent at the next login.
+  reload =
+    label: program:
     lib.concatMapStringsSep "\n" (user: ''
-      if uid="$(${lib.getExe' pkgs.coreutils-full "id"} -u ${lib.escapeShellArg user.user} 2>/dev/null)"; then
-        /bin/launchctl kickstart -k "gui/''${uid}/${label}" 2>/dev/null || true
+      if uid="$(${lib.getExe' pkgs.coreutils-full "id"} -u ${lib.escapeShellArg user.user} 2>/dev/null)" \
+        && /bin/launchctl print "gui/''${uid}" > /dev/null 2>&1; then
+        /bin/launchctl bootout "gui/''${uid}/${label}" 2>/dev/null || true
+        /bin/launchctl asuser "$uid" /usr/bin/sudo -u ${lib.escapeShellArg user.user} --set-home ${program} \
+          || echo "caisson: the agent ${label} failed for ${user.user}" >&2
+        /bin/launchctl bootstrap "gui/''${uid}" /Library/LaunchAgents/${label}.plist 2>/dev/null || true
       fi
     '') users;
 
@@ -147,33 +249,7 @@ in
 
     launchd.agents = {
       hjem-activate.serviceConfig = {
-        Program = lib.getExe (
-          pkgs.writeShellApplication {
-            name = "hjem-activate";
-            runtimeInputs = [ pkgs.coreutils-full ];
-            text = ''
-              set -euo pipefail
-
-              USER="$(id -un)"
-              ${selectUser}
-              NEW="${newManifests}/manifest-''${USER}.json"
-
-              if [ ! -f "$NEW" ]; then
-                exit 0
-              fi
-
-              STATE_DIR="$HOME/Library/Application Support/Hjem"
-              mkdir -p "$STATE_DIR"
-              CUR="$STATE_DIR/manifest.json"
-
-              "$hjem" internal activate \
-                --manifest "$NEW" \
-                --state "$CUR" \
-                --actions-file "$STATE_DIR/actions.json" \
-                --prefix "${prefix}"
-            '';
-          }
-        );
+        Program = activateProgram;
         Label = activateLabel;
         RunAtLoad = true;
         StandardOutPath = "/var/tmp/hjem-activate.out";
@@ -181,57 +257,7 @@ in
       };
 
       link-nix-apps.serviceConfig = {
-        Program = lib.getExe (
-          pkgs.writeShellApplication {
-            name = "link-nix-apps";
-            runtimeInputs = with pkgs; [
-              coreutils-full
-              findutils
-              gnugrep
-              nix
-            ];
-            text = ''
-              set -euo pipefail
-
-              USER="$(id -un)"
-              ${requireUser}
-              GROUP="$(id -gn)"
-              DEST="$HOME/Applications/Nix User Apps"
-              PROFILE="/etc/profiles/per-user/$USER"
-
-              install -d -m 0755 -o "$USER" -g "$GROUP" "$DEST"
-
-              desired="$(mktemp -t desired-apps.XXXXXX)"
-              trap 'rm -f "$desired"' EXIT
-
-              nix-store -qR "$PROFILE" | while IFS= read -r p; do
-                apps="$p/Applications"
-                if [ -d "$apps" ]; then
-                  find "$apps" -maxdepth 1 -type d -name "*.app" -print0 \
-                  | while IFS= read -r -d "" app; do
-                      bname="$(basename "$app")"
-                      echo "$bname" >> "$desired"
-                      ln -sfn "$app" "$DEST/$bname"
-                    done
-                fi
-              done
-
-              sort -u "$desired" -o "$desired"
-
-              find "$DEST" -maxdepth 1 -type l -name "*.app" -print0 \
-              | while IFS= read -r -d "" link; do
-                  name="$(basename "$link")"
-                  if ! grep -Fxq "$name" "$desired"; then
-                    rm -f "$link"
-                  fi
-                done
-
-              # Remove broken links
-              find "$DEST" -maxdepth 1 -type l -name "*.app" -print0 \
-                | xargs -0 -I {} bash -c '[[ -e "{}" ]] || rm -f "{}"'
-            '';
-          }
-        );
+        Program = appsProgram;
         Label = appsLabel;
         RunAtLoad = true;
         StandardOutPath = "/var/tmp/link-nix-apps.out";
@@ -239,15 +265,18 @@ in
       };
     };
 
-    # The restart runs in `postActivation`, after nix-darwin's `launchd`
+    # The step runs in `postActivation`, after nix-darwin's `launchd`
     # step installs the agents of the new generation. nix-darwin runs a
     # fixed list of activation steps; hjem's nix-darwin module restarts
     # the activation agent from a step of another name, which nix-darwin
     # does not run, and the applications agent from `applications`,
-    # which runs before the agents are installed.
-    system.activationScripts.postActivation.text = lib.mkAfter ''
-      ${kick activateLabel}
-      ${kick appsLabel}
+    # which runs before the agents are installed. `mkBefore` places the
+    # step before the step of the module `profile-activation`, which
+    # activates the profiles inside the hjem configurations once their
+    # files are applied.
+    system.activationScripts.postActivation.text = lib.mkBefore ''
+      ${reload activateLabel activateProgram}
+      ${reload appsLabel appsProgram}
     '';
   };
 }

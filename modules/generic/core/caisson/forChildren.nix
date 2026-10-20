@@ -65,13 +65,14 @@
         The systems the configurations declared inside this one are
         evaluated for. It applies to configurations that are
         evaluated per system, such as a NixOS configuration or a
-        home: each gets one evaluation per system listed.
+        home-manager configuration: each gets one evaluation per
+        system listed.
 
         When null, a configuration that is itself evaluated per
         system has its children evaluated for its system only, so a
-        home inside a NixOS configuration for x86_64-linux is
-        evaluated for x86_64-linux. Any other configuration passes
-        on the list it was given.
+        home-manager configuration inside a NixOS configuration for
+        x86_64-linux is evaluated for x86_64-linux. Any other
+        configuration passes on the list it was given.
 
         Set it on a NixOS configuration that holds a configuration
         for another architecture, such as an image, or on a

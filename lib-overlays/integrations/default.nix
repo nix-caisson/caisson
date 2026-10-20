@@ -268,7 +268,8 @@
       #
       # `activation` is given by an integration whose configurations
       # are activated on a machine or for a user: NixOS, darwin and
-      # system-manager machines, homes, hjem configurations. It holds
+      # system-manager machines, home-manager configurations, hjem
+      # configurations. It holds
       # two functions of a manifest of the configuration. `identity`
       # returns the store path that names what the activation applies,
       # computed from the childless evaluation, or null where there is
@@ -598,8 +599,9 @@
       # The nearest configuration above `manifest` whose integration is
       # one of `types`, null when there is none. The manifest records
       # the nearest ancestor of each integration; of those, the nearest
-      # is the one with the most ancestors itself. A home reads its
-      # machine this way, which is a NixOS or a darwin configuration.
+      # is the ancestor with the most ancestors itself. A home-manager
+      # configuration reads its machine this way, which is a NixOS or a
+      # darwin configuration.
       nearestOf =
         types: manifest:
         builtins.foldl' (
@@ -617,9 +619,10 @@
 
       # The nearest configuration above `manifest` that has an
       # activation (`mkModuleConfiguration`'s `activation`), as its
-      # childless manifest, or null when there is none. A home inside a
-      # NixOS machine finds the machine; an nvf configuration inside
-      # that home finds the home.
+      # childless manifest, or null when there is none. A home-manager
+      # configuration inside a NixOS machine finds the machine; an nvf
+      # configuration inside that home-manager configuration finds the
+      # home-manager configuration.
       activatingAncestorOf =
         manifest:
         let
@@ -700,7 +703,20 @@
         (entry.manifest.activation or null) != null
         && !(entry.manifest.activation.standsAlone or false)
         && ancestor != null
-        && builtins.length (ancestor.ancestors or [ ]) == builtins.length (manifest.ancestors or [ ]);
+        && placeOf ancestor == placeOf manifest;
+
+      # Where a configuration is in the tree: the integration and the name
+      # of each configuration from the top down to it, the nodes of the
+      # systems included. Configurations at the same depth have
+      # different places, such as a home-manager configuration and a
+      # hjem configuration inside the same machine, and the childless
+      # and the full manifest of a
+      # configuration have the same place.
+      placeOf =
+        manifest:
+        builtins.map (node: "${node.type or "lib"}/${toString (node.name or "")}") (
+          (manifest.ancestors or [ ]) ++ [ manifest ]
+        );
 
       # The shell text with which the activation of the configuration of
       # `manifest` checks for drift: it compares the marker of the
@@ -727,6 +743,10 @@
           # The digest of the identity, quoted for the shell. A digest is
           # hexadecimal, so quoting it whole is enough.
           escaped = "'${digestOf expected}'";
+          # A line of the warning, quoted for the shell as it is. The
+          # names in it are in backticks, which the shell would run
+          # inside double quotes.
+          say = text: "echo ${final.escapeShellArg text} >&2";
         in
         if expected == null then
           ""
@@ -735,20 +755,20 @@
             _caissonMarker="${marker}"
             if [ ! -f "$_caissonMarker" ]; then
               echo "WARNING: $_caissonMarker does not exist." >&2
-              echo "  ${self} is declared inside ${above}," >&2
-              echo "  and the activation of ${above} has not recorded what it applied." >&2
-              echo "  Activate ${above} as this configuration was built with it," >&2
-              echo "  or set ${optionText} to false in ${self}." >&2
+              ${say "  ${self} is declared inside ${above},"}
+              ${say "  and the activation of ${above} has not recorded what it applied."}
+              ${say "  Activate ${above} as this configuration was built with it,"}
+              ${say "  or set ${optionText} to false in ${self}."}
             else
               _caissonApplied="$(${jq} -r '.identity // empty' < "$_caissonMarker")"
               if [ "$_caissonApplied" != ${escaped} ]; then
-                echo "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied." >&2
-                echo "  digest of the version applied (configurations declared inside it left out):" >&2
+                ${say "WARNING: ${self} was built for a version of ${above} that differs from the version that is applied."}
+                ${say "  digest of the version applied (configurations declared inside it left out):"}
                 echo "    ''${_caissonApplied:-unknown}" >&2
-                echo "  digest of the version built for (configurations declared inside it left out):" >&2
+                ${say "  digest of the version built for (configurations declared inside it left out):"}
                 echo "    "${escaped} >&2
-                echo "  Activate ${above} as this configuration was built with it," >&2
-                echo "  or set ${optionText} to false in ${self}." >&2
+                ${say "  Activate ${above} as this configuration was built with it,"}
+                ${say "  or set ${optionText} to false in ${self}."}
               fi
             fi
           '';
@@ -763,8 +783,8 @@
         );
 
       # A configuration that is a program a person runs, such as a
-      # Neovim, kept in a Nix profile of its own, the way a home keeps
-      # its generations in the home-manager profile.
+      # Neovim, kept in a Nix profile of its own, the way a home-manager
+      # configuration keeps its generations in the home-manager profile.
       #
       # `activationPackage` holds `activate`, which checks for drift
       # against the nearest configuration above with an activation
@@ -777,8 +797,8 @@
       # Where the profile is depends on the configuration above. Inside
       # a machine it is a profile of the system,
       # `/nix/var/nix/profiles/caisson/<kind>/<name>`, which the machine
-      # activates as root. Inside a home or a hjem configuration, or as
-      # a top, it is a profile of the user,
+      # activates as root. Inside a home-manager configuration or a hjem
+      # configuration, or as a top, it is a profile of the user,
       # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
       # names `$HOME` and not `$XDG_STATE_HOME`: the units of a machine
       # run without `$XDG_STATE_HOME`, and a shell may set it, and the
@@ -855,8 +875,9 @@
       # configuration of `manifest` that it activates as profiles
       # (`profileOf`): those with a `profile`, evaluated for the system
       # of the configuration, whose nearest configuration above with an
-      # activation is this one. A profile inside a home inside this
-      # machine is the home's to activate, and is left out.
+      # activation is this one. A profile inside a home-manager
+      # configuration inside this machine is activated by that
+      # home-manager configuration, and is left out.
       profilesActivatedBy =
         manifest: configurations:
         builtins.filter (

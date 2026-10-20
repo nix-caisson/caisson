@@ -24,11 +24,12 @@ plumbing works.
 
 - **Scope:** caisson composed with concrete pinned versions of the upstream
   world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem,
-  terranix, system-manager) and exercised end to end: a home
-  configuration, a NixOS system with homes declared inside it, a
-  colmena hive, disk layouts with the machines installed onto them, a
-  darwin machine evaluated for aarch64-darwin with and without a home
-  and a hjem configuration inside it, hjem configurations on
+  terranix, system-manager) and exercised end to end: a home-manager
+  configuration, a NixOS system with home-manager configurations
+  declared inside it, a colmena hive, disk layouts with the machines
+  installed onto them, a darwin machine evaluated for aarch64-darwin
+  with and without a home-manager configuration and a hjem
+  configuration inside it, hjem configurations on
   their own and inside a NixOS machine, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
   overlays. The `hjem-system` check builds the manifest file of the hjem

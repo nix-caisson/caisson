@@ -8,8 +8,9 @@
 # each profile of the system as root, and of each profile declared
 # inside a hjem configuration inside the machine as its user, through
 # `launchctl asuser` and `sudo`, after the hjem agents are restarted. A
-# profile inside a home is activated by the home. The machine installs
-# the programs that choose among the profiles of the system in
+# profile inside a home-manager configuration is activated by the
+# home-manager configuration. The machine installs the programs that
+# choose among the profiles of the system in
 # `environment.systemPackages`.
 #
 # caisson's `default` darwin module imports this module. It defines

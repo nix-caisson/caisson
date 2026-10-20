@@ -5,14 +5,15 @@
 # `moduleImports`, so this is what a darwin configuration gets from
 # caisson when it does not select its modules itself.
 #
-# It holds what a macOS machine does for the homes and the hjem
-# configurations declared inside it:
+# It holds what a macOS machine does for the home-manager
+# configurations and the hjem configurations declared inside it:
 #
-# - `./caisson/forChildren.nix` gives each home the home-manager module
-#   `darwin-parent`, and each hjem configuration the hjem module
-#   `darwin-parent`. Both set the options that come from the machine.
-# - The registered module `home-manager-activation` activates the homes
-#   when the machine is activated.
+# - `./caisson/forChildren.nix` gives each home-manager configuration
+#   the home-manager module `darwin-parent`, and each hjem
+#   configuration the hjem module `darwin-parent`. Both set the options
+#   that come from the machine.
+# - The registered module `home-manager-activation` activates the
+#   home-manager configurations when the machine is activated.
 # - The registered module `hjem-activation` writes the launchd agents
 #   that apply the hjem configurations.
 #

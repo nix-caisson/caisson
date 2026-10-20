@@ -770,9 +770,9 @@ in
       };
     };
 
-    # The machine of a home is the nearest NixOS or darwin configuration
-    # above it: of the nearest ancestor of each integration, the one with
-    # the most ancestors.
+    # The machine of a home-manager configuration is the nearest NixOS
+    # or darwin configuration above it: of the nearest ancestor of each
+    # integration, the ancestor with the most ancestors.
     "test: nearestOf finds the nearest ancestor of the given integrations" = {
       expr =
         let
@@ -3088,8 +3088,9 @@ in
       # different as a tree, so an evaluation can name another
       # home-manager and nothing but the refusal stands in its way.
       hmStubCopy = inputs.parent.outPath + "/tests/unit/home-manager-stub";
-      # A home takes its system and its package set from the
-      # composition: one system, and a stand-in set named `default`.
+      # A home-manager configuration takes its system and its package
+      # set from the composition: one system, and a stand-in set named
+      # `default`.
       homeComposition = {
         systems = [ "x86_64-linux" ];
         pkgSets = stubPkgSets { default = { }; };
@@ -3181,10 +3182,11 @@ in
             nixpkgs = lib.isFunction lib.id;
           };
         };
-      # A composition for homes in a tree: the systems given, the
-      # package configs `default` and `other`, whose set for a system
-      # says which it is, NixOS configurations over the stand-in
-      # nixpkgs tree, and a home registered under the name `chris`.
+      # A composition for home-manager configurations in a tree: the
+      # systems given, the package configs `default` and `other`, whose
+      # set for a system says which it is, NixOS configurations over
+      # the stand-in nixpkgs tree, and a home-manager configuration
+      # registered under the name `chris`.
       treeLibWith =
         systems:
         caisson.mkLib {
@@ -3247,10 +3249,11 @@ in
             );
           };
         };
-      # A tree with a home alone and a machine `laptop` on the set
-      # `other` with two homes, the second naming another user and
-      # selecting `default`. `serving` adds a machine `server` that
-      # holds a configuration for another system.
+      # A tree with a home-manager configuration alone and a machine
+      # `laptop` on the set `other` with two home-manager
+      # configurations, the second naming another user and selecting
+      # `default`. `serving` adds a machine `server` that holds a
+      # configuration for another system.
       home = lib: args: lib.caisson.home-manager.mkConfiguration ({ check = false; } // args);
       treeWith =
         { serving }:
@@ -3286,8 +3289,9 @@ in
             };
           };
         };
-      # A home finalized as a top, read as the home-manager CLI reads
-      # it: the evaluated home.
+      # A home-manager configuration finalized as a top, read as the
+      # home-manager CLI reads it: the evaluated home-manager
+      # configuration.
       configuration = myLib.caisson.home-manager.mkTopConfiguration {
         configModule = probeModule;
         check = false;
@@ -3395,8 +3399,8 @@ in
       # The evaluation composes home-manager's module list from the
       # declared source and hands it `modulesPath`, the special
       # argument home-manager's news entries interpolate. It asks for
-      # the list without home-manager's nixpkgs module, so the home
-      # runs on the package set it is given.
+      # the list without home-manager's nixpkgs module, so the
+      # home-manager configuration runs on the package set it is given.
       "test: the evaluation reads the module list of the declared source" = {
         expr = {
           inherit (configuration.config.stub) minimal useNixpkgsModule;
@@ -3637,93 +3641,101 @@ in
         };
       };
 
-      # A home is a configuration. Declared beneath another
-      # configuration it takes the module registered under its name,
-      # its user is the name it is declared under unless a module of
-      # the home names another, and it runs on the package set in
-      # force where it is declared: beneath a NixOS configuration the
-      # set of that configuration, unless the home selects. A top
-      # publishes it under `homeConfigurations`, named `<user>@<host>`
-      # beneath a NixOS configuration and by its name otherwise.
-      "test: a home declared beneath a configuration is named, published and given its package set" = {
-        expr =
-          let
-            lib = treeLibWith [ "x86_64-linux" ];
-            top = lib.caisson.structural.mkTopConfiguration {
-              moduleImports = _modules: [ ];
-              configModule = treeWith { serving = false; };
+      # A home-manager configuration is a configuration. Declared
+      # beneath another configuration it takes the module registered
+      # under its name, its user is the name it is declared under
+      # unless a module of the home-manager configuration names
+      # another, and it runs on the package set in force where it is
+      # declared: beneath a NixOS configuration the set of that
+      # configuration, unless the home-manager configuration selects.
+      # A top publishes it under `homeConfigurations`, named
+      # `<user>@<host>` beneath a NixOS configuration and by its name
+      # otherwise.
+      "test: a home-manager configuration declared beneath a configuration is named, published and given its package set" =
+        {
+          expr =
+            let
+              lib = treeLibWith [ "x86_64-linux" ];
+              top = lib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule = treeWith { serving = false; };
+              };
+              homes = top.homeConfigurations;
+              seen = home: {
+                user = home.config.home.username;
+                set = home.pkgs.marker;
+              };
+            in
+            {
+              names = builtins.attrNames homes;
+              alone = seen homes.chris // {
+                registered = homes.chris.config.seenLib.registered;
+              };
+              beneathAMachine = seen homes."chris@laptop";
+              selecting = seen homes."dana@laptop";
+              aTopHasNoDeclaredName =
+                (lib.caisson.home-manager.mkTopConfiguration {
+                  configModule = { };
+                  check = false;
+                }).config.home.username;
             };
-            homes = top.homeConfigurations;
-            seen = home: {
-              user = home.config.home.username;
-              set = home.pkgs.marker;
+          expected = {
+            names = [
+              "chris"
+              "chris@laptop"
+              "dana@laptop"
+            ];
+            alone = {
+              user = "chris";
+              set = "default for x86_64-linux";
+              registered = true;
             };
-          in
-          {
-            names = builtins.attrNames homes;
-            alone = seen homes.chris // {
-              registered = homes.chris.config.seenLib.registered;
+            beneathAMachine = {
+              user = "chris";
+              set = "other for x86_64-linux";
             };
-            beneathAMachine = seen homes."chris@laptop";
-            selecting = seen homes."dana@laptop";
-            aTopHasNoDeclaredName =
-              (lib.caisson.home-manager.mkTopConfiguration {
-                configModule = { };
-                check = false;
-              }).config.home.username;
+            selecting = {
+              user = "someone-else";
+              set = "default for x86_64-linux";
+            };
+            aTopHasNoDeclaredName = "";
           };
-        expected = {
-          names = [
-            "chris"
-            "chris@laptop"
-            "dana@laptop"
-          ];
-          alone = {
-            user = "chris";
-            set = "default for x86_64-linux";
-            registered = true;
-          };
-          beneathAMachine = {
-            user = "chris";
-            set = "other for x86_64-linux";
-          };
-          selecting = {
-            user = "someone-else";
-            set = "default for x86_64-linux";
-          };
-          aTopHasNoDeclaredName = "";
         };
-      };
 
-      # A home declared inside a NixOS configuration is given its
-      # machine. The home-manager integration hands it the
-      # configuration of the machine as `osConfig`. The `default`
-      # NixOS module of caisson adds the module `nixos-parent` to the
-      # modules the home imports by default, and that module sets the
+      # A home-manager configuration declared inside a NixOS
+      # configuration is given its machine. The home-manager
+      # integration hands it the configuration of the machine as
+      # `osConfig`. The `default` NixOS module of caisson adds the
+      # module `nixos-parent` to the modules the home-manager
+      # configuration imports by default, and that module sets the
       # home directory and the user ID from the account the machine
       # declares, the Nix of the machine, and the option home-manager
-      # reads to tell that a machine activates the home.
+      # reads to tell that a machine activates the home-manager
+      # configuration.
       #
-      # The five homes below are these. A home whose account the
-      # machine declares. A home whose account the machine does not
-      # declare, as with an account that systemd-homed manages. A home
-      # that passes `moduleImports` and so selects its modules itself.
-      # A home inside a NixOS configuration that passes
-      # `moduleImports`, and so does not import the `default` NixOS
-      # module. A home declared outside any machine.
-      "test: a home declared inside a NixOS configuration is given its machine" = {
+      # The five home-manager configurations below are these. A
+      # home-manager configuration whose account the machine declares.
+      # A home-manager configuration whose account the machine does
+      # not declare, as with an account that systemd-homed manages. A
+      # home-manager configuration that passes `moduleImports` and so
+      # selects its modules itself. A home-manager configuration inside
+      # a NixOS configuration that passes `moduleImports`, and so does
+      # not import the `default` NixOS module. A home-manager
+      # configuration declared outside any machine.
+      "test: a home-manager configuration declared inside a NixOS configuration is given its machine" = {
         expr =
           let
             lib = treeLibWith [ "x86_64-linux" ];
-            # What a home sees of its machine through `osConfig`.
+            # What a home-manager configuration sees of its machine
+            # through `osConfig`.
             probe =
               { osConfig, ... }:
               {
                 seenLib.machineNix = if osConfig == null then null else osConfig.nix.package;
                 programs.home-manager.enable = true;
               };
-            # The class of the machine, which only a home inside a
-            # machine is handed.
+            # The class of the machine, which only a home-manager
+            # configuration inside a machine is handed.
             classProbe =
               { osClass, ... }:
               {
@@ -3761,7 +3773,8 @@ in
                   # A NixOS configuration that selects its modules
                   # itself. It does not import caisson's `default`
                   # NixOS module, so it adds nothing to the default
-                  # modules of the home declared inside it.
+                  # modules of the home-manager configuration declared
+                  # inside it.
                   caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
                     moduleImports = _modules: [ ];
                     configModule =
@@ -3843,247 +3856,258 @@ in
         };
       };
 
-      # A NixOS configuration activates the homes declared inside it.
-      # The `default` NixOS module of caisson imports a module that
-      # writes a systemd unit for each such home. The unit is a system
-      # unit when the machine declares the account of the user of the
-      # home in `users.users`. A home whose user has no account there
-      # is refused, unless the machine lists the user in
+      # A NixOS configuration activates the home-manager configurations
+      # declared inside it. The `default` NixOS module of caisson
+      # imports a module that writes a systemd unit for each such
+      # home-manager configuration. The unit is a system unit when the
+      # machine declares the account of the user of the home-manager
+      # configuration in `users.users`. A home-manager configuration
+      # whose user has no account there is refused, unless the machine
+      # lists the user in
       # `caisson.home-manager.activation.usersDeclaredElsewhere`, and
       # then the unit is a user unit.
       #
-      # The machine `laptop` below has four homes. It declares the
-      # account of the first. It lists the users of the second and
-      # the third as declared elsewhere. The third is declared inside
-      # a structural configuration inside the machine, and the machine
-      # activates it too. The fourth is declared inside a second NixOS
-      # configuration, `image`, that is itself inside `laptop`. That
-      # home belongs to `image`, and `laptop` writes no unit for it.
+      # The machine `laptop` below has four home-manager
+      # configurations. It declares the account of the first. It lists
+      # the users of the second and the third as declared elsewhere.
+      # The third is declared inside a structural configuration inside
+      # the machine, and the machine activates it too. The fourth is
+      # declared inside a second NixOS configuration, `image`, that is
+      # itself inside `laptop`. That home-manager configuration belongs
+      # to `image`, and `laptop` writes no unit for it.
       #
       # Three more machines are each refused with one assertion.
-      # `clash` has two homes for one user. `stray` has a home whose
-      # user has no account and is not listed. `both` lists a user
-      # that it also declares.
-      "test: a NixOS configuration writes a unit for each home declared inside it" = {
-        expr =
-          let
-            lib = treeLibWith [ "x86_64-linux" ];
-            top = lib.caisson.structural.mkTopConfiguration {
-              moduleImports = _modules: [ ];
-              configModule =
-                { lib, ... }:
-                {
-                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        users.users.declared.home = "/home/declared";
-                        caisson.home-manager.activation.usersDeclaredElsewhere = [
-                          "elsewhere"
-                          "layered"
-                        ];
-                        caisson.home-manager.configurations = {
-                          declared = home lib { };
-                          elsewhere = home lib { };
+      # `clash` has two home-manager configurations for one user.
+      # `stray` has a home-manager configuration whose user has no
+      # account and is not listed. `both` lists a user that it also
+      # declares.
+      "test: a NixOS configuration writes a unit for each home-manager configuration declared inside it" =
+        {
+          expr =
+            let
+              lib = treeLibWith [ "x86_64-linux" ];
+              top = lib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          users.users.declared.home = "/home/declared";
+                          caisson.home-manager.activation.usersDeclaredElsewhere = [
+                            "elsewhere"
+                            "layered"
+                          ];
+                          caisson.home-manager.configurations = {
+                            declared = home lib { };
+                            elsewhere = home lib { };
+                          };
+                          caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                            moduleImports = _modules: [ ];
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.home-manager.configurations.layered = home lib { };
+                              };
+                          };
+                          caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                            configModule =
+                              { lib, ... }:
+                              {
+                                users.users.inner.home = "/home/inner";
+                                caisson.home-manager.configurations.inner = home lib { };
+                              };
+                          };
                         };
-                        caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
-                          moduleImports = _modules: [ ];
-                          configModule =
-                            { lib, ... }:
-                            {
-                              caisson.home-manager.configurations.layered = home lib { };
-                            };
+                    };
+                    caisson.nixos.configurations.clash = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          users.users.shared.home = "/home/shared";
+                          caisson.home-manager.configurations = {
+                            first = home lib { configModule.home.username = "shared"; };
+                            second = home lib { configModule.home.username = "shared"; };
+                          };
                         };
-                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
-                          configModule =
-                            { lib, ... }:
-                            {
-                              users.users.inner.home = "/home/inner";
-                              caisson.home-manager.configurations.inner = home lib { };
-                            };
+                    };
+                    caisson.nixos.configurations.stray = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.home-manager.configurations.typo = home lib {
+                            configModule.home.username = "nobody";
+                          };
                         };
-                      };
+                    };
+                    caisson.nixos.configurations.both = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          users.users.twice.home = "/home/twice";
+                          caisson.home-manager.activation.usersDeclaredElsewhere = [ "twice" ];
+                          caisson.home-manager.configurations.twice = home lib { };
+                        };
+                    };
                   };
-                  caisson.nixos.configurations.clash = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        users.users.shared.home = "/home/shared";
-                        caisson.home-manager.configurations = {
-                          first = home lib { configModule.home.username = "shared"; };
-                          second = home lib { configModule.home.username = "shared"; };
-                        };
-                      };
-                  };
-                  caisson.nixos.configurations.stray = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        caisson.home-manager.configurations.typo = home lib {
-                          configModule.home.username = "nobody";
-                        };
-                      };
-                  };
-                  caisson.nixos.configurations.both = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        users.users.twice.home = "/home/twice";
-                        caisson.home-manager.activation.usersDeclaredElsewhere = [ "twice" ];
-                        caisson.home-manager.configurations.twice = home lib { };
-                      };
-                  };
-                };
-            };
-            units = machine: {
-              system = builtins.attrNames machine.config.systemd.services;
-              user = builtins.attrNames machine.config.systemd.user.services;
-              refused = builtins.map (assertion: assertion.message) (
-                builtins.filter (assertion: !assertion.assertion) machine.config.assertions
-              );
-            };
-            laptop = units top.nixosConfigurations.laptop;
-            image = units top.nixosConfigurations.image;
-            # How many assertions of a machine fail, and whether the
-            # message of the first names each of the words given.
-            refusal =
-              name: words:
-              let
-                inherit (units top.nixosConfigurations.${name}) refused;
-              in
-              {
-                count = builtins.length refused;
-                names = builtins.all (word: lib.hasInfix word (builtins.head refused)) words;
               };
-          in
-          {
-            inherit laptop image;
-            clash = refusal "clash" [
-              "shared"
-              "first"
-              "second"
-            ];
-            stray = refusal "stray" [
-              "typo"
-              "nobody"
-              "usersDeclaredElsewhere"
-            ];
-            both = refusal "both" [ "twice" ];
-            # A home that is refused gets no unit of either kind.
-            strayUnits = {
-              inherit (units top.nixosConfigurations.stray) system user;
+              units = machine: {
+                system = builtins.attrNames machine.config.systemd.services;
+                user = builtins.attrNames machine.config.systemd.user.services;
+                refused = builtins.map (assertion: assertion.message) (
+                  builtins.filter (assertion: !assertion.assertion) machine.config.assertions
+                );
+              };
+              laptop = units top.nixosConfigurations.laptop;
+              image = units top.nixosConfigurations.image;
+              # How many assertions of a machine fail, and whether the
+              # message of the first names each of the words given.
+              refusal =
+                name: words:
+                let
+                  inherit (units top.nixosConfigurations.${name}) refused;
+                in
+                {
+                  count = builtins.length refused;
+                  names = builtins.all (word: lib.hasInfix word (builtins.head refused)) words;
+                };
+            in
+            {
+              inherit laptop image;
+              clash = refusal "clash" [
+                "shared"
+                "first"
+                "second"
+              ];
+              stray = refusal "stray" [
+                "typo"
+                "nobody"
+                "usersDeclaredElsewhere"
+              ];
+              both = refusal "both" [ "twice" ];
+              # A home-manager configuration that is refused gets no
+              # unit of either kind.
+              strayUnits = {
+                inherit (units top.nixosConfigurations.stray) system user;
+              };
             };
-          };
-        expected = {
-          laptop = {
-            system = [ "home-manager-declared" ];
-            user = [
-              "home-manager-elsewhere"
-              "home-manager-layered"
-            ];
-            refused = [ ];
-          };
-          image = {
-            system = [ "home-manager-inner" ];
-            user = [ ];
-            refused = [ ];
-          };
-          clash = {
-            count = 1;
-            names = true;
-          };
-          stray = {
-            count = 1;
-            names = true;
-          };
-          both = {
-            count = 1;
-            names = true;
-          };
-          strayUnits = {
-            system = [ ];
-            user = [ ];
+          expected = {
+            laptop = {
+              system = [ "home-manager-declared" ];
+              user = [
+                "home-manager-elsewhere"
+                "home-manager-layered"
+              ];
+              refused = [ ];
+            };
+            image = {
+              system = [ "home-manager-inner" ];
+              user = [ ];
+              refused = [ ];
+            };
+            clash = {
+              count = 1;
+              names = true;
+            };
+            stray = {
+              count = 1;
+              names = true;
+            };
+            both = {
+              count = 1;
+              names = true;
+            };
+            strayUnits = {
+              system = [ ];
+              user = [ ];
+            };
           };
         };
-      };
 
-      # A NixOS configuration with a home declared inside it writes the
-      # file `caisson/marker.json` under `/etc`. The file holds the digest
-      # of the store path of the system of the machine with the
-      # configurations declared inside it left out.
+      # A NixOS configuration with a home-manager configuration declared
+      # inside it writes the file `caisson/marker.json` under `/etc`.
+      # The file holds the digest of the store path of the system of
+      # the machine with the configurations declared inside it left
+      # out.
       #
       # The stub of NixOS puts the number of system units into the
-      # store path of a system. The machine `laptop` has one home, and
-      # `laptop` declares the account of that home. The system of
-      # `laptop` therefore has one unit. The digest in the file must be
-      # that of the system with no units.
+      # store path of a system. The machine `laptop` has one
+      # home-manager configuration, and `laptop` declares the account
+      # of that home-manager configuration. The system of `laptop`
+      # therefore has one unit. The digest in the file must be that of
+      # the system with no units.
       #
-      # The machine `bare` has no home, and writes no file.
+      # The machine `bare` has no home-manager configuration, and
+      # writes no file.
       #
       # The machine `outer` has a machine `image` declared inside it,
-      # and `image` has a home. That home belongs to `image`. So
-      # `image` writes the file, and `outer` does not: `image` is
-      # applied on its own host, so it checks no marker of `outer`.
-      "test: a NixOS configuration with homes records the system it runs without them" = {
-        expr =
-          let
-            lib = treeLibWith [ "x86_64-linux" ];
-            withHome =
-              lib:
-              { ... }:
-              {
-                users.users.chris.home = "/home/chris";
-                caisson.home-manager.configurations.chris = home lib { };
-              };
-            top = lib.caisson.structural.mkTopConfiguration {
-              moduleImports = _modules: [ ];
-              configModule =
-                { lib, ... }:
+      # and `image` has a home-manager configuration. That home-manager
+      # configuration belongs to `image`. So `image` writes the file,
+      # and `outer` does not: `image` is applied on its own host, so it
+      # checks no marker of `outer`.
+      "test: a NixOS configuration with home-manager configurations records the system it runs without them" =
+        {
+          expr =
+            let
+              lib = treeLibWith [ "x86_64-linux" ];
+              withHome =
+                lib:
+                { ... }:
                 {
-                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
-                    configModule = { lib, ... }: withHome lib { };
-                  };
-                  caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
-                    configModule = { };
-                  };
-                  caisson.nixos.configurations.outer = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
-                          configModule = { lib, ... }: withHome lib { };
-                        };
-                      };
-                  };
+                  users.users.chris.home = "/home/chris";
+                  caisson.home-manager.configurations.chris = home lib { };
                 };
+              top = lib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                      configModule = { lib, ... }: withHome lib { };
+                    };
+                    caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
+                      configModule = { };
+                    };
+                    caisson.nixos.configurations.outer = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.nixos.configurations.image = lib.caisson.nixos.mkConfiguration {
+                            configModule = { lib, ... }: withHome lib { };
+                          };
+                        };
+                    };
+                  };
+              };
+              file = "caisson/marker.json";
+              recordOf =
+                name:
+                let
+                  inherit (top.nixosConfigurations.${name}.config.environment) etc;
+                in
+                if etc ? ${file} then builtins.fromJSON etc.${file}.text else null;
+            in
+            {
+              laptop = recordOf "laptop";
+              laptopBuilds = top.nixosConfigurations.laptop.config.system.build.toplevel.outPath;
+              bare = recordOf "bare";
+              outer = recordOf "outer";
+              image = recordOf "image";
             };
-            file = "caisson/marker.json";
-            recordOf =
-              name:
-              let
-                inherit (top.nixosConfigurations.${name}.config.environment) etc;
-              in
-              if etc ? ${file} then builtins.fromJSON etc.${file}.text else null;
-          in
-          {
-            laptop = recordOf "laptop";
-            laptopBuilds = top.nixosConfigurations.laptop.config.system.build.toplevel.outPath;
-            bare = recordOf "bare";
-            outer = recordOf "outer";
-            image = recordOf "image";
-          };
-        expected = {
-          laptop = {
-            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
-          };
-          laptopBuilds = "/nix/store/stub-system-with-1-units";
-          bare = null;
-          outer = null;
-          image = {
-            identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
+          expected = {
+            laptop = {
+              identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
+            };
+            laptopBuilds = "/nix/store/stub-system-with-1-units";
+            bare = null;
+            outer = null;
+            image = {
+              identity = builtins.hashString "sha256" "/nix/store/stub-system-with-0-units";
+            };
           };
         };
-      };
 
       # The library of a flake has registries: its lib overlays, its
       # modules and its package overlays. A configuration exports the
@@ -4099,9 +4123,9 @@ in
       #
       # The library below registers lib overlays, one NixOS module
       # and one package overlay. `laptop` is a NixOS configuration
-      # with a home declared inside it. The home passes all three
-      # registries up to `laptop`, and `laptop` exports each entry
-      # once.
+      # with a home-manager configuration declared inside it. The
+      # home-manager configuration passes all three registries up to
+      # `laptop`, and `laptop` exports each entry once.
       "test: a registry entry passed up from inside a configuration is exported once" = {
         expr =
           let
@@ -4142,47 +4166,49 @@ in
       };
 
       # Beneath the evaluation of a NixOS configuration for a system,
-      # that system is the one in force, so a home declared there has
-      # that evaluation alone, and each evaluation of the machine
-      # publishes its home. A machine that states other systems for
-      # what is beneath it (`caisson.forChildren.systems`) holds its
+      # that system is the one in force, so a home-manager
+      # configuration declared there has that evaluation alone, and
+      # each evaluation of the machine publishes its home-manager
+      # configuration. A machine that states other systems for what is
+      # beneath it (`caisson.forChildren.systems`) holds its
       # configurations for those.
-      "test: a home beneath a machine is evaluated for the system of the machine" = {
-        expr =
-          let
-            lib = treeLibWith [
-              "x86_64-linux"
-              "aarch64-linux"
-            ];
-            declared = lib.caisson.structural.mkConfiguration {
-              moduleImports = _modules: [ ];
-              configModule = treeWith { serving = true; };
+      "test: a home-manager configuration beneath a machine is evaluated for the system of the machine" =
+        {
+          expr =
+            let
+              lib = treeLibWith [
+                "x86_64-linux"
+                "aarch64-linux"
+              ];
+              declared = lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule = treeWith { serving = true; };
+              };
+              top = lib.caisson-core.finalizeTop declared;
+              machines = top.children.system.x86_64-linux.children.nixos;
+            in
+            {
+              homeOfTheMachine = builtins.attrNames machines.laptop.children.system;
+              homeAt = machines.laptop.children.system.x86_64-linux.children.home-manager.chris.system;
+              imagesOfTheServer = builtins.attrNames machines.server.children.system;
+              published = builtins.filter (name: lib.hasSuffix "chris@laptop" name) (
+                builtins.attrNames
+                  (lib.caisson.structural.mkTopConfiguration {
+                    moduleImports = _modules: [ ];
+                    configModule = treeWith { serving = true; };
+                  }).homeConfigurations
+              );
             };
-            top = lib.caisson-core.finalizeTop declared;
-            machines = top.children.system.x86_64-linux.children.nixos;
-          in
-          {
-            homeOfTheMachine = builtins.attrNames machines.laptop.children.system;
-            homeAt = machines.laptop.children.system.x86_64-linux.children.home-manager.chris.system;
-            imagesOfTheServer = builtins.attrNames machines.server.children.system;
-            published = builtins.filter (name: lib.hasSuffix "chris@laptop" name) (
-              builtins.attrNames
-                (lib.caisson.structural.mkTopConfiguration {
-                  moduleImports = _modules: [ ];
-                  configModule = treeWith { serving = true; };
-                }).homeConfigurations
-            );
+          expected = {
+            homeOfTheMachine = [ "x86_64-linux" ];
+            homeAt = "x86_64-linux";
+            imagesOfTheServer = [ "aarch64-linux" ];
+            published = [
+              "aarch64-linux/chris@laptop"
+              "x86_64-linux/chris@laptop"
+            ];
           };
-        expected = {
-          homeOfTheMachine = [ "x86_64-linux" ];
-          homeAt = "x86_64-linux";
-          imagesOfTheServer = [ "aarch64-linux" ];
-          published = [
-            "aarch64-linux/chris@laptop"
-            "x86_64-linux/chris@laptop"
-          ];
         };
-      };
 
       # How a configuration is published is recorded on its manifest
       # when it is constructed, and applied where it is passed up, so
@@ -4236,8 +4262,9 @@ in
       };
 
       # A published name may not contain `/`, which separates the
-      # parts of a name, and a home whose name does is refused.
-      "test: a home whose published name holds the separator is refused" = {
+      # parts of a name, and a home-manager configuration whose name
+      # does is refused.
+      "test: a home-manager configuration whose published name holds the separator is refused" = {
         expr =
           builtins.attrNames
             ((treeLibWith [ "x86_64-linux" ]).caisson.structural.mkTopConfiguration {
@@ -5507,8 +5534,8 @@ in
         caisson.mkLib {
           sources = mockSources;
           defaultEcosystemSrc.home-manager = hmStub;
-          # A home takes its system and its package set from the
-          # composition.
+          # A home-manager configuration takes its system and its
+          # package set from the composition.
           systems = [ "x86_64-linux" ];
           pkgSets = stubPkgSets sets;
           libOverlays = _lib: {
@@ -5599,8 +5626,9 @@ in
 
       # The alt takes the arguments of the integration that owns the
       # class, and what it returns is a configuration of that
-      # integration: a home, published where homes are.
-      "test: the alt takes the arguments of the owner and returns a home" = {
+      # integration: a home-manager configuration, published where
+      # home-manager configurations are.
+      "test: the alt takes the arguments of the owner and returns a home-manager configuration" = {
         expr = {
           sameArguments =
             builtins.functionArgs myLib.caisson.home-manager-minimal.mkConfiguration
@@ -5670,7 +5698,7 @@ in
             true;
         expectedError = {
           type = "ThrownError";
-          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration: this home for x86_64-linux runs on the package set named `default`";
+          msg = "lib\\.caisson\\.home-manager-minimal\\.mkConfiguration: this home-manager configuration for x86_64-linux runs on the package set named `default`";
         };
       };
     };

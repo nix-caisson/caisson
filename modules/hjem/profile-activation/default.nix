@@ -16,6 +16,38 @@
 # profile of the user, so that the programs the machine installs choose
 # the same.
 #
+# A hjem configuration with no machine above it is applied with
+# `hjem standalone switch`, and no machine activates its profiles. On
+# Linux, this module adds to its files the systemd user units that do.
+# The service `caisson-profiles` runs
+# `~/.local/state/caisson/activate-profiles`, which the files link to
+# the script that runs the `activate` of each profile of the generation
+# applied. It is wanted by `default.target`, so it runs when the user's
+# systemd starts. The unit files name no store path, so they are the same
+# in every generation, and the systemd of the user, which keeps the
+# units it has read until it reloads, runs the script of the generation
+# applied last. The path unit `caisson-profiles` starts the service when the
+# manifest hjem keeps for the current generation changes,
+# `$XDG_STATE_HOME/hjem/standalone/current/manifest.json` (`%S` in a
+# unit of the user), which `hjem standalone switch` writes at every
+# switch. The units are read by the user's systemd once it reloads, so
+# the switch that first adds them activates the profiles at the next
+# login, or after `systemctl --user daemon-reload` and
+# `systemctl --user start caisson-profiles.path caisson-profiles.service`.
+#
+# On macOS, the module adds the launchd agent `org.caisson.profiles` to
+# the files, as `~/Library/LaunchAgents/org.caisson.profiles.plist`. The
+# agent runs the same script from the same link when launchd loads it,
+# which it does at login, and when the manifest of the current
+# generation changes. Like the unit files, the agent is the same in
+# every generation. launchd expands no variables in the paths an agent watches,
+# so the agent watches the manifest where hjem keeps it when
+# `XDG_STATE_HOME` is unset,
+# `~/.local/state/hjem/standalone/current/manifest.json`. The switch that
+# first adds the agent activates the profiles at the next login, or
+# after `launchctl bootstrap gui/$(id -u)
+# ~/Library/LaunchAgents/org.caisson.profiles.plist`.
+#
 # caisson's `default` hjem module imports this module. It defines
 # nothing in the childless evaluation.
 { ... }:
@@ -42,6 +74,74 @@ let
     choice:
     builtins.replaceStrings [ "$HOME" ] [ config.directory ]
       choice.chosen.manifest.outputs.profile.path;
+
+  # True when no machine applies this hjem configuration: there is no
+  # configuration above it with an activation.
+  standalone = selection.activatingAncestorOf evalManifest == null;
+
+  onLinux = lib.hasSuffix "-linux" (evalManifest.system or "");
+  onDarwin = lib.hasSuffix "-darwin" (evalManifest.system or "");
+
+  activateProfiles = pkgs.writeShellScript "caisson-profiles" (
+    lib.concatMapStrings (entry: ''
+      ${entry.manifest.outputs.activationPackage}/activate
+    '') profiles
+  );
+
+  # Where the files link the script of this generation, relative to the
+  # home directory. The service and the agent run the script from here.
+  # systemd and launchd keep the definition of a unit or an agent they
+  # have loaded until they load it again, which a switch does not make
+  # them do. So the unit files and the agent name no store path and are
+  # the same in every generation, and the link names the script of the
+  # generation applied last.
+  script = ".local/state/caisson/activate-profiles";
+
+  # Each unit is a file named as the unit, so that the links to it in
+  # `default.target.wants` and `paths.target.wants` point at a file of
+  # the same name, which systemd requires of such a link.
+  unitFile = name: text: "${pkgs.writeTextDir name text}/${name}";
+
+  # The path unit starts the service at each switch, and a switch can
+  # change the manifest more than once, so the service has no start
+  # limit: with the default of systemd, a few switches in quick
+  # succession would fail the service and the path unit until the
+  # systemd of the user restarts.
+  serviceUnit = unitFile "caisson-profiles.service" ''
+    [Unit]
+    Description=Activate the profiles of the hjem configuration
+    StartLimitIntervalSec=0
+
+    [Service]
+    Type=oneshot
+    ExecStart=%h/${script}
+  '';
+
+  pathUnit = unitFile "caisson-profiles.path" ''
+    [Unit]
+    Description=Activate the profiles of the hjem configuration when hjem switches
+
+    [Path]
+    PathChanged=%S/hjem/standalone/current/manifest.json
+    Unit=caisson-profiles.service
+  '';
+
+  # The directory of the user's systemd units, relative to the home
+  # directory, as hjem's `files` names a file.
+  units = ".config/systemd/user";
+
+  agent = pkgs.writeText "org.caisson.profiles.plist" (
+    lib.generators.toPlist { escape = true; } {
+      Label = "org.caisson.profiles";
+      ProgramArguments = [ "${config.directory}/${script}" ];
+      RunAtLoad = true;
+      WatchPaths = [ "${config.directory}/.local/state/hjem/standalone/current/manifest.json" ];
+      # launchd waits this many seconds after a start before it starts
+      # the agent again, 10 by default; a switch soon after another
+      # then waits a second.
+      ThrottleInterval = 1;
+    }
+  );
 in
 {
   options.caisson.profiles.selected = lib.mkOption {
@@ -59,6 +159,21 @@ in
   };
 
   config = lib.mkIf (!evalManifest.childless && profiles != [ ]) {
+    files = lib.mkMerge [
+      (lib.mkIf (standalone && (onLinux || onDarwin)) {
+        ${script}.source = activateProfiles;
+      })
+      (lib.mkIf (standalone && onLinux) {
+        "${units}/caisson-profiles.service".source = serviceUnit;
+        "${units}/default.target.wants/caisson-profiles.service".source = serviceUnit;
+        "${units}/caisson-profiles.path".source = pathUnit;
+        "${units}/paths.target.wants/caisson-profiles.path".source = pathUnit;
+      })
+      (lib.mkIf (standalone && onDarwin) {
+        "Library/LaunchAgents/org.caisson.profiles.plist".source = agent;
+      })
+    ];
+
     packages = lib.mapAttrsToList (
       variable: choice:
       selection.profileShimsOf {

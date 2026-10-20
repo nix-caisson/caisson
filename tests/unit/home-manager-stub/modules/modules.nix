@@ -43,16 +43,18 @@ let
           type = lib.types.str;
           default = "activation-package";
         };
-        # The user of the home, which the integration defaults to the
-        # name the home is declared under.
+        # The user of the home-manager configuration, which the
+        # integration defaults to the name the home-manager
+        # configuration is declared under.
         home.username = lib.mkOption {
           type = lib.types.str;
           default = "";
         };
-        # The options a NixOS configuration sets in the homes declared
-        # inside it: the home directory and the user ID of the
-        # account, the Nix of the machine, and the option home-manager
-        # reads to tell that a machine activates the home.
+        # The options a NixOS configuration sets in the home-manager
+        # configurations declared inside it: the home directory and the
+        # user ID of the account, the Nix of the machine, and the
+        # option home-manager reads to tell that a machine activates
+        # the home-manager configuration.
         home.homeDirectory = lib.mkOption {
           type = lib.types.str;
           default = "";
@@ -78,7 +80,8 @@ let
           default = false;
         };
         # home-manager's command-line program, which home-manager
-        # leaves out of a home that a machine activates.
+        # leaves out of a home-manager configuration that a machine
+        # activates.
         programs.home-manager.enable = lib.mkOption {
           type = lib.types.bool;
           default = false;
@@ -87,7 +90,7 @@ let
           type = lib.types.str;
           default = "home-manager-cli";
         };
-        # The steps of the activation of the home.
+        # The steps of the activation of the home-manager configuration.
         home.activation = lib.mkOption {
           type = lib.types.attrs;
           default = { };

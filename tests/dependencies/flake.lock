@@ -554,6 +554,26 @@
         "type": "github"
       }
     },
+    "nix-vm-test": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791914881,
+        "narHash": "sha256-lV7zuX2ABOi4LMvd7b5CNHxbrJGXmj6Ls/ZSJqvnWm0=",
+        "owner": "numtide",
+        "repo": "nix-vm-test",
+        "rev": "ca6eb23e60c78cd5fe89530e0de6a6efedc9bae8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "nix-vm-test",
+        "type": "github"
+      }
+    },
     "nixidy": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -721,6 +741,7 @@
         "nix-darwin": "nix-darwin",
         "nix-topology": "nix-topology",
         "nix-unit": "nix-unit",
+        "nix-vm-test": "nix-vm-test",
         "nixidy": "nixidy",
         "nixpkgs": "nixpkgs",
         "nixpkgs-lib": "nixpkgs-lib_3",
