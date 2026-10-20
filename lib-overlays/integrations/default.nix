@@ -262,9 +262,11 @@
       # leaves out is still passed up.
       # `exportsTo` may also be a list of such exports, for an
       # integration whose configurations are published in more than
-      # one output. It is recorded on the manifest, and applied where
-      # the configuration is passed up (`entriesOf`). Null for a
-      # configuration that is not published under a name.
+      # one output. It is recorded on the manifest, with
+      # `exportsToPosition`, the file and line where the integration
+      # wrote it, and applied where the configuration is passed up
+      # (`entriesOf`). Null for a configuration that is not published
+      # under a name.
       #
       # `activation` is given by an integration whose configurations
       # are activated on a machine or for a user: NixOS, darwin and
@@ -283,7 +285,7 @@
       # is activated (`driftCheckOf`). Null for a configuration that is
       # not activated.
       mkModuleConfiguration =
-        {
+        args@{
           type,
           perSystem ? false,
           defaultPkgs ? null,
@@ -295,7 +297,15 @@
           inherit type perSystem;
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
-            // (if exportsTo == null then { } else { inherit exportsTo; })
+            // (
+              if exportsTo == null then
+                { }
+              else
+                {
+                  inherit exportsTo;
+                  exportsToPosition = positionOf (builtins.unsafeGetAttrPos "exportsTo" args);
+                }
+            )
             // (if activation == null then { } else { inherit activation; });
           evaluate =
             view:
@@ -537,6 +547,19 @@
               `caisson.${name}.configurations` and returns the subset to
               export; `_: { }` exports none. What each selected configuration
               exports is merged into this configuration's `caisson.exports`.
+            '';
+          };
+          exportNote = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "office machines carry the site prefix; lab machines are never deployed from this flake";
+            description = ''
+              A sentence saying what `caisson.${name}.exported` does to the
+              ${name} configurations it passes up, for a selector that does
+              more than pass every configuration up unchanged. The top
+              records it in the export record (`exportRecord` of the
+              manifest it publishes) for each name published from those
+              configurations, with the notes of the levels beneath.
             '';
           };
           configurations = lib.mkOption {
@@ -978,13 +1001,30 @@
         path:
         builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
 
+      # A position as the export record holds it: the file and line of
+      # what `builtins.unsafeGetAttrPos` returns, null when it returns
+      # none.
+      positionOf = position: if position == null then null else { inherit (position) file line; };
+
       # The entry of a configuration that is passed up under `prefix`,
       # whose last segment holds the name it is passed up under: the
       # output attribute set and the value its `exportsTo` gives, and
       # its path, on which the name its `exportsTo` gives, where it
       # gives one, stands in place of that name.
+      #
+      # The entry also carries what the export record of the top holds
+      # for it (`recordOf`): `namePath`, its path by the names the
+      # configurations are declared under, which is its address under
+      # the `children` of the manifests from here; `notes`, the
+      # sentence `exportsTo` writes for the name it gives, when it
+      # writes a sentence, and then the notes of `level`; and `code`,
+      # the positions of what transformed it, those of `level` and then
+      # the position of `exportsTo`. `level` is what the configuration
+      # that holds this configuration adds for the integration of this
+      # configuration: its `exportNote`, as a list, and the files that
+      # define its `exported`.
       entryOf =
-        prefix: manifest: exportsTo:
+        level: declared: prefix: manifest: exportsTo:
         let
           leaf = last prefix;
           named =
@@ -1019,6 +1059,11 @@
               }
             )
           ];
+          namePath = declared;
+          notes = (if named ? description then [ named.description ] else [ ]) ++ level.notes;
+          code =
+            level.code
+            ++ (if (manifest.exportsToPosition or null) == null then [ ] else [ manifest.exportsToPosition ]);
         }
         // (if named ? description then { inherit (named) description; } else { });
 
@@ -1042,44 +1087,74 @@
       # and every configuration contributes the entries it passes up
       # in turn, with its segments in front. An entry carries all a
       # top needs to publish it.
+      #
+      # `levels` is what this configuration adds, by integration, to
+      # the entries of the configurations of that integration it passes
+      # up, nested ones included: `notes`, its `exportNote` as a list,
+      # and `code`, the positions of the definitions of its `exported`.
+      # The segments of `namePath` carry the names the configurations
+      # are declared under, which a parent's `exported` may have
+      # changed on `path`.
       entriesOf =
-        selected:
+        levels: selected:
         builtins.concatMap (
           integration:
           builtins.concatMap (
             name:
             let
               finalized = selected.${integration}.${name};
-              segment = {
+              level =
+                levels.${integration} or {
+                  notes = [ ];
+                  code = [ ];
+                };
+              segmentOf = name: {
                 type = integration;
                 inherit name;
+              };
+              systemSegment = system: {
+                type = "system";
+                name = system;
               };
               beneath =
                 if isManifest finalized then
                   [
                     {
-                      prefix = [ segment ];
+                      prefix = [ (segmentOf name) ];
+                      declared = [ (segmentOf finalized.name) ];
                       manifest = finalized;
                     }
                   ]
                 else
                   builtins.map (system: {
                     prefix = [
-                      {
-                        type = "system";
-                        name = system;
-                      }
-                      segment
+                      (systemSegment system)
+                      (segmentOf name)
+                    ];
+                    declared = [
+                      (systemSegment system)
+                      (segmentOf finalized.${system}.name)
                     ];
                     manifest = finalized.${system};
                   }) (builtins.attrNames finalized);
             in
             builtins.concatMap (
-              { prefix, manifest }:
-              builtins.map (entryOf prefix manifest) (exportsOf manifest)
-              ++ builtins.map (entry: entry // { path = prefix ++ entry.path; }) (
-                manifest.outputs.exports.configurations or [ ]
-              )
+              {
+                prefix,
+                declared,
+                manifest,
+              }:
+              builtins.map (entryOf level declared prefix manifest) (exportsOf manifest)
+              ++ builtins.map (
+                entry:
+                entry
+                // {
+                  path = prefix ++ entry.path;
+                  namePath = declared ++ entry.namePath;
+                  notes = entry.notes ++ level.notes;
+                  code = entry.code ++ level.code;
+                }
+              ) (manifest.outputs.exports.configurations or [ ])
             ) beneath
           ) (builtins.attrNames selected.${integration})
         ) (builtins.attrNames selected);
@@ -1102,8 +1177,27 @@
       # and `formatter`: `<attrset>.<system>`, holding the entries
       # evaluated for that system, named by the rules above over their
       # paths without the systems on them, or the single value there.
-      publish =
+      publish = entries: publicationOf (entry: entry.value) entries;
+
+      # The export record of a top, keyed as `publish` keys the outputs:
+      # for each name published, `from.namePath`, the path from the top
+      # to the manifest of the configuration by the names declared,
+      # which is its address under the `children` of the top's
+      # manifest; `notes`, the sentences each side that transformed the
+      # configuration on the way up wrote, from the configuration up to
+      # the top; and `code`, the positions of that code, the
+      # definitions of each `exported` and each integration's
+      # `exportsTo`, in the same order.
+      recordOf =
         entries:
+        publicationOf (entry: {
+          from.namePath = entry.namePath;
+          inherit (entry) notes code;
+        }) entries;
+
+      # What `publish` and `recordOf` key by name, `of` of each entry.
+      publicationOf =
+        of: entries:
         let
           attrsets = unique (builtins.map (entry: entry.attrset) entries);
           publishIn =
@@ -1149,7 +1243,7 @@
             in
             if single then
               if builtins.length members == 1 && notDefault == [ ] then
-                (builtins.head members).value
+                of (builtins.head members)
               else
                 throw ''
                   ${attrset}: this output holds a single value, the configuration
@@ -1171,7 +1265,7 @@
               builtins.listToAttrs (
                 builtins.map (item: {
                   inherit (item) name;
-                  inherit (item.entry) value;
+                  value = of item.entry;
                 }) named
               );
         in
@@ -1250,6 +1344,7 @@
             integrationsIn
             integrationsDeclaringIn
             nearestOf
+            recordOf
             activatingAncestorOf
             machineActivation
             markerFileName

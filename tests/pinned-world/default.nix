@@ -716,6 +716,101 @@ let
       && hasTheProgram declared
       && hasTheProgram undeclared;
 
+    # The manifest a top publishes carries the export record, an entry
+    # for each name the top publishes, keyed as the outputs are. The
+    # name path of an entry, followed from that manifest through
+    # `children`, reaches the configuration published under the name.
+    # The home-manager integration names a home-manager configuration
+    # after the NixOS configuration it is inside, and the entry carries
+    # the sentence the integration wrote for that, and the position in
+    # the file of the integration where it gives its `exportsTo`.
+    exportRecordLeadsToWhatIsPublished =
+      let
+        top = machineWithHomes.caisson.manifest;
+        record = top.exportRecord;
+        follow = builtins.foldl' (manifest: segment: manifest.children.${segment.type}.${segment.name}) top;
+        declared = record.homeConfigurations."declared@probe";
+        machine = record.nixosConfigurations.probe;
+        inIntegration =
+          integration: position:
+          pkgs.lib.hasSuffix "/lib-overlays/${integration}/default.nix" position.file
+          && builtins.isInt position.line;
+      in
+      builtins.attrNames record == [
+        "homeConfigurations"
+        "nixosConfigurations"
+      ]
+      &&
+        builtins.attrNames record.homeConfigurations == [
+          "declared@probe"
+          "undeclared@probe"
+        ]
+      &&
+        (follow declared.from.namePath).value.activationPackage.drvPath
+        == machineWithHomes.homeConfigurations."declared@probe".activationPackage.drvPath
+      &&
+        (follow machine.from.namePath).value.config.system.build.toplevel.drvPath
+        == machineWithHomes.nixosConfigurations.probe.config.system.build.toplevel.drvPath
+      &&
+        declared.notes
+        == [ "named declared@probe from its name and the name of the NixOS configuration it is under" ]
+      && machine.notes == [ ]
+      && builtins.length declared.code == 1
+      && inIntegration "home-manager" (builtins.head declared.code)
+      && builtins.length machine.code == 1
+      && inIntegration "nixos" (builtins.head machine.code);
+
+    # A selector that renames and drops configurations, with a note
+    # saying so: the export record holds the published names alone,
+    # each with the name path by the names the configurations are
+    # declared under, the note, and the file that defines the
+    # selector before the position of the `exportsTo` of the NixOS
+    # integration.
+    exportRecordFollowsTheSelector =
+      let
+        machine =
+          lib:
+          lib.caisson.nixos.mkConfiguration {
+            ecosystemSrc = inputs.nixpkgs;
+            configModule = minimalNixosBase;
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations = {
+                nas-1 = machine lib;
+                lab-3 = machine lib;
+              };
+              caisson.nixos.exported =
+                configurations:
+                lib.mapAttrs' (name: lib.nameValuePair "office-${name}") (
+                  lib.filterAttrs (name: _: !lib.hasPrefix "lab-" name) configurations
+                );
+              caisson.nixos.exportNote = "office machines carry the site prefix; lab machines stay unpublished";
+            };
+        };
+        entry = top.caisson.manifest.exportRecord.nixosConfigurations.office-nas-1;
+      in
+      builtins.attrNames top.nixosConfigurations == [ "office-nas-1" ]
+      && builtins.attrNames top.caisson.manifest.exportRecord.nixosConfigurations == [ "office-nas-1" ]
+      &&
+        entry.from.namePath == [
+          {
+            type = "system";
+            name = "x86_64-linux";
+          }
+          {
+            type = "nixos";
+            name = "nas-1";
+          }
+        ]
+      && entry.notes == [ "office machines carry the site prefix; lab machines stay unpublished" ]
+      && builtins.length entry.code == 2
+      && (builtins.elemAt entry.code 0).line == null
+      && pkgs.lib.hasSuffix "/lib-overlays/nixos/default.nix" (builtins.elemAt entry.code 1).file;
+
     # The same machine activates the home-manager configurations
     # inside it. It writes a system unit for the home-manager
     # configuration whose account it declares, which runs as that
@@ -826,6 +921,34 @@ let
         systemOf = configuration: configuration.config.system.build.toplevel.drvPath;
       in
       systemOf insideStructural == systemOf alone && systemOf insideFlake == systemOf alone;
+
+    # A flake publishes its manifest as the output `caisson.manifest`,
+    # as a structural top does, with the export record of what it
+    # publishes. The name path of the record's entry for the machine,
+    # followed from that manifest through `children`, reaches the
+    # machine the flake publishes.
+    aFlakePublishesItsManifestWithTheExportRecord =
+      let
+        flake = hiveLib.caisson.flake-parts.mkTopConfiguration {
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                ecosystemSrc = inputs.nixpkgs;
+                configModule = minimalNixosBase;
+              };
+            };
+        };
+        top = flake.caisson.manifest;
+        entry = top.exportRecord.nixosConfigurations.probe;
+        reached = builtins.foldl' (
+          manifest: segment: manifest.children.${segment.type}.${segment.name}
+        ) top entry.from.namePath;
+      in
+      top.type == "flake-parts"
+      &&
+        reached.value.config.system.build.toplevel.drvPath
+        == flake.nixosConfigurations.probe.config.system.build.toplevel.drvPath;
 
     # The NixOS integration records what `nixos-rebuild` reads from a
     # configuration: the system, the VM, the VM with a boot loader,
