@@ -87,6 +87,16 @@
         in
         {
           inherit value;
+          # What eval-config received: NixOS' module list, then the
+          # modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nixos";
+              project = "nixpkgs";
+              file = "nixos/modules/module-list.nix";
+            })
+          ]
+          ++ common.modules;
           # What `nixos-rebuild` reads from a configuration, each a
           # reference into `config.system.build`.
           outputs = {

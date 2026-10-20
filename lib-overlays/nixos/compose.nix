@@ -44,13 +44,20 @@ let
   # eval-config evaluations carry the nixpkgs module, so the set lands
   # on `nixpkgs.pkgs`; an evaluation without that module takes it as
   # the `pkgs` module argument instead.
-  pkgSetModule =
-    { lib, ... }:
-    {
-      _file = "caisson-nixos:pkgSet";
-      config =
-        if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
-    };
+  # It is keyed, so the history of the evaluation names it.
+  pkgSetModule = {
+    key = "caisson.nixos.pkgSet";
+    imports = [
+      (
+        { lib, ... }:
+        {
+          _file = "caisson-nixos:pkgSet";
+          config =
+            if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
+        }
+      )
+    ];
+  };
 
   registry = lib.caisson.modules.nixos or { };
   # The framework module of the class, forced.

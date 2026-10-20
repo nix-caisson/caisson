@@ -129,6 +129,22 @@
             else
               null;
 
+          # The modules of the composition: the modules selected from
+          # the registry, the configuration's module and the framework
+          # module of the class. The module list of nvf is imported
+          # separately, below, and goes first.
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
+          nvfModuleList =
+            import "${src}/modules/modules.nix" {
+              inherit pkgs;
+              lib = nvfLib;
+            }
+            ++ moduleList;
+
           value = nvfLib.evalModules (
             {
               class = "nvf";
@@ -139,14 +155,7 @@
                 lib = nvfLib;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                import "${src}/modules/modules.nix" {
-                  inherit pkgs;
-                  lib = nvfLib;
-                }
-                ++ frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = nvfModuleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -168,6 +177,16 @@
         in
         {
           inherit value;
+          # What evalModules received: nvf's module list, then the
+          # modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nvf";
+              project = "nvf";
+              file = "modules/modules.nix";
+            })
+          ]
+          ++ moduleList;
           outputs = {
             inherit neovim;
             inherit (kept) activationPackage profile;

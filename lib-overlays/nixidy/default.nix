@@ -90,13 +90,15 @@
             else
               null;
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
           value = src.lib.mkEnv (
             {
               inherit pkgs lib;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
               extraSpecialArgs = {
                 inherit pkgSets;
               }
@@ -110,6 +112,16 @@
         in
         {
           inherit value;
+          # What `mkEnv` received: the modules of the composition,
+          # then nixidy's module list. `mkEnv` appends nixidy's module
+          # list after the modules it is given.
+          modules = moduleList ++ [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nixidy";
+              project = "nixidy";
+              file = "modules/modules.nix";
+            })
+          ];
           outputs = {
             inherit (value) environmentPackage activationPackage bootstrapPackage;
           };

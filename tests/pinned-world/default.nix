@@ -760,6 +760,64 @@ let
       && builtins.length machine.code == 1
       && inIntegration "nixos" (builtins.head machine.code);
 
+    # The history of a NixOS configuration records what eval-config
+    # received, as `declaration` events of its manifest: NixOS' module
+    # list as a single event, the framework module of caisson, the
+    # modules selected from the registry by their registry keys, the
+    # module of the configuration, and the module that hands it the
+    # package set. The history of a home-manager configuration inside
+    # it begins with the history of the childless manifest of the
+    # machine.
+    aMachineRecordsWhatItsEvaluatorReceived =
+      let
+        machine = machineWithHomes.caisson.manifest.children.system.x86_64-linux.children.nixos.probe;
+        path = [
+          {
+            type = "system";
+            name = "x86_64-linux";
+          }
+          {
+            type = "nixos";
+            name = "probe";
+          }
+        ];
+        ofMachine = builtins.filter (event: event.manifest == path) machine.history;
+        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
+        prefix = builtins.length machine.childlessManifest.history;
+        identity = event: {
+          inherit (event)
+            manifest
+            operation
+            index
+            key
+            ;
+        };
+      in
+      builtins.map (event: event.key) ofMachine == [
+        "nixos"
+        "caisson.nixos"
+        "modules.nixos.caisson/core"
+        "modules.nixos.caisson/default"
+        "inline/4"
+        "caisson.nixos.pkgSet"
+      ]
+      && builtins.all (event: event.operation == "declaration" && event.type == "nixos") ofMachine
+      && builtins.map (event: event.index) ofMachine == pkgs.lib.range 0 5
+      &&
+        (builtins.head ofMachine).origin == {
+          project = "nixpkgs";
+          file = "nixos/modules/module-list.nix";
+        }
+      &&
+        (builtins.elemAt ofMachine 1).origin == {
+          project = "caisson";
+          file = "modules/nixos/core";
+        }
+      &&
+        builtins.map identity (pkgs.lib.take prefix declared.history)
+        == builtins.map identity machine.childlessManifest.history
+      && builtins.length declared.history > prefix;
+
     # A selector that renames and drops configurations, with a note
     # saying so: the export record holds the published names alone,
     # each with the name path by the names the configurations are

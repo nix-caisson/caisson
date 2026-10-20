@@ -76,6 +76,13 @@
             else
               null;
 
+          moduleList = [
+            reportOptions
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           evaluated = lib.evalModules (
             {
               class = "facter";
@@ -83,12 +90,7 @@
                 inherit lib;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                reportOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -96,6 +98,12 @@
         in
         {
           value = evaluated;
+          # What evalModules received: the report option, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. The report is
+          # data read from `reportPath`, not a module list, so there is
+          # no ecosystem module list here.
+          modules = moduleList;
           outputs = {
             inherit reportPath;
             report =

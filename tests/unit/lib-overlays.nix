@@ -736,7 +736,14 @@ in
         in
         {
           modules = builtins.attrNames myLib.caisson.modules.nixos;
-          fromManifest = myLib.caisson.modules == myLib.caisson-core.libManifest.modules;
+          # Each module is the module of the manifest's registry, in a
+          # module keyed by its registry key and the project that
+          # registered it, here a composition with no name.
+          fromManifest =
+            builtins.mapAttrs (
+              _: builtins.mapAttrs (_: module: builtins.head module.imports)
+            ) myLib.caisson.modules == myLib.caisson-core.libManifest.modules
+            && myLib.caisson.modules.nixos.local.key == "modules.nixos.local@";
           libOverlays =
             builtins.attrNames myLib.caisson.libOverlays
             == builtins.attrNames myLib.caisson-core.libManifest.libOverlays;
@@ -1279,7 +1286,8 @@ in
         in
         {
           inherit (myLib) libOverlays extraLibOverlayImports;
-          inherit (myLib.caisson.modules.generic.probe.config) modules;
+          # The registered module is inside the module that keys it.
+          modules = (builtins.head myLib.caisson.modules.generic.probe.imports).config.modules;
           composed =
             builtins.attrNames myLib.caisson.libOverlays
             == builtins.attrNames myLib.caisson-core.libManifest.libOverlays

@@ -78,11 +78,48 @@ let
       ;
     mkLib = mkLibIn lib;
     # the registries
-    modules = registryIn lib "modules";
+    modules = keyedModules lib (registryIn lib "modules");
     configs = registryIn lib "configs";
     libOverlays = registryIn lib "libOverlays";
     pkgOverlays = registryIn lib "pkgOverlays";
   };
+
+  # The module registry as a selection reads it: each module wrapped
+  # in a module that imports it, keyed `modules.<class>.<name>@<project>`:
+  # its registry key and the project that registered it. The module
+  # system imports the modules that share a key once, so an entry an
+  # evaluation selects twice is imported once, while entries of the
+  # same name that different projects register, such as the local
+  # entries of the tree and those of caisson's registry, which caisson
+  # reads from its closure, stay apart. The key tells which
+  # registry entry a module of the evaluation is, for its
+  # `declaration` events (`lib.caisson.integrations.declarationEventsOf`).
+  keyedModules =
+    lib:
+    let
+      manifest = lib.caisson-core.libManifest or { };
+      projectOf =
+        class: name:
+        let
+          registered = (manifest.moduleProjects or { }).${class}.${name} or null;
+          local = manifest.name or null;
+        in
+        if registered != null then
+          registered
+        else if local != null then
+          local
+        else
+          "";
+    in
+    builtins.mapAttrs (
+      class:
+      builtins.mapAttrs (
+        name: module: {
+          key = "modules.${class}.${name}@${projectOf class name}";
+          imports = [ module ];
+        }
+      )
+    );
 
   # A registry, read from the manifest of the library. A registry is
   # empty in a library that no mkLib built, and in a stage of the

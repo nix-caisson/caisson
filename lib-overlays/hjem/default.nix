@@ -173,6 +173,15 @@
               clobberFiles = lib.mkDefault false;
             };
 
+          moduleList = [
+            "${src}/modules/common/user.nix"
+            userModule
+          ]
+          ++ lib.optional nixosUser "${src}/modules/nixos/systemd.nix"
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           value = lib.evalModules (
             {
               class = "hjem";
@@ -195,14 +204,7 @@
                 inherit (machineArgs) utils;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                "${src}/modules/common/user.nix"
-                userModule
-              ]
-              ++ lib.optional nixosUser "${src}/modules/nixos/systemd.nix"
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -227,6 +229,16 @@
         in
         {
           inherit value;
+          # What evalModules received: hjem's user module, the module
+          # that sets the user's name, hjem's systemd module where the
+          # machine has `utils`, the framework module of the class, the
+          # modules selected from the registry and the configuration's
+          # module. The modules of hjem are recorded as modules of the
+          # hjem source.
+          modules = final.caisson.integrations.inEcosystem {
+            name = "hjem";
+            inherit src;
+          } moduleList;
           outputs = {
             manifest = manifestValue;
             manifestFile = pkgs.writeTextFile {

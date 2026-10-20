@@ -246,18 +246,20 @@
               ];
             };
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ systemModule ]
+            ++ compatModulesFor { inherit src nixpkgsSrc; };
+
           value =
             if (ecosystemArgs.overlays or [ ]) != [ ] then
               throw "${context}: ${what} passes `overlays` in `ecosystemArgs`, which have no effect: it runs on the package set caisson selects. Declare package overlays on `mkLib`."
             else
               systemManagerLib.makeSystemConfig (
                 {
-                  modules =
-                    frameworkModules
-                    ++ moduleImports registry
-                    ++ (if configModule == null then [ ] else [ configModule ])
-                    ++ [ systemModule ]
-                    ++ compatModulesFor { inherit src nixpkgsSrc; };
+                  modules = moduleList;
                   # The module system takes a special argument before an
                   # entry of `_module.args`, so `pkgs` and `userborn`
                   # here are the ones every module receives, and the
@@ -277,6 +279,16 @@
         in
         {
           inherit value;
+          # What `makeSystemConfig` received: system-manager's module
+          # list, then the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "system-manager";
+              project = "system-manager";
+              file = "nix/modules";
+            })
+          ]
+          ++ moduleList;
           # What `system-manager switch` activates: the system itself.
           outputs.toplevel = value;
         };

@@ -471,12 +471,23 @@
         variant: args: view:
         let
           composed = compose variant view args;
-          value = evaluate composed (
-            composed.ecosystemArgs // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
-          );
+          ecosystemArgs =
+            composed.ecosystemArgs
+            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
+          value = evaluate composed ecosystemArgs;
         in
         {
           inherit value;
+          # What evalModules received: the configuration module, then
+          # home-manager's module list.
+          modules = [
+            ecosystemArgs.configuration
+            (final.caisson.integrations.ecosystemUnit {
+              key = "home-manager";
+              project = "home-manager";
+              file = "modules/modules.nix";
+            })
+          ];
           # What `home-manager switch` builds and runs.
           outputs = {
             inherit (value) activationPackage;

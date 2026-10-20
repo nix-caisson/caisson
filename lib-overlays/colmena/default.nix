@@ -195,6 +195,13 @@
           registry = lib.caisson.modules.colmena or { };
           frameworkModules = selection.frameworkModules "colmena" registry;
           moduleImports = selection.moduleImportsOf "colmena" { inherit lib manifest; } args;
+          moduleList = [
+            native.metaOptions
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ [ (hiveModule src hive) ];
+
           evaluated = lib.evalModules (
             {
               class = "colmena";
@@ -204,18 +211,19 @@
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                native.metaOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ [ (hiveModule src hive) ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the options of the class, the
+          # framework module of the class, the modules selected from
+          # the registry and the module made from the hive. Each node is
+          # a separate NixOS configuration, and the history of the node
+          # records the modules NixOS received.
+          modules = moduleList;
           outputs.hive = native.hiveOf {
             inherit src;
             inherit (evaluated) config;

@@ -122,14 +122,16 @@
                 lib.mkIf (rev != null) rev;
             };
 
+          darwinModules =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ darwinSystemModule ];
+
           value = import "${src}/eval-config.nix" (
             {
               inherit lib;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [ darwinSystemModule ];
+              modules = darwinModules;
               # The package sets for the configuration's system, by
               # config name, and the composed library, which is what
               # the modules receive as `lib`.
@@ -143,6 +145,15 @@
         in
         {
           inherit value;
+          # What eval-config received: the modules of the
+          # composition, then nix-darwin's module list.
+          modules = darwinModules ++ [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nix-darwin";
+              project = "nix-darwin";
+              file = "modules/module-list.nix";
+            })
+          ];
           # What `darwin-rebuild` builds: the closure of the system.
           outputs.toplevel = value.config.system.build.toplevel;
         };

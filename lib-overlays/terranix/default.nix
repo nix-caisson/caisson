@@ -106,14 +106,16 @@
               _meta.caisson = config.caisson;
             };
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ metaModule ];
+
           value = src.lib.terranixConfiguration (
             {
               inherit pkgs;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [ metaModule ];
+              modules = moduleList;
               # terranix names the special arguments `extraArgs`.
               extraArgs = {
                 inherit lib pkgSets;
@@ -125,6 +127,16 @@
         in
         {
           inherit value;
+          # What `terranixConfiguration` received: terranix's module
+          # list, then the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "terranix";
+              project = "terranix";
+              file = null;
+            })
+          ]
+          ++ moduleList;
           # What Terraform reads: the `config.tf.json` file.
           outputs.json = value;
           # caisson's options, from `_meta`. terranix keeps the options
