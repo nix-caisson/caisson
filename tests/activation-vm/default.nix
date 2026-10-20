@@ -18,7 +18,8 @@
 # `v2` declares v2, which drops `retired` and adds the home-manager
 # configuration of `erin`. The test boots the machine, switches to v2
 # and back, and checks after each step that the profiles, the files and
-# the units are those of the version the machine runs. It checks that a
+# the units are those of the version the machine runs, and that the
+# profile of a removed configuration stays where it was. It checks that a
 # switch puts the profile of `alice` back after it is changed by hand,
 # and that a boot puts the profiles of the system and of `carol` back.
 #
@@ -421,19 +422,23 @@ pkgs.testers.runNixOSTest {
 
       # The machine switches to v2: everything follows, the unit of the
       # removed profile `retired` is gone, and the added home-manager
-      # configuration of `erin` is activated.
+      # configuration of `erin` is activated. The profile `retired`
+      # itself stays, with the Neovim of v1, until someone deletes it.
       switch_to("${v1}/specialisation/v2")
       is_at("v2")
       machine.fail("systemctl cat caisson-profile-nvf-retired.service")
+      holds("/nix/var/nix/profiles/caisson/nvf/retired", "v1")
       machine.wait_for_unit("home-manager-erin.service")
       holds(profile_of("erin", "home-editor"), "v2")
       has_file("erin", "v2")
 
       # And back to v1: everything follows, and the unit of the removed
-      # home-manager configuration of `erin` is gone.
+      # home-manager configuration of `erin` is gone. The profile inside
+      # it stays in the home directory of `erin`, with the Neovim of v2.
       switch_to("${v1}")
       is_at("v1")
       machine.fail("systemctl cat home-manager-erin.service")
+      holds(profile_of("erin", "home-editor"), "v2")
       machine.wait_for_unit("caisson-profile-nvf-retired.service")
       restored = target_of("${profile}")
       assert restored == declared, f"the profile is {restored}, not {declared}"
