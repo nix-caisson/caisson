@@ -91,10 +91,11 @@ let
       "etc/systemd/system/*.wants/${unit}"
     ]) names;
 
-  # The services that the systemd of Ubuntu 22.04 (249) and of Rocky
-  # Linux 9 (252) starts and never runs in this container: their boot
-  # reports show the start jobs running until the driver gives up, while
-  # the newer distributions start the same services. The test uses none
+  # The services that the systemd of Ubuntu 22.04 (249), and of Rocky
+  # Linux 9 and Debian 12 (252), starts and does not always run in this
+  # container: their boot reports show the start jobs running until the
+  # driver gives up, while the newer distributions start the same
+  # services. On Debian 12 logind hung on some runs and not on others. The test uses none
   # of them; the unit that applies the files of a hjem user skips the
   # reload of the units of the user when `loginctl` knows no session.
   olderSystemdHangs = unitPatterns [
@@ -148,6 +149,7 @@ in
     url = "https://cloud.debian.org/images/cloud/bookworm/20261018-2635/debian-12-genericcloud-amd64-20261018-2635.tar.xz";
     hash = "sha256-Iy+sX6a2WqenvidBlmF7UZQ/DA2kloX/klmBNiEdD0s=";
     format = "disk-tarball";
+    extraExcludes = olderSystemdHangs;
   };
 
   fedora-43 = cloudImage {
