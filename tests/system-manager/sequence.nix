@@ -1,19 +1,16 @@
 # SPDX-License-Identifier: MIT
 #
-# A test of what a system-manager machine activates, run with
-# system-manager's container test driver
-# (`system-manager.lib.containerTest.makeContainerTest`) in a container
-# of a distribution, through sequences of changes. `inputs` is the
-# dependency pool of the checks partition with `caisson` set to the tree
-# itself; `distro` names a distribution of `distros.nix` beside this
-# file, whose root filesystem the container runs.
+# The sequence of changes of the system-manager test, which
+# `container.nix` runs in a container of a distribution and `vm.nix` in
+# a VM of a distribution. `inputs` is the dependency pool of the checks
+# partition with `caisson` set to the tree itself.
 #
-# The driver runs the container with systemd-nspawn in the build
-# sandbox, which needs the `uid-range` system feature, so Nix must run
-# with `auto-allocate-uids = true`. The test is therefore not among the
-# checks `nix flake check` builds: it is the output
-# `containerTests.x86_64-linux.system-manager-<distro>`, which CI builds
-# with that setting, for each distribution.
+# It returns the systems of the machine in each version (`v1`, `v2`),
+# the activation packages of the home-manager configuration of `carol`
+# in each version, and `script`, the test script. Each driver puts in
+# front of the script the definitions of `machine`,
+# `activate (toplevel)` and `exit_status (command)`, which the drivers
+# do differently, and the boot of the machine with Nix installed.
 #
 # The machine comes in the versions v1 and v2, which caisson evaluates
 # separately (`topOf` below). It declares the profiles of
@@ -27,7 +24,7 @@
 # `alice` and of the system back after they are changed by hand, and
 # that the activation of the home of `carol` in v2, run by hand while
 # the machine runs v1, warns of the drift.
-{ inputs, distro }:
+{ inputs }:
 let
   core = inputs.caisson.lib.caisson-core;
 
@@ -151,25 +148,20 @@ let
 
   profile = "/nix/var/nix/profiles/caisson/nvf/editor";
 in
-inputs.system-manager.lib.containerTest.makeContainerTest {
-  hostPkgs = pkgs;
-  # The name of the container, which systemd-nspawn takes as a host
-  # name, where `_` is not allowed.
-  name = builtins.replaceStrings [ "_" ] [ "-" ] "caisson-system-manager-${distro}";
-  rootfs = (import ./distros.nix { inherit inputs pkgs; }).${distro};
-  toplevel = v1;
-  extraPathsToRegister = [
+{
+  inherit
+    pkgs
+    v1
     v2
     carolV1
     carolV2
-  ];
-  testScript = ''
+    ;
+  script = ''
     import time
 
-    # The driver's `execute` returns a `subprocess.CompletedProcess`.
     def wait_until_fails(command, timeout=60):
         for _ in range(timeout):
-            if machine.execute(command).returncode != 0:
+            if exit_status(command) != 0:
                 return
             time.sleep(1)
         raise Exception(f"`{command}` still succeeds")
@@ -180,9 +172,11 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
     def target_of(path):
         return machine.succeed(f"readlink -f {path}").strip()
 
+    # The user runs `nix-env` in a login shell, where the profile script
+    # of the Nix installation puts it on the `PATH`.
     def change_by_hand(path, user):
         machine.succeed(
-            f"runuser -u {user} -- nix-env --profile {path} --set ${v1}"
+            f"runuser -l {user} -c 'nix-env --profile {path} --set ${v1}'"
         )
         machine.fail(f"test -e {path}/bin/nvim")
 
@@ -203,15 +197,6 @@ inputs.system-manager.lib.containerTest.makeContainerTest {
         for user, name in [("alice", "hjem-editor"), ("carol", "home-editor")]:
             holds(profile_of(user, name), version)
             names(f"/home/{user}/.config/probe/version", version)
-
-    def activate(toplevel):
-        logs = machine.activate(profile=toplevel)
-        for line in logs.split("\n"):
-            assert "ERROR" not in line, line
-        machine.wait_for_unit("system-manager.target")
-
-    start_all()
-    machine.wait_for_unit("multi-user.target")
 
     # v1: everything is v1, and the profile `retired` is activated.
     activate("${v1}")

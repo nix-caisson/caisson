@@ -10,6 +10,11 @@
 # installation of the distribution as it ships, with the systemd, the
 # PAM configuration and the default services of the distribution, which
 # is what the test runs against.
+#
+# Ubuntu 22.04, Debian 12 and Rocky Linux 9 are not here. Their systemd
+# does not start logind and other services of the distribution in this
+# container, and a test without them would not test the distribution
+# as it ships. The test runs on them in a VM (`vm.nix`).
 { inputs, pkgs }:
 let
   containerTest = inputs.system-manager.lib.containerTest;
@@ -19,8 +24,7 @@ let
   # The units that cannot run in a container, or that wait in a container
   # for what it does not have, so that the boot never finishes:
   #
-  # - cloud-init waits for the data source of a cloud, from its units and,
-  #   on Debian 12, from its SysV init scripts, which systemd runs too;
+  # - cloud-init waits for the data source of a cloud;
   # - the first-boot wizard of systemd asks on the console for what a
   #   cloud would have provided;
   # - audit needs the audit of the kernel;
@@ -53,8 +57,6 @@ let
     "etc/systemd/system/cloud-init.target.wants/*"
     "etc/systemd/system/multi-user.target.wants/cloud-*"
     "usr/lib/systemd/system/cloud-*"
-    "etc/init.d/cloud-*"
-    "etc/rc*.d/*cloud-*"
     "usr/lib/systemd/system/systemd-remount-fs.service"
     "usr/lib/systemd/system/proc-sys-fs-binfmt_misc.automount"
     "usr/lib/systemd/system/sys-kernel-*"
@@ -91,34 +93,15 @@ let
       "etc/systemd/system/*.wants/${unit}"
     ]) names;
 
-  # The services that the systemd of Ubuntu 22.04 (249), and of Rocky
-  # Linux 9 and Debian 12 (252), starts and does not always run in this
-  # container: their boot reports show the start jobs running until the
-  # driver gives up, while the newer distributions start the same
-  # services. On Debian 12 logind hung on some runs and not on others. The test uses none
-  # of them; the unit that applies the files of a hjem user skips the
-  # reload of the units of the user when `loginctl` knows no session.
-  olderSystemdHangs = unitPatterns [
-    "systemd-logind.service"
-    "systemd-hostnamed.service"
-    "systemd-networkd.service"
-    "systemd-networkd.socket"
-    "systemd-networkd-wait-online.service"
-    "kdump.service"
-    "rsyslog.service"
-  ];
-
   cloudImage =
     {
       name,
       url,
       hash,
       format,
-      extraExcludes ? [ ],
     }:
     buildRootfs {
-      inherit name;
-      excludePatterns = excludePatterns ++ extraExcludes;
+      inherit name excludePatterns;
       cloudImg = pkgs.fetchurl { inherit url hash; };
       cloudImgFormat = format;
       extraSetup = bootReport;
@@ -126,31 +109,21 @@ let
 
   # An image of the driver, built again with the boot report.
   driverImage =
-    name: extraExcludes:
+    name:
     let
       config = driverImages.${name}.rootfs.passthru.rootFsConfig;
     in
     buildRootfs (
       config
       // {
-        excludePatterns = (config.excludePatterns or [ ]) ++ extraExcludes;
         extraSetup = (config.extraSetup or "") + bootReport;
       }
     );
 in
 {
-  ubuntu-22_04 = driverImage "ubuntu-22_04" olderSystemdHangs;
-  ubuntu-24_04 = driverImage "ubuntu-24_04" [ ];
-  ubuntu-26_04 = driverImage "ubuntu-26_04" [ ];
-  debian-13 = driverImage "debian-13" [ ];
-
-  debian-12 = cloudImage {
-    name = "debian-12";
-    url = "https://cloud.debian.org/images/cloud/bookworm/20261018-2635/debian-12-genericcloud-amd64-20261018-2635.tar.xz";
-    hash = "sha256-Iy+sX6a2WqenvidBlmF7UZQ/DA2kloX/klmBNiEdD0s=";
-    format = "disk-tarball";
-    extraExcludes = olderSystemdHangs;
-  };
+  ubuntu-24_04 = driverImage "ubuntu-24_04";
+  ubuntu-26_04 = driverImage "ubuntu-26_04";
+  debian-13 = driverImage "debian-13";
 
   fedora-43 = cloudImage {
     name = "fedora-43";
@@ -164,14 +137,6 @@ in
     url = "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2";
     hash = "sha256-KGgP5bNxpaguv0OjGSbghqFo5ZlJ0DlpxQk+cHH5C38=";
     format = "qcow2";
-  };
-
-  rocky-9 = cloudImage {
-    name = "rocky-9";
-    url = "https://dl.rockylinux.org/vault/rocky/9.7/images/x86_64/Rocky-9-GenericCloud-Base-9.7-20251123.2.x86_64.qcow2";
-    hash = "sha256-FdgdNDSymBQrL92PtUrvJmJoTbXAgswZHDx5di7WNgw=";
-    format = "qcow2";
-    extraExcludes = olderSystemdHangs;
   };
 
   rocky-10 = cloudImage {

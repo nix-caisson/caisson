@@ -11,6 +11,13 @@
     extraInputs = (lib.caisson.pins.flake-compat ../../../../tests/dependencies).sources;
     module =
       { inputs, self, ... }:
+      let
+        # The inputs of the system-manager tests: the dependency pool
+        # with `caisson` set to this tree.
+        testInputs = inputs // {
+          caisson = self;
+        };
+      in
       {
         imports = [ inputs.treefmt-nix.flakeModule ];
         systems = [ "x86_64-linux" ];
@@ -302,7 +309,7 @@
           };
 
         # A system-manager machine activated in a container of each
-        # distribution of tests/system-manager-container/distros.nix,
+        # distribution of tests/system-manager/container-distros.nix,
         # through sequences of changes, as
         # `system-manager-<distribution>`. The container runs in the
         # build sandbox only where Nix runs with
@@ -310,11 +317,8 @@
         # `nix flake check` builds; the workflow builds them by name.
         flake.containerTests.x86_64-linux =
           let
-            testInputs = inputs // {
-              caisson = self;
-            };
             distros = builtins.attrNames (
-              import (self.outPath + "/tests/system-manager-container/distros.nix") {
+              import (self.outPath + "/tests/system-manager/container-distros.nix") {
                 inputs = testInputs;
                 pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
               }
@@ -323,12 +327,33 @@
           builtins.listToAttrs (
             builtins.map (distro: {
               name = "system-manager-${distro}";
-              value = import (self.outPath + "/tests/system-manager-container") {
+              value = import (self.outPath + "/tests/system-manager/container.nix") {
                 inputs = testInputs;
                 inherit distro;
               };
             }) distros
           );
+
+        # The same machine and sequences in a VM of each distribution
+        # below, booted from the cloud image of the distribution with
+        # its kernel and its systemd, as
+        # `system-manager-vm-<distribution>`. These are the
+        # distributions whose systemd does not start all of its
+        # services in the container.
+        flake.checks.x86_64-linux = builtins.listToAttrs (
+          builtins.map
+            (distro: {
+              name = "system-manager-vm-${distro}";
+              value = import (self.outPath + "/tests/system-manager/vm.nix") {
+                inputs = testInputs;
+                inherit distro;
+              };
+            })
+            [
+              "ubuntu-22_04"
+              "debian-12"
+            ]
+        );
 
         # A macOS machine declared through the darwin integration, built:
         # the system `darwin-rebuild` would build for it. It is the only
