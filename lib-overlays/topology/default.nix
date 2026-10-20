@@ -124,6 +124,14 @@
               caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ "${src}/nixos/module.nix" ];
             };
 
+          moduleList = [
+            "${src}/topology"
+            machinesModule
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           value = lib.evalModules (
             {
               class = "topology";
@@ -133,19 +141,23 @@
                 modulesPath = toString "${src}/topology";
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                "${src}/topology"
-                machinesModule
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           inherit value;
+          # What evalModules received: the topology module tree of
+          # nix-topology, recorded as a module of the nix-topology
+          # source, the module that hands it the NixOS configurations
+          # declared inside, the framework module of the class, the
+          # modules selected from the registry and the configuration's
+          # module.
+          modules = final.caisson.integrations.inEcosystem {
+            name = "nix-topology";
+            inherit src;
+          } moduleList;
           outputs.output = value.config.output;
         };
 

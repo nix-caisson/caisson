@@ -148,7 +148,163 @@
       # caisson itself is read from the closure, so it is there
       # however the integration was registered.
       frameworkModules =
-        class: registry: [ closure-lib.caisson.modules.${class}.core ] ++ select "core" registry;
+        class: registry:
+        [
+          {
+            key = "caisson.${class}";
+            imports = [ closure-lib.caisson.modules.${class}.core ];
+          }
+        ]
+        ++ select "core" registry;
+
+      # A stand-in, in the `modules` an integration's `evaluate` returns,
+      # for the module list of the ecosystem, where the evaluator
+      # receives that list: it is recorded as a single `declaration`
+      # event, keyed `key` (`nixos`), from the file `file` of the
+      # source `project` (`nixpkgs`), rather than an event for each of
+      # its modules.
+      ecosystemUnit =
+        {
+          key,
+          project,
+          file,
+        }:
+        {
+          _type = "caisson-ecosystem-unit";
+          inherit key project file;
+        };
+
+      # `modules` as an integration returns it for its `declaration`
+      # events, when the list it hands the evaluator names modules of
+      # the ecosystem by their files in the source `src`: each such
+      # module is an `ecosystemUnit` of the source `name`, keyed by
+      # that name, with its file inside the source.
+      inEcosystem =
+        { name, src }:
+        builtins.map (
+          module:
+          let
+            string = if builtins.isPath module || builtins.isString module then toString module else null;
+            prefix = "${toString src}/";
+          in
+          if string != null && final.hasPrefix prefix string then
+            ecosystemUnit {
+              key = name;
+              project = name;
+              file = final.removePrefix prefix string;
+            }
+          else
+            module
+        );
+
+      # The `declaration` events of an evaluation: an event for each
+      # element of `modules`, the list the integration hands the
+      # evaluator, in that order, with the module list of the ecosystem
+      # as the single event of its `ecosystemUnit`. A module selected
+      # from the registry carries its registry key in its module key
+      # (`lib.caisson.modules`): the event is keyed by the registry key,
+      # and its origin is the project that registered the module and
+      # the file of the module, where the module has a file. A module of
+      # caisson itself is keyed `caisson.<…>`, and its project is
+      # caisson. A module given as a path is keyed by the path, and any
+      # other module by its position in the list, `inline/<index>`, with
+      # the file the module names, where it names a file. A file inside
+      # a source in the Nix store is written relative to that source,
+      # the way a project's files are named in the project. `lib` is the
+      # lib of the evaluation.
+      declarationEventsOf =
+        { lib, modules }:
+        let
+          libManifest = lib.caisson-core.libManifest or { };
+          project = libManifest.name or null;
+          inSource =
+            file:
+            let
+              string = toString file;
+              parts = lib.splitString "/" string;
+            in
+            if lib.hasPrefix "${builtins.storeDir}/" string && builtins.length parts > 4 then
+              builtins.concatStringsSep "/" (lib.drop 4 parts)
+            else
+              string;
+          # The file of a module, looking through the wrappers that key
+          # a module and import it alone.
+          fileOf =
+            module:
+            if builtins.isPath module || builtins.isString module then
+              inSource module
+            else if builtins.isAttrs module && module ? _file then
+              inSource module._file
+            else if builtins.isAttrs module && builtins.length (module.imports or [ ]) == 1 then
+              fileOf (builtins.head module.imports)
+            else
+              null;
+          keyed = prefix: module: builtins.isAttrs module && lib.hasPrefix prefix (module.key or "");
+          # The parts of the key of a module of the registry,
+          # `modules.<class>.<name>@<project>`: the registry key and the
+          # project that registered the module, null where the library
+          # names no project.
+          registryPartsOf =
+            key:
+            let
+              parts = lib.splitString "@" key;
+              registered = lib.last parts;
+            in
+            {
+              key = builtins.head parts;
+              project = if builtins.length parts < 2 || registered == "" then null else registered;
+            };
+          eventOf =
+            index: module:
+            {
+              operation = "declaration";
+            }
+            // (
+              if (module._type or null) == "caisson-ecosystem-unit" then
+                {
+                  inherit (module) key;
+                  origin = {
+                    inherit (module) project file;
+                  };
+                }
+              else if keyed "modules." module then
+                let
+                  registered = registryPartsOf module.key;
+                in
+                {
+                  inherit (registered) key;
+                  origin = {
+                    inherit (registered) project;
+                    file = fileOf module;
+                  };
+                }
+              else if keyed "caisson." module then
+                {
+                  inherit (module) key;
+                  origin = {
+                    project = "caisson";
+                    file = fileOf module;
+                  };
+                }
+              else if builtins.isPath module then
+                {
+                  key = inSource module;
+                  origin = {
+                    inherit project;
+                    file = inSource module;
+                  };
+                }
+              else
+                {
+                  key = "inline/${toString index}";
+                  origin = {
+                    inherit project;
+                    file = fileOf module;
+                  };
+                }
+            );
+        in
+        lib.imap0 eventOf modules;
 
       # The selection of an evaluation over the registry of its class,
       # from the arguments of the configuration, as a function of that
@@ -328,6 +484,14 @@
                 ]) config.caisson.forChildren.extraDefaultModuleImports;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
                 systems = config.caisson.forChildren.systems;
+              };
+              # What the evaluator received, as `declaration` events:
+              # the integration's `evaluate` returns `modules`, the list
+              # it handed the evaluator, with an `ecosystemUnit` where
+              # the module list of the ecosystem is.
+              events = declarationEventsOf {
+                inherit (view) lib;
+                modules = evaluated.modules or [ ];
               };
             };
         };
@@ -1339,6 +1503,9 @@
           inherit
             childrenOf
             displayName
+            declarationEventsOf
+            ecosystemUnit
+            inEcosystem
             entriesOf
             configurationsModuleFor
             integrationsIn

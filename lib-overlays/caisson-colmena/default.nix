@@ -250,6 +250,13 @@
             else
               null;
 
+          moduleList = [
+            colmenaOptions
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           evaluated = lib.evalModules (
             {
               class = "caisson-colmena";
@@ -259,18 +266,19 @@
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                colmenaOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the options of the class, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. Each node is a
+          # separate NixOS configuration, and the history of the node
+          # records the modules NixOS received.
+          modules = moduleList;
           outputs.hive = hiveOf {
             inherit src;
             inherit (evaluated) config;

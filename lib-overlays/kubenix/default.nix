@@ -115,6 +115,20 @@
             else
               null;
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [
+              {
+                _file = "caisson-kubenix:args";
+                config._module.args = {
+                  inherit pkgs;
+                  name = "default";
+                };
+              }
+            ];
+
           value = kubenixLib.evalModules (
             {
               class = "kubenix";
@@ -131,25 +145,21 @@
                 };
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [
-                  {
-                    _file = "caisson-kubenix:args";
-                    config._module.args = {
-                      inherit pkgs;
-                      name = "default";
-                    };
-                  }
-                ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           inherit value;
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry, the
+          # configuration's module and the module that hands the
+          # evaluation its arguments. The modules of kubenix reach the
+          # configuration's module through the `kubenix` special
+          # argument, imported only where a module selects them, so
+          # none of kubenix's modules are declared here.
+          modules = moduleList;
           outputs.result =
             value.config.kubernetes.result
               or (throw "${what} has no `kubernetes.result`; it imports kubenix's `k8s` module from `kubenix.modules.k8s` to have one.");

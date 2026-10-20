@@ -229,6 +229,14 @@
             else
               null;
 
+          moduleList = [
+            (devicesOptions diskoLib)
+            assertionsOptions
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           evaluated = lib.evalModules (
             {
               class = "caisson-disko";
@@ -238,19 +246,19 @@
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                (devicesOptions diskoLib)
-                assertionsOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the devices option and the
+          # assertions, the framework module of the class, the modules
+          # selected from the registry and the configuration's module.
+          # disko's type library builds the devices option; it reads
+          # no module list of disko.
+          modules = moduleList;
           outputs = layoutOf {
             context = "lib.caisson.caisson-disko";
             inherit (evaluated.config) assertions;

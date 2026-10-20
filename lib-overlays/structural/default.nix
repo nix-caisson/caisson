@@ -62,6 +62,11 @@
             else
               null;
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
           evaluated = lib.evalModules (
             {
               class = "structural";
@@ -71,16 +76,17 @@
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry and the
+          # configuration's module.
+          modules = moduleList;
         };
 
       configuration =

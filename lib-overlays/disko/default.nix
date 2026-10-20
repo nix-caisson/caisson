@@ -78,6 +78,13 @@
             else
               null;
 
+          moduleList = [
+            (native.devicesOptions diskoLib)
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           evaluated = lib.evalModules (
             {
               class = "disko";
@@ -87,18 +94,19 @@
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                (native.devicesOptions diskoLib)
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the devices option, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. disko's type
+          # library builds the devices option; it reads no module
+          # list of disko.
+          modules = moduleList;
           outputs = native.layoutOf {
             context = "lib.caisson.disko";
             assertions = [ ];

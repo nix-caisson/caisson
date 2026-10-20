@@ -221,6 +221,16 @@
         in
         {
           value = evaluated;
+          # What `evalFlakeModule` received: flake-parts' core modules,
+          # then the module of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "flake-parts";
+              project = "flake-parts";
+              file = null;
+            })
+            module
+          ];
           outputs = {
             flake = outputs;
           };

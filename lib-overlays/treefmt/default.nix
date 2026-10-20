@@ -102,6 +102,16 @@
           # `submoduleWith` returns.
           upstreamSpecialArgs = (treefmt.submoduleWith lib { }).functor.payload.specialArgs;
 
+          moduleList = [
+            {
+              _file = "caisson-treefmt:pkgs";
+              inherit pkgs;
+            }
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
+
           value = lib.evalModules (
             {
               class = "treefmt";
@@ -111,17 +121,7 @@
                   inherit lib pkgSets;
                 }
                 // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                treefmt.submodule-modules
-                ++ [
-                  {
-                    _file = "caisson-treefmt:pkgs";
-                    inherit pkgs;
-                  }
-                ]
-                ++ frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = treefmt.submodule-modules ++ moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -129,6 +129,16 @@
         in
         {
           inherit value;
+          # What evalModules received: treefmt-nix's module list, then
+          # the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "treefmt-nix";
+              project = "treefmt-nix";
+              file = null;
+            })
+          ]
+          ++ moduleList;
           outputs = {
             inherit (build)
               wrapper

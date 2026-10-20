@@ -114,6 +114,19 @@
             else
               null;
 
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [
+              "${src}/modules/top-level"
+              {
+                _file = "caisson-nixvim:evalNixvim";
+                flake = nixvimLib.mkOptionDefault src;
+                nixpkgs.pkgs = pkgs;
+              }
+            ];
+
           value = nixvimLib.evalModules (
             {
               class = "nixvim";
@@ -123,18 +136,7 @@
                 modulesPath = "${src}/modules";
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [
-                  "${src}/modules/top-level"
-                  {
-                    _file = "caisson-nixvim:evalNixvim";
-                    flake = nixvimLib.mkOptionDefault src;
-                    nixpkgs.pkgs = pkgs;
-                  }
-                ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -155,6 +157,15 @@
         in
         {
           inherit value;
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry, the
+          # configuration's module, the top-level module tree of nixvim,
+          # recorded as a module of the nixvim source, and the module
+          # that sets `flake` and `nixpkgs.pkgs`.
+          modules = final.caisson.integrations.inEcosystem {
+            name = "nixvim";
+            inherit src;
+          } moduleList;
           outputs = {
             inherit package;
             inherit (kept) activationPackage profile;

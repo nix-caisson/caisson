@@ -61,6 +61,9 @@
               inherit (callArgs) lib;
             }).evalModules
               (builtins.removeAttrs callArgs [ "lib" ]);
+          # What evalModules received: the modules of the composition,
+          # with no NixOS base modules.
+          modules = common.modules;
         };
 
       configuration =
