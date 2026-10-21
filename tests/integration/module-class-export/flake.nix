@@ -16,6 +16,7 @@
     let
       lib = parent.lib.caisson.mkLib {
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
 
         projects = {
           caisson = parent;

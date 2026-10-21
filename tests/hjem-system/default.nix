@@ -6,8 +6,10 @@
 # tree itself.
 #
 # The composition is for x86_64-linux, with a package config whose set
-# there is nixpkgs, and with nixpkgs and hjem declared as its
-# ecosystems. `user` is a hjem module with a file and a package.
+# there is nixpkgs, and with nixpkgs, hjem, the library and the NixOS
+# module collection declared as its ecosystems, the library and the
+# module collection from the same nixpkgs pin. `user` is a hjem module
+# with a file and a package.
 # `standalone` is a hjem configuration that is a top, for the user
 # `probe` with the home directory it sets itself. `top` is a structural
 # top holding a NixOS machine `probe-machine`, which declares the
@@ -22,11 +24,19 @@ let
   pkgs = import inputs.nixpkgs { inherit system; };
 
   lib = core.mkLib {
-    sources = { };
+    sources = {
+      inherit (inputs)
+        nixpkgs
+        hjem
+        nvf
+        home-manager
+        ;
+    };
     systems = [ system ];
     projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = {
-      inherit (inputs) nixpkgs hjem;
+    defaultEcosystemSrc = sources: {
+      nixpkgs-lib = sources.nixpkgs;
+      nixos = sources.nixpkgs;
     };
     pkgSets = _lib: {
       default =

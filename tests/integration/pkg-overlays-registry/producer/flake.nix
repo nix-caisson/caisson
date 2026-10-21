@@ -19,6 +19,7 @@
         inherit (core.pins.flake inputs) sources root;
         name = "producer";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
         projects = {
           caisson = parent;
         };

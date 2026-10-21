@@ -79,6 +79,11 @@
         # composition closes over, and the root from `self`.
         inherit (caisson.lib.caisson.pins.flake inputs) sources root;
 
+        # The library the composition runs on: the `lib` of the
+        # nixpkgs input, selected under the `nixpkgs-lib` key since
+        # this flake names no separate nixpkgs.lib mirror.
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
+
         # The project's name, which this flake holds and which is the
         # namespace it contributes to the composed library: the `lib`
         # flake output holds `lib.literate-flake` because of this

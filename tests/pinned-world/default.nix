@@ -38,8 +38,7 @@ let
   # last occurrence of a key supplies its value.
   registered =
     (core.mkLib {
-      sources = { };
-      defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+      sources = { inherit (inputs) nixpkgs-lib; };
       projects.caisson = inputs.caisson;
     }).caisson-core.libManifest.libOverlays;
 
@@ -202,22 +201,37 @@ let
 
   # The colmena and disko probes compose with declared ecosystems: a
   # node resolves the colmena source, a layout resolves the disko
-  # source, and nixpkgs resolves from the declaration, as it does in a
-  # consumer flake.
+  # source, and the package set, the library and the NixOS module
+  # collection resolve from the declaration, as they do in a consumer
+  # flake. The library and the NixOS module collection are the same
+  # nixpkgs pin as the package set.
   hiveLib = core.mkLib (
     declaresPkgs
     // {
-      sources = { };
-      projects = {
-        caisson = inputs.caisson;
-      };
-      defaultEcosystemSrc = {
+      sources = {
         inherit (inputs)
           nixpkgs
           colmena
           flake-parts
           disko
+          home-manager
+          nvf
+          treefmt-nix
+          nixvim
+          nix-topology
+          kubenix
+          nixidy
+          system-manager
+          hjem
+          terranix
           ;
+      };
+      projects = {
+        caisson = inputs.caisson;
+      };
+      defaultEcosystemSrc = sources: {
+        nixpkgs-lib = sources.nixpkgs;
+        nixos = sources.nixpkgs;
       };
     }
   );
@@ -379,14 +393,14 @@ let
       { lib, ... }:
       {
         caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           configModule =
             { lib, ... }:
             let
               home =
                 module:
                 lib.caisson.home-manager.mkConfiguration {
-                  ecosystemSrc = inputs.home-manager;
+                  ecosystemSrc = sources: sources.home-manager;
                   configModule = {
                     imports = [ module ];
                     home.stateVersion = "25.05";
@@ -419,7 +433,7 @@ let
   # of the evaluation hands the library out through an option.
   nixosEvaluationLib =
     (hiveLib.caisson.nixos.mkTopConfiguration {
-      ecosystemSrc = inputs.nixpkgs;
+      ecosystemSrc = sources: sources.nixpkgs;
       configModule =
         { lib, ... }:
         {
@@ -614,7 +628,7 @@ let
     minimalNixosSystemEvaluates =
       let
         system = hiveLib.caisson.nixos-minimal.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           # The minimal evaluator carries no nixpkgs module, so the
           # package set arrives as the `pkgs` module argument.
           configModule =
@@ -638,20 +652,20 @@ let
             { lib, ... }:
             {
               caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
-                ecosystemSrc = { };
+                ecosystemSrc = sources: { };
               };
             };
         }).colmenaHive
       &&
         throws
           (hiveLib.caisson.terranix.mkTopConfiguration {
-            ecosystemSrc = { };
+            ecosystemSrc = sources: { };
             configModule = { };
           }).drvPath
       &&
         throws
           (hiveLib.caisson.system-manager.mkTopConfiguration {
-            ecosystemSrc = { };
+            ecosystemSrc = sources: { };
             configModule = { };
           }).drvPath;
 
@@ -662,7 +676,7 @@ let
         # home-manager CLI reads it: the evaluated home-manager
         # configuration.
         home = hiveLib.caisson.home-manager.mkTopConfiguration {
-          ecosystemSrc = inputs.home-manager;
+          ecosystemSrc = sources: sources.home-manager;
           configModule =
             { ... }:
             {
@@ -883,7 +897,7 @@ let
         machine =
           lib:
           lib.caisson.nixos.mkConfiguration {
-            ecosystemSrc = inputs.nixpkgs;
+            ecosystemSrc = sources: sources.nixpkgs;
             configModule = minimalNixosBase;
           };
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -1009,7 +1023,7 @@ let
     aMachineInsideAParentIsTheSameMachine =
       let
         machine = {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           configModule = {
             imports = [ minimalNixosBase ];
             networking.hostName = "probe";
@@ -1046,7 +1060,7 @@ let
             { lib, ... }:
             {
               caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
-                ecosystemSrc = inputs.nixpkgs;
+                ecosystemSrc = sources: sources.nixpkgs;
                 configModule = minimalNixosBase;
               };
             };
@@ -1093,7 +1107,7 @@ let
     aHomeInsideAParentIsTheSameHome =
       let
         home = {
-          ecosystemSrc = inputs.home-manager;
+          ecosystemSrc = sources: sources.home-manager;
           configModule = {
             home.username = "probe";
             home.homeDirectory = "/home/probe";
@@ -1117,7 +1131,7 @@ let
               { lib, ... }:
               {
                 caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
-                  ecosystemSrc = inputs.nixpkgs;
+                  ecosystemSrc = sources: sources.nixpkgs;
                   configModule =
                     { lib, ... }:
                     {
@@ -1219,7 +1233,7 @@ let
         top = colmenaTop { probe = hostModule; };
         node = top.colmenaHive.nodes.probe;
         system = hiveLib.caisson.nixos.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           configModule = hostModule;
         };
       in
@@ -1292,11 +1306,12 @@ let
           "aarch64-linux"
         ];
         twoSystemsLib = core.mkLib {
-          sources = { };
+          sources = { inherit (inputs) nixpkgs colmena; };
           inherit systems;
           projects.caisson = inputs.caisson;
-          defaultEcosystemSrc = {
-            inherit (inputs) nixpkgs colmena;
+          defaultEcosystemSrc = sources: {
+            nixpkgs-lib = sources.nixpkgs;
+            nixos = sources.nixpkgs;
           };
           pkgSets = _lib: {
             default =
@@ -1366,7 +1381,7 @@ let
               { lib, ... }:
               {
                 caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
-                  inherit ecosystemSrc;
+                  ecosystemSrc = _sources: ecosystemSrc;
                   configModule =
                     { lib, ... }:
                     {
@@ -2177,7 +2192,7 @@ let
         nvfConfiguration =
           lib: module:
           lib.caisson.nvf.mkConfiguration {
-            ecosystemSrc = inputs.nvf;
+            ecosystemSrc = sources: sources.nvf;
             configModule = module;
           };
         top = probe.lib.caisson.structural.mkTopConfiguration {
@@ -2269,7 +2284,7 @@ let
           { lib, ... }:
           {
             caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
-              ecosystemSrc = inputs.nvf;
+              ecosystemSrc = sources: sources.nvf;
               configModule.vim.viAlias = true;
             };
           };
@@ -2511,11 +2526,11 @@ let
           { lib, ... }:
           {
             caisson.treefmt.configurations.default = lib.caisson.treefmt.mkConfiguration {
-              ecosystemSrc = inputs.treefmt-nix;
+              ecosystemSrc = sources: sources.treefmt-nix;
               configModule = module;
             };
             caisson.treefmt.configurations.docs = lib.caisson.treefmt.mkConfiguration {
-              ecosystemSrc = inputs.treefmt-nix;
+              ecosystemSrc = sources: sources.treefmt-nix;
               configModule = {
                 projectRootFile = "book.toml";
                 programs.nixfmt.enable = true;
@@ -2532,12 +2547,10 @@ let
         rootedLib = core.mkLib (
           declaresPkgs
           // {
-            sources = { };
+            sources = { inherit (inputs) nixpkgs treefmt-nix; };
             inherit root;
             projects.caisson = inputs.caisson;
-            defaultEcosystemSrc = {
-              inherit (inputs) nixpkgs;
-            };
+            defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
           }
         );
         rooted = rootedLib.caisson.structural.mkTopConfiguration {
@@ -2579,7 +2592,7 @@ let
         nvfConfiguration =
           lib:
           lib.caisson.nvf.mkConfiguration {
-            ecosystemSrc = inputs.nvf;
+            ecosystemSrc = sources: sources.nvf;
             configModule = module;
           };
         top = hiveLib.caisson.structural.mkTopConfiguration {
@@ -2602,7 +2615,7 @@ let
                   };
               };
               caisson.home-manager.configurations.alice = lib.caisson.home-manager.mkConfiguration {
-                ecosystemSrc = inputs.home-manager;
+                ecosystemSrc = sources: sources.home-manager;
                 configModule =
                   { lib, ... }:
                   {
@@ -2671,7 +2684,7 @@ let
             { lib, ... }:
             {
               caisson.nixvim.configurations.editor = lib.caisson.nixvim.mkConfiguration {
-                ecosystemSrc = inputs.nixvim;
+                ecosystemSrc = sources: sources.nixvim;
                 configModule = module;
               };
             };
@@ -2710,7 +2723,7 @@ let
                   {
                     imports = [ minimalNixosBase ];
                     caisson.nixvim.configurations.machine-editor = lib.caisson.nixvim.mkConfiguration {
-                      ecosystemSrc = inputs.nixvim;
+                      ecosystemSrc = sources: sources.nixvim;
                       configModule = module;
                     };
                   };
@@ -2762,7 +2775,7 @@ let
             { lib, ... }:
             {
               caisson.topology.configurations.default = lib.caisson.topology.mkConfiguration {
-                ecosystemSrc = inputs.nix-topology;
+                ecosystemSrc = sources: sources.nix-topology;
                 configModule =
                   { lib, ... }:
                   {
@@ -2825,7 +2838,7 @@ let
             { lib, ... }:
             {
               caisson.kubenix.configurations.cluster = lib.caisson.kubenix.mkConfiguration {
-                ecosystemSrc = inputs.kubenix;
+                ecosystemSrc = sources: sources.kubenix;
                 configModule = module;
               };
             };
@@ -2855,7 +2868,7 @@ let
             { lib, ... }:
             {
               caisson.nixidy.configurations.prod = lib.caisson.nixidy.mkConfiguration {
-                ecosystemSrc = inputs.nixidy;
+                ecosystemSrc = sources: sources.nixidy;
                 configModule = module;
               };
             };
@@ -2883,7 +2896,7 @@ let
         editor =
           lib:
           lib.caisson.nvf.mkConfiguration {
-            ecosystemSrc = inputs.nvf;
+            ecosystemSrc = sources: sources.nvf;
             configModule.vim.viAlias = true;
           };
         withEditor =
@@ -2912,7 +2925,7 @@ let
                       bob = lib.caisson.hjem.mkConfiguration { configModule = withEditor "bob-editor"; };
                     };
                     caisson.home-manager.configurations.carol = lib.caisson.home-manager.mkConfiguration {
-                      ecosystemSrc = inputs.home-manager;
+                      ecosystemSrc = sources: sources.home-manager;
                       configModule = {
                         imports = [ (withEditor "carol-editor") ];
                         home.stateVersion = "25.05";
@@ -2950,7 +2963,7 @@ let
             { lib, ... }:
             {
               caisson.system-manager.configurations.box = lib.caisson.system-manager.mkConfiguration {
-                ecosystemSrc = inputs.system-manager;
+                ecosystemSrc = sources: sources.system-manager;
                 configModule =
                   { lib, ... }:
                   {
@@ -2963,24 +2976,24 @@ let
                       home = "/home/probe";
                     };
                     caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
-                      ecosystemSrc = inputs.home-manager;
+                      ecosystemSrc = sources: sources.home-manager;
                       configModule.home.stateVersion = "25.05";
                     };
                     caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
-                      ecosystemSrc = inputs.hjem;
+                      ecosystemSrc = sources: sources.hjem;
                       configModule =
                         { lib, pkgs, ... }:
                         {
                           files.".config/probe/greeting".text = "hello";
                           packages = [ pkgs.hello ];
                           caisson.nvf.configurations.hjem-editor = lib.caisson.nvf.mkConfiguration {
-                            ecosystemSrc = inputs.nvf;
+                            ecosystemSrc = sources: sources.nvf;
                             configModule.vim.vimAlias = true;
                           };
                         };
                     };
                     caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
-                      ecosystemSrc = inputs.nvf;
+                      ecosystemSrc = sources: sources.nvf;
                       configModule.vim.viAlias = true;
                     };
                   };
@@ -3040,7 +3053,7 @@ let
             config.output.composed.value = lib ? caisson-core;
           };
         terraform = hiveLib.caisson.terranix.mkTopConfiguration {
-          ecosystemSrc = inputs.terranix;
+          ecosystemSrc = sources: sources.terranix;
           configModule = module;
         };
         published = hiveLib.caisson.structural.mkTopConfiguration {
@@ -3049,7 +3062,7 @@ let
             { lib, ... }:
             {
               caisson.terranix.configurations.infra = lib.caisson.terranix.mkConfiguration {
-                ecosystemSrc = inputs.terranix;
+                ecosystemSrc = sources: sources.terranix;
                 configModule = module;
               };
             };
@@ -3078,11 +3091,11 @@ let
             config.environment.etc.composed.text = builtins.toJSON (lib ? caisson-core);
           };
         system = hiveLib.caisson.system-manager.mkTopConfiguration {
-          ecosystemSrc = inputs.system-manager;
+          ecosystemSrc = sources: sources.system-manager;
           configModule = module;
         };
         withOverlay = hiveLib.caisson.system-manager.mkTopConfiguration {
-          ecosystemSrc = inputs.system-manager;
+          ecosystemSrc = sources: sources.system-manager;
           configModule = {
             imports = [ module ];
             nixpkgs.overlays = [ (_final: _prev: { }) ];
@@ -3097,7 +3110,7 @@ let
             { lib, ... }:
             {
               caisson.system-manager.configurations.default = lib.caisson.system-manager.mkConfiguration {
-                ecosystemSrc = inputs.system-manager;
+                ecosystemSrc = sources: sources.system-manager;
                 configModule = module;
               };
             };
@@ -3128,7 +3141,7 @@ let
           hiveLib.caisson.integrations.topValue (
             hiveLib.caisson-core.finalizeTop (
               hiveLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
-                ecosystemSrc = inputs.nixpkgs;
+                ecosystemSrc = sources: sources.nixpkgs;
                 configModule =
                   { lib, ... }:
                   {
@@ -3143,7 +3156,7 @@ let
         terraform = hiveLib.caisson.integrations.topValue (
           hiveLib.caisson-core.finalizeTop (
             hiveLib.caisson.terranix.mkConfigurationWithEcosystemArgs {
-              ecosystemSrc = inputs.terranix;
+              ecosystemSrc = sources: sources.terranix;
               configModule = {
                 config.terraform.required_version = ">= 1.0";
               };
@@ -3154,7 +3167,7 @@ let
         home = hiveLib.caisson.integrations.topValue (
           hiveLib.caisson-core.finalizeTop (
             hiveLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
-              ecosystemSrc = inputs.home-manager;
+              ecosystemSrc = sources: sources.home-manager;
               configModule = {
                 home.username = "probe";
                 home.homeDirectory = "/home/probe";
@@ -3174,8 +3187,7 @@ let
         registeringLib = core.mkLib (
           declaresPkgs
           // {
-            sources = { };
-            defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+            sources = { inherit (inputs) nixpkgs-lib nixpkgs; };
             projects.caisson = inputs.caisson;
             modules = lib: {
               nixos.pinned-world-probe = lib.caisson-core.mkModule "nixos" (
@@ -3192,7 +3204,7 @@ let
           }
         );
         system = registeringLib.caisson.nixos-minimal.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           configModule =
             { lib, ... }:
             {
@@ -3208,8 +3220,7 @@ let
     manifestTravelsWithMkLibCompositions =
       let
         composedWithMkLib = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+          sources = { inherit (inputs) nixpkgs-lib; };
           projects.caisson = inputs.caisson;
         };
         manifest = composedWithMkLib.caisson-core.libManifest;
@@ -3255,9 +3266,7 @@ let
     systemsDeclaredOnMkLibReachFlakeParts =
       let
         composedWithSystems = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          defaultEcosystemSrc.flake-parts = inputs.flake-parts;
+          sources = { inherit (inputs) nixpkgs-lib flake-parts; };
           systems = [
             "x86_64-linux"
             "aarch64-linux"
@@ -3285,15 +3294,14 @@ let
         composedFromProject = core.mkLib (
           declaresPkgs
           // {
-            sources = { };
-            defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
+            sources = { inherit (inputs) nixpkgs-lib nixpkgs; };
             projects = {
               caisson = inputs.caisson;
             };
           }
         );
         system = composedFromProject.caisson.nixos-minimal.mkTopConfiguration {
-          ecosystemSrc = inputs.nixpkgs;
+          ecosystemSrc = sources: sources.nixpkgs;
           configModule =
             { pkgs, lib, ... }:
             {
@@ -3306,13 +3314,24 @@ let
       && composedFromProject.caisson-core.libManifest.modules.flake ? "caisson/default"
       && system.config.probe;
 
+    # A tree's declared ecosystem sources reach the nixos-minimal
+    # adapter with no `ecosystemSrc` passed to its configuration: the
+    # package set from `nixpkgs`, the library from `nixpkgs-lib` and
+    # the NixOS module collection from `nixos`, each key declared
+    # separately, all three pointing at the same nixpkgs pin.
     declaredEcosystemServesAdapters =
       let
         composedWithDeclaration = core.mkLib (
           declaresPkgs
           // {
-            sources = { };
-            defaultEcosystemSrc.nixpkgs = inputs.nixpkgs;
+            sources = {
+              pinned-nixpkgs = inputs.nixpkgs;
+            };
+            defaultEcosystemSrc = sources: {
+              nixpkgs = sources.pinned-nixpkgs;
+              nixpkgs-lib = sources.pinned-nixpkgs;
+              nixos = sources.pinned-nixpkgs;
+            };
             projects.caisson = inputs.caisson;
           }
         );
@@ -3353,9 +3372,7 @@ let
     structuralTopMatchesFlakeParts =
       let
         composedWithBoth = core.mkLib {
-          sources = { };
-          defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib;
-          defaultEcosystemSrc.flake-parts = inputs.flake-parts;
+          sources = { inherit (inputs) nixpkgs-lib flake-parts; };
           systems = [ "x86_64-linux" ];
           projects.caisson = inputs.caisson;
         };

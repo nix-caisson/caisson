@@ -139,8 +139,7 @@
                 core = import ${inputs.caisson-core.outPath};
               in
               core.mkLib {
-                sources = { };
-                defaultEcosystemSrc.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
+                sources.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
                 modules = lib: lib.caisson-core.mkModules ${self.outPath}/modules;
                 libOverlays = lib: lib.caisson-core.mkLibOverlays ${self.outPath}/lib-overlays;
               }

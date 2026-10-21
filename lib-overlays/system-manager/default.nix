@@ -58,10 +58,11 @@
         context = "caisson.system-manager";
       };
 
-      # The nixpkgs the evaluation runs on: the one the composition
-      # declares, as for a NixOS configuration.
+      # The source of the NixOS module collection the evaluation reads
+      # modules from: the composition's `nixos` key, as for a NixOS
+      # configuration.
       resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
-        name = "nixpkgs";
+        name = "nixos";
         context = "caisson.system-manager";
       };
 

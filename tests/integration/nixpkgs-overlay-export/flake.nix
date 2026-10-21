@@ -23,6 +23,7 @@
         inherit (parent.lib.caisson.pins.flake inputs) sources root;
         name = "nixpkgs-overlay-export";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
         projects = {
           caisson = parent;
         };

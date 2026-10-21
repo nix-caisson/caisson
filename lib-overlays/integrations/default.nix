@@ -104,6 +104,25 @@
       inherit (final.caisson-core.strings) hasInfix;
       inherit (final.caisson-core.functions) functionArgs setFunctionArgs;
 
+      # The source a configuration's `ecosystemSrc` selects: the
+      # argument is a function of the tree's pinned sources, as
+      # `defaultEcosystemSrc` on mkLib is, so a configuration chooses
+      # among the sources the tree pins. Null when the configuration
+      # passes none. `manifest` is the manifest whose `sources` it
+      # selects from, the lib manifest of the evaluation.
+      selectedEcosystemSrc =
+        context: manifest: explicit:
+        if explicit == null then
+          null
+        else if builtins.isFunction explicit then
+          explicit (manifest.sources or { })
+        else
+          throw ''
+            ${context}: `ecosystemSrc` is a function of the tree's sources that
+            returns the source to use, `ecosystemSrc = sources: sources.<name>;`,
+            but got a ${builtins.typeOf explicit}.
+          '';
+
       resolveEcosystemSrc =
         {
           # the integration's name for its ecosystem, e.g. "nixpkgs"
@@ -117,7 +136,8 @@
         }:
         let
           resolved = final.caisson-core.resolve {
-            inherit name explicit;
+            inherit name;
+            explicit = selectedEcosystemSrc context manifest explicit;
             defaults = manifest.defaultEcosystemSrc or { };
             sources = manifest.sources or { };
           };
@@ -126,9 +146,11 @@
           resolved
         else
           throw ''
-            ${context}: no ${name} ecosystem source. Pass `ecosystemSrc`
-            explicitly, declare `defaultEcosystemSrc.${name}` in the mkLib call,
-            or pin a source named `${name}` in the `sources` passed to mkLib.
+            ${context}: no ${name} ecosystem source. Select one with
+            `ecosystemSrc = sources: sources.<name>;` on the configuration,
+            return a `${name}` from the `defaultEcosystemSrc` function of the
+            mkLib call, or pin a source named `${name}` in the `sources` passed
+            to mkLib.
           '';
 
       named =
@@ -1630,6 +1652,7 @@
             publish
             topValue
             resolveEcosystemSrc
+            selectedEcosystemSrc
             mkIntegration
             mkAltIntegration
             frameworkModules

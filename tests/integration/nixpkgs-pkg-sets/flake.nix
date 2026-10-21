@@ -22,9 +22,7 @@
         projects = {
           caisson = parent;
         };
-        defaultEcosystemSrc = {
-          inherit (inputs) nixpkgs;
-        };
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
         modules = lib: lib.caisson.mkModules ./modules;
         pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
         # The package configs: `default` takes the default selections,
