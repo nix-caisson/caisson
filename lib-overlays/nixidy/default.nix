@@ -140,6 +140,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixidy";
+            inherit args;
+          };
           type = "nixidy";
           # A nixidy configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

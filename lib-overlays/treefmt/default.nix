@@ -178,6 +178,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "treefmt";
+            inherit args;
+          };
           type = "treefmt";
           # A treefmt configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

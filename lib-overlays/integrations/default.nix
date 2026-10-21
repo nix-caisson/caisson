@@ -174,6 +174,44 @@
           inherit key project file;
         };
 
+      # A file as the record writes it: a file inside a source in the
+      # Nix store relative to that source, the way a project's files are
+      # named in the project, and any other file as it is.
+      inSource =
+        file:
+        let
+          string = toString file;
+          parts = final.splitString "/" string;
+        in
+        if final.hasPrefix "${builtins.storeDir}/" string && builtins.length parts > 4 then
+          builtins.concatStringsSep "/" (final.drop 4 parts)
+        else
+          string;
+
+      # The parts of the key of a module of the registry,
+      # `modules.<class>.<name>@<project>`: the registry key and the
+      # project that registered the module, null where the library
+      # names no project.
+      registryPartsOf =
+        key:
+        let
+          parts = final.splitString "@" key;
+          registered = final.last parts;
+        in
+        {
+          key = builtins.head parts;
+          project = if builtins.length parts < 2 || registered == "" then null else registered;
+        };
+
+      # The registry key of a module of the registry, null for any
+      # other module.
+      registryKeyOf =
+        module:
+        if builtins.isAttrs module && final.hasPrefix "modules." (module.key or "") then
+          (registryPartsOf module.key).key
+        else
+          null;
+
       # `modules` as an integration returns it for its `declaration`
       # events, when the list it hands the evaluator names modules of
       # the ecosystem by their files in the source `src`: each such
@@ -217,16 +255,6 @@
         let
           libManifest = lib.caisson-core.libManifest or { };
           project = libManifest.name or null;
-          inSource =
-            file:
-            let
-              string = toString file;
-              parts = lib.splitString "/" string;
-            in
-            if lib.hasPrefix "${builtins.storeDir}/" string && builtins.length parts > 4 then
-              builtins.concatStringsSep "/" (lib.drop 4 parts)
-            else
-              string;
           # The file of a module, looking through the wrappers that key
           # a module and import it alone.
           fileOf =
@@ -240,20 +268,6 @@
             else
               null;
           keyed = prefix: module: builtins.isAttrs module && lib.hasPrefix prefix (module.key or "");
-          # The parts of the key of a module of the registry,
-          # `modules.<class>.<name>@<project>`: the registry key and the
-          # project that registered the module, null where the library
-          # names no project.
-          registryPartsOf =
-            key:
-            let
-              parts = lib.splitString "@" key;
-              registered = lib.last parts;
-            in
-            {
-              key = builtins.head parts;
-              project = if builtins.length parts < 2 || registered == "" then null else registered;
-            };
           eventOf =
             index: module:
             {
@@ -306,6 +320,71 @@
         in
         lib.imap0 eventOf modules;
 
+      # How an evaluation of the class `class`, constructed with `args`,
+      # selected its modules, as its manifest records it in
+      # `moduleImports`:
+      #
+      # - `act`: `default` when the configuration took the default of
+      #   the class, `appended` when it gave `extraModuleImports`
+      #   alone, and `reset` when it gave `moduleImports`, which
+      #   replaces the default;
+      # - `position`: where the configuration gave `moduleImports` or
+      #   `extraModuleImports`, the file and line number, null for
+      #   `default`;
+      # - `default`: the default in force, whatever the act, as
+      #   `{ key; level; file; }` entries: first the entries of the
+      #   registry named `default`, with a null `level` and `file`,
+      #   then what each level above added
+      #   (`caisson.forChildren.extraDefaultModuleImports`), with the
+      #   name path of the level and the file that defines it;
+      # - `selected`: the registry keys of the modules selected, null
+      #   for a module that is not from the registry.
+      selectionAccountOf =
+        { class, args }:
+        { lib, manifest }:
+        let
+          registry = lib.caisson.modules.${class} or { };
+          given = args.moduleImports or null;
+          extra = args.extraModuleImports or null;
+          given' =
+            if given != null then
+              "moduleImports"
+            else if extra != null then
+              "extraModuleImports"
+            else
+              null;
+        in
+        {
+          act =
+            if given != null then
+              "reset"
+            else if extra != null then
+              "appended"
+            else
+              "default";
+          position =
+            let
+              position = positionOf (builtins.unsafeGetAttrPos given' args);
+            in
+            if given' == null || position == null then null else position // { file = inSource position.file; };
+          default =
+            builtins.map (module: {
+              key = registryKeyOf module;
+              level = null;
+              file = null;
+            }) (select "default" registry)
+            ++ builtins.concatMap (
+              entry:
+              builtins.map (module: {
+                key = registryKeyOf module;
+                inherit (entry) level file;
+              }) (entry.select lib)
+            ) (manifest.defaultModuleImports.${class} or [ ]);
+          selected = builtins.map registryKeyOf (
+            moduleImportsOf class { inherit lib manifest; } args registry
+          );
+        };
+
       # The selection of an evaluation over the registry of its class,
       # from the arguments of the configuration, as a function of that
       # registry: what `moduleImports` selects, and with none
@@ -331,7 +410,7 @@
             given registry
           else
             select "default" registry
-            ++ builtins.concatMap (selection: selection lib) (manifest.defaultModuleImports.${class} or [ ])
+            ++ builtins.concatMap (entry: entry.select lib) (manifest.defaultModuleImports.${class} or [ ])
         )
         ++ (if extra == null then [ ] else extra registry);
 
@@ -440,6 +519,12 @@
       # the marker of the nearest such configuration above it when it
       # is activated (`driftCheckOf`). Null for a configuration that is
       # not activated.
+      #
+      # `selection` is `{ class; args; }`, the class of the evaluation
+      # and the arguments the configuration was constructed with, from
+      # which the manifest records how the evaluation selected its
+      # modules as `moduleImports` (`selectionAccountOf`). Null for a
+      # configuration whose modules are not selected from a class.
       mkModuleConfiguration =
         args@{
           type,
@@ -447,10 +532,12 @@
           defaultPkgs ? null,
           exportsTo ? null,
           activation ? null,
+          selection ? null,
           evaluate,
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
+          recordFromEvaluation = if selection == null then [ ] else [ "moduleImports" ];
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
             // (
@@ -479,9 +566,23 @@
               # What the modules give the configurations beneath
               # (`caisson.forChildren`).
               forChildren = {
-                extraDefaultModuleImports = builtins.mapAttrs (_: selection: [
-                  selection
-                ]) config.caisson.forChildren.extraDefaultModuleImports;
+                # Each addition with the file that defines it for its
+                # class, the last definition where several modules
+                # define the class.
+                extraDefaultModuleImports = builtins.mapAttrs (
+                  class: selection:
+                  let
+                    defining = builtins.filter (definition: definition.value ? ${class}) (
+                      options.caisson.forChildren.extraDefaultModuleImports.definitionsWithLocations
+                    );
+                  in
+                  [
+                    {
+                      select = selection;
+                      file = if defining == [ ] then null else inSource (final.last defining).file;
+                    }
+                  ]
+                ) config.caisson.forChildren.extraDefaultModuleImports;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
                 systems = config.caisson.forChildren.systems;
               };
@@ -493,6 +594,8 @@
                 inherit (view) lib;
                 modules = evaluated.modules or [ ];
               };
+              # How the evaluation selected its modules.
+              record = if selection == null then { } else { moduleImports = selectionAccountOf selection view; };
             };
         };
 

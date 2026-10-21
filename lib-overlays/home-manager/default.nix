@@ -533,6 +533,10 @@
       configuration =
         variant: args:
         selection.mkModuleConfiguration {
+          selection = {
+            class = "homeManager";
+            inherit args;
+          };
           type = "home-manager";
           # A home-manager configuration is evaluated per system: it
           # has an evaluation for every system in force where it is

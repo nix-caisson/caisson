@@ -818,6 +818,60 @@ let
         == builtins.map identity machine.childlessManifest.history
       && builtins.length declared.history > prefix;
 
+    # Each configuration records how it selected its modules. The top
+    # of the machine gives `moduleImports`, which replaces the default,
+    # and the record holds where it gave it. The machine takes the
+    # default of its class, the entries named `default`. The
+    # home-manager configuration inside it takes the default of its
+    # class too, which holds what the machine adds for the
+    # home-manager configurations beneath it, with the name path of the
+    # machine and the file of caisson that adds it.
+    selectionsRecordHowModulesWereChosen =
+      let
+        top = machineWithHomes.caisson.manifest;
+        machine = top.children.system.x86_64-linux.children.nixos.probe;
+        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
+        machinePath = [
+          {
+            type = "system";
+            name = "x86_64-linux";
+          }
+          {
+            type = "nixos";
+            name = "probe";
+          }
+        ];
+      in
+      top.moduleImports.act == "reset"
+      && top.moduleImports.selected == [ ]
+      && top.moduleImports.position.file == "tests/pinned-world/default.nix"
+      && builtins.isInt top.moduleImports.position.line
+      &&
+        machine.moduleImports == {
+          act = "default";
+          position = null;
+          default = [
+            {
+              key = "modules.nixos.caisson/default";
+              level = null;
+              file = null;
+            }
+          ];
+          selected = [ "modules.nixos.caisson/default" ];
+        }
+      && declared.moduleImports.act == "default"
+      &&
+        declared.moduleImports.selected == [
+          "modules.homeManager.caisson/default"
+          "modules.homeManager.nixos-parent"
+        ]
+      &&
+        builtins.elemAt declared.moduleImports.default 1 == {
+          key = "modules.homeManager.nixos-parent";
+          level = machinePath;
+          file = "modules/nixos/default/caisson";
+        };
+
     # A selector that renames and drops configurations, with a note
     # saying so: the export record holds the published names alone,
     # each with the name path by the names the configurations are

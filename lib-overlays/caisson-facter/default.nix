@@ -227,6 +227,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "caisson-facter";
+            inherit args;
+          };
           type = "caisson-facter";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;

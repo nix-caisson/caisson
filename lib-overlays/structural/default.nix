@@ -92,6 +92,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "structural";
+            inherit args;
+          };
           type = "structural";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;

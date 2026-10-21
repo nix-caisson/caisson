@@ -178,6 +178,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "kubenix";
+            inherit args;
+          };
           type = "kubenix";
           # A kubenix configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

@@ -119,6 +119,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "disko";
+            inherit args;
+          };
           type = "disko";
           defaultPkgs = args.defaultPkgs or null;
           inherit (native) exportsTo;

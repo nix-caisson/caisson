@@ -118,6 +118,10 @@
       configuration =
         variant: args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixos";
+            inherit args;
+          };
           type = "nixos";
           # A NixOS configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.

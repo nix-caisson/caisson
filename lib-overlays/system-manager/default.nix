@@ -304,6 +304,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "systemManager";
+            inherit args;
+          };
           type = "system-manager";
           # A system-manager configuration is evaluated per system: it
           # has an evaluation for every system in force where it is

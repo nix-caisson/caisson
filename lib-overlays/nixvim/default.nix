@@ -184,6 +184,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixvim";
+            inherit args;
+          };
           type = "nixvim";
           # A nixvim configuration is evaluated per system: it has an
           # evaluation for every system in force where it is declared.
