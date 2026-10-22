@@ -512,14 +512,20 @@
         nixpkgs = prevNs // integration.namespace;
       };
 
-      # `maintainers` and `teams` describe the packages of a package
-      # set. nixpkgs keeps them in its library, read from the
-      # `maintainers` directory of the checkout, and the library of the
-      # composition can come from a source without that directory, such
-      # as the nixpkgs.lib mirror. Inside a package set they come from
-      # the source of that package set, as that source defines them.
+      # `maintainers`, `teams`, `licenses` and `sourceTypes` describe
+      # the packages of a package set, and nixpkgs keeps them in its
+      # library. Inside a package set they come from the source of that
+      # package set, as that source defines them. The library of the
+      # composition can come from another source. The nixpkgs.lib
+      # mirror holds `lib/` alone, and nixpkgs reads `maintainers` and
+      # `teams` from the `maintainers` directory beside `lib/`. A
+      # library of another revision holds the licenses of that
+      # revision, and the packages of a set name the licenses of the
+      # revision of the set.
       maintainers = if packageSetSrc == null then prev.maintainers else packageSetLib.maintainers;
       teams = if packageSetSrc == null then prev.teams else packageSetLib.teams;
+      licenses = if packageSetSrc == null then prev.licenses else packageSetLib.licenses;
+      sourceTypes = if packageSetSrc == null then prev.sourceTypes else packageSetLib.sourceTypes;
     }
   );
 
