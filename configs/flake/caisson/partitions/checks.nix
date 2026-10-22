@@ -91,6 +91,10 @@
               path = self.outPath + "/tests/integration/nixpkgs-pkg-sets";
             };
 
+            nixpkgsLibOnlyOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-lib-only";
+            };
+
             # A project that registers package overlays, and a consumer
             # that takes them through `projects`.
             pkgOverlaysProducerOutputs = callConsumer {
@@ -161,6 +165,7 @@
               // nixpkgsOverlayExportOutputs.checks.${system}
               // nixpkgsNoPkgSetsOutputs.checks.${system}
               // nixpkgsPkgSetsOutputs.checks.${system}
+              // nixpkgsLibOnlyOutputs.checks.${system}
               // pkgOverlaysProducerOutputs.checks.${system}
               // pkgOverlaysConsumerOutputs.checks.${system}
               // unitTestOutputs.checks.${system}

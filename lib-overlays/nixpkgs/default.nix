@@ -492,11 +492,34 @@
 
         };
       };
+
+      # The source of the package set this lib is built for, or null
+      # where the lib is built for no package set. A package set's lib
+      # carries the set's manifest as `pkgsManifest`, and the manifest
+      # of its package config records the source as `ecosystemSrc`.
+      packageSetSrc =
+        let
+          setManifest = (final.caisson-core or { }).pkgsManifest or null;
+        in
+        if setManifest == null then null else setManifest.parent.ecosystemSrc or null;
+
+      # The library that the package set's source defines, read for
+      # its package information only.
+      packageSetLib = builtins.import "${packageSetSrc}/lib";
     in
     {
       caisson = (prev.caisson or { }) // {
         nixpkgs = prevNs // integration.namespace;
       };
+
+      # `maintainers` and `teams` describe the packages of a package
+      # set. nixpkgs keeps them in its library, read from the
+      # `maintainers` directory of the checkout, and the library of the
+      # composition can come from a source without that directory, such
+      # as the nixpkgs.lib mirror. Inside a package set they come from
+      # the source of that package set, as that source defines them.
+      maintainers = if packageSetSrc == null then prev.maintainers else packageSetLib.maintainers;
+      teams = if packageSetSrc == null then prev.teams else packageSetLib.teams;
     }
   );
 
