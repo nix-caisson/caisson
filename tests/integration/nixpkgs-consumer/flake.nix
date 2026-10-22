@@ -25,6 +25,7 @@
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
         projects = {
           caisson = parent;
         };

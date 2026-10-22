@@ -85,8 +85,13 @@
         let
           selection = lib.caisson.integrations;
 
-          flakeParts =
-            if (args.ecosystemSrc or null) == null then flakePartsDefault else flakePartsFor args.ecosystemSrc;
+          # The flake-parts source the configuration selects from the
+          # tree's sources, null when it selects none.
+          selected =
+            selection.selectedEcosystemSrc "lib.caisson.flake-parts.mkConfiguration"
+              (lib.caisson-core.libManifest or { })
+              (args.ecosystemSrc or null);
+          flakeParts = if selected == null then flakePartsDefault else flakePartsFor selected;
 
           # The flake class of the registry, the same source every
           # adapter selects from, so modules arriving by any channel

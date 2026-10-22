@@ -1752,7 +1752,7 @@ in
       "test: a declared ecosystem resolves for an adapter" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
@@ -1763,13 +1763,31 @@ in
       "test: an explicit ecosystemSrc beats the declaration" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
+          in
+          (myLib.caisson.terranix.mkTopConfiguration {
+            ecosystemSrc = sources: terranixStub "explicit";
+            configModule = { };
+          }).stubbed;
+        expected = "explicit";
+      };
+
+      # `ecosystemSrc` selects from the tree's sources, so a
+      # configuration gives it as a function; a value is refused before
+      # resolution runs.
+      "test: an ecosystemSrc given as a value is refused" = {
+        expr =
+          let
+            myLib = mkResolutionLib { };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
             ecosystemSrc = terranixStub "explicit";
             configModule = { };
           }).stubbed;
-        expected = "explicit";
+        expectedError = {
+          type = "ThrownError";
+          msg = "caisson\\.terranix: `ecosystemSrc` is a function of the tree's sources that\\s+returns the source to use, `ecosystemSrc = sources: sources\\.<name>;`,\\s+but got a set\\.";
+        };
       };
 
       "test: an input with the exact name is the last channel" = {
@@ -1794,7 +1812,7 @@ in
               sources = mockSources // {
                 terranix = terranixStub "input";
               };
-              defaultEcosystemSrc.terranix = terranixStub "declared";
+              defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; };
             };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
@@ -1818,7 +1836,7 @@ in
       "test: declarations join the manifest" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc.terranix = terranixStub "declared"; };
+            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
           in
           (myLib.caisson-core.libManifest.defaultEcosystemSrc.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
@@ -1838,11 +1856,20 @@ in
   nixosLib =
     let
       nixosStub = ./nixos-stub;
+      # mockSources with the nixos stub added, under a name a
+      # composition's `defaultEcosystemSrc` selects.
+      sourcesWithNixos = mockSources // {
+        inherit nixosStub;
+      };
+      nixosEcosystemSrc = sources: {
+        nixpkgs = sources.nixosStub;
+        nixos = sources.nixosStub;
+      };
       mkComposition =
         extraOverlays:
         caisson.mkLib {
-          sources = mockSources;
-          defaultEcosystemSrc.nixpkgs = nixosStub;
+          sources = sourcesWithNixos;
+          defaultEcosystemSrc = nixosEcosystemSrc;
           # A configuration takes its system and its package set from
           # the composition.
           systems = [ "x86_64-linux" ];
@@ -1879,9 +1906,9 @@ in
       # `machine`, which records the name and the system its evaluation
       # carries.
       publishingLib = caisson.mkLib {
-        sources = mockSources;
+        sources = sourcesWithNixos;
         name = "publishing";
-        defaultEcosystemSrc.nixpkgs = nixosStub;
+        defaultEcosystemSrc = nixosEcosystemSrc;
         systems = [ "x86_64-linux" ];
         pkgSets = stubPkgSets { default = { }; };
         libOverlays = _lib: {
@@ -2205,9 +2232,9 @@ in
         expr =
           let
             noDefault = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "no-default";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { stable = { }; };
               libOverlays = _lib: {
@@ -2269,9 +2296,9 @@ in
             on =
               systems:
               caisson.mkLib {
-                sources = mockSources;
+                sources = sourcesWithNixos;
                 name = "machine";
-                defaultEcosystemSrc.nixpkgs = nixosStub;
+                defaultEcosystemSrc = nixosEcosystemSrc;
                 inherit systems;
                 libOverlays = _lib: {
                   nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
@@ -2362,9 +2389,9 @@ in
         expr =
           let
             minimalLib = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "publishing";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { default = { }; };
               libOverlays = _lib: {
@@ -2474,9 +2501,9 @@ in
                 };
               };
             everyLib = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "publishing";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { default = { }; };
               libOverlays = _lib: {
@@ -2580,9 +2607,9 @@ in
             # The modules are registered in the composition. A
             # configuration selects from that registry.
             registeringModulesLib = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "registering-modules";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
               pkgSets = stubPkgSets { default = { }; };
               libOverlays = _lib: {
@@ -2879,9 +2906,9 @@ in
         expr =
           let
             severalLib = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "several";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [
                 "x86_64-linux"
                 "aarch64-linux"
@@ -2924,9 +2951,9 @@ in
         expr =
           let
             oneSystemLib = caisson.mkLib {
-              sources = mockSources;
+              sources = sourcesWithNixos;
               name = "one-system";
-              defaultEcosystemSrc.nixpkgs = nixosStub;
+              defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
               libOverlays = _lib: {
                 nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
@@ -3108,7 +3135,9 @@ in
         caisson.mkLib (
           homeComposition
           // {
-            sources = mockSources;
+            sources = mockSources // {
+              inherit hmStub hmStubCopy;
+            };
             libOverlays =
               _lib:
               {
@@ -3129,7 +3158,9 @@ in
           }
           // declaration
         );
-      mkComposition = mkCompositionWith { defaultEcosystemSrc.home-manager = hmStub; };
+      mkComposition = mkCompositionWith {
+        defaultEcosystemSrc = sources: { home-manager = sources.hmStub; };
+      };
       myLib = mkComposition { };
       # A composition that declares no home-manager: no
       # `defaultEcosystemSrc.home-manager`, and no input of that name.
@@ -3151,7 +3182,9 @@ in
         caisson.mkLib (
           homeComposition
           // {
-            sources = mockSources;
+            sources = mockSources // {
+              inherit hmStub;
+            };
             libOverlays = _lib: {
               home-manager = {
                 imports = [
@@ -3198,11 +3231,15 @@ in
       treeLibWith =
         systems:
         caisson.mkLib {
-          sources = mockSources;
+          sources = mockSources // {
+            nixosStub = ./nixos-stub;
+            inherit hmStub;
+          };
           name = "homes";
-          defaultEcosystemSrc = {
-            nixpkgs = ./nixos-stub;
-            home-manager = hmStub;
+          defaultEcosystemSrc = sources: {
+            nixpkgs = sources.nixosStub;
+            nixos = sources.nixosStub;
+            home-manager = sources.hmStub;
           };
           inherit systems;
           pkgSets =
@@ -3343,7 +3380,8 @@ in
       "test: lib.maintainers carries both lists" = {
         expr =
           builtins.attrNames
-            (mkMaintainersComposition { defaultEcosystemSrc.home-manager = hmStub; }).maintainers;
+            (mkMaintainersComposition { defaultEcosystemSrc = sources: { home-manager = sources.hmStub; }; })
+            .maintainers;
         expected = [
           "a-nixpkgs-maintainer"
           "home-manager-stub-maintainer"
@@ -3363,7 +3401,7 @@ in
       "test: an evaluation naming its home-manager merges its maintainers" = {
         expr =
           ((mkMaintainersComposition { }).caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = hmStub;
+            ecosystemSrc = sources: sources.hmStub;
             configModule =
               { lib, ... }:
               {
@@ -3484,7 +3522,7 @@ in
       "test: an evaluation naming the declared tree runs on the composed library" = {
         expr =
           (myLib.caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = hmStub;
+            ecosystemSrc = sources: sources.hmStub;
             configModule = probeModule;
             check = false;
           }).config.seenLib;
@@ -3505,7 +3543,7 @@ in
         expr =
           builtins.deepSeq
             (myLib.caisson.home-manager.mkTopConfiguration {
-              ecosystemSrc = hmStubCopy;
+              ecosystemSrc = sources: sources.hmStubCopy;
               configModule = probeModule;
               check = false;
             }).config.seenLib
@@ -3524,7 +3562,7 @@ in
       "test: an evaluation names its home-manager when the composition declares none" = {
         expr =
           (undeclaredLib.caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = hmStub;
+            ecosystemSrc = sources: sources.hmStub;
             configModule = probeModule;
             check = false;
           }).config.seenLib;
@@ -3544,7 +3582,7 @@ in
         expr =
           let
             evaluated = undeclaredLib.caisson.home-manager.mkTopConfiguration {
-              ecosystemSrc = hmStub;
+              ecosystemSrc = sources: sources.hmStub;
               configModule =
                 { config, lib, ... }:
                 {
@@ -3606,7 +3644,7 @@ in
           in
           {
             declared = seenUnder myLib { };
-            named = seenUnder undeclaredLib { ecosystemSrc = hmStub; };
+            named = seenUnder undeclaredLib { ecosystemSrc = sources: sources.hmStub; };
           };
         expected = {
           declared = {
@@ -5490,7 +5528,7 @@ in
                   { lib, ... }:
                   {
                     caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
-                      ecosystemSrc = colmenaStub;
+                      ecosystemSrc = _sources: colmenaStub;
                       configModule.meta.description = "probe";
                     };
                   };
@@ -5540,8 +5578,10 @@ in
       mkCompositionWith =
         sets:
         caisson.mkLib {
-          sources = mockSources;
-          defaultEcosystemSrc.home-manager = hmStub;
+          sources = mockSources // {
+            inherit hmStub;
+          };
+          defaultEcosystemSrc = sources: { home-manager = sources.hmStub; };
           # A home-manager configuration takes its system and its
           # package set from the composition.
           systems = [ "x86_64-linux" ];

@@ -91,6 +91,10 @@
               path = self.outPath + "/tests/integration/nixpkgs-pkg-sets";
             };
 
+            nixpkgsLibOnlyOutputs = callConsumer {
+              path = self.outPath + "/tests/integration/nixpkgs-lib-only";
+            };
+
             # A project that registers package overlays, and a consumer
             # that takes them through `projects`.
             pkgOverlaysProducerOutputs = callConsumer {
@@ -139,8 +143,7 @@
                 core = import ${inputs.caisson-core.outPath};
               in
               core.mkLib {
-                sources = { };
-                defaultEcosystemSrc.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
+                sources.nixpkgs-lib = ${inputs.nixpkgs-lib.outPath};
                 modules = lib: lib.caisson-core.mkModules ${self.outPath}/modules;
                 libOverlays = lib: lib.caisson-core.mkLibOverlays ${self.outPath}/lib-overlays;
               }
@@ -162,6 +165,7 @@
               // nixpkgsOverlayExportOutputs.checks.${system}
               // nixpkgsNoPkgSetsOutputs.checks.${system}
               // nixpkgsPkgSetsOutputs.checks.${system}
+              // nixpkgsLibOnlyOutputs.checks.${system}
               // pkgOverlaysProducerOutputs.checks.${system}
               // pkgOverlaysConsumerOutputs.checks.${system}
               // unitTestOutputs.checks.${system}

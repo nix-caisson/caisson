@@ -58,10 +58,7 @@ let
   pkgs = import inputs.nixpkgs { inherit system; };
 
   lib = core.mkLib {
-    sources = { };
-    systems = [ system ];
-    projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = {
+    sources = {
       inherit (inputs)
         nixpkgs
         nvf
@@ -69,6 +66,12 @@ let
         hjem
         home-manager
         ;
+    };
+    systems = [ system ];
+    projects.caisson = inputs.caisson;
+    defaultEcosystemSrc = sources: {
+      nixpkgs-lib = sources.nixpkgs;
+      nixos = sources.nixpkgs;
     };
     pkgSets = _lib: {
       default =

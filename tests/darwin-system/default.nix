@@ -23,10 +23,7 @@ let
   pkgs = import inputs.nixpkgs { inherit system; };
 
   lib = core.mkLib {
-    sources = { };
-    systems = [ system ];
-    projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = {
+    sources = {
       inherit (inputs)
         nixpkgs
         nix-darwin
@@ -35,6 +32,9 @@ let
         nvf
         ;
     };
+    systems = [ system ];
+    projects.caisson = inputs.caisson;
+    defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
     pkgSets = _lib: {
       default =
         { name, parent }:

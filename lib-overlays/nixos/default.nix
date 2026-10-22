@@ -24,8 +24,13 @@
   overlay =
     final: prev:
     let
+      # The source of the NixOS module collection: `nixos/modules` and
+      # `nixos/lib/eval-config.nix`, of the composition's `nixos` key.
+      # The library the modules run on is the composed lib, from the
+      # `nixpkgs-lib` key, and the package set is a package config,
+      # from the `nixpkgs` key: three parts, each from a separate key.
       resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
-        name = "nixpkgs";
+        name = "nixos";
         context = "caisson.nixos";
       };
 

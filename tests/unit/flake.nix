@@ -48,7 +48,6 @@
       pins = import (parent.outPath + "/lib-overlays/framework/pins");
       lib = core.mkLib {
         inherit (pins.flake inputs) sources root;
-        defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
         # Registered from the parent's source path: a flake cannot
         # reference files outside its tree, and reading the
         # source forces none of the parent's outputs. The overlays

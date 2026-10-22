@@ -10,13 +10,15 @@
 # merges that source's `lib` into the composed library, as the source
 # fixes it.
 #
-# The source is the one the composition supplies for the ecosystem
-# `nixpkgs-lib` (the library part declared separately: the nixpkgs.lib
-# mirror, or nixpkgs' `lib` directory), else the one it supplies for
-# the ecosystem `nixpkgs` (a nixpkgs checkout, one pin supplying every
-# part). What a composition supplies for an ecosystem is its
-# `defaultEcosystemSrc.<name>`, else the source it pins under that
-# exact name.
+# The source is the source the composition supplies for the part
+# `nixpkgs-lib`: the nixpkgs.lib mirror, a tree holding nixpkgs' `lib`
+# directory such as a nixpkgs checkout, or that directory. The library
+# is a part of the nixpkgs stack separate from the package set and from
+# the NixOS module collection, each supplied from a separate key, so a
+# tree that takes the library from its nixpkgs checkout names that
+# checkout under `nixpkgs-lib` as well. What a composition supplies for
+# a part is its `defaultEcosystemSrc.<name>`, else the source it pins
+# under that exact name.
 #
 # The source is read from `prev.caisson-core.ecosystemSrc`, which
 # caisson-core publishes in the first layers of a library from the
@@ -52,15 +54,15 @@
       # Null for every name in a library that caisson-core's entries
       # are not part of.
       supplied = (prev.caisson-core or { }).ecosystemSrc or (_name: null);
-      src = if supplied "nixpkgs-lib" != null then supplied "nixpkgs-lib" else supplied "nixpkgs";
+      src = supplied "nixpkgs-lib";
       root =
         if src == null then
           builtins.throw ''
             caisson: the `nixpkgs-lib` entry has no source. Declare
-            `defaultEcosystemSrc.nixpkgs-lib` (the nixpkgs.lib mirror, or nixpkgs'
-            `lib` directory) or `defaultEcosystemSrc.nixpkgs` (a nixpkgs checkout)
-            in the mkLib call, or pin a source named exactly `nixpkgs-lib` or
-            `nixpkgs` in the `sources` passed to mkLib.
+            `defaultEcosystemSrc.nixpkgs-lib` in the mkLib call (the nixpkgs.lib
+            mirror, or a nixpkgs checkout: `defaultEcosystemSrc.nixpkgs-lib =
+            inputs.nixpkgs;`), or pin a source named exactly `nixpkgs-lib` in the
+            `sources` passed to mkLib.
           ''
         else
           "${src}";
