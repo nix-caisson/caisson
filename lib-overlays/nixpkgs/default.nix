@@ -54,6 +54,95 @@
           final.filterAttrs (name: _: name == "default" || final.hasSuffix "/default" name) registry
         );
 
+      # nixpkgs' library holds two kinds of library. The general
+      # utilities and the module system serve every evaluation, and the
+      # composition supplies them from the `nixpkgs-lib` key. The
+      # package-set libraries describe and build packages: the platform
+      # model, the package metadata and its tables, the `callPackage`
+      # machinery, the fetchers and version comparison. The packages of
+      # a set are written against the package-set libraries of the
+      # revision of the set, so a package set's lib takes them from the
+      # source of the set.
+      #
+      # `packageSetLibraries` are sublibraries whose functions nixpkgs
+      # also publishes at the top level of its library. `packageSetData`
+      # are tables taken whole. `generalLibraries` are the general
+      # sublibraries. A top-level name that belongs to a package-set
+      # library and to a general library stays with the general
+      # library: `compareVersions` is one, defined in `versions` and in
+      # `strings` as the same builtin.
+      packageSetLibraries = [
+        "systems"
+        "meta"
+        "customisation"
+        "derivations"
+        "fetchers"
+        "versions"
+      ];
+      packageSetData = [
+        "licenses"
+        "sourceTypes"
+        "maintainers"
+        "teams"
+        "platforms"
+      ];
+      generalLibraries = [
+        "trivial"
+        "fixedPoints"
+        "attrsets"
+        "lists"
+        "strings"
+        "stringsWithDeps"
+        "modules"
+        "options"
+        "types"
+        "cli"
+        "gvariant"
+        "generators"
+        "asserts"
+        "debug"
+        "services"
+        "path"
+        "filesystem"
+        "fileset"
+        "sources"
+        "kernel"
+        "network"
+        "flakes"
+      ];
+
+      # The lib a package set at `src` runs on: `base`, the composed lib
+      # with the set's manifest, with the package-set libraries of the
+      # library at `src`. The top-level names taken are the
+      # package-set libraries, the tables, and every top-level name of
+      # the library at `src` that is also a function of a package-set
+      # library and of no general library, which is how nixpkgs
+      # publishes `callPackageWith`,
+      # `getExe` and the rest. Each value is the value at `src`, and a
+      # function taken from there runs on the fixpoint of the library at
+      # `src`. The lib is an attribute merge over `base`: nixpkgs hands
+      # it to the packages as `pkgs.lib` and builds no fixpoint over it.
+      packageSetLib =
+        src: base:
+        let
+          sourceLib = builtins.import "${src}/lib";
+          present = builtins.filter (name: sourceLib ? ${name});
+          libraries = present packageSetLibraries;
+          general = present generalLibraries;
+          memberOf = group: name: builtins.any (library: sourceLib.${library} ? ${name}) group;
+          reExports = builtins.filter (
+            name: !(builtins.elem name libraries) && memberOf libraries name && !(memberOf general name)
+          ) (builtins.attrNames sourceLib);
+          names = libraries ++ present packageSetData ++ reExports;
+        in
+        base
+        // builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value = sourceLib.${name};
+          }) names
+        );
+
       # The package set of nixpkgs at `src`, instantiated as
       # `pkgs/top-level/default.nix` instantiates it, from arguments
       # caisson has already resolved: `lib` is the composed lib the
@@ -288,7 +377,7 @@
               };
               pkgs = instantiate src (
                 {
-                  lib = lib.caisson-core.withManifests { pkgsManifest = setManifest; };
+                  lib = packageSetLib src (lib.caisson-core.withManifests { pkgsManifest = setManifest; });
                   localSystem = { inherit system; };
                   inherit config overlays;
                 }
@@ -492,40 +581,11 @@
 
         };
       };
-
-      # The source of the package set this lib is built for, or null
-      # where the lib is built for no package set. A package set's lib
-      # carries the set's manifest as `pkgsManifest`, and the manifest
-      # of its package config records the source as `ecosystemSrc`.
-      packageSetSrc =
-        let
-          setManifest = (final.caisson-core or { }).pkgsManifest or null;
-        in
-        if setManifest == null then null else setManifest.parent.ecosystemSrc or null;
-
-      # The library that the package set's source defines, read for
-      # its package information only.
-      packageSetLib = builtins.import "${packageSetSrc}/lib";
     in
     {
       caisson = (prev.caisson or { }) // {
         nixpkgs = prevNs // integration.namespace;
       };
-
-      # `maintainers`, `teams`, `licenses` and `sourceTypes` describe
-      # the packages of a package set, and nixpkgs keeps them in its
-      # library. Inside a package set they come from the source of that
-      # package set, as that source defines them. The library of the
-      # composition can come from another source. The nixpkgs.lib
-      # mirror holds `lib/` alone, and nixpkgs reads `maintainers` and
-      # `teams` from the `maintainers` directory beside `lib/`. A
-      # library of another revision holds the licenses of that
-      # revision, and the packages of a set name the licenses of the
-      # revision of the set.
-      maintainers = if packageSetSrc == null then prev.maintainers else packageSetLib.maintainers;
-      teams = if packageSetSrc == null then prev.teams else packageSetLib.teams;
-      licenses = if packageSetSrc == null then prev.licenses else packageSetLib.licenses;
-      sourceTypes = if packageSetSrc == null then prev.sourceTypes else packageSetLib.sourceTypes;
     }
   );
 

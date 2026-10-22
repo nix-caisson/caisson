@@ -31,6 +31,7 @@
             name = "nixpkgs-lib-only";
           };
         };
+        libOverlays = lib: lib.caisson.mkLibOverlays ./lib-overlays;
         pkgSets = lib: { default = lib.caisson.nixpkgs.mkConfiguration { }; };
       };
     in
