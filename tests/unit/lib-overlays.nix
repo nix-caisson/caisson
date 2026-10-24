@@ -2224,6 +2224,123 @@ in
         };
       };
 
+      # Each configuration evaluated per system records which package
+      # config it runs on and the configuration that made the
+      # selection: its own `defaultPkgs`, the `defaultPkgs` of a
+      # configuration above it, or the `caisson.forChildren.defaultPkgs`
+      # of a parent. Where nothing selects it records `default` and no
+      # level. It also records the names of the namespaces of its lib.
+      "test: a configuration records the package config it runs on and who selected it" = {
+        expr =
+          let
+            machine =
+              lib: args:
+              lib.caisson.nixos.mkConfiguration (
+                {
+                  configModule = { ... }: { };
+                }
+                // args
+              );
+            top = myLib.caisson-core.finalizeTop (
+              myLib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.beside = machine lib { };
+                    caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      defaultPkgs = pkgSets: pkgSets.other;
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.nixos.configurations.inherits = machine lib { };
+                          caisson.nixos.configurations.selects = machine lib {
+                            defaultPkgs = pkgSets: pkgSets.default;
+                            configModule =
+                              { lib, ... }:
+                              {
+                                caisson.nixos.configurations.image = machine lib { };
+                              };
+                          };
+                        };
+                    };
+                  };
+              }
+            );
+            host =
+              (myLib.caisson-core.finalizeTop (
+                machine myLib {
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.forChildren.defaultPkgs = pkgSets: pkgSets.other;
+                      caisson.nixos.configurations.image = machine lib { };
+                    };
+                }
+              )).x86_64-linux;
+            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            grouped = machinesOf top.children.structural.group;
+            beside = (machinesOf top).beside;
+          in
+          {
+            beside = beside.pkgSet;
+            inherits = grouped.inherits.pkgSet;
+            selects = grouped.selects.pkgSet;
+            beneathSelects = (machinesOf grouped.selects).image.pkgSet;
+            host = host.pkgSet;
+            image = (machinesOf host).image.pkgSet;
+            namespaces =
+              builtins.elem "mkConfiguration" beside.namespaces.caisson.nixos
+              && builtins.elem "namePathOf" beside.namespaces.caisson-core;
+          };
+        expected =
+          let
+            group = {
+              type = "structural";
+              name = "group";
+            };
+            selectsPath = [
+              group
+              {
+                type = "system";
+                name = "x86_64-linux";
+              }
+              {
+                type = "nixos";
+                name = "selects";
+              }
+            ];
+          in
+          {
+            beside = {
+              name = "default";
+              level = null;
+            };
+            inherits = {
+              name = "other";
+              level = [ group ];
+            };
+            selects = {
+              name = "default";
+              level = selectsPath;
+            };
+            beneathSelects = {
+              name = "default";
+              level = selectsPath;
+            };
+            host = {
+              name = "default";
+              level = null;
+            };
+            image = {
+              name = "other";
+              level = [ ];
+            };
+            namespaces = true;
+          };
+      };
+
       # Where no configuration from the top down selects, a
       # configuration runs on the set named `default`, and a
       # composition that declares none says so, with the sets it does
