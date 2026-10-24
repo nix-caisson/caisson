@@ -97,34 +97,41 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/topology/<name>`), else none.
-          registered = lib.caisson.configs.topology or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "topology";
+            configModule = args.configModule or null;
+          };
 
           # The NixOS configurations declared inside, for this system, as
           # the configurations nix-topology reads. They are read in the
           # full evaluation; the childless evaluation reads none.
-          machinesModule =
-            { config, lib, ... }:
-            {
-              _file = "caisson-topology:machines";
-              nixosConfigurations =
-                if lib.caisson-core.evalManifest.childless then
-                  { }
-                else
-                  builtins.mapAttrs (_: evaluations: evaluations.${system}.value) (
-                    lib.filterAttrs (_: evaluations: evaluations ? ${system}) config.caisson.nixos.configurations
-                  );
-              # The NixOS configurations declared inside get the NixOS
-              # module of nix-topology, which declares the options
-              # nix-topology reads.
-              caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ "${src}/nixos/module.nix" ];
-            };
+          machinesModule = selection.caissonModule {
+            key = "caisson.topology.machines";
+            file = "caisson-topology:machines";
+            module =
+              { config, lib, ... }:
+              {
+                _file = "caisson-topology:machines";
+                nixosConfigurations =
+                  if lib.caisson-core.evalManifest.childless then
+                    { }
+                  else
+                    builtins.mapAttrs (_: evaluations: evaluations.${system}.value) (
+                      lib.filterAttrs (_: evaluations: evaluations ? ${system}) config.caisson.nixos.configurations
+                    );
+                # The NixOS configurations declared inside get the NixOS
+                # module of nix-topology, which declares the options
+                # nix-topology reads.
+                caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [
+                  (selection.caissonModule {
+                    key = "caisson.topology.nixosModule";
+                    file = "caisson-topology:nixosModule";
+                    module = "${src}/nixos/module.nix";
+                  })
+                ];
+              };
+          };
 
           moduleList = [
             "${src}/topology"

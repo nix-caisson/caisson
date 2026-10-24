@@ -185,18 +185,23 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-facter/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-facter or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-facter";
+            configModule = args.configModule or null;
+          };
 
           moduleList = [
-            reportOptions
-            assertionsOptions
+            (selection.caissonModule {
+              key = "caisson.caisson-facter.reportOptions";
+              file = "caisson-caisson-facter:reportOptions";
+              module = reportOptions;
+            })
+            (selection.caissonModule {
+              key = "caisson.caisson-facter.assertionsOptions";
+              file = "caisson-caisson-facter:assertionsOptions";
+              module = assertionsOptions;
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry

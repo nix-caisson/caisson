@@ -122,14 +122,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nvf/<name>`), else none.
-          registered = lib.caisson.configs.nvf or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nvf";
+            configModule = args.configModule or null;
+          };
 
           # The modules of the composition: the modules selected from
           # the registry, the configuration's module and the framework

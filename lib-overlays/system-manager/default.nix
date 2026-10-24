@@ -107,20 +107,18 @@
           # else surfaces as a duplicate declaration at that pin's gate.
           smIgnoredOptionsText = builtins.readFile "${src}/nix/modules/upstream/nixpkgs/default.nix";
           smDeclaresDisplayManager = final.hasInfix "displayManager" smIgnoredOptionsText;
-          displayManagerSinkModule = {
-            _file = "caisson-system-manager:nixpkgs-compat-sink";
-            imports = [
-              (
-                { lib, ... }:
-                {
-                  options.services.displayManager.hiddenUsers = lib.mkOption {
-                    type = lib.types.listOf lib.types.str;
-                    default = [ ];
-                    description = "Compatibility sink; system-manager configs have no display manager.";
-                  };
-                }
-              )
-            ];
+          displayManagerSinkModule = final.caisson.integrations.caissonModule {
+            key = "caisson.systemManager.nixpkgsCompatSink";
+            file = "caisson-system-manager:nixpkgs-compat-sink";
+            module =
+              { lib, ... }:
+              {
+                options.services.displayManager.hiddenUsers = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Compatibility sink; system-manager configs have no display manager.";
+                };
+              };
           };
 
           # (2) That module now also declares `nix.enable`/`nix.package`
@@ -134,26 +132,29 @@
           # declaration defaults it on, which would materialize nixbld
           # users on hosts whose configs did not ask for nix management).
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
-          nixStubReplacementModule = {
-            _file = "caisson-system-manager:nixpkgs-compat-nix-stub";
-            disabledModules = [ "${src}/nix/modules/upstream/nixpkgs/nix.nix" ];
-            imports = [
-              (
-                { config, lib, ... }:
-                {
-                  config = lib.mkMerge [
-                    { nix.enable = lib.mkDefault false; }
-                    (lib.mkIf config.nix.enable {
-                      environment.etc."nix/nix.conf".replaceExisting = true;
-                      nix.settings.experimental-features = lib.mkDefault [
-                        "nix-command"
-                        "flakes"
-                      ];
-                    })
-                  ];
-                }
-              )
-            ];
+          nixStubReplacementModule = final.caisson.integrations.caissonModule {
+            key = "caisson.systemManager.nixpkgsCompatNixStub";
+            file = "caisson-system-manager:nixpkgs-compat-nix-stub";
+            module = {
+              disabledModules = [ "${src}/nix/modules/upstream/nixpkgs/nix.nix" ];
+              imports = [
+                (
+                  { config, lib, ... }:
+                  {
+                    config = lib.mkMerge [
+                      { nix.enable = lib.mkDefault false; }
+                      (lib.mkIf config.nix.enable {
+                        environment.etc."nix/nix.conf".replaceExisting = true;
+                        nix.settings.experimental-features = lib.mkDefault [
+                          "nix-command"
+                          "flakes"
+                        ];
+                      })
+                    ];
+                  }
+                )
+              ];
+            };
           };
         in
         final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
@@ -217,39 +218,40 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/systemManager/<name>`), else none.
-          registered = lib.caisson.configs.systemManager or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "systemManager";
+            configModule = args.configModule or null;
+          };
 
           # The platform of the selected set, and the refusals of what
           # the selected set makes ineffective.
-          systemModule =
-            { config, lib, ... }:
-            {
-              _file = "caisson-system-manager:system";
-              nixpkgs.hostPlatform = lib.mkDefault pkgs.stdenv.hostPlatform.system;
-              assertions = [
-                {
-                  assertion = config.nixpkgs.overlays == [ ] && config.nixpkgs.config == { };
-                  message = "caisson: ${what} sets `nixpkgs.overlays` or `nixpkgs.config`, which have no effect: it runs on the package set caisson selects. Declare package configs and package overlays on `mkLib`, and select a set with `defaultPkgs`.";
-                }
-                {
-                  assertion =
-                    (
-                      if builtins.isString config.nixpkgs.hostPlatform then
-                        config.nixpkgs.hostPlatform
-                      else
-                        config.nixpkgs.hostPlatform.system or null
-                    ) == pkgs.stdenv.hostPlatform.system;
-                  message = "caisson: ${what} sets `nixpkgs.hostPlatform` to a platform other than that of the package set it runs on, ${pkgs.stdenv.hostPlatform.system}.";
-                }
-              ];
-            };
+          systemModule = selection.caissonModule {
+            key = "caisson.systemManager.pkgSet";
+            file = "caisson-system-manager:system";
+            module =
+              { config, lib, ... }:
+              {
+                _file = "caisson-system-manager:system";
+                nixpkgs.hostPlatform = lib.mkDefault pkgs.stdenv.hostPlatform.system;
+                assertions = [
+                  {
+                    assertion = config.nixpkgs.overlays == [ ] && config.nixpkgs.config == { };
+                    message = "caisson: ${what} sets `nixpkgs.overlays` or `nixpkgs.config`, which have no effect: it runs on the package set caisson selects. Declare package configs and package overlays on `mkLib`, and select a set with `defaultPkgs`.";
+                  }
+                  {
+                    assertion =
+                      (
+                        if builtins.isString config.nixpkgs.hostPlatform then
+                          config.nixpkgs.hostPlatform
+                        else
+                          config.nixpkgs.hostPlatform.system or null
+                      ) == pkgs.stdenv.hostPlatform.system;
+                    message = "caisson: ${what} sets `nixpkgs.hostPlatform` to a platform other than that of the package set it runs on, ${pkgs.stdenv.hostPlatform.system}.";
+                  }
+                ];
+              };
+          };
 
           moduleList =
             frameworkModules

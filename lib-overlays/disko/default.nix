@@ -69,17 +69,18 @@
           # configuration registered under the configuration's name
           # (`configs/disko/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.disko or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "disko";
+            configModule = args.configModule or null;
+          };
 
           moduleList = [
-            (native.devicesOptions diskoLib)
+            (selection.caissonModule {
+              key = "caisson.disko.devicesOptions";
+              file = "caisson-disko:devicesOptions";
+              module = native.devicesOptions diskoLib;
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry

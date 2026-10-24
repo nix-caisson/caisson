@@ -122,14 +122,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/hjem/<name>`), else none.
-          registered = lib.caisson.configs.hjem or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "hjem";
+            configModule = args.configModule or null;
+          };
 
           # The machine the configuration is declared inside, when there
           # is one: the childless evaluation of the nearest NixOS,
@@ -167,13 +164,17 @@
           # What hjem's OS modules set on a user that caisson sets too:
           # the user's name from the name the configuration is declared
           # under, and hjem's default of not clobbering existing files.
-          userModule =
-            { lib, ... }:
-            {
-              _file = "caisson-hjem:user";
-              user = lib.mkIf (name != null) (lib.mkDefault name);
-              clobberFiles = lib.mkDefault false;
-            };
+          userModule = selection.caissonModule {
+            key = "caisson.hjem.user";
+            file = "caisson-hjem:user";
+            module =
+              { lib, ... }:
+              {
+                _file = "caisson-hjem:user";
+                user = lib.mkIf (name != null) (lib.mkDefault name);
+                clobberFiles = lib.mkDefault false;
+              };
+          };
 
           moduleList = [
             "${src}/modules/common/user.nix"

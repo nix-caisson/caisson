@@ -142,8 +142,14 @@
           pkgs = nodePkgsOf hive name;
         in
         {
-          configModule = {
-            imports = nodeModules src hive hive.nodes.${name} ++ extraModules;
+          # Keyed as a module of the integration, so the history of the
+          # node names it.
+          configModule = final.caisson.integrations.caissonModule {
+            key = "caisson.colmena.node";
+            file = "caisson-colmena:node";
+            module = {
+              imports = nodeModules src hive hive.nodes.${name} ++ extraModules;
+            };
           };
           specialArgs = {
             inherit name nodes;
@@ -196,11 +202,21 @@
           frameworkModules = selection.frameworkModules "colmena" registry;
           moduleImports = selection.moduleImportsOf "colmena" { inherit lib manifest; } args;
           moduleList = [
-            native.metaOptions
+            (selection.caissonModule {
+              key = "caisson.colmena.metaOptions";
+              file = "caisson-colmena:metaOptions";
+              module = native.metaOptions;
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry
-          ++ [ (hiveModule src hive) ];
+          ++ [
+            (selection.caissonModule {
+              key = "caisson.colmena.hive";
+              file = "caisson-colmena:hive";
+              module = hiveModule src hive;
+            })
+          ];
 
           evaluated = lib.evalModules (
             {

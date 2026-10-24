@@ -223,14 +223,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the name of the home-manager
           # configuration (`configs/homeManager/<name>`), else none.
-          registered = lib.caisson.configs.homeManager or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = integrations.configModuleOf {
+            inherit lib name;
+            class = "homeManager";
+            configModule = args.configModule or null;
+          };
 
           # The user of a home-manager configuration is the name it is
           # declared under, unless a module of the home-manager
@@ -238,9 +235,23 @@
           # declared under no name: the name it holds is the name of
           # the composition.
           declaredUnderAName = name != null && (manifest.parent.parent.type or "lib") != "lib";
-          usernameModule = {
-            _file = "caisson-home-manager:username";
-            home.username = lib.mkDefault name;
+          usernameModule = integrations.caissonModule {
+            key = "caisson.homeManager.username";
+            file = "caisson-home-manager:username";
+            module = {
+              _file = "caisson-home-manager:username";
+              home.username = lib.mkDefault name;
+            };
+          };
+
+          # The home-manager command of the home-manager configuration:
+          # the home-manager source it was evaluated with.
+          pathModule = integrations.caissonModule {
+            key = "caisson.homeManager.path";
+            file = "caisson-home-manager:path";
+            module = {
+              programs.home-manager.path = final.mkDefault hmSource;
+            };
           };
 
           # The machine the home-manager configuration is declared
@@ -268,19 +279,26 @@
               null;
 
           hmSource = resolveOutPath (resolveSrc (args.ecosystemSrc or null));
+
+          # The modules of the composition, which the configuration
+          # module imports: the framework module of the class, the
+          # modules selected from the registry, the configuration's
+          # module, the module that names the home-manager command and,
+          # for a home-manager configuration declared under a name, the
+          # module that names the user.
+          configurationModules =
+            frameworkModules
+            ++ moduleImports classRegistry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ pathModule ]
+            ++ (if declaredUnderAName then [ usernameModule ] else [ ]);
         in
         {
           inherit minimal pkgs;
           check = if (args.check or null) == null then true else args.check;
+          inherit configurationModules;
           configuration = {
-            imports =
-              frameworkModules
-              ++ moduleImports classRegistry
-              ++ (if configModule == null then [ ] else [ configModule ])
-              ++ [
-                { programs.home-manager.path = final.mkDefault hmSource; }
-              ]
-              ++ (if declaredUnderAName then [ usernameModule ] else [ ]);
+            imports = configurationModules;
           };
           # The library of the view, with the module system tied over
           # it, is what the evaluation runs on, and it carries
@@ -485,16 +503,24 @@
             explicit = args.ecosystemSrc or null;
             manifest = final.caisson-core.libManifest or { };
           };
-          # What evalModules received: the configuration module, then
-          # home-manager's module list.
-          modules = [
-            ecosystemArgs.configuration
-            (final.caisson.integrations.ecosystemUnit {
-              key = "home-manager";
-              project = "home-manager";
-              file = "modules/modules.nix";
-            })
-          ];
+          # What evalModules received: each module the configuration
+          # module imports, then home-manager's module list. A
+          # configuration module given through `ecosystemArgs` is
+          # recorded as the one module it is.
+          modules =
+            (
+              if (args.ecosystemArgs or null) != null && args.ecosystemArgs ? configuration then
+                [ ecosystemArgs.configuration ]
+              else
+                composed.configurationModules
+            )
+            ++ [
+              (final.caisson.integrations.ecosystemUnit {
+                key = "home-manager";
+                project = "home-manager";
+                file = "modules/modules.nix";
+              })
+            ];
           # What `home-manager switch` builds and runs.
           outputs = {
             inherit (value) activationPackage;

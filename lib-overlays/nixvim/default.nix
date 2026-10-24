@@ -107,14 +107,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nixvim/<name>`), else none.
-          registered = lib.caisson.configs.nixvim or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixvim";
+            configModule = args.configModule or null;
+          };
 
           moduleList =
             frameworkModules
@@ -122,11 +119,15 @@
             ++ (if configModule == null then [ ] else [ configModule ])
             ++ [
               "${src}/modules/top-level"
-              {
-                _file = "caisson-nixvim:evalNixvim";
-                flake = nixvimLib.mkOptionDefault src;
-                nixpkgs.pkgs = pkgs;
-              }
+              (selection.caissonModule {
+                key = "caisson.nixvim.pkgSet";
+                file = "caisson-nixvim:evalNixvim";
+                module = {
+                  _file = "caisson-nixvim:evalNixvim";
+                  flake = nixvimLib.mkOptionDefault src;
+                  nixpkgs.pkgs = pkgs;
+                };
+              })
             ];
 
           value = nixvimLib.evalModules (

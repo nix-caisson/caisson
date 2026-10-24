@@ -98,33 +98,34 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/darwin/<name>`), else none.
-          registered = lib.caisson.configs.darwin or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "darwin";
+            configModule = args.configModule or null;
+          };
 
           # What `darwinSystem` adds to the modules of a configuration,
           # with the package set caisson selects.
-          darwinSystemModule =
-            { lib, ... }:
-            {
-              _file = "caisson-darwin:darwinSystem";
-              nixpkgs.pkgs = pkgs;
-              nixpkgs.hostPlatform = lib.mkDefault system;
-              nixpkgs.source = lib.mkDefault nixpkgsSrc;
-              nixpkgs.flake.source = lib.mkDefault (nixpkgsSrc.outPath or (toString nixpkgsSrc));
-              system.checks.verifyNixPath = lib.mkDefault false;
-              system.darwinVersionSuffix = ".${src.shortRev or src.dirtyShortRev or "dirty"}";
-              system.darwinRevision =
-                let
-                  rev = src.rev or src.dirtyRev or null;
-                in
-                lib.mkIf (rev != null) rev;
-            };
+          darwinSystemModule = selection.caissonModule {
+            key = "caisson.darwin.pkgSet";
+            file = "caisson-darwin:darwinSystem";
+            module =
+              { lib, ... }:
+              {
+                _file = "caisson-darwin:darwinSystem";
+                nixpkgs.pkgs = pkgs;
+                nixpkgs.hostPlatform = lib.mkDefault system;
+                nixpkgs.source = lib.mkDefault nixpkgsSrc;
+                nixpkgs.flake.source = lib.mkDefault (nixpkgsSrc.outPath or (toString nixpkgsSrc));
+                system.checks.verifyNixPath = lib.mkDefault false;
+                system.darwinVersionSuffix = ".${src.shortRev or src.dirtyShortRev or "dirty"}";
+                system.darwinRevision =
+                  let
+                    rev = src.rev or src.dirtyRev or null;
+                  in
+                  lib.mkIf (rev != null) rev;
+              };
+          };
 
           darwinModules =
             frameworkModules

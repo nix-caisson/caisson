@@ -108,27 +108,28 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/kubenix/<name>`), else none.
-          registered = lib.caisson.configs.kubenix or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "kubenix";
+            configModule = args.configModule or null;
+          };
 
           moduleList =
             frameworkModules
             ++ moduleImports registry
             ++ (if configModule == null then [ ] else [ configModule ])
             ++ [
-              {
-                _file = "caisson-kubenix:args";
-                config._module.args = {
-                  inherit pkgs;
-                  name = "default";
+              (selection.caissonModule {
+                key = "caisson.kubenix.pkgSet";
+                file = "caisson-kubenix:args";
+                module = {
+                  _file = "caisson-kubenix:args";
+                  config._module.args = {
+                    inherit pkgs;
+                    name = "default";
+                  };
                 };
-              }
+              })
             ];
 
           value = kubenixLib.evalModules (

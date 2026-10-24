@@ -83,14 +83,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nixidy/<name>`), else none.
-          registered = lib.caisson.configs.nixidy or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixidy";
+            configModule = args.configModule or null;
+          };
 
           moduleList =
             frameworkModules
