@@ -32,6 +32,14 @@
         inherit system;
         overlays = [ (_final: _prev: { topMarker = "ok"; }) ];
       };
+      # The traced set of the same package config, and a package made
+      # from it by two further steps.
+      traced = configs.default.traced.children.nixpkgs.${system}.value;
+      bottom = traced.hello.caissonTrace;
+      renamed = (traced.hello.override { }).overrideAttrs (_: {
+        pname = "hello-traced";
+      });
+      chain = lib.caisson.nixpkgs.traceChainOf renamed;
     in
     {
       checks.nixpkgs-pkg-sets =
@@ -71,6 +79,31 @@
           }).hello.drvPath;
         assert fails (top { }).hello.drvPath;
         assert !(top ? hello);
+        # A traced package is the same derivation, and carries how it
+        # was made. The set that is not traced carries nothing.
+        assert traced.hello.drvPath == pkgs.hello.drvPath;
+        assert !(pkgs.hello ? caissonTrace);
+        assert bottom.step == "callPackage" && bottom.from == null;
+        assert lib.hasSuffix "/hello/package.nix" bottom.file;
+        assert builtins.elem "stdenv" bottom.resolved;
+        assert
+          bottom.set == {
+            config = "default";
+            inherit system;
+          };
+        assert
+          builtins.map (step: step.step) chain == [
+            "overrideAttrs"
+            "override"
+            "callPackage"
+          ];
+        assert (builtins.elemAt chain 2).drvPath == pkgs.hello.drvPath;
+        assert (builtins.elemAt chain 1).from == pkgs.hello.drvPath;
+        assert
+          renamed.drvPath == ((pkgs.hello.override { }).overrideAttrs (_: {
+            pname = "hello-traced";
+          })).drvPath;
+        assert lib.caisson.nixpkgs.traceChainOf pkgs.hello == null;
         pkgs.runCommand "nixpkgs-pkg-sets" { } "touch $out";
     };
 }

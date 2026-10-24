@@ -368,9 +368,24 @@
             ++ lib.caisson-core.pkgOverlaysFor (caissonConfig.overlays ++ caissonConfig.extraOverlays);
           ecosystemArgs = args.ecosystemArgs or { };
 
+          # The set of this package config for `system`, as a manifest.
+          # With `trace`, the set is built on its lib with
+          # `callPackageWith` replaced by the tracing version of
+          # trace.nix.
           setFor =
+            { trace }:
             system:
             let
+              traceOf =
+                if trace then
+                  import ./trace.nix {
+                    set = {
+                      config = name;
+                      inherit system;
+                    };
+                  }
+                else
+                  setLib: setLib;
               setManifest = {
                 _type = "caisson-manifest";
                 type = "nixpkgs";
@@ -389,7 +404,7 @@
               };
               pkgs = instantiate src (
                 {
-                  lib = packageSetLib src (lib.caisson-core.withManifests { pkgsManifest = setManifest; });
+                  lib = traceOf (packageSetLib src (lib.caisson-core.withManifests { pkgsManifest = setManifest; }));
                   localSystem = { inherit system; };
                   inherit config overlays;
                 }
@@ -430,7 +445,15 @@
             );
             value = configEval;
             inherit config;
-            children.nixpkgs = final.genAttrs caissonConfig.systems setFor;
+            children.nixpkgs = final.genAttrs caissonConfig.systems (setFor {
+              trace = false;
+            });
+            # The same sets, traced: each package carries how it was
+            # made (trace.nix). Only an inspection reads it, so an
+            # ordinary evaluation builds no traced set.
+            traced.children.nixpkgs = final.genAttrs caissonConfig.systems (setFor {
+              trace = true;
+            });
           };
         in
         manifest;
@@ -534,6 +557,32 @@
               current = if builtins ? currentSystem then setAt builtins.currentSystem else { };
             in
             current // { __functor = _self: call; };
+
+          # The trace of a package of a traced set (`traced` on a
+          # package config manifest) as plain data: the steps from the
+          # last down to the `callPackage`, each with the `drvPath` it
+          # made, and `from` as the `drvPath` of the derivation it was
+          # applied to. Null for a value that carries no trace.
+          traceChainOf =
+            value:
+            let
+              chain =
+                current:
+                let
+                  record = current.caissonTrace;
+                in
+                [
+                  (
+                    record
+                    // {
+                      inherit (current) drvPath;
+                      from = if record.from == null then null else record.from.drvPath;
+                    }
+                  )
+                ]
+                ++ (if record.from == null then [ ] else chain record.from);
+            in
+            if builtins.isAttrs value && value ? caissonTrace then chain value else null;
 
           mkScope = (
             pkgs: scopeFunction: final.makeScope pkgs.newScope (scope: scopeFunction scope.callPackage)
