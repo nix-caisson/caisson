@@ -45,18 +45,16 @@ let
   # on `nixpkgs.pkgs`; an evaluation without that module takes it as
   # the `pkgs` module argument instead.
   # It is keyed, so the history of the evaluation names it.
-  pkgSetModule = {
+  pkgSetModule = selection.caissonModule {
     key = "caisson.nixos.pkgSet";
-    imports = [
-      (
-        { lib, ... }:
-        {
-          _file = "caisson-nixos:pkgSet";
-          config =
-            if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
-        }
-      )
-    ];
+    file = "caisson-nixos:pkgSet";
+    module =
+      { lib, ... }:
+      {
+        _file = "caisson-nixos:pkgSet";
+        config =
+          if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
+      };
   };
 
   registry = lib.caisson.modules.nixos or { };
@@ -67,14 +65,11 @@ let
   # The configuration's module: the module passed, else the
   # configuration registered under the configuration's name
   # (`configs/nixos/<name>`), else none.
-  registered = lib.caisson.configs.nixos or { };
-  configModule =
-    if (args.configModule or null) != null then
-      args.configModule
-    else if name != null then
-      registered.${name} or null
-    else
-      null;
+  configModule = selection.configModuleOf {
+    inherit lib name;
+    class = "nixos";
+    configModule = args.configModule or null;
+  };
 in
 {
   inherit system pkgSets;

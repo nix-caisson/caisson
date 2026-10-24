@@ -40,19 +40,23 @@
       context = "lib.caisson.facter";
 
       # The option of the class: the report file.
-      reportOptions =
-        { lib, ... }:
-        {
-          options.reportPath = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = ''
-              The hardware report nixos-facter writes, `facter.json`, which
-              the NixOS configurations declared inside this configuration
-              get as `hardware.facter.reportPath`.
-            '';
+      reportOptions = final.caisson.integrations.caissonModule {
+        key = "caisson.facter.reportOptions";
+        file = "caisson-facter:reportOptions";
+        module =
+          { lib, ... }:
+          {
+            options.reportPath = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = ''
+                The hardware report nixos-facter writes, `facter.json`, which
+                the NixOS configurations declared inside this configuration
+                get as `hardware.facter.reportPath`.
+              '';
+            };
           };
-        };
+      };
 
       evaluate =
         args:
@@ -67,14 +71,11 @@
           # configuration registered under the configuration's name
           # (`configs/facter/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.facter or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "facter";
+            configModule = args.configModule or null;
+          };
 
           moduleList = [
             reportOptions

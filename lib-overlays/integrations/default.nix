@@ -223,6 +223,52 @@
         ]
         ++ select "core" registry;
 
+      # The module of a configuration of `class` named `name`, in the
+      # evaluation whose lib is `lib`: `configModule` when the
+      # configuration was given one, else the configuration registered
+      # under its name (`lib.caisson.configs.<class>.<name>`), else
+      # null. A module given is returned as it was given. A module
+      # taken from the registry is wrapped in a module keyed
+      # `configs.<class>.<name>` that imports it, so its `declaration`
+      # event names the registry entry (`declarationEventsOf`).
+      configModuleOf =
+        {
+          lib,
+          class,
+          name,
+          configModule ? null,
+        }:
+        let
+          registered = lib.caisson.configs.${class} or { };
+        in
+        if configModule != null then
+          configModule
+        else if name != null && registered ? ${name} then
+          {
+            key = "configs.${class}.${name}";
+            imports = [ registered.${name} ];
+          }
+        else
+          null;
+
+      # A module an integration adds to an evaluation itself, keyed
+      # `key` (`caisson.<class>.<purpose>`) and named by the file `file`
+      # (`caisson-<class>:<purpose>`). The wrapper carries the file, so
+      # its `declaration` event names it even where `module` is a
+      # function, and the key names the module in the history of the
+      # evaluation.
+      caissonModule =
+        {
+          key,
+          file,
+          module,
+        }:
+        {
+          inherit key;
+          _file = file;
+          imports = [ module ];
+        };
+
       # A stand-in, in the `modules` an integration's `evaluate` returns,
       # for the module list of the ecosystem, where the evaluator
       # receives that list: it is recorded as a single `declaration`
@@ -308,11 +354,17 @@
       # from the registry carries its registry key in its module key
       # (`lib.caisson.modules`): the event is keyed by the registry key,
       # and its origin is the project that registered the module and
-      # the file of the module, where the module has a file. A module of
-      # caisson itself is keyed `caisson.<…>`, and its project is
-      # caisson. A module given as a path is keyed by the path, and any
-      # other module by its position in the list, `inline/<index>`, with
-      # the file the module names, where it names a file. A file inside
+      # the file of the module, where the module has a file. A
+      # configuration module taken from the registry of configurations
+      # is keyed `configs.<class>.<name>` (`configModuleOf`): the event
+      # carries that key, and its origin is the project of the lib and
+      # the file of the registered configuration. A module of caisson
+      # itself is keyed `caisson.<…>`, and its project is caisson. A
+      # module given as a path is keyed by the path, and any other
+      # module by its position in the list, `inline/<index>`, with the
+      # file the module names, where it names a file. Every module
+      # caisson adds is keyed, so an `inline/<index>` event is a module
+      # the configuration was given as a value. A file inside
       # a source in the Nix store is written relative to that source,
       # the way a project's files are named in the project. `lib` is the
       # lib of the evaluation.
@@ -355,6 +407,14 @@
                   inherit (registered) key;
                   origin = {
                     inherit (registered) project;
+                    file = fileOf module;
+                  };
+                }
+              else if keyed "configs." module then
+                {
+                  inherit (module) key;
+                  origin = {
+                    inherit project;
                     file = fileOf module;
                   };
                 }
@@ -1826,6 +1886,8 @@
             mkIntegration
             mkAltIntegration
             frameworkModules
+            configModuleOf
+            caissonModule
             mkModuleConfiguration
             moduleImportsOf
             pkgSetOf

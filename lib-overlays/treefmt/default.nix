@@ -91,24 +91,25 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/treefmt/<name>`), else none.
-          registered = lib.caisson.configs.treefmt or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "treefmt";
+            configModule = args.configModule or null;
+          };
 
           # treefmt-nix's special arguments, from the type its
           # `submoduleWith` returns.
           upstreamSpecialArgs = (treefmt.submoduleWith lib { }).functor.payload.specialArgs;
 
           moduleList = [
-            {
-              _file = "caisson-treefmt:pkgs";
-              inherit pkgs;
-            }
+            (selection.caissonModule {
+              key = "caisson.treefmt.pkgSet";
+              file = "caisson-treefmt:pkgs";
+              module = {
+                _file = "caisson-treefmt:pkgs";
+                inherit pkgs;
+              };
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry

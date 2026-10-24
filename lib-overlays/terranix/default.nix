@@ -88,25 +88,26 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/terranix/<name>`), else none.
-          registered = lib.caisson.configs.terranix or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "terranix";
+            configModule = args.configModule or null;
+          };
 
           # terranix returns the configuration with the keys Terraform
           # reads alone, and `_meta`, the metadata it passes through
           # without rendering it. caisson's options reach the result
           # there.
-          metaModule =
-            { config, ... }:
-            {
-              _file = "caisson-terranix:meta";
-              _meta.caisson = config.caisson;
-            };
+          metaModule = selection.caissonModule {
+            key = "caisson.terranix.meta";
+            file = "caisson-terranix:meta";
+            module =
+              { config, ... }:
+              {
+                _file = "caisson-terranix:meta";
+                _meta.caisson = config.caisson;
+              };
+          };
 
           moduleList =
             frameworkModules

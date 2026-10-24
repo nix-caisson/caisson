@@ -120,14 +120,11 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/flake/<name>`), else none.
-          registered = lib.caisson.configs.flake or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "flake";
+            configModule = args.configModule or null;
+          };
 
           # Exported modules are keyed by flake-parts' moduleLocation,
           # which defaults to self.outPath, a rev-sensitive identity, so
@@ -160,38 +157,51 @@
           # flake with no package sets for a system keeps the `pkgs`
           # flake-parts provides. Every available set stays reachable
           # by name, as the `pkgSets` argument of perSystem.
-          pkgSetModule = {
-            _file = "caisson-flake-parts:pkgSet";
-            perSystem =
-              { system, lib, ... }:
-              let
-                available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
-                  lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
-                    manifest.pkgSets or { }
-                  )
-                );
-              in
-              {
-                _module.args.pkgs = lib.mkIf (available != { }) (
-                  lib.mkDefault (
-                    selection.pkgSetOf {
-                      context = "lib.caisson.flake-parts.mkConfiguration";
-                      what = "the flake for ${system}";
-                    } manifest available
-                  )
-                );
-              };
+          pkgSetModule = selection.caissonModule {
+            key = "caisson.flake.pkgSet";
+            file = "caisson-flake-parts:pkgSet";
+            module = {
+              _file = "caisson-flake-parts:pkgSet";
+              perSystem =
+                { system, lib, ... }:
+                let
+                  available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
+                    lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
+                      manifest.pkgSets or { }
+                    )
+                  );
+                in
+                {
+                  _module.args.pkgs = lib.mkIf (available != { }) (
+                    lib.mkDefault (
+                      selection.pkgSetOf {
+                        context = "lib.caisson.flake-parts.mkConfiguration";
+                        what = "the flake for ${system}";
+                      } manifest available
+                    )
+                  );
+                };
+            };
           };
 
+          # The modules of the composition: the framework module of the
+          # class, the module that hands perSystem its package set, the
+          # modules selected from the registry and the configuration's
+          # module.
+          compositionModules =
+            frameworkModules
+            ++ [ pkgSetModule ]
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
+          # `evalFlakeModule` takes a single module: flake-parts' core
+          # modules followed by the modules of the composition.
           module = {
             imports = [
               flakeParts.flakeModules.flakeModules
               flakeParts.flakeModules.modules
             ]
-            ++ frameworkModules
-            ++ [ pkgSetModule ]
-            ++ moduleImports registry
-            ++ (if configModule == null then [ ] else [ configModule ]);
+            ++ compositionModules;
           };
 
           # flake-parts reads the flake's `self` from `inputs.self`, and
@@ -243,16 +253,19 @@
                 inherit explicit;
                 manifest = lib.caisson-core.libManifest or { };
               };
-          # What `evalFlakeModule` received: flake-parts' core modules,
-          # then the module of the composition.
+          # What `evalFlakeModule` received, element by element of the
+          # module it was handed: flake-parts' own modules, its module
+          # list and the two core modules imported here, as the single
+          # event of the flake-parts ecosystem, then each of the modules
+          # of the composition.
           modules = [
             (final.caisson.integrations.ecosystemUnit {
               key = "flake-parts";
               project = "flake-parts";
               file = null;
             })
-            module
-          ];
+          ]
+          ++ compositionModules;
           outputs = {
             flake = outputs;
           };

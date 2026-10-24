@@ -243,17 +243,18 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-colmena/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-colmena or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-colmena";
+            configModule = args.configModule or null;
+          };
 
           moduleList = [
-            colmenaOptions
+            (selection.caissonModule {
+              key = "caisson.caisson-colmena.colmenaOptions";
+              file = "caisson-caisson-colmena:colmenaOptions";
+              module = colmenaOptions;
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry

@@ -53,14 +53,11 @@
           # configuration registered under the configuration's name
           # (`configs/structural/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.structural or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "structural";
+            configModule = args.configModule or null;
+          };
 
           moduleList =
             frameworkModules

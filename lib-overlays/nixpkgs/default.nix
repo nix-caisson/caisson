@@ -335,11 +335,11 @@
           # The config's module: the module passed, else the configuration
           # registered under the config's name
           # (`configs/nixpkgsConfig/<name>`), else none.
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else
-              (lib.caisson.configs.nixpkgsConfig or { }).${name} or null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixpkgsConfig";
+            configModule = args.configModule or null;
+          };
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
             # The composed lib, so a config module reads

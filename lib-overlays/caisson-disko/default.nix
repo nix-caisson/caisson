@@ -227,18 +227,23 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-disko/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-disko or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-disko";
+            configModule = args.configModule or null;
+          };
 
           moduleList = [
-            (devicesOptions diskoLib)
-            assertionsOptions
+            (selection.caissonModule {
+              key = "caisson.caisson-disko.devicesOptions";
+              file = "caisson-caisson-disko:devicesOptions";
+              module = devicesOptions diskoLib;
+            })
+            (selection.caissonModule {
+              key = "caisson.caisson-disko.assertionsOptions";
+              file = "caisson-caisson-disko:assertionsOptions";
+              module = assertionsOptions;
+            })
           ]
           ++ frameworkModules
           ++ moduleImports registry

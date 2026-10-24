@@ -205,36 +205,66 @@ let
   # collection resolve from the declaration, as they do in a consumer
   # flake. The library and the NixOS module collection are the same
   # nixpkgs pin as the package set.
-  hiveLib = core.mkLib (
-    declaresPkgs
+  hiveLib = core.mkLib hiveLibArgs;
+  hiveLibArgs = declaresPkgs // {
+    sources = {
+      inherit (inputs)
+        nixpkgs
+        colmena
+        flake-parts
+        disko
+        home-manager
+        nvf
+        treefmt-nix
+        nixvim
+        nix-topology
+        kubenix
+        nixidy
+        system-manager
+        hjem
+        terranix
+        ;
+    };
+    projects = {
+      caisson = inputs.caisson;
+    };
+    defaultEcosystemSrc = sources: {
+      nixpkgs-lib = sources.nixpkgs;
+      nixos = sources.nixpkgs;
+    };
+  };
+
+  # The registered world: the composition of `hiveLib` under the name
+  # `pinned-world`, with a configuration registered for each class in
+  # tests/pinned-world/configs. Its top is the structural configuration
+  # registered under that name, which declares a configuration of each
+  # integration and gives none of them a module, so each takes the
+  # module registered under its name.
+  registeredLib = core.mkLib (
+    hiveLibArgs
     // {
-      sources = {
-        inherit (inputs)
-          nixpkgs
-          colmena
-          flake-parts
-          disko
-          home-manager
-          nvf
-          treefmt-nix
-          nixvim
-          nix-topology
-          kubenix
-          nixidy
-          system-manager
-          hjem
-          terranix
-          ;
-      };
-      projects = {
-        caisson = inputs.caisson;
-      };
-      defaultEcosystemSrc = sources: {
-        nixpkgs-lib = sources.nixpkgs;
-        nixos = sources.nixpkgs;
-      };
+      name = "pinned-world";
+      configs = lib: lib.caisson-core.mkModules ./configs;
     }
   );
+  registeredWorld = registeredLib.caisson.structural.mkTopConfiguration { };
+
+  # Every manifest of a tree, from its top down through `children`. A
+  # configuration evaluated per system has a manifest for each system,
+  # with the configurations evaluated for that system beneath it.
+  manifestsOf =
+    manifest:
+    [ manifest ]
+    ++ builtins.concatMap (
+      byName:
+      builtins.concatMap (
+        value:
+        if (value._type or null) == "caisson-manifest" then
+          manifestsOf value
+        else
+          builtins.concatMap manifestsOf (builtins.attrValues value)
+      ) (builtins.attrValues byName)
+    ) (builtins.attrValues (manifest.children or { }));
 
   # Disk layouts as disko writes them, from disko's examples: a disk
   # with an ESP and LUKS around LVM, and one with mdadm, ZFS, LUKS and
@@ -831,6 +861,149 @@ let
         builtins.map identity (pkgs.lib.take prefix declared.history)
         == builtins.map identity machine.childlessManifest.history
       && builtins.length declared.history > prefix;
+
+    # Every module caisson adds to an evaluation is keyed, so the
+    # history of the evaluation names it. The suite walks every
+    # manifest of the trees of the pinned world below, from the top
+    # down through `children`, which holds a configuration of every
+    # integration. An `inline/<index>` event is a module a
+    # configuration was given as a value, and the only such events are
+    # the modules the suite passes as `configModule` itself, each listed
+    # here by the configuration it was passed to.
+    #
+    # The registered world declares a configuration of each
+    # integration and gives none of them a module. Each records the
+    # module registered under its name as `configs.<class>.<name>`,
+    # with the project of the composition and the file of the
+    # registered configuration, and none records an `inline/<index>`
+    # event.
+    everyModuleCaissonAddsIsNamed =
+      let
+        darwin = import ../darwin-system { inherit inputs; };
+        hjem = import ../hjem-system { inherit inputs; };
+        declarationsOf =
+          top:
+          builtins.filter (event: event.operation == "declaration") (
+            builtins.concatMap (manifest: manifest.history) (manifestsOf top.caisson.manifest)
+          );
+        placeOf =
+          event:
+          if event.manifest == [ ] then
+            "top"
+          else
+            builtins.concatStringsSep " / " (
+              builtins.map (segment: "${segment.type} ${segment.name}") event.manifest
+            );
+        # The `inline/<index>` events of a tree, each as the place of
+        # the configuration that records it and its key, once.
+        inlineOf =
+          top:
+          builtins.sort builtins.lessThan (
+            pkgs.lib.unique (
+              builtins.map (event: "${placeOf event}: ${event.key}") (
+                builtins.filter (event: pkgs.lib.hasPrefix "inline/" event.key) (declarationsOf top)
+              )
+            )
+          );
+        expected = builtins.mapAttrs (_: builtins.sort builtins.lessThan) {
+          registered = [ ];
+          machineWithHomes = [
+            "top: inline/2"
+            "system x86_64-linux / nixos probe: inline/4"
+            "system x86_64-linux / nixos probe / system x86_64-linux / home-manager declared: inline/4"
+            "system x86_64-linux / nixos probe / system x86_64-linux / home-manager undeclared: inline/4"
+          ];
+          upstreamHive = [ "top: inline/2" ];
+          colmena = [
+            "top: inline/2"
+            "caisson-colmena default: inline/4"
+            "caisson-colmena default / system x86_64-linux / nixos probe-node: inline/5"
+          ];
+          caissonDisko = [
+            "top: inline/2"
+            "caisson-disko nas-1: inline/5"
+            "caisson-disko nas-1 / system x86_64-linux / nixos nas-1: inline/5"
+          ];
+          disko = [
+            "top: inline/2"
+            "disko nas-1: inline/4"
+          ];
+          darwin = [
+            "top: inline/2"
+            "system aarch64-darwin / darwin probe: inline/3"
+            "system aarch64-darwin / darwin family: inline/3"
+            "system aarch64-darwin / darwin family / system aarch64-darwin / home-manager probe: inline/4"
+            "system aarch64-darwin / darwin family / system aarch64-darwin / hjem probe: inline/6"
+          ];
+          hjem = [
+            "top: inline/2"
+            "system x86_64-linux / nixos probe-machine: inline/4"
+            "system x86_64-linux / nixos probe-machine / system x86_64-linux / hjem probe: inline/7"
+          ];
+        };
+        recorded = {
+          registered = inlineOf registeredWorld;
+          machineWithHomes = inlineOf machineWithHomes;
+          upstreamHive = inlineOf upstreamHiveTop;
+          colmena = inlineOf (colmenaTop {
+            probe-node = minimalNixosBase;
+          });
+          caissonDisko = inlineOf (layoutTop {
+            integration = "caisson-disko";
+            layout = luksLvmLayout;
+            machine = diskoMachineBase;
+          });
+          disko = inlineOf (layoutTop {
+            integration = "disko";
+            layout = luksLvmLayout;
+          });
+          darwin = inlineOf darwin.top;
+          hjem = inlineOf hjem.top;
+        };
+        # The registered configurations of the registered world, as
+        # its `configs.` declaration events record them.
+        fromRegistry = pkgs.lib.unique (
+          builtins.map (event: { inherit (event) key origin; }) (
+            builtins.filter (event: pkgs.lib.hasPrefix "configs." event.key) (declarationsOf registeredWorld)
+          )
+        );
+        registeredAs = class: name: {
+          key = "configs.${class}.${name}";
+          origin = {
+            project = "pinned-world";
+            file = "tests/pinned-world/configs/${class}/${name}";
+          };
+        };
+        sortByKey = builtins.sort (a: b: a.key < b.key);
+      in
+      recorded == expected
+      &&
+        sortByKey fromRegistry == sortByKey (
+          [
+            (registeredAs "structural" "pinned-world")
+            (registeredAs "nixos" "minimal")
+          ]
+          ++ builtins.map (class: registeredAs class "registered") [
+            "nixos"
+            "homeManager"
+            "hjem"
+            "structural"
+            "flake"
+            "caisson-colmena"
+            "caisson-disko"
+            "disko"
+            "caisson-facter"
+            "facter"
+            "terranix"
+            "systemManager"
+            "treefmt"
+            "nvf"
+            "nixvim"
+            "topology"
+            "kubenix"
+            "nixidy"
+          ]
+        );
 
     # Each configuration records how it selected its modules. The top
     # of the machine gives `moduleImports`, which replaces the default,
