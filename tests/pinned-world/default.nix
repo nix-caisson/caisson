@@ -1003,7 +1003,19 @@ let
             "kubenix"
             "nixidy"
           ]
-        );
+        )
+      # The configuration given the entry registered as `minimal`
+      # records that entry, not an inline module.
+      &&
+        pkgs.lib.unique (
+          builtins.map (event: event.key) (
+            builtins.filter (
+              event:
+              pkgs.lib.hasPrefix "configs." event.key
+              && placeOf event == "system x86_64-linux / nixos given-an-entry"
+            ) (declarationsOf registeredWorld)
+          )
+        ) == [ "configs.nixos.minimal" ];
 
     # Each configuration records how it selected its modules. The top
     # of the machine gives `moduleImports`, which replaces the default,
