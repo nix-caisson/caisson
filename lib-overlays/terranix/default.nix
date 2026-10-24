@@ -39,7 +39,9 @@
     let
       context = "lib.caisson.terranix.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "terranix";
         context = "caisson.terranix";
       };
@@ -127,6 +129,11 @@
         in
         {
           inherit value;
+          # Where terranix came from, as `src` was resolved.
+          ecosystems.terranix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What `terranixConfiguration` received: terranix's module
           # list, then the modules of the composition.
           modules = [

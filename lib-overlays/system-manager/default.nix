@@ -53,7 +53,9 @@
     let
       context = "lib.caisson.system-manager.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "system-manager";
         context = "caisson.system-manager";
       };
@@ -61,7 +63,9 @@
       # The source of the NixOS module collection the evaluation reads
       # modules from: the composition's `nixos` key, as for a NixOS
       # configuration.
-      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc nixosEcosystem;
+      nixosAccountOf = final.caisson.integrations.ecosystemAccountOf nixosEcosystem;
+      nixosEcosystem = {
         name = "nixos";
         context = "caisson.system-manager";
       };
@@ -280,6 +284,19 @@
         in
         {
           inherit value;
+          # Where system-manager came from, as `src` was resolved, and
+          # where the NixOS module collection came from, as `nixpkgsSrc`
+          # was resolved.
+          ecosystems = {
+            system-manager = ecosystemAccountOf {
+              explicit = args.ecosystemSrc or null;
+              manifest = lib.caisson-core.libManifest or { };
+            };
+            nixos = nixosAccountOf {
+              explicit = null;
+              manifest = lib.caisson-core.libManifest or { };
+            };
+          };
           # What `makeSystemConfig` received: system-manager's module
           # list, then the modules of the composition.
           modules = [

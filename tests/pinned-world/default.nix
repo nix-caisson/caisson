@@ -886,6 +886,102 @@ let
           file = "modules/nixos/default/caisson";
         };
 
+    # Each configuration records where each part of the stack it used
+    # came from. The library of every evaluation is the nixpkgs pin,
+    # through the `defaultEcosystemSrc` of the tree. The machine selects
+    # its module collection with its own `ecosystemSrc`, and the
+    # home-manager configuration inside it selects home-manager the
+    # same way. The top resolves no ecosystem beside the library.
+    ecosystemsRecordWhereEachPartCameFrom =
+      let
+        top = machineWithHomes.caisson.manifest;
+        machine = top.children.system.x86_64-linux.children.nixos.probe;
+        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
+        library = {
+          from = "defaultEcosystemSrc";
+          source = "nixpkgs";
+        };
+      in
+      top.ecosystems == {
+        nixpkgs-lib = library;
+      }
+      &&
+        machine.ecosystems == {
+          nixpkgs-lib = library;
+          nixos = {
+            from = "ecosystemSrc";
+            source = "nixpkgs";
+          };
+        }
+      &&
+        declared.ecosystems == {
+          nixpkgs-lib = library;
+          home-manager = {
+            from = "ecosystemSrc";
+            source = "home-manager";
+          };
+        };
+
+    # The configurations of the shared probe trees record where each
+    # ecosystem they resolved came from. `hiveLib` pins colmena and
+    # disko under those names and selects nothing for them, so a colmena
+    # configuration and a disko configuration of either integration
+    # take the pinned source of that name. A machine inside them takes
+    # its module collection from the `nixos` of the `defaultEcosystemSrc`
+    # of the tree. The darwin tree pins nix-darwin, nixpkgs,
+    # home-manager and hjem under those names. The hjem tree pins hjem
+    # and selects its module collection as `hiveLib` does.
+    ecosystemsRecordWhereEachIntegrationsPartsCameFrom =
+      let
+        pinned = source: {
+          from = "sources";
+          inherit source;
+        };
+        library = {
+          from = "defaultEcosystemSrc";
+          source = "nixpkgs";
+        };
+        colmena =
+          (colmenaTop { probe-node = minimalNixosBase; }).caisson.manifest.children.caisson-colmena.default;
+        node = colmena.children.system.x86_64-linux.children.nixos.probe-node;
+        upstreamColmena = upstreamHiveTop.caisson.manifest.children.colmena.default;
+        caissonDisko = layoutManifest "caisson-disko" (layoutTop {
+          integration = "caisson-disko";
+          layout = luksLvmLayout;
+        });
+        disko = layoutManifest "disko" (layoutTop {
+          integration = "disko";
+          layout = luksLvmLayout;
+        });
+        darwin = import ../darwin-system { inherit inputs; };
+        family = darwin.familyManifest;
+        familyChildren = family.children.system.${darwin.system}.children;
+        hjem = import ../hjem-system { inherit inputs; };
+      in
+      colmena.ecosystems == {
+        nixpkgs-lib = library;
+        colmena = pinned "colmena";
+      }
+      && node.ecosystems.nixos == library
+      && upstreamColmena.ecosystems.colmena == pinned "colmena"
+      &&
+        caissonDisko.ecosystems == {
+          nixpkgs-lib = library;
+          disko = pinned "disko";
+        }
+      && disko.ecosystems.disko == pinned "disko"
+      &&
+        family.ecosystems == {
+          nixpkgs-lib = library;
+          nix-darwin = pinned "nix-darwin";
+          nixpkgs = pinned "nixpkgs";
+        }
+      && familyChildren.home-manager.probe.ecosystems.home-manager == pinned "home-manager"
+      && familyChildren.hjem.probe.ecosystems.hjem == pinned "hjem"
+      && hjem.standalone.caisson.manifest.ecosystems.hjem == pinned "hjem"
+      && hjem.inner.ecosystems.hjem == pinned "hjem"
+      && hjem.machineManifest.ecosystems.nixos == library;
+
     # A selector that renames and drops configurations, with a note
     # saying so: the export record holds the published names alone,
     # each with the name path by the names the configurations are
@@ -2575,7 +2671,13 @@ let
       && rooted.checks.x86_64-linux.treefmt.drvPath == (rootedEvaluation.outputs.check root).drvPath
       && rooted.formatter.x86_64-linux.drvPath == upstream.drvPath
       # The configuration `docs` is evaluated.
-      && builtins.isString children.docs.outputs.wrapper.drvPath;
+      && builtins.isString children.docs.outputs.wrapper.drvPath
+      # Each configuration records the treefmt-nix it selects.
+      &&
+        evaluation.ecosystems.treefmt-nix == {
+          from = "ecosystemSrc";
+          source = "treefmt-nix";
+        };
 
     # An nvf configuration is published as
     # `nvfConfigurations.<system>.<name>`, and its Neovim is the one
@@ -2666,7 +2768,13 @@ let
       # the Neovim nvf builds.
       && topProfile.scope == "user"
       && topProfile.path == "$HOME/.local/state/caisson/profiles/nvf/editor"
-      && topProfile.package.drvPath == upstream.drvPath;
+      && topProfile.package.drvPath == upstream.drvPath
+      # The configuration records the nvf it selects.
+      &&
+        top.caisson.manifest.children.system.x86_64-linux.children.nvf.editor.ecosystems.nvf == {
+          from = "ecosystemSrc";
+          source = "nvf";
+        };
 
     # A nixvim configuration is published as
     # `nixvimConfigurations.<system>.<name>`, and its package is the one
@@ -2699,7 +2807,13 @@ let
       builtins.attrNames top.nixvimConfigurations == [ "x86_64-linux" ]
       &&
         top.nixvimConfigurations.x86_64-linux.editor.config.build.package.drvPath
-        == upstream.config.build.package.drvPath;
+        == upstream.config.build.package.drvPath
+      # The configuration records the nixvim it selects.
+      &&
+        top.caisson.manifest.children.system.x86_64-linux.children.nixvim.editor.ecosystems.nixvim == {
+          from = "ecosystemSrc";
+          source = "nixvim";
+        };
 
     # A nixvim configuration declared inside a NixOS machine is a profile
     # of the system, as an nvf configuration there is. The machine writes
@@ -2811,6 +2925,7 @@ let
           ];
         };
         topology = top.topology.x86_64-linux;
+        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.topology.default;
       in
       builtins.attrNames top.nixosConfigurations == [
         "alpha"
@@ -2818,7 +2933,19 @@ let
       ]
       && builtins.attrNames topology.config.nodes == builtins.attrNames upstream.config.nodes
       && builtins.elem "alpha" (builtins.attrNames topology.config.nodes)
-      && topology.config.output.drvPath == upstream.config.output.drvPath;
+      && topology.config.output.drvPath == upstream.config.output.drvPath
+      # The configuration records the nix-topology it selects, and each
+      # machine inside it the module collection of the tree.
+      &&
+        evaluation.ecosystems.nix-topology == {
+          from = "ecosystemSrc";
+          source = "nix-topology";
+        }
+      &&
+        evaluation.children.system.x86_64-linux.children.nixos.alpha.ecosystems.nixos == {
+          from = "defaultEcosystemSrc";
+          source = "nixpkgs";
+        };
 
     # A kubenix configuration is published as
     # `kubenixConfigurations.<system>.<name>`, its evaluation, whose
@@ -2846,7 +2973,13 @@ let
         upstream = import "${inputs.kubenix}/lib/eval-modules.nix" { inherit pkgs; } { inherit module; };
       in
       top.kubenixConfigurations.x86_64-linux.cluster.config.kubernetes.result.drvPath
-      == upstream.config.kubernetes.result.drvPath;
+      == upstream.config.kubernetes.result.drvPath
+      # The configuration records the kubenix it selects.
+      &&
+        top.caisson.manifest.children.system.x86_64-linux.children.kubenix.cluster.ecosystems.kubenix == {
+          from = "ecosystemSrc";
+          source = "kubenix";
+        };
 
     # A nixidy configuration is published as
     # `nixidyEnvs.<system>.<name>`, and its rendered environment is the
@@ -2878,7 +3011,13 @@ let
           modules = [ module ];
         };
       in
-      top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath;
+      top.nixidyEnvs.x86_64-linux.prod.environmentPackage.drvPath == upstream.environmentPackage.drvPath
+      # The configuration records the nixidy it selects.
+      &&
+        top.caisson.manifest.children.system.x86_64-linux.children.nixidy.prod.ecosystems.nixidy == {
+          from = "ecosystemSrc";
+          source = "nixidy";
+        };
 
     # A machine activates the profile inside a hjem configuration as the
     # user of that hjem configuration and of no other. The machine here
@@ -3072,7 +3211,14 @@ let
       && terraform.name == "config.tf.json"
       && terraform.passthru.config.terraform.required_version == ">= 1.0"
       && terraform.passthru.config.output.composed.value
-      && published.terranixConfigurations.infra.drvPath == terraform.drvPath;
+      && published.terranixConfigurations.infra.drvPath == terraform.drvPath
+      # The configuration records the terranix it selects.
+      &&
+        published.caisson.manifest.children.system.x86_64-linux.children.terranix.infra.ecosystems.terranix
+        == {
+          from = "ecosystemSrc";
+          source = "terranix";
+        };
 
     # A system-manager configuration that is a top is its system, built
     # for the system of the evaluation, and its modules get the composed
@@ -3131,7 +3277,25 @@ let
       && (runsOn.pinnedWorldProbe or null) == "the set the composition declares"
       && system.config.services.userborn.package.drvPath == userborn.drvPath
       && !(builtins.tryEval withOverlay.drvPath).success
-      && published.systemConfigs.default.drvPath == system.drvPath;
+      && published.systemConfigs.default.drvPath == system.drvPath
+      # The configuration records the system-manager it selects, and the
+      # module collection of the tree it reads NixOS modules from.
+      &&
+        published.caisson.manifest.children.system.x86_64-linux.children.system-manager.default.ecosystems
+        == {
+          nixpkgs-lib = {
+            from = "defaultEcosystemSrc";
+            source = "nixpkgs";
+          };
+          system-manager = {
+            from = "ecosystemSrc";
+            source = "system-manager";
+          };
+          nixos = {
+            from = "defaultEcosystemSrc";
+            source = "nixpkgs";
+          };
+        };
 
     # The ecosystem-args twins take the evaluator's arguments in
     # `ecosystemArgs`, applied last.
@@ -3343,8 +3507,24 @@ let
               config.probePkgs = pkgs;
             };
         };
+        # The manifest of such an evaluation, for its system.
+        evaluation =
+          (composedWithDeclaration.caisson-core.finalizeTop (
+            composedWithDeclaration.caisson.nixos-minimal.mkConfiguration { configModule = { }; }
+          )).x86_64-linux;
+        declared = {
+          from = "defaultEcosystemSrc";
+          source = "pinned-nixpkgs";
+        };
       in
-      system.config.probePkgs ? hello;
+      system.config.probePkgs ? hello
+      # The evaluation records the library and the module collection it
+      # took from the declaration.
+      &&
+        evaluation.ecosystems == {
+          nixpkgs-lib = declared;
+          nixos = declared;
+        };
 
     nixpkgsHelpersWorkOnRealPkgs =
       let
@@ -3385,6 +3565,11 @@ let
         flake = composedWithBoth.caisson.flake-parts.mkTopConfiguration {
           configModule = selectors;
         };
+        # The same flake, with flake-parts selected by the configuration.
+        selecting = composedWithBoth.caisson.flake-parts.mkTopConfiguration {
+          ecosystemSrc = sources: sources.flake-parts;
+          configModule = selectors;
+        };
       in
       builtins.attrNames top.libOverlays == [ "caisson/structural" ]
       && top.caisson.manifest ? modules
@@ -3393,7 +3578,23 @@ let
       && flake.lib ? caisson
       &&
         builtins.attrNames flake.lib.caisson-core.evalManifest.outputs.exports.libOverlays
-        == [ "caisson/structural" ];
+        == [ "caisson/structural" ]
+      # The flake records the flake-parts the tree pins under that name.
+      &&
+        flake.caisson.manifest.ecosystems.flake-parts == {
+          from = "sources";
+          source = "flake-parts";
+        }
+      # A flake that selects flake-parts runs on it and records the
+      # selection.
+      &&
+        builtins.attrNames selecting.lib.caisson-core.evalManifest.outputs.exports.libOverlays
+        == [ "caisson/structural" ]
+      &&
+        selecting.caisson.manifest.ecosystems.flake-parts == {
+          from = "ecosystemSrc";
+          source = "flake-parts";
+        };
 
     # The modules that caisson exports work only inside an evaluation
     # that caisson makes. caisson publishes none of them in its

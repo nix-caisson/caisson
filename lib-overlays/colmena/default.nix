@@ -218,6 +218,11 @@
         in
         {
           value = evaluated;
+          # Where colmena came from, as `src` was resolved.
+          ecosystems.colmena = native.ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
           # What evalModules received: the options of the class, the
           # framework module of the class, the modules selected from
           # the registry and the module made from the hive. Each node is

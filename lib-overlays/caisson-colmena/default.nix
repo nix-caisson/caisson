@@ -43,7 +43,9 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "colmena";
         context = "caisson.caisson-colmena";
       };
@@ -273,6 +275,11 @@
         in
         {
           value = evaluated;
+          # Where colmena came from, as `src` was resolved.
+          ecosystems.colmena = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
           # What evalModules received: the options of the class, the
           # framework module of the class, the modules selected from
           # the registry and the configuration's module. Each node is a
@@ -382,6 +389,10 @@
             assertColmenaEcosystemSrc (resolveEcosystemSrc {
               inherit explicit manifest;
             });
+          # Where that colmena source came from, from the same
+          # arguments, as a manifest records it under
+          # `ecosystems.colmena`.
+          ecosystemAccountOf = { explicit, manifest }: ecosystemAccountOf { inherit explicit manifest; };
         };
       };
     in

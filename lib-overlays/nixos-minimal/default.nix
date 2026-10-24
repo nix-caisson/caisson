@@ -61,6 +61,8 @@
               inherit (callArgs) lib;
             }).evalModules
               (builtins.removeAttrs callArgs [ "lib" ]);
+          # Where the module collection came from, as `src` was resolved.
+          ecosystems.nixos = common.srcAccount;
           # What evalModules received: the modules of the composition,
           # with no NixOS base modules.
           modules = common.modules;

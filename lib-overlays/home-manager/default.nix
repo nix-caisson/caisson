@@ -35,7 +35,9 @@
     let
       selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "home-manager";
         context = "caisson.home-manager";
       };
@@ -478,6 +480,11 @@
         in
         {
           inherit value;
+          # Where home-manager came from, as `resolveSrc` resolved it.
+          ecosystems.home-manager = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = final.caisson-core.libManifest or { };
+          };
           # What evalModules received: the configuration module, then
           # home-manager's module list.
           modules = [

@@ -39,7 +39,9 @@
     let
       context = "lib.caisson.kubenix.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "kubenix";
         context = "caisson.kubenix";
       };
@@ -152,6 +154,11 @@
         in
         {
           inherit value;
+          # Where kubenix came from, as `src` was resolved.
+          ecosystems.kubenix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: the framework module of the
           # class, the modules selected from the registry, the
           # configuration's module and the module that hands the

@@ -45,7 +45,9 @@
     let
       context = "lib.caisson.nixvim.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixvim";
         context = "caisson.nixvim";
       };
@@ -157,6 +159,11 @@
         in
         {
           inherit value;
+          # Where nixvim came from, as `src` was resolved.
+          ecosystems.nixvim = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: the framework module of the
           # class, the modules selected from the registry, the
           # configuration's module, the top-level module tree of nixvim,

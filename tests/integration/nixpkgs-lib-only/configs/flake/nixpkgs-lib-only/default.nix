@@ -27,6 +27,7 @@
       # of the package set's source.
       fromSet = name: set: lib.hasPrefix "${inputs.nixpkgs}/lib/" (fileOf name set);
       marked = "marked by the composition";
+      inherit (lib.caisson.nixpkgs.pkgSets.default) ecosystems;
     in
     {
       checks.nixpkgs-lib-only =
@@ -46,6 +47,23 @@
         assert lib.getExe pkgs.hello == marked;
         assert pkgs.lib.getExe pkgs.hello == upstream.lib.getExe upstream.hello;
         assert pkgs.lib.splitString "," "a,b" == [ marked ];
+        # The package config records where the parts came from. The
+        # library is a copy the selection builds, so it names no pinned
+        # source. The package set and its package-set libraries come
+        # from the source pinned as `nixpkgs`.
+        assert
+          ecosystems.nixpkgs-lib == {
+            from = "defaultEcosystemSrc";
+            source = null;
+          };
+        assert ecosystems.nixpkgs.from == "sources" && ecosystems.nixpkgs.source == "nixpkgs";
+        assert builtins.all (name: builtins.elem name ecosystems.nixpkgs.libraries) [
+          "systems"
+          "licenses"
+          "getExe"
+          "callPackageWith"
+        ];
+        assert !(builtins.elem "compareVersions" ecosystems.nixpkgs.libraries);
         pkgs.runCommand "nixpkgs-lib-only" { } "touch $out";
     };
 }

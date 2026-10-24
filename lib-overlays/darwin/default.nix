@@ -35,12 +35,16 @@
     let
       context = "lib.caisson.darwin.mkConfiguration";
 
-      resolveDarwinSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveDarwinSrc = final.caisson.integrations.resolveEcosystemSrc darwinEcosystem;
+      darwinAccountOf = final.caisson.integrations.ecosystemAccountOf darwinEcosystem;
+      darwinEcosystem = {
         name = "nix-darwin";
         context = "caisson.darwin";
       };
 
-      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc nixpkgsEcosystem;
+      nixpkgsAccountOf = final.caisson.integrations.ecosystemAccountOf nixpkgsEcosystem;
+      nixpkgsEcosystem = {
         name = "nixpkgs";
         context = "caisson.darwin";
       };
@@ -145,6 +149,16 @@
         in
         {
           inherit value;
+          # Where nix-darwin came from, as `src` was resolved, and where
+          # the nixpkgs of `nixpkgs.source` came from, as `nixpkgsSrc`
+          # was resolved.
+          ecosystems = {
+            nix-darwin = darwinAccountOf {
+              explicit = args.ecosystemSrc or null;
+              manifest = libManifest;
+            };
+            nixpkgs = nixpkgsAccountOf { manifest = libManifest; };
+          };
           # What eval-config received: the modules of the
           # composition, then nix-darwin's module list.
           modules = darwinModules ++ [

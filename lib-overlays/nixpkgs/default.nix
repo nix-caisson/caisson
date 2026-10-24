@@ -39,7 +39,9 @@
       prevNs = (prev.caisson or { }).nixpkgs or { };
       selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = selection.resolveEcosystemSrc {
+      resolveEcosystemSrc = selection.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = selection.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixpkgs";
         context = "lib.caisson.nixpkgs.mkConfiguration";
       };
@@ -126,6 +128,23 @@
         src: base:
         let
           sourceLib = builtins.import "${src}/lib";
+        in
+        base
+        // builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value = sourceLib.${name};
+          }) (packageSetNames src)
+        );
+
+      # The top-level names of the library at `src` that the lib of a
+      # package set takes from there, in the order `packageSetLib` takes
+      # them: the package-set libraries, the tables, then the top-level
+      # names of the functions of the package-set libraries.
+      packageSetNames =
+        src:
+        let
+          sourceLib = builtins.import "${src}/lib";
           present = builtins.filter (name: sourceLib ? ${name});
           libraries = present packageSetLibraries;
           general = present generalLibraries;
@@ -133,15 +152,8 @@
           reExports = builtins.filter (
             name: !(builtins.elem name libraries) && memberOf libraries name && !(memberOf general name)
           ) (builtins.attrNames sourceLib);
-          names = libraries ++ present packageSetData ++ reExports;
         in
-        base
-        // builtins.listToAttrs (
-          builtins.map (name: {
-            inherit name;
-            value = sourceLib.${name};
-          }) names
-        );
+        libraries ++ present packageSetData ++ reExports;
 
       # The package set of nixpkgs at `src`, instantiated as
       # `pkgs/top-level/default.nix` instantiates it, from arguments
@@ -399,6 +411,20 @@
             childless = false;
             inherit (caissonConfig) systems;
             ecosystemSrc = src;
+            # Where each part of the stack the sets use came from. The
+            # general utilities and the module system come from the
+            # library of the composition. The package set comes from
+            # `nixpkgs`, and so do the package-set libraries of its lib,
+            # which `libraries` lists by their top-level names.
+            ecosystems = {
+              nixpkgs-lib = selection.ecosystemAccountOf {
+                name = "nixpkgs-lib";
+                context = "the nixpkgs-lib entry";
+              } { };
+              nixpkgs = ecosystemAccountOf { explicit = args.ecosystemSrc or null; } // {
+                libraries = packageSetNames src;
+              };
+            };
             pkgOverlays = builtins.map (entry: entry.key) (
               caissonConfig.overlays ++ caissonConfig.extraOverlays
             );

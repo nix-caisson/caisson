@@ -29,7 +29,9 @@
       # The library the modules run on is the composed lib, from the
       # `nixpkgs-lib` key, and the package set is a package config,
       # from the `nixpkgs` key: three parts, each from a separate key.
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixos";
         context = "caisson.nixos";
       };
@@ -54,6 +56,12 @@
         composeNixos { inherit context nixpkgsModule; } view args
         // {
           src = resolveEcosystemSrc {
+            explicit = args.ecosystemSrc or null;
+            manifest = view.lib.caisson-core.libManifest or { };
+          };
+          # Where the module collection came from, as `src` was
+          # resolved, which an evaluation records as `ecosystems.nixos`.
+          srcAccount = ecosystemAccountOf {
             explicit = args.ecosystemSrc or null;
             manifest = view.lib.caisson-core.libManifest or { };
           };
@@ -92,6 +100,8 @@
         in
         {
           inherit value;
+          # Where the module collection came from, as `src` was resolved.
+          ecosystems.nixos = common.srcAccount;
           # What eval-config received: NixOS' module list, then the
           # modules of the composition.
           modules = [

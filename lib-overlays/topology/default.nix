@@ -42,7 +42,9 @@
     let
       context = "lib.caisson.topology.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nix-topology";
         context = "caisson.topology";
       };
@@ -148,6 +150,11 @@
         in
         {
           inherit value;
+          # Where nix-topology came from, as `src` was resolved.
+          ecosystems.nix-topology = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: the topology module tree of
           # nix-topology, recorded as a module of the nix-topology
           # source, the module that hands it the NixOS configurations
