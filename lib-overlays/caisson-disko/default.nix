@@ -50,7 +50,8 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystem = {
         name = "disko";
         context = "caisson.caisson-disko";
       };
@@ -76,6 +77,12 @@
         assertDiskoEcosystemSrc (resolveEcosystemSrc {
           inherit explicit manifest;
         });
+
+      # Where that disko source came from, from the same arguments, as
+      # a manifest records it under `ecosystems.disko`.
+      ecosystemAccountOf =
+        { explicit, manifest }:
+        final.caisson.integrations.ecosystemAccountOf ecosystem { inherit explicit manifest; };
 
       # disko's type library, from the disko source, over `lib`. The
       # types are built from `rootMountPoint`, the directory the mount
@@ -253,6 +260,11 @@
         in
         {
           value = evaluated;
+          # Where disko came from, as `src` was resolved.
+          ecosystems.disko = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
           # What evalModules received: the devices option and the
           # assertions, the framework module of the class, the modules
           # selected from the registry and the configuration's module.
@@ -359,6 +371,8 @@
           # `disko`, as recorded on `manifest`; refused when it is no
           # disko source.
           inherit ecosystemSrcOf;
+          # Where that disko source came from, from the same arguments.
+          inherit ecosystemAccountOf;
           # disko's type library from `{ lib, src, rootMountPoint }`.
           inherit diskoLibOf;
           # The module declaring `disko.devices`, for a type library.

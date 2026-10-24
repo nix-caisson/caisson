@@ -101,6 +101,11 @@
         in
         {
           value = evaluated;
+          # Where disko came from, as `src` was resolved.
+          ecosystems.disko = native.ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
           # What evalModules received: the devices option, the
           # framework module of the class, the modules selected from
           # the registry and the configuration's module. disko's type

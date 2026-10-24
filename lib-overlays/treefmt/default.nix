@@ -43,7 +43,9 @@
     let
       context = "lib.caisson.treefmt.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "treefmt-nix";
         context = "caisson.treefmt";
       };
@@ -129,6 +131,11 @@
         in
         {
           inherit value;
+          # Where treefmt-nix came from, as `treefmt` was resolved.
+          ecosystems.treefmt-nix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: treefmt-nix's module list, then
           # the modules of the composition.
           modules = [

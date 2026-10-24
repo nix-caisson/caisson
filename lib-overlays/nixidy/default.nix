@@ -40,7 +40,9 @@
     let
       context = "lib.caisson.nixidy.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixidy";
         context = "caisson.nixidy";
       };
@@ -112,6 +114,11 @@
         in
         {
           inherit value;
+          # Where nixidy came from, as `src` was resolved.
+          ecosystems.nixidy = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What `mkEnv` received: the modules of the composition,
           # then nixidy's module list. `mkEnv` appends nixidy's module
           # list after the modules it is given.

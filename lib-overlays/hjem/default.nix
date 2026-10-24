@@ -47,7 +47,9 @@
     let
       context = "lib.caisson.hjem.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "hjem";
         context = "caisson.hjem";
       };
@@ -229,6 +231,11 @@
         in
         {
           inherit value;
+          # Where hjem came from, as `src` was resolved.
+          ecosystems.hjem = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: hjem's user module, the module
           # that sets the user's name, hjem's systemd module where the
           # machine has `utils`, the framework module of the class, the

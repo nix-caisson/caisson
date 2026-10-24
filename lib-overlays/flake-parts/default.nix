@@ -39,35 +39,36 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "flake-parts";
         context = "caisson.flake-parts";
       };
-      resolveSrc =
-        explicit:
-        resolveEcosystemSrc {
-          inherit explicit;
-          manifest = final.caisson-core.libManifest or { };
-        };
       resolveOutPath = value: if builtins.isAttrs value && value ? outPath then value.outPath else value;
 
-      # flake-parts instantiated over this composition: its flake.nix
-      # applied to the composed library as `nixpkgs-lib`. What comes
-      # out (`lib.evalFlakeModule`, `flakeModules`) is flake-parts'
-      # machinery on caisson's library, with no second nixpkgs lib
-      # inside it.
-      flakePartsFor =
-        explicit:
+      # flake-parts instantiated over this composition from the
+      # flake-parts source `src`: its flake.nix applied to the composed
+      # library as `nixpkgs-lib`. What comes out (`lib.evalFlakeModule`,
+      # `flakeModules`) is flake-parts' machinery on caisson's library,
+      # with no second nixpkgs lib inside it.
+      flakePartsOf =
+        src:
         final.caisson.callFlake {
-          src = resolveOutPath (resolveSrc explicit);
+          src = resolveOutPath src;
           inputs.nixpkgs-lib = {
             lib = final;
           };
         };
+      # The manifest the declared flake-parts is resolved from: the
+      # lib manifest of this composed library.
+      defaultManifest = final.caisson-core.libManifest or { };
       # The composition's declared flake-parts, instantiated per
       # composed library and shared by every evaluation that passes
       # no `ecosystemSrc`.
-      flakePartsDefault = flakePartsFor null;
+      flakePartsDefault = flakePartsOf (resolveEcosystemSrc {
+        manifest = defaultManifest;
+      });
 
       # The option types of the core module, re-exported under this
       # namespace for the readers of that name.
@@ -85,13 +86,20 @@
         let
           selection = lib.caisson.integrations;
 
-          # The flake-parts source the configuration selects from the
-          # tree's sources, null when it selects none.
-          selected =
-            selection.selectedEcosystemSrc "lib.caisson.flake-parts.mkConfiguration"
-              (lib.caisson-core.libManifest or { })
-              (args.ecosystemSrc or null);
-          flakeParts = if selected == null then flakePartsDefault else flakePartsFor selected;
+          # The flake-parts the configuration runs on. A configuration
+          # that selects a source with `ecosystemSrc` selects it from
+          # the sources of the lib manifest of the evaluation. A
+          # configuration that selects none runs on the declared
+          # flake-parts.
+          explicit = args.ecosystemSrc or null;
+          flakeParts =
+            if explicit == null then
+              flakePartsDefault
+            else
+              flakePartsOf (resolveEcosystemSrc {
+                inherit explicit;
+                manifest = lib.caisson-core.libManifest or { };
+              });
 
           # The flake class of the registry, the same source every
           # adapter selects from, so modules arriving by any channel
@@ -226,6 +234,15 @@
         in
         {
           value = evaluated;
+          # Where flake-parts came from, as `flakeParts` was resolved.
+          ecosystems.flake-parts =
+            if explicit == null then
+              ecosystemAccountOf { manifest = defaultManifest; }
+            else
+              ecosystemAccountOf {
+                inherit explicit;
+                manifest = lib.caisson-core.libManifest or { };
+              };
           # What `evalFlakeModule` received: flake-parts' core modules,
           # then the module of the composition.
           modules = [

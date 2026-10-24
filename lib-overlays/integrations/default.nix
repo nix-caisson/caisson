@@ -153,6 +153,50 @@
             to mkLib.
           '';
 
+      # How an evaluation came by the source of the ecosystem `name`, as
+      # its manifest records it under `ecosystems.<name>`. It takes the
+      # arguments `resolveEcosystemSrc` takes and follows the same
+      # order. `from` names the declaration that supplied the source:
+      # `ecosystemSrc` for the selection of the configuration,
+      # `defaultEcosystemSrc` for the selection of the tree, and
+      # `sources` for the source the tree pins under exactly that name.
+      # `source` is the name of that source among the pinned sources,
+      # where `pin` records its revision, or null where a selection
+      # builds the value in another way. Reading the account forces no
+      # source a selection does not read.
+      ecosystemAccountOf =
+        {
+          name,
+          context,
+        }:
+        {
+          explicit ? null,
+          manifest ? final.caisson-core.libManifest or { },
+        }:
+        let
+          sources = manifest.sources or { };
+        in
+        if explicit != null then
+          {
+            from = "ecosystemSrc";
+            source = final.caisson-core.selectedSourceName {
+              inherit sources;
+              selection = sources: selectedEcosystemSrc context { inherit sources; } explicit;
+            };
+          }
+        else if (manifest.defaultEcosystemSrc or { }) ? ${name} then
+          {
+            from = "defaultEcosystemSrc";
+            source = (manifest.defaultEcosystemSrcNames or { }).${name} or null;
+          }
+        else if sources ? ${name} then
+          {
+            from = "sources";
+            source = name;
+          }
+        else
+          resolveEcosystemSrc { inherit name context; } { inherit explicit manifest; };
+
       named =
         leaf: name:
         let
@@ -559,7 +603,7 @@
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          recordFromEvaluation = if selection == null then [ ] else [ "moduleImports" ];
+          recordFromEvaluation = [ "ecosystems" ] ++ (if selection == null then [ ] else [ "moduleImports" ]);
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
             // (
@@ -616,8 +660,21 @@
                 inherit (view) lib;
                 modules = evaluated.modules or [ ];
               };
+              record = {
+                # Where each part of the stack the evaluation used came
+                # from (`ecosystemAccountOf`): the library of the lib it
+                # runs on, and each ecosystem the integration resolved,
+                # which its `evaluate` returns as `ecosystems`.
+                ecosystems = {
+                  nixpkgs-lib = ecosystemAccountOf {
+                    name = "nixpkgs-lib";
+                    context = "the nixpkgs-lib entry";
+                  } { manifest = view.lib.caisson-core.libManifest or { }; };
+                }
+                // (evaluated.ecosystems or { });
+              }
               # How the evaluation selected its modules.
-              record = if selection == null then { } else { moduleImports = selectionAccountOf selection view; };
+              // (if selection == null then { } else { moduleImports = selectionAccountOf selection view; });
             };
         };
 
@@ -1653,6 +1710,7 @@
             topValue
             resolveEcosystemSrc
             selectedEcosystemSrc
+            ecosystemAccountOf
             mkIntegration
             mkAltIntegration
             frameworkModules

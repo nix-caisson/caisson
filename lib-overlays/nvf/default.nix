@@ -47,7 +47,9 @@
     let
       context = "lib.caisson.nvf.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nvf";
         context = "caisson.nvf";
       };
@@ -177,6 +179,11 @@
         in
         {
           inherit value;
+          # Where nvf came from, as `src` was resolved.
+          ecosystems.nvf = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
           # What evalModules received: nvf's module list, then the
           # modules of the composition.
           modules = [
