@@ -525,6 +525,89 @@
             (`defaultPkgs = pkgSets: pkgSets.<name>;`).
           '');
 
+      # Which package config a configuration runs on, as its manifest
+      # records it under `pkgSet`. `name` is the name of the package
+      # config whose set the selection in force at `manifest` returns.
+      # It is read from the selection applied to `pkgSets` tagged with
+      # their names, so it is null where the selection returns a set it
+      # builds in another way. `level` is the name path of the
+      # configuration that made the selection: the configuration itself
+      # when `own` says it was constructed with `defaultPkgs`, else the
+      # nearest configuration above that selected for the
+      # configurations beneath it. Where no configuration selects,
+      # `name` is `default` and `level` is null, as `pkgSetOf` runs the
+      # configuration on the set named `default`. `perSystem` says
+      # whether the configuration is evaluated per system. A
+      # configuration evaluated once for every system runs on no single
+      # set, so its `name` is null, and `pkgSets` is not read.
+      pkgSetAccountOf =
+        { own, perSystem }:
+        manifest: pkgSets:
+        let
+          selection = manifest.defaultPkgs or null;
+          tag = "_caissonPkgSetName";
+          tagged = builtins.mapAttrs (name: set: set // { ${tag} = name; }) pkgSets;
+          selected = selection tagged;
+        in
+        if selection == null then
+          {
+            name = if perSystem then "default" else null;
+            level = null;
+          }
+        else
+          {
+            name =
+              if !perSystem then
+                null
+              else if builtins.isAttrs selected then
+                selected.${tag} or null
+              else
+                null;
+            level = if own then final.caisson-core.namePathOf manifest else selectionLevelAbove manifest;
+          };
+
+      # The name path of the configuration above `manifest` that made
+      # the package set selection in force at `manifest`: the nearest
+      # parent that selects for the configurations beneath it with
+      # `caisson.forChildren.defaultPkgs`, or else the level a parent
+      # records for its own selection. A system between a configuration
+      # and its parent is passed over. Null where no configuration
+      # above selects.
+      selectionLevelAbove =
+        manifest:
+        let
+          parent = manifest.parent or null;
+        in
+        if parent == null then
+          null
+        else if ((parent.forChildren or { }).defaultPkgs or null) != null then
+          final.caisson-core.namePathOf parent
+        else if parent ? pkgSet then
+          parent.pkgSet.level
+        else
+          selectionLevelAbove parent;
+
+      # The names of the namespaces of the lib an evaluation runs on, as
+      # its manifest records them under `namespaces`: for each entry of
+      # `lib.caisson`, the names of its attributes where it is an
+      # attribute set and null where it is not, and the names of
+      # `lib.caisson-core`. Names only, so nothing is forced past the
+      # keys of the namespaces.
+      namespacesOf =
+        lib:
+        let
+          namesOf =
+            value:
+            let
+              isSet = builtins.tryEval (builtins.isAttrs value);
+            in
+            if isSet.success && isSet.value then builtins.attrNames value else null;
+        in
+        {
+          caisson = builtins.mapAttrs (_: namesOf) (lib.caisson or { });
+          caisson-core = builtins.attrNames (lib.caisson-core or { });
+        };
+
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
       # configuration per system, as caisson-core.mkConfiguration
@@ -603,7 +686,12 @@
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          recordFromEvaluation = [ "ecosystems" ] ++ (if selection == null then [ ] else [ "moduleImports" ]);
+          recordFromEvaluation = [
+            "ecosystems"
+            "namespaces"
+            "pkgSet"
+          ]
+          ++ (if selection == null then [ ] else [ "moduleImports" ]);
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
             // (
@@ -672,6 +760,28 @@
                   } { manifest = view.lib.caisson-core.libManifest or { }; };
                 }
                 // (evaluated.ecosystems or { });
+                # The names of the namespaces of the lib the evaluation
+                # runs on (`namespacesOf`).
+                namespaces = namespacesOf view.lib;
+              }
+              # Which package config the evaluation runs on and the
+              # configuration that selected it (`pkgSetAccountOf`). A
+              # configuration evaluated once for every system runs on
+              # no single set, so it records the level alone.
+              // {
+                pkgSet =
+                  pkgSetAccountOf
+                    {
+                      own = defaultPkgs != null;
+                      inherit perSystem;
+                    }
+                    view.manifest
+                    (
+                      pkgSetsForSystem {
+                        context = "the pkgSet record";
+                        what = "the configuration";
+                      } view.manifest view.manifest.system
+                    );
               }
               # How the evaluation selected its modules.
               // (if selection == null then { } else { moduleImports = selectionAccountOf selection view; });
@@ -1711,6 +1821,8 @@
             resolveEcosystemSrc
             selectedEcosystemSrc
             ecosystemAccountOf
+            pkgSetAccountOf
+            namespacesOf
             mkIntegration
             mkAltIntegration
             frameworkModules
