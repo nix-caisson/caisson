@@ -227,10 +227,11 @@
       # evaluation whose lib is `lib`: `configModule` when the
       # configuration was given one, else the configuration registered
       # under its name (`lib.caisson.configs.<class>.<name>`), else
-      # null. A module given is returned as it was given. A module
-      # taken from the registry is wrapped in a module keyed
-      # `configs.<class>.<name>` that imports it, so its `declaration`
-      # event names the registry entry (`declarationEventsOf`).
+      # null. A module given is returned as it was given. Every entry of
+      # the registry is keyed `configs.<class>.<name>@<project>`
+      # (`lib.caisson.configs`), so the `declaration` event of a module
+      # from the registry names its entry, whether it was taken here or
+      # given (`declarationEventsOf`).
       configModuleOf =
         {
           lib,
@@ -243,11 +244,8 @@
         in
         if configModule != null then
           configModule
-        else if name != null && registered ? ${name} then
-          {
-            key = "configs.${class}.${name}";
-            imports = [ registered.${name} ];
-          }
+        else if name != null then
+          registered.${name} or null
         else
           null;
 
@@ -411,10 +409,13 @@
                   };
                 }
               else if keyed "configs." module then
+                let
+                  registered = registryPartsOf module.key;
+                in
                 {
-                  inherit (module) key;
+                  inherit (registered) key;
                   origin = {
-                    inherit project;
+                    project = if registered.project == null then project else registered.project;
                     file = fileOf module;
                   };
                 }

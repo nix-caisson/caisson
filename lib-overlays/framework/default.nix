@@ -79,7 +79,7 @@ let
     mkLib = mkLibIn lib;
     # the registries
     modules = keyedModules lib (registryIn lib "modules");
-    configs = registryIn lib "configs";
+    configs = keyedConfigs lib (registryIn lib "configs");
     libOverlays = registryIn lib "libOverlays";
     pkgOverlays = registryIn lib "pkgOverlays";
   };
@@ -116,6 +116,29 @@ let
       builtins.mapAttrs (
         name: module: {
           key = "modules.${class}.${name}@${projectOf class name}";
+          imports = [ module ];
+        }
+      )
+    );
+
+  # The configuration registry as an integration reads it: each
+  # configuration module wrapped in a module that imports it, keyed
+  # `configs.<class>.<name>@<project>`, the way `keyedModules` keys the
+  # module registry. The configurations of a registry are those of the
+  # tree that registered them. The key names the registry entry in the
+  # `declaration` events of an evaluation, whether the configuration
+  # was taken by its name or a configuration was given the entry as its
+  # `configModule`.
+  keyedConfigs =
+    lib:
+    let
+      project = (lib.caisson-core.libManifest or { }).name or "";
+    in
+    builtins.mapAttrs (
+      class:
+      builtins.mapAttrs (
+        name: module: {
+          key = "configs.${class}.${name}@${project}";
           imports = [ module ];
         }
       )

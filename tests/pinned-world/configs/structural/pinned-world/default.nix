@@ -4,12 +4,18 @@
 # pinned-world suite, registered under the name of its composition. It
 # declares a configuration of each integration whose module is
 # registered under the configuration's name, and none of them is given
-# a module, so each takes the module registered for it.
+# a module, so each takes the module registered for it. The NixOS
+# configuration `given-an-entry` is given the entry registered as
+# `minimal` as its module, the way configurations that share one
+# registered module take it.
 { ... }:
 { lib, ... }:
 {
   caisson.nixos.configurations.registered = lib.caisson.nixos.mkConfiguration { };
   caisson.nixos.configurations.minimal = lib.caisson.nixos-minimal.mkConfiguration { };
+  caisson.nixos.configurations.given-an-entry = lib.caisson.nixos-minimal.mkConfiguration {
+    configModule = lib.caisson.configs.nixos.minimal;
+  };
   caisson.home-manager.configurations.registered = lib.caisson.home-manager.mkConfiguration { };
   caisson.hjem.configurations.registered = lib.caisson.hjem.mkConfiguration { };
   caisson.structural.configurations.registered = lib.caisson.structural.mkConfiguration { };
