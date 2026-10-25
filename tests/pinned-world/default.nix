@@ -467,6 +467,37 @@ let
       };
   };
 
+  # A NixOS host named `host` like the host of `microvmHostTop`, whose
+  # caisson-microvm configuration `pool` runs its guests on qemu: one
+  # slot of the kind `microvm-slot`, with the vsock CID 301. The user
+  # `probe` may control `microvm-slot-1`.
+  qemuMicrovmHostTop = registeredLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
+          extraModuleImports = modules: [ modules."caisson/microvm-host" ];
+          configModule =
+            { lib, ... }:
+            {
+              imports = [ minimalNixosBase ];
+              users.users.probe.isNormalUser = true;
+              caisson.microvm-host.operators.probe = [ "microvm-slot-1" ];
+              caisson.caisson-microvm.configurations.pool = lib.caisson.caisson-microvm.mkConfiguration {
+                configModule = {
+                  hypervisor = "qemu";
+                  slots.microvm-slot = {
+                    count = 1;
+                    cidBase = 300;
+                  };
+                };
+              };
+            };
+        };
+      };
+  };
+
   # A hive in the format colmena reads, with every feature the
   # upstream-compatible integration carries: `meta.nixpkgs`, shared and
   # per-node special arguments, `defaults` that read the node's name, a
@@ -2742,6 +2773,99 @@ let
       && (builtins.tryEval microvmHostTop.nixosConfigurations.host.config.system.build.toplevel.drvPath)
         .success
       && !(builtins.tryEval refused.config.system.build.toplevel.drvPath).success;
+
+    # The operators of a guest on cloud-hypervisor that has a vsock CID
+    # may connect to the socket of its hybrid vsock. Of the guests of
+    # `microvmHostTop`, all on cloud-hypervisor with a CID except
+    # `upstream`, the user `probe` operates `a` and `microvm-slot-2`.
+    # Each of those two has the group `microvm-<guest>` with `probe` as
+    # its only member. Its working directory belongs to that group with
+    # the mode 0750, and its unit `microvm@<guest>.service` removes a
+    # socket a previous run left before it starts and gives the socket
+    # of this run to the group after it starts. The guests no user
+    # operates keep the directory that microvm.nix creates and get no
+    # such step. The slots of `pool` record their socket as
+    # `vsockSocket`.
+    microvmOperatorsReachTheirGuestsVsock =
+      let
+        host = microvmHostTop.nixosConfigurations.host.config;
+        pool =
+          microvmHostTop.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-microvm.pool;
+        socket = name: "/var/lib/microvms/${name}/notify.vsock";
+        directory = name: {
+          inherit (host.systemd.tmpfiles.settings."10-microvm"."/var/lib/microvms/${name}".d) user group mode;
+        };
+        unit = name: host.systemd.services."microvm@${name}".serviceConfig;
+        reached = [
+          "a"
+          "microvm-slot-2"
+        ];
+        unreached = [
+          "b"
+          "microvm-reset-1"
+          "microvm-slot-1"
+          "upstream"
+        ];
+      in
+      builtins.mapAttrs (_name: group: group.members) (
+        pkgs.lib.filterAttrs (name: _group: pkgs.lib.hasPrefix "microvm-" name) host.users.groups
+      ) == {
+        microvm-a = [ "probe" ];
+        microvm-microvm-slot-2 = [ "probe" ];
+      }
+      && builtins.all (
+        name:
+        directory name == {
+          user = "microvm";
+          group = "microvm-${name}";
+          mode = "0750";
+        }
+        && builtins.length (unit name).ExecStartPre == 1
+        && pkgs.lib.hasPrefix "+/nix/store/" (builtins.head (unit name).ExecStartPre)
+        && pkgs.lib.hasSuffix "/bin/rm -f ${socket name}" (builtins.head (unit name).ExecStartPre)
+        && builtins.length (unit name).ExecStartPost == 1
+        && pkgs.lib.hasPrefix "+/nix/store/" (builtins.head (unit name).ExecStartPost)
+        && pkgs.lib.hasSuffix "-microvm-vsock-access-${name}" (builtins.head (unit name).ExecStartPost)
+      ) reached
+      && builtins.all (
+        name:
+        directory name == {
+          user = "microvm";
+          group = "kvm";
+          mode = "0775";
+        }
+        && !((unit name) ? ExecStartPre)
+        && !((unit name) ? ExecStartPost)
+      ) unreached
+      &&
+        builtins.mapAttrs (_name: slot: slot.vsockSocket) pool.outputs.slots == {
+          microvm-reset-1 = socket "microvm-reset-1";
+          microvm-slot-1 = socket "microvm-slot-1";
+          microvm-slot-2 = socket "microvm-slot-2";
+        };
+
+    # A guest on qemu has the vsock of the kernel and no socket. The
+    # guest `microvm-slot-1` of `qemuMicrovmHostTop` has a CID and an
+    # operator, and the host gives it no group, keeps the directory that
+    # microvm.nix creates and adds no step to its unit. Its slot records
+    # a `vsockSocket` of null.
+    microvmQemuGuestsGetNoVsockSocket =
+      let
+        host = qemuMicrovmHostTop.nixosConfigurations.host.config;
+        pool =
+          qemuMicrovmHostTop.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-microvm.pool;
+        unit = host.systemd.services."microvm@microvm-slot-1".serviceConfig;
+        directory = host.systemd.tmpfiles.settings."10-microvm"."/var/lib/microvms/microvm-slot-1".d;
+      in
+      host.microvm.vms.microvm-slot-1.evaluatedConfig.config.microvm.vsock.cid == 301
+      && host.microvm.vms.microvm-slot-1.evaluatedConfig.config.microvm.hypervisor == "qemu"
+      && !(builtins.any (pkgs.lib.hasPrefix "microvm-") (builtins.attrNames host.users.groups))
+      && directory.group == "kvm"
+      && directory.mode == "0775"
+      && !(unit ? ExecStartPre)
+      && !(unit ? ExecStartPost)
+      && pool.outputs.slots.microvm-slot-1.vsockSocket == null
+      && pool.outputs.slots.microvm-slot-1.cid == 301;
 
     # A slot kind that passes `moduleImports` replaces the default
     # selection of the nixos class for its slots: `microvm-reset-1`

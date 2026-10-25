@@ -199,6 +199,17 @@
                 configuration registered as `lib.caisson.configs.nixos.<kind>`
                 as its module, and gets the vsock CID and the shares of its
                 slot.
+
+                The configuration records each slot under
+                `outputs.slots.<guest>`. When `hypervisor` is
+                `cloud-hypervisor`, the slot's `vsockSocket` is the Unix socket
+                through which the host reaches the guest's vsock,
+                `<stateDir>/<guest>/notify.vsock`, where `<stateDir>` is the
+                host's `microvm.stateDir`. A client connects to it, sends
+                `CONNECT <port>` and a newline, and reads `OK <n>` and a
+                newline before it speaks to the port. On any other hypervisor,
+                and inside a host that does not declare `microvm.stateDir`,
+                `vsockSocket` is null.
               '';
             };
           };
@@ -272,6 +283,29 @@
             };
           };
         };
+
+      # The socket through which the host reaches the vsock of the guest
+      # `name`, for a configuration on `hypervisor` whose host keeps the
+      # working directories of its guests under `stateDir`. The
+      # cloud-hypervisor runner of microvm.nix gives a guest that has a
+      # vsock CID a hybrid vsock: cloud-hypervisor listens on the Unix
+      # socket `notify.vsock` in the guest's working directory
+      # `<stateDir>/<guest>`. A client connects to that socket, sends
+      # `CONNECT <port>` and a newline, reads `OK <n>` and a newline, and
+      # then speaks to the guest's vsock port. A guest on another
+      # hypervisor has the kernel's vsock, which needs no socket, and
+      # gets null. A host whose configuration does not declare
+      # `microvm.stateDir` runs no guests, and its guests get null.
+      vsockSocketOf =
+        {
+          hypervisor,
+          stateDir,
+          name,
+        }:
+        if hypervisor == "cloud-hypervisor" && stateDir != null then
+          "${stateDir}/${name}/notify.vsock"
+        else
+          null;
 
       # The slots of an evaluated caisson-microvm configuration, by the
       # name of the guest: its kind, its number, its vsock CID, the
@@ -411,6 +445,14 @@
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
           inherit (evaluated) config options;
+
+          # The NixOS host the configuration is declared inside, as its
+          # childless evaluation, which leaves out the guests, and the
+          # directory under which that host keeps the working directories
+          # of its guests. microvm.nix's host module declares
+          # `microvm.stateDir`.
+          host = selection.nearestOf [ "nixos" ] manifest;
+          stateDir = if host == null then null else host.value.config.microvm.stateDir or null;
         in
         {
           value = evaluated;
@@ -431,7 +473,11 @@
           # virtual CPUs and the memory, and the definitions of the
           # interfaces and the shares. `start` is how the host starts and
           # stops the guests. `slots` holds the slot of each guest the
-          # slots declare, by the name of the guest.
+          # slots declare, by the name of the guest. The slot of a guest
+          # records as `vsockSocket` the Unix socket through which the
+          # host reaches the guest's vsock, for the `hypervisor` of this
+          # configuration. It is null when that hypervisor is not
+          # cloud-hypervisor.
           outputs = {
             ecosystemSrc = src;
             guests = {
@@ -442,7 +488,16 @@
             start = {
               inherit (config) autostart restartIfChanged runtimeMaxSec;
             };
-            slots = slotsOf config.slots;
+            slots = builtins.mapAttrs (
+              name: slot:
+              slot
+              // {
+                vsockSocket = vsockSocketOf {
+                  inherit (config) hypervisor;
+                  inherit stateDir name;
+                };
+              }
+            ) (slotsOf config.slots);
           };
         };
 
@@ -525,6 +580,11 @@
           # The check that a value is a microvm.nix source, with the
           # name of the caller for the message.
           inherit assertMicrovmEcosystemSrc;
+          # The Unix socket through which a host reaches the vsock of a
+          # guest, from the guest's hypervisor, the host's
+          # `microvm.stateDir` and the guest's name, null for a guest
+          # that is not on cloud-hypervisor.
+          inherit vsockSocketOf;
         };
       };
     in
