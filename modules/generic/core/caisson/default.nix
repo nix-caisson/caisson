@@ -6,6 +6,7 @@
     ./configurations.nix
     ./exports.nix
     ./forChildren.nix
+    ./forNearestChildren.nix
     ./libOverlays.nix
     ./modules.nix
     ./pkgOverlays.nix

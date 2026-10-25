@@ -8,7 +8,7 @@
 # the report into the NixOS settings of the hardware.
 #
 # The default module of the caisson-facter class adds this module to
-# every NixOS configuration declared inside a caisson-facter
+# the nearest NixOS configurations beneath a caisson-facter
 # configuration. A NixOS configuration that passes `moduleImports`
 # selects its modules itself, and then it lists this module itself. A
 # module of the NixOS configuration that needs more of its hardware

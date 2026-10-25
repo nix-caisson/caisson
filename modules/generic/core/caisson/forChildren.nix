@@ -32,6 +32,12 @@
         gets none of them. Definitions from several modules are
         concatenated.
 
+        These additions reach the configurations of the class at any
+        depth beneath this configuration.
+        `caisson.forNearestChildren.extraDefaultModuleImports` gives
+        additions that reach only the nearest configurations of a
+        class.
+
         A module listed here is a module registered in the
         composition, on `mkLib` or by a project.
       '';

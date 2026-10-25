@@ -15,7 +15,8 @@
 # package overlay of nix-topology, and sets `nixosConfigurations` to
 # the NixOS configurations declared inside the topology configuration,
 # evaluated for its system. Those NixOS configurations get the NixOS
-# module of nix-topology by default, through `caisson.forChildren`.
+# module of nix-topology by default, through
+# `caisson.forNearestChildren`.
 #
 # The output is `output`, the rendered diagram. The configuration
 # declared under the name `default` is published as `topology.<system>`,
@@ -122,8 +123,9 @@
                     );
                 # The NixOS configurations declared inside get the NixOS
                 # module of nix-topology, which declares the options
-                # nix-topology reads.
-                caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [
+                # nix-topology reads. A NixOS configuration declared
+                # inside one of them is not read and does not get it.
+                caisson.forNearestChildren.extraDefaultModuleImports.nixos = _lib: [
                   (selection.caissonModule {
                     key = "caisson.topology.nixosModule";
                     file = "caisson-topology:nixosModule";

@@ -2226,6 +2226,226 @@ let
       &&
         hive.toplevel.nas-1.drvPath == top.nixosConfigurations.nas-1.config.system.build.toplevel.drvPath;
 
+    # The nodes of a colmena configuration are the NixOS configurations
+    # with no other NixOS configuration between them and the colmena
+    # configuration. `nas-1`, beneath a structural group and a disk
+    # layout, is a node with colmena's deployment options. `plain` is a
+    # node declared directly. A NixOS configuration declared inside a
+    # node, `image` inside `nas-1` and `guest` inside `plain`, belongs to
+    # that node: it is not a node of the hive, it has no deployment
+    # options, and `image` does not get the file systems of the layout.
+    # The top still publishes all four as NixOS configurations.
+    nixosConfigurationsInsideANodeAreNotNodes =
+      let
+        nested =
+          lib: hostName:
+          lib.caisson.nixos.mkConfiguration {
+            configModule = {
+              imports = [ minimalNixosBase ];
+              networking.hostName = hostName;
+            };
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.structural.configurations.rack = lib.caisson.structural.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule =
+                        { lib, ... }:
+                        {
+                          caisson.caisson-disko.configurations.nas-1 = lib.caisson.caisson-disko.mkConfiguration {
+                            configModule =
+                              { lib, ... }:
+                              {
+                                imports = [ luksLvmLayout ];
+                                caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
+                                  configModule =
+                                    { lib, ... }:
+                                    diskoMachineBase
+                                    // {
+                                      networking.hostName = "nas-1";
+                                      caisson.nixos.configurations.image = nested lib "image";
+                                    };
+                                };
+                              };
+                          };
+                        };
+                    };
+                    caisson.nixos.configurations.plain = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          imports = [ minimalNixosBase ];
+                          networking.hostName = "plain";
+                          caisson.nixos.configurations.guest = nested lib "guest";
+                        };
+                    };
+                  };
+              };
+            };
+        };
+        hive = top.colmenaHive;
+        published = top.nixosConfigurations;
+      in
+      builtins.attrNames hive.nodes == [
+        "nas-1"
+        "plain"
+      ]
+      &&
+        builtins.attrNames published == [
+          "guest"
+          "image"
+          "nas-1"
+          "plain"
+        ]
+      && hive.nodes.nas-1.options ? deployment
+      && hive.deploymentConfig.nas-1.targetHost == "nas-1"
+      && hive.nodes.plain.options ? deployment
+      && !(published.image.options ? deployment)
+      && !(published.guest.options ? deployment)
+      && published.nas-1.config.fileSystems ? "/boot"
+      && !(published.image.config.fileSystems ? "/boot")
+      && published.image.config.fileSystems."/".fsType == "tmpfs";
+
+    # What a level gives through `caisson.forNearestChildren` reaches
+    # the nearest NixOS configurations beneath it, through a structural
+    # group and through a disk layout, and not a NixOS configuration
+    # declared inside one of them. What it gives through
+    # `caisson.forChildren` reaches the NixOS configurations at every
+    # depth. The default account of a nearest configuration records the
+    # addition with the level and the file that gave it and with
+    # `nearest = true`, after the additions for every configuration. The
+    # default account of a configuration beneath records none.
+    forNearestChildrenConnectsOnce =
+      let
+        marker = name: {
+          environment.etc.${name}.text = name;
+        };
+        machine =
+          lib: hostName: base: inner:
+          lib.caisson.nixos.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                imports = [ base ];
+                networking.hostName = hostName;
+              }
+              // (
+                if inner == null then
+                  { }
+                else
+                  {
+                    caisson.nixos.configurations.${inner} = machine lib inner minimalNixosBase null;
+                  }
+              );
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.forNearestChildren.extraDefaultModuleImports.nixos = _lib: [ (marker "nearest") ];
+              caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ (marker "every") ];
+              caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.nixos.configurations.a = machine lib "a" minimalNixosBase "a-inner";
+                  };
+              };
+              caisson.caisson-disko.configurations.layout = lib.caisson.caisson-disko.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [ luksLvmLayout ];
+                    caisson.nixos.configurations.b = machine lib "b" diskoMachineBase "b-inner";
+                  };
+              };
+            };
+        };
+        published = top.nixosConfigurations;
+        has = name: host: published.${host}.config.environment.etc ? ${name};
+        hosts = [
+          "a"
+          "a-inner"
+          "b"
+          "b-inner"
+        ];
+        manifest = top.caisson.manifest;
+        b = manifest.children.caisson-disko.layout.children.system.x86_64-linux.children.nixos.b;
+        bInner = b.children.system.x86_64-linux.children.nixos.b-inner;
+        shapeOf =
+          account:
+          builtins.map (entry: {
+            inherit (entry) level;
+            nearest = entry.nearest or false;
+          }) account.default;
+        topLevel = [ ];
+        layoutLevel = [
+          {
+            type = "caisson-disko";
+            name = "layout";
+          }
+        ];
+      in
+      builtins.attrNames published == hosts
+      &&
+        builtins.map (has "nearest") hosts == [
+          true
+          false
+          true
+          false
+        ]
+      && builtins.all (has "every") hosts
+      # The default entry of caisson, the addition of the top for every
+      # configuration, the addition of the top for the nearest ones, and
+      # the layout entry of caisson-disko, which is an addition for the
+      # nearest ones too.
+      &&
+        shapeOf b.moduleImports == [
+          {
+            level = null;
+            nearest = false;
+          }
+          {
+            level = topLevel;
+            nearest = false;
+          }
+          {
+            level = topLevel;
+            nearest = true;
+          }
+          {
+            level = layoutLevel;
+            nearest = true;
+          }
+        ]
+      &&
+        builtins.elemAt b.moduleImports.default 3 == {
+          key = "modules.nixos.caisson-disko-layout";
+          level = layoutLevel;
+          file = "modules/caisson-disko/default";
+          nearest = true;
+        }
+      &&
+        shapeOf bInner.moduleImports == [
+          {
+            level = null;
+            nearest = false;
+          }
+          {
+            level = topLevel;
+            nearest = false;
+          }
+        ];
+
     # The convention for a machine inside a layout: the layout declares
     # it under the layout's own name, read from
     # `lib.caisson-core.evalManifest.name`, and caisson's default NixOS

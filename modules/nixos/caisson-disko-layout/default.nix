@@ -7,7 +7,7 @@
 # read from the layout through the manifest, at default priority.
 #
 # The default module of the caisson-disko class adds this module to
-# every NixOS configuration declared inside a caisson-disko
+# the nearest NixOS configurations beneath a caisson-disko
 # configuration. A NixOS configuration that passes `moduleImports`
 # selects its modules itself, and then it lists this module itself.
 #
