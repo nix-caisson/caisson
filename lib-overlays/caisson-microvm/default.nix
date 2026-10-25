@@ -170,9 +170,13 @@
               type = lib.types.nullOr lib.types.ints.positive;
               default = null;
               description = ''
-                The number of seconds a guest may run before systemd stops it,
-                set as `RuntimeMaxSec` of its unit `microvm@<guest>.service`.
-                When null, a guest runs until it is stopped.
+                The number of seconds a guest may run before the host stops it.
+                Each start of the guest's unit `microvm@<guest>.service` starts
+                the timer `microvm-runtime-limit-<guest>.timer`, which counts
+                these seconds. When the timer elapses, its service runs
+                `systemctl stop microvm@<guest>.service`. The guest's unit
+                stays stopped, since systemd does not restart a unit that a stop
+                job stopped. When null, a guest runs until it is stopped.
               '';
             };
             slots = lib.mkOption {
