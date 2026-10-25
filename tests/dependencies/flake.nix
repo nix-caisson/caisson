@@ -35,6 +35,8 @@
   inputs.hjem.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nix-darwin.url = "github:nix-darwin/nix-darwin";
   inputs.nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.microvm.url = "github:microvm-nix/microvm.nix";
+  inputs.microvm.inputs.nixpkgs.follows = "nixpkgs";
   # The VMs of other distributions the system-manager VM test boots
   # (tests/system-manager).
   inputs.nix-vm-test.url = "github:numtide/nix-vm-test";
