@@ -20,9 +20,11 @@
 # For each guest, `evaluatedConfig` is caisson's evaluation of the
 # guest, the configuration published as `nixosConfigurations.<guest>`.
 # A guest of a caisson-microvm configuration gets `autostart` and
-# `restartIfChanged` from that configuration, and its unit
-# `microvm@<guest>.service` gets `RuntimeMaxSec` from its
-# `runtimeMaxSec` when that is set. A microvm configuration keeps the
+# `restartIfChanged` from that configuration. When that configuration
+# sets `runtimeMaxSec`, the guest gets the timer
+# `microvm-runtime-limit-<guest>.timer`, which each start of its unit
+# `microvm@<guest>.service` arms. When that many seconds have passed,
+# the timer's service stops the unit. A microvm configuration keeps the
 # default `autostart` of microvm.nix and gets `restartIfChanged`
 # true. These are at `mkDefault` priority, so a host module that sets
 # them replaces them. The host refuses microvm.nix's `config` and
@@ -117,6 +119,9 @@ let
         }) entries
       );
 
+  # The guests that have a runtime limit, by name.
+  limited = lib.filterAttrs (_name: guest: guest.start.runtimeMaxSec != null) guests;
+
   operators = config.caisson.microvm-host.operators;
 
   # The units each operator may start, stop and restart.
@@ -162,10 +167,35 @@ in
       )
     ) guests;
 
-    systemd.services = lib.mapAttrs' (name: guest: {
-      name = "microvm@${name}";
-      value.serviceConfig.RuntimeMaxSec = toString guest.start.runtimeMaxSec;
-    }) (lib.filterAttrs (_name: guest: guest.start.runtimeMaxSec != null) guests);
+    # The runtime limit of a guest. The unit `microvm@<guest>.service`
+    # wants the timer `microvm-runtime-limit-<guest>.timer`, so each
+    # start of the guest's unit starts the timer and arms it afresh. The
+    # timer is bound to the guest's unit, so stopping the guest stops the
+    # timer. When the timer elapses, its service runs a stop job on the
+    # guest's unit. microvm.nix gives that unit `Restart=always`, and
+    # systemd does not restart a unit that a stop job stopped.
+    systemd.services = lib.mkMerge (
+      lib.mapAttrsToList (name: _guest: {
+        "microvm@${name}".wants = [ "microvm-runtime-limit-${name}.timer" ];
+        "microvm-runtime-limit-${name}" = {
+          description = "Stop the microvm guest ${name} at its runtime limit";
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = "${lib.getExe' config.systemd.package "systemctl"} stop microvm@${name}.service";
+          };
+        };
+      }) limited
+    );
+
+    systemd.timers = lib.mapAttrs' (name: guest: {
+      name = "microvm-runtime-limit-${name}";
+      value = {
+        description = "Runtime limit of the microvm guest ${name}";
+        bindsTo = [ "microvm@${name}.service" ];
+        after = [ "microvm@${name}.service" ];
+        timerConfig.OnActiveSec = "${toString guest.start.runtimeMaxSec}s";
+      };
+    }) limited;
 
     assertions =
       builtins.concatMap (name: [

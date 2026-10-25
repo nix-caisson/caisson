@@ -2574,8 +2574,11 @@ let
     # gives the guests its start options, its hypervisor, CPUs, memory
     # and shares, and a guest that sets its memory keeps it. A guest
     # sets its own CID, and a slot has the CID `cidBase + k` and the
-    # shares of its slot directory. The
-    # unit of each guest stops it after `runtimeMaxSec`.
+    # shares of its slot directory. The unit of each guest of the
+    # caisson-microvm configuration wants that guest's timer
+    # `microvm-runtime-limit-<guest>.timer`, which elapses after
+    # `runtimeMaxSec` and whose service stops that guest's unit. The unit
+    # has no `RuntimeMaxSec`. The guest `upstream` has no such timer.
     caissonMicrovmGuestsRunOnTheirHost =
       let
         top = microvmHostTop;
@@ -2642,9 +2645,33 @@ let
       ) (native ++ [ "upstream" ])
       && builtins.all (name: !vms.${name}.autostart && vms.${name}.restartIfChanged) native
       && builtins.all (
-        name: host.systemd.services."microvm@${name}".serviceConfig.RuntimeMaxSec == "3600"
+        name:
+        let
+          unit = host.systemd.services."microvm@${name}";
+          timer = host.systemd.timers."microvm-runtime-limit-${name}";
+          stop = host.systemd.services."microvm-runtime-limit-${name}";
+        in
+        !(unit.serviceConfig ? RuntimeMaxSec)
+        && builtins.elem "microvm-runtime-limit-${name}.timer" unit.wants
+        && timer.bindsTo == [ "microvm@${name}.service" ]
+        && timer.after == [ "microvm@${name}.service" ]
+        && timer.wantedBy == [ ]
+        && timer.timerConfig.OnActiveSec == "3600s"
+        && stop.serviceConfig.Type == "oneshot"
+        && pkgs.lib.hasSuffix "/bin/systemctl stop microvm@${name}.service" stop.serviceConfig.ExecStart
       ) native
       && !(host.systemd.services."microvm@upstream".serviceConfig ? RuntimeMaxSec)
+      && host.systemd.services."microvm@upstream".wants == [ ]
+      &&
+        builtins.attrNames (
+          pkgs.lib.filterAttrs (name: _: pkgs.lib.hasPrefix "microvm-runtime-limit-" name) host.systemd.timers
+        ) == builtins.map (name: "microvm-runtime-limit-${name}") native
+      &&
+        builtins.attrNames (
+          pkgs.lib.filterAttrs (
+            name: _: pkgs.lib.hasPrefix "microvm-runtime-limit-" name
+          ) host.systemd.services
+        ) == builtins.map (name: "microvm-runtime-limit-${name}") native
       &&
         builtins.map (name: (guest name).vsock.cid) native == [
           3
