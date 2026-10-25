@@ -85,24 +85,46 @@ let
   };
 
   # The module registry as a selection reads it: each module wrapped
-  # in a module that imports it, keyed `modules.<class>.<name>@<project>`:
-  # its registry key and the project that registered it. The module
-  # system imports the modules that share a key once, so an entry an
-  # evaluation selects twice is imported once, while entries of the
-  # same name that different projects register, such as the local
-  # entries of the tree and those of caisson's registry, which caisson
-  # reads from its closure, stay apart. The key tells which
-  # registry entry a module of the evaluation is, for its
-  # `declaration` events (`lib.caisson.integrations.declarationEventsOf`).
+  # in two modules, one inside the other, the inner one importing the
+  # module.
+  #
+  # The outer module is keyed `modules.<class>.<name>@<project>`: the
+  # name of the entry in the registry being read and the project that
+  # registered it. A registry names an entry of a listed project
+  # `<project>/<name>`, and the registry of that project names the
+  # same entry `<name>`. The outer key tells which registry entry a
+  # module of the evaluation is, as the registry it was read from
+  # names it, for the `declaration` events of the evaluation and its
+  # selection record (`lib.caisson.integrations.declarationEventsOf`,
+  # `lib.caisson.integrations.selectionAccountOf`).
+  #
+  # The inner module is keyed `registered.modules.<class>.<name>@<project>`,
+  # with the name the entry has in the registry of the project that
+  # registered it. That name is the registry name with the leading
+  # `<project>/` removed, when the manifest records the entry as
+  # contributed by `<project>` (`moduleProjects`). An entry the tree
+  # registers itself keeps its registry name, whatever it holds, and
+  # its project is the name of the tree. So the inner key is the same
+  # whichever registry an evaluation reads the entry from. The entries
+  # of caisson are an example: caisson registers `default`, a tree that
+  # lists caisson reads it as `caisson/default`, and an integration
+  # reads it as `default` from the library of caisson.
+  #
+  # The module system imports the modules that share a key once. An
+  # entry that an evaluation selects twice, from one registry or from
+  # two, is therefore imported once. Entries of the same name that
+  # different projects register stay apart, since their projects
+  # differ.
   keyedModules =
     lib:
     let
       manifest = lib.caisson-core.libManifest or { };
+      local = manifest.name or null;
+      registeredBy = class: name: (manifest.moduleProjects or { }).${class}.${name} or null;
       projectOf =
         class: name:
         let
-          registered = (manifest.moduleProjects or { }).${class}.${name} or null;
-          local = manifest.name or null;
+          registered = registeredBy class name;
         in
         if registered != null then
           registered
@@ -110,22 +132,45 @@ let
           local
         else
           "";
+      nameInProjectOf =
+        class: name:
+        let
+          registered = registeredBy class name;
+          prefix = "${registered}/";
+          length = builtins.stringLength prefix;
+        in
+        if registered != null && builtins.substring 0 length name == prefix then
+          builtins.substring length (builtins.stringLength name - length) name
+        else
+          name;
     in
     builtins.mapAttrs (
       class:
       builtins.mapAttrs (
-        name: module: {
-          key = "modules.${class}.${name}@${projectOf class name}";
-          imports = [ module ];
+        name: module:
+        let
+          project = projectOf class name;
+        in
+        {
+          key = "modules.${class}.${name}@${project}";
+          imports = [
+            {
+              key = "registered.modules.${class}.${nameInProjectOf class name}@${project}";
+              imports = [ module ];
+            }
+          ];
         }
       )
     );
 
   # The configuration registry as an integration reads it: each
   # configuration module wrapped in a module that imports it, keyed
-  # `configs.<class>.<name>@<project>`, the way `keyedModules` keys the
-  # module registry. The configurations of a registry are those of the
-  # tree that registered them. The key names the registry entry in the
+  # `configs.<class>.<name>@<project>`. The configurations of a registry
+  # are those of the tree that registered them: mkLib takes no
+  # configuration from a listed project, so a registry name is the name
+  # in the registering tree, and the project is the name of the tree.
+  # The key is therefore the same in every library that holds the
+  # entry, and one module keys it. The key names the registry entry in the
   # `declaration` events of an evaluation, whether the configuration
   # was taken by its name or a configuration was given the entry as its
   # `configModule`.

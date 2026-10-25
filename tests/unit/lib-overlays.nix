@@ -737,13 +737,17 @@ in
         {
           modules = builtins.attrNames myLib.caisson.modules.nixos;
           # Each module is the module of the manifest's registry, in a
-          # module keyed by its registry key and the project that
-          # registered it, here a composition with no name.
+          # module keyed by the name the project that registered it
+          # gives it and that project, inside a module keyed by its
+          # registry key and that project, here a composition with no
+          # name.
           fromManifest =
             builtins.mapAttrs (
-              _: builtins.mapAttrs (_: module: builtins.head module.imports)
+              _: builtins.mapAttrs (_: module: builtins.head (builtins.head module.imports).imports)
             ) myLib.caisson.modules == myLib.caisson-core.libManifest.modules
-            && myLib.caisson.modules.nixos.local.key == "modules.nixos.local@";
+            && myLib.caisson.modules.nixos.local.key == "modules.nixos.local@"
+            &&
+              (builtins.head myLib.caisson.modules.nixos.local.imports).key == "registered.modules.nixos.local@";
           libOverlays =
             builtins.attrNames myLib.caisson.libOverlays
             == builtins.attrNames myLib.caisson-core.libManifest.libOverlays;
@@ -754,6 +758,63 @@ in
         libOverlays = true;
       };
     };
+
+    # A project `counter-project` registers `counter`, a module given
+    # as a value, with no key of its own. A tree that lists the
+    # project reads the entry as `counter-project/counter`, and the
+    # library of the project reads it as `counter`. An evaluation that
+    # selects the entry from both registries imports the module once,
+    # so the list it appends to has one element. The registry keys of
+    # the two reads stay as each registry names the entry.
+    "test: an entry read from the registry of a tree and from the library of its project is imported once" =
+      {
+        expr =
+          let
+            counter =
+              { lib, ... }:
+              {
+                options.counted = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                };
+                config.counted = [ "counter" ];
+              };
+            projectLib = caisson.mkLib {
+              sources = mockSources;
+              name = "counter-project";
+              modules = _lib: { generic.counter = counter; };
+            };
+            treeLib = caisson.mkLib {
+              sources = mockSources;
+              name = "tree";
+              projects.counter-project = {
+                modules.generic.counter = counter;
+              };
+            };
+            fromTree = treeLib.caisson.modules.generic."counter-project/counter";
+            fromProject = projectLib.caisson.modules.generic.counter;
+          in
+          {
+            counted =
+              (lib.evalModules {
+                modules = [
+                  fromTree
+                  fromProject
+                ];
+              }).config.counted;
+            keys = [
+              fromTree.key
+              fromProject.key
+            ];
+          };
+        expected = {
+          counted = [ "counter" ];
+          keys = [
+            "modules.generic.counter-project/counter@counter-project"
+            "modules.generic.counter@counter-project"
+          ];
+        };
+      };
 
     # Each integration of caisson has the module that declares its
     # configurations option, and an evaluation holds configurations of
@@ -1286,8 +1347,9 @@ in
         in
         {
           inherit (myLib) libOverlays extraLibOverlayImports;
-          # The registered module is inside the module that keys it.
-          modules = (builtins.head myLib.caisson.modules.generic.probe.imports).config.modules;
+          # The registered module is inside the two modules that key it.
+          modules =
+            (builtins.head (builtins.head myLib.caisson.modules.generic.probe.imports).imports).config.modules;
           composed =
             builtins.attrNames myLib.caisson.libOverlays
             == builtins.attrNames myLib.caisson-core.libManifest.libOverlays

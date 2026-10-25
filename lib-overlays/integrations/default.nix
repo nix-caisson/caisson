@@ -351,8 +351,12 @@
       # as the single event of its `ecosystemUnit`. A module selected
       # from the registry carries its registry key in its module key
       # (`lib.caisson.modules`): the event is keyed by the registry key,
-      # and its origin is the project that registered the module and
-      # the file of the module, where the module has a file. A
+      # with the name the registry it was read from gives the entry, and
+      # its origin is the project that registered the module and the
+      # file of the module, where the module has a file. An entry of a
+      # listed project read from the registry of the tree is therefore
+      # `modules.<class>.<project>/<name>`, and the same entry read from
+      # the library of that project is `modules.<class>.<name>`. A
       # configuration module taken from the registry of configurations
       # is keyed `configs.<class>.<name>` (`configModuleOf`): the event
       # carries that key, and its origin is the project of the lib and
