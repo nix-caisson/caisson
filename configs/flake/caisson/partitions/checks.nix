@@ -244,15 +244,6 @@
                     caisson = self;
                   };
                 };
-                # A cloud-hypervisor guest on nested KVM whose operator
-                # connects to its hybrid vsock through the socket its
-                # slot records, and whose socket no other user reaches
-                # (tests/microvm-vsock-vm).
-                microvm-vsock-vm = import (self.outPath + "/tests/microvm-vsock-vm") {
-                  inputs = inputs // {
-                    caisson = self;
-                  };
-                };
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the
@@ -348,6 +339,20 @@
             }) distros
           );
 
+        # A cloud-hypervisor guest whose operator connects to its hybrid
+        # vsock through the socket its slot records, and whose socket no
+        # other user reaches (tests/microvm-vsock-vm). The guest runs
+        # inside the test VM, so it needs nested KVM. On a CI runner,
+        # which is itself a VM, the guest is three levels deep and does
+        # not finish booting within the start timeout, so the test is
+        # not a check; it is built by name on a machine with KVM.
+        flake.nestedVmTests.x86_64-linux.microvm-vsock-vm =
+          import (self.outPath + "/tests/microvm-vsock-vm")
+            {
+              inputs = inputs // {
+                caisson = self;
+              };
+            };
         # The same machine and sequences in a VM of each distribution
         # below, booted from the cloud image of the distribution with
         # its kernel and its systemd, as

@@ -19,6 +19,7 @@
 
   partitionedAttrs.checks = "checks";
   partitionedAttrs.containerTests = "checks";
+  partitionedAttrs.nestedVmTests = "checks";
 
   debug = false;
 
