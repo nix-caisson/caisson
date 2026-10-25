@@ -467,7 +467,11 @@
       #   registry named `default`, with a null `level` and `file`,
       #   then what each level above added
       #   (`caisson.forChildren.extraDefaultModuleImports`), with the
-      #   name path of the level and the file that defines it;
+      #   name path of the level and the file that defines it, then
+      #   what each level above added for the nearest configurations of
+      #   the class where this configuration is one of them
+      #   (`caisson.forNearestChildren.extraDefaultModuleImports`), with
+      #   its level and file and `nearest = true`;
       # - `selected`: the registry keys of the modules selected, null
       #   for a module that is not from the registry.
       selectionAccountOf =
@@ -506,10 +510,14 @@
             }) (select "default" registry)
             ++ builtins.concatMap (
               entry:
-              builtins.map (module: {
-                key = registryKeyOf module;
-                inherit (entry) level file;
-              }) (entry.select lib)
+              builtins.map (
+                module:
+                {
+                  key = registryKeyOf module;
+                  inherit (entry) level file;
+                }
+                // (if entry.nearest or false then { nearest = true; } else { })
+              ) (entry.select lib)
             ) (manifest.defaultModuleImports.${class} or [ ]);
           selected = builtins.map registryKeyOf (
             moduleImportsOf class { inherit lib manifest; } args registry
@@ -521,7 +529,10 @@
       # registry: what `moduleImports` selects, and with none
       # given the default of the class, every entry named `default`
       # followed by what the levels above the evaluation added for the
-      # class (`caisson.forChildren.extraDefaultModuleImports`), each
+      # class (`caisson.forChildren.extraDefaultModuleImports`), then
+      # what they added for the nearest configurations of the class
+      # where this evaluation is one of them
+      # (`caisson.forNearestChildren.extraDefaultModuleImports`), each
       # applied to the lib of the evaluation.
       #
       # `extraModuleImports` of the configuration is appended to
@@ -652,6 +663,30 @@
         else
           selectionLevelAbove parent;
 
+      # The additions to the default selections that a container of
+      # options gives, `caisson.forChildren` or
+      # `caisson.forNearestChildren`, as caisson-core takes them: by
+      # class, a list holding the selection with the file that defines
+      # it for its class, the last definition where several modules
+      # define the class. `containerOptions` are the options of the
+      # container and `containerConfig` its values.
+      additionsOf =
+        containerOptions: containerConfig:
+        builtins.mapAttrs (
+          class: selection:
+          let
+            defining = builtins.filter (definition: definition.value ? ${class}) (
+              containerOptions.extraDefaultModuleImports.definitionsWithLocations
+            );
+          in
+          [
+            {
+              select = selection;
+              file = if defining == [ ] then null else inSource (final.last defining).file;
+            }
+          ]
+        ) containerConfig.extraDefaultModuleImports;
+
       # The names of the namespaces of the lib an evaluation runs on, as
       # its manifest records them under `namespaces`: for each entry of
       # `lib.caisson`, the names of its attributes where it is an
@@ -739,6 +774,10 @@
       # which the manifest records how the evaluation selected its
       # modules as `moduleImports` (`selectionAccountOf`). Null for a
       # configuration whose modules are not selected from a class.
+      #
+      # What the modules give the configurations beneath is read from
+      # `caisson.forChildren` and `caisson.forNearestChildren`
+      # (`additionsOf`).
       mkModuleConfiguration =
         args@{
           type,
@@ -751,6 +790,9 @@
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
+          # The class of the evaluation, where the additions for the
+          # nearest children of that class connect.
+          class = if selection == null then null else selection.class;
           recordFromEvaluation = [
             "ecosystems"
             "namespaces"
@@ -785,25 +827,14 @@
               # What the modules give the configurations beneath
               # (`caisson.forChildren`).
               forChildren = {
-                # Each addition with the file that defines it for its
-                # class, the last definition where several modules
-                # define the class.
-                extraDefaultModuleImports = builtins.mapAttrs (
-                  class: selection:
-                  let
-                    defining = builtins.filter (definition: definition.value ? ${class}) (
-                      options.caisson.forChildren.extraDefaultModuleImports.definitionsWithLocations
-                    );
-                  in
-                  [
-                    {
-                      select = selection;
-                      file = if defining == [ ] then null else inSource (final.last defining).file;
-                    }
-                  ]
-                ) config.caisson.forChildren.extraDefaultModuleImports;
+                extraDefaultModuleImports = additionsOf options.caisson.forChildren config.caisson.forChildren;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
                 systems = config.caisson.forChildren.systems;
+              };
+              # What the modules give the nearest configurations of a
+              # class beneath (`caisson.forNearestChildren`).
+              forNearestChildren = {
+                extraDefaultModuleImports = additionsOf options.caisson.forNearestChildren config.caisson.forNearestChildren;
               };
               # What the evaluator received, as `declaration` events:
               # the integration's `evaluate` returns `modules`, the list
@@ -1139,6 +1170,22 @@
         filterAttrs (_: declared: declared != { }) (
           genAttrs (integrationsDeclaringIn options) (name: config.caisson.${name}.configurations)
         );
+
+      # True when `entry`, an entry of `caisson.exports.configurations`
+      # of a configuration, belongs to that configuration as a reader of
+      # the configurations of the integration `type`: no configuration
+      # of `type` sits between the two, so the nearest configuration
+      # above the entry that a reader of `type` stops at is that
+      # configuration. The path of the entry runs from beneath that
+      # configuration down to the entry, so the entry belongs to it
+      # when no segment of the path before the last is of `type`.
+      # Segments of other integrations and systems do not count. A
+      # colmena configuration builds its nodes from the NixOS
+      # configurations that belong to it in this sense:
+      # `belongsHere "nixos"` keeps a machine beneath a disk layout or a
+      # structural group and leaves out a NixOS configuration declared
+      # inside a node.
+      belongsHere = type: entry: !(builtins.any (segment: segment.type == type) (init entry.path));
 
       # The nearest configuration above `manifest` whose integration is
       # one of `types`, null when there is none. The manifest records
@@ -1868,6 +1915,7 @@
             integrationsIn
             integrationsDeclaringIn
             nearestOf
+            belongsHere
             recordOf
             activatingAncestorOf
             machineActivation

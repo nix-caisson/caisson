@@ -133,12 +133,21 @@
 
       # The nodes, by the name each is published under: the NixOS
       # configurations among the entries the colmena configuration
-      # passes up. A node is refused when it has more than one
-      # evaluation, when colmena could not select it, and when it does
-      # not declare the `deployment` options colmena reads.
+      # passes up that belong to it (`integrations.belongsHere`), those
+      # with no NixOS configuration between them and the colmena
+      # configuration. A machine beneath a disk layout or a structural
+      # group is a node. A NixOS configuration declared inside a node,
+      # such as an image, belongs to the node and is not one. A node is
+      # refused when it has more than one evaluation, when colmena could
+      # not select it, and when it does not declare the `deployment`
+      # options colmena reads.
       nodesOf =
-        entries:
+        allEntries:
         let
+          entries = builtins.filter (
+            entry:
+            entry.attrset == "nixosConfigurations" && final.caisson.integrations.belongsHere "nixos" entry
+          ) allEntries;
           repeated = evaluatedMoreThanOnce entries;
           published = (final.caisson.integrations.publish entries).nixosConfigurations or { };
           bad = builtins.filter unaddressable (builtins.attrNames published);

@@ -885,6 +885,44 @@ in
         other = null;
       };
     };
+
+    # An entry belongs to the configuration that passes it up, as a
+    # reader of the configurations of an integration, when no
+    # configuration of that integration sits between the two on the
+    # path of the entry. Systems and the configurations of other
+    # integrations on the path do not count. The last segment is the
+    # entry itself.
+    "test: belongsHere passes over other integrations and stops at its own" = {
+      expr =
+        let
+          segment = type: name: { inherit type name; };
+          entry = path: { inherit path; };
+          belongs = lib.caisson.integrations.belongsHere "nixos";
+        in
+        {
+          direct = belongs (entry [
+            (segment "system" "x86_64-linux")
+            (segment "nixos" "node")
+          ]);
+          beneathALayout = belongs (entry [
+            (segment "structural" "rack")
+            (segment "caisson-disko" "nas-1")
+            (segment "system" "x86_64-linux")
+            (segment "nixos" "nas-1")
+          ]);
+          insideANode = belongs (entry [
+            (segment "system" "x86_64-linux")
+            (segment "nixos" "node")
+            (segment "system" "x86_64-linux")
+            (segment "nixos" "image")
+          ]);
+        };
+      expected = {
+        direct = true;
+        beneathALayout = true;
+        insideANode = false;
+      };
+    };
   };
 
   mkLib = {

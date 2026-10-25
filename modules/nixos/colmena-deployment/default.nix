@@ -6,8 +6,9 @@
 # It also imports colmena's modules that act on those settings: the
 # assertions on them and the services that install the keys.
 #
-# The default module of the colmena class adds this module to every
-# NixOS configuration declared inside a colmena configuration. A NixOS
+# The default module of the colmena class adds this module to the
+# nearest NixOS configurations beneath a colmena configuration, its
+# nodes. A NixOS
 # configuration that is also deployed some other way, and sets these
 # options, imports this module itself.
 #
