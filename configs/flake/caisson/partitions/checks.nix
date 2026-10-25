@@ -244,6 +244,15 @@
                     caisson = self;
                   };
                 };
+                # A cloud-hypervisor guest on nested KVM whose operator
+                # connects to its hybrid vsock through the socket its
+                # slot records, and whose socket no other user reaches
+                # (tests/microvm-vsock-vm).
+                microvm-vsock-vm = import (self.outPath + "/tests/microvm-vsock-vm") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the
