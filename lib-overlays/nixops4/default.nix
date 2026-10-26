@@ -140,6 +140,8 @@
                 };
               }) config.members;
               ofKind = kind: lib.filterAttrs (name: _: kinds.${name} == kind) config.members;
+              # The state resources are the root's to list.
+              memberCtx = builtins.removeAttrs ctx [ "stateResources" ];
             in
             {
               options.members = lib.mkOption {
@@ -154,10 +156,10 @@
               # evaluation.
               config.caisson.forDirectChildren.unsafeCrossChildReferences.${upstreamClass} = true;
               config.caisson.caisson-nixops4-composite.configurations = builtins.mapAttrs (
-                _: module: compositeOf ctx [ module ]
+                _: module: compositeOf memberCtx [ module ]
               ) (ofKind "caisson-nixops4-composite");
               config.caisson.caisson-nixops4-resource.configurations = builtins.mapAttrs (
-                _: module: resourceOf ctx [ module ]
+                _: module: resourceOf memberCtx [ module ]
               ) (ofKind "caisson-nixops4-resource");
             };
         };
@@ -190,6 +192,7 @@
         configModule = modulesModule modules;
         inherit (ctx) ecosystemSrc;
         specialArgs = ctx.specialArgs;
+        stateResources = ctx.stateResources or [ ];
       };
 
       # An upstream composite: NixOps4's class and options, `members`
@@ -240,6 +243,7 @@
             }
             // (if (args.specialArgs or null) != null then args.specialArgs else { });
             cacheableOutputs = args.cacheableOutputs or { };
+            stateResources = args.stateResources or [ ];
           };
           rootModule = selection.caissonModule {
             key = "caisson.nixops4.root";
@@ -307,6 +311,11 @@
             # NixOps4 marks no output as secret, so none is cacheable
             # unless listed.
             cacheableOutputs ? { },
+            # The member paths of the resources that hold the state of
+            # the deployment, as `nixops4 state dump` takes them, such
+            # as `default.state`. A tool reads the outputs NixOps4
+            # recorded from them.
+            stateResources ? [ ],
             # The package set the deployment runs on: a function that
             # receives the package sets available, by package config
             # name, and returns the set to run on.
@@ -328,6 +337,7 @@
             modules ? [ ],
             specialArgs ? null,
             cacheableOutputs ? { },
+            stateResources ? [ ],
             defaultPkgs ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
