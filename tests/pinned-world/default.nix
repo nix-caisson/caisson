@@ -394,14 +394,35 @@ let
     };
   };
 
+  # A guest in caisson's form that sets its own `microvm.*` options: it
+  # runs on cloud-hypervisor with two virtual CPUs, 768 megabytes, the
+  # vsock CID 3 and the store of its host over virtiofs.
+  cloudHypervisorGuest = {
+    imports = [ microvmGuestBase ];
+    microvm = {
+      hypervisor = "cloud-hypervisor";
+      vcpu = 2;
+      mem = 768;
+      vsock.cid = 3;
+      shares = [
+        {
+          tag = "ro-store";
+          source = "/nix/store";
+          mountPoint = "/nix/.ro-store";
+          proto = "virtiofs";
+        }
+      ];
+    };
+  };
+
   # A NixOS host named `host` that selects caisson's `microvm-host`
-  # module, inside the structural top of `registeredLib`, whose
-  # registry holds the NixOS configurations `microvm-slot` and
-  # `microvm-reset` the slots take. The host holds the caisson-microvm configuration `pool`, with
-  # the guests `a` and `b` and a pool of two slots of the kind
-  # `microvm-slot`, one slot of the kind `microvm-reset` that selects
-  # its modules itself, and the microvm configuration `upstream`. The
-  # user `probe` may control `a` and `microvm-slot-2`.
+  # module, inside the structural top of `registeredLib`. The host holds
+  # the caisson-microvm configuration `pool` and the microvm
+  # configuration `upstream`. `pool` starts its guests at boot and
+  # leaves a running guest whose configuration changed as it is. Its
+  # guest `a` sets its own `microvm.*` options. Its guest `b` sets none
+  # of them. Its guest `c` selects its modules itself, caisson's
+  # `microvm-guest` NixOS module alone.
   microvmHostTop = registeredLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
@@ -413,85 +434,26 @@ let
             { lib, ... }:
             {
               imports = [ minimalNixosBase ];
-              users.users.probe.isNormalUser = true;
-              caisson.microvm-host.operators.probe = [
-                "a"
-                "microvm-slot-2"
-              ];
               caisson.caisson-microvm.configurations.pool = lib.caisson.caisson-microvm.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
-                    hypervisor = "cloud-hypervisor";
-                    vcpu = 2;
-                    mem = 768;
-                    runtimeMaxSec = 3600;
-                    shares = [
-                      {
-                        tag = "ro-store";
-                        source = "/nix/store";
-                        mountPoint = "/nix/.ro-store";
-                        proto = "virtiofs";
-                      }
-                    ];
-                    slots.microvm-slot = {
-                      count = 2;
-                      cidBase = 100;
-                      shareRoot = "/var/lib/probe";
-                    };
-                    slots.microvm-reset = {
-                      count = 1;
-                      cidBase = 200;
-                      moduleImports = modules: [ modules."caisson/microvm-guest" ];
-                    };
+                    autostart = true;
+                    restartIfChanged = false;
                     caisson.nixos.configurations.a = lib.caisson.nixos.mkConfiguration {
-                      configModule = {
-                        imports = [ microvmGuestBase ];
-                        microvm.vsock.cid = 3;
-                      };
+                      configModule = cloudHypervisorGuest;
                     };
                     caisson.nixos.configurations.b = lib.caisson.nixos.mkConfiguration {
-                      configModule = {
-                        imports = [ microvmGuestBase ];
-                        microvm.vsock.cid = 4;
-                        microvm.mem = 1024;
-                      };
+                      configModule = microvmGuestBase;
+                    };
+                    caisson.nixos.configurations.c = lib.caisson.nixos.mkConfiguration {
+                      moduleImports = modules: [ modules."caisson/microvm-guest" ];
+                      configModule = microvmGuestBase;
                     };
                   };
               };
               caisson.microvm.configurations.upstream = lib.caisson.microvm.mkConfiguration {
                 configModule = upstreamMicrovmGuest;
-              };
-            };
-        };
-      };
-  };
-
-  # A NixOS host named `host` like the host of `microvmHostTop`, whose
-  # caisson-microvm configuration `pool` runs its guests on qemu: one
-  # slot of the kind `microvm-slot`, with the vsock CID 301. The user
-  # `probe` may control `microvm-slot-1`.
-  qemuMicrovmHostTop = registeredLib.caisson.structural.mkTopConfiguration {
-    moduleImports = _modules: [ ];
-    configModule =
-      { lib, ... }:
-      {
-        caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
-          extraModuleImports = modules: [ modules."caisson/microvm-host" ];
-          configModule =
-            { lib, ... }:
-            {
-              imports = [ minimalNixosBase ];
-              users.users.probe.isNormalUser = true;
-              caisson.microvm-host.operators.probe = [ "microvm-slot-1" ];
-              caisson.caisson-microvm.configurations.pool = lib.caisson.caisson-microvm.mkConfiguration {
-                configModule = {
-                  hypervisor = "qemu";
-                  slots.microvm-slot = {
-                    count = 1;
-                    cidBase = 300;
-                  };
-                };
               };
             };
         };
@@ -1078,14 +1040,13 @@ let
             "system x86_64-linux / nixos probe-machine: inline/4"
             "system x86_64-linux / nixos probe-machine / system x86_64-linux / hjem probe: inline/7"
           ];
-          # The slots take their registered configuration, so only the
-          # guests `a` and `b` given a module as a value record one.
           microvm = [
             "top: inline/2"
             "system x86_64-linux / nixos host: inline/5"
-            "system x86_64-linux / nixos host / caisson-microvm pool: inline/5"
+            "system x86_64-linux / nixos host / caisson-microvm pool: inline/4"
             "system x86_64-linux / nixos host / caisson-microvm pool / system x86_64-linux / nixos a: inline/5"
             "system x86_64-linux / nixos host / caisson-microvm pool / system x86_64-linux / nixos b: inline/5"
+            "system x86_64-linux / nixos host / caisson-microvm pool / system x86_64-linux / nixos c: inline/4"
             "system x86_64-linux / nixos host / system x86_64-linux / microvm upstream: inline/4"
           ];
         };
@@ -2596,76 +2557,29 @@ let
         ];
 
     # A host that selects caisson's `microvm-host` NixOS module runs
-    # the guests of its caisson-microvm configuration: the guests
-    # declared there, `a` and `b`, and the slots, `microvm-slot-1`,
-    # `microvm-slot-2` and `microvm-reset-1`. Each is a
+    # the guests of its caisson-microvm configuration, `a`, `b` and
+    # `c`, and its microvm configuration `upstream`. Each is a
     # `microvm.vms.<guest>` whose `evaluatedConfig` is caisson's
     # evaluation of the guest, the configuration the top publishes as
-    # `nixosConfigurations.<guest>`. The caisson-microvm configuration
-    # gives the guests its start options, its hypervisor, CPUs, memory
-    # and shares, and a guest that sets its memory keeps it. A guest
-    # sets its own CID, and a slot has the CID `cidBase + k` and the
-    # shares of its slot directory. The unit of each guest of the
-    # caisson-microvm configuration wants that guest's timer
-    # `microvm-runtime-limit-<guest>.timer`, which elapses after
-    # `runtimeMaxSec` and whose service stops that guest's unit. The unit
-    # has no `RuntimeMaxSec`. The guest `upstream` has no such timer.
+    # `nixosConfigurations.<guest>`. Each guest of `pool` gets the
+    # `autostart` and `restartIfChanged` of `pool` as
+    # `microvm.vms.<guest>.autostart` and
+    # `microvm.vms.<guest>.restartIfChanged`.
     caissonMicrovmGuestsRunOnTheirHost =
       let
         top = microvmHostTop;
-        host = top.nixosConfigurations.host.config;
-        vms = host.microvm.vms;
+        vms = top.nixosConfigurations.host.config.microvm.vms;
         native = [
           "a"
           "b"
-          "microvm-reset-1"
-          "microvm-slot-1"
-          "microvm-slot-2"
-        ];
-        guest = name: vms.${name}.evaluatedConfig.config.microvm;
-        sharesOf =
-          name:
-          builtins.map (share: {
-            inherit (share)
-              tag
-              source
-              mountPoint
-              readOnly
-              proto
-              ;
-          }) (guest name).shares;
-        roStore = {
-          tag = "ro-store";
-          source = "/nix/store";
-          mountPoint = "/nix/.ro-store";
-          readOnly = false;
-          proto = "virtiofs";
-        };
-        slotShares = slot: [
-          roStore
-          {
-            tag = "work-in";
-            source = "/var/lib/probe/${slot}/in";
-            mountPoint = "/work/in";
-            readOnly = true;
-            proto = "virtiofs";
-          }
-          {
-            tag = "work-out";
-            source = "/var/lib/probe/${slot}/out";
-            mountPoint = "/work/out";
-            readOnly = false;
-            proto = "virtiofs";
-          }
+          "c"
         ];
       in
       builtins.attrNames top.nixosConfigurations == [
         "a"
         "b"
+        "c"
         "host"
-        "microvm-reset-1"
-        "microvm-slot-1"
-        "microvm-slot-2"
         "upstream"
       ]
       && builtins.attrNames vms == native ++ [ "upstream" ]
@@ -2674,53 +2588,40 @@ let
         vms.${name}.evaluatedConfig.config.system.build.toplevel.drvPath
         == top.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
       ) (native ++ [ "upstream" ])
-      && builtins.all (name: !vms.${name}.autostart && vms.${name}.restartIfChanged) native
-      && builtins.all (
-        name:
-        let
-          unit = host.systemd.services."microvm@${name}";
-          timer = host.systemd.timers."microvm-runtime-limit-${name}";
-          stop = host.systemd.services."microvm-runtime-limit-${name}";
-        in
-        !(unit.serviceConfig ? RuntimeMaxSec)
-        && builtins.elem "microvm-runtime-limit-${name}.timer" unit.wants
-        && timer.bindsTo == [ "microvm@${name}.service" ]
-        && timer.after == [ "microvm@${name}.service" ]
-        && timer.wantedBy == [ ]
-        && timer.timerConfig.OnActiveSec == "3600s"
-        && stop.serviceConfig.Type == "oneshot"
-        && pkgs.lib.hasSuffix "/bin/systemctl stop microvm@${name}.service" stop.serviceConfig.ExecStart
-      ) native
-      && !(host.systemd.services."microvm@upstream".serviceConfig ? RuntimeMaxSec)
-      && host.systemd.services."microvm@upstream".wants == [ ]
+      && builtins.all (name: vms.${name}.autostart && !vms.${name}.restartIfChanged) native;
+
+    # microvm.nix reads the `microvm.*` options of a guest of a
+    # caisson-microvm configuration from the evaluation of the guest,
+    # and the guest sets them in its own modules. The guest `a` sets
+    # its hypervisor, CPUs, memory, vsock CID and shares, and its
+    # `evaluatedConfig` on the host has exactly those. The guest `b`
+    # sets none of them, and its `evaluatedConfig` has the defaults that
+    # microvm.nix declares. The runner microvm.nix builds for `a` runs
+    # cloud-hypervisor.
+    caissonMicrovmGuestsSetTheirOwnMicrovmOptions =
+      let
+        vms = microvmHostTop.nixosConfigurations.host.config.microvm.vms;
+        a = vms.a.evaluatedConfig.config.microvm;
+        b = vms.b.evaluatedConfig;
+        defaultOf = name: b.options.microvm.${name}.default;
+      in
+      a.hypervisor == "cloud-hypervisor"
+      && a.vcpu == 2
+      && a.mem == 768
+      && a.vsock.cid == 3
       &&
-        builtins.attrNames (
-          pkgs.lib.filterAttrs (name: _: pkgs.lib.hasPrefix "microvm-runtime-limit-" name) host.systemd.timers
-        ) == builtins.map (name: "microvm-runtime-limit-${name}") native
-      &&
-        builtins.attrNames (
-          pkgs.lib.filterAttrs (
-            name: _: pkgs.lib.hasPrefix "microvm-runtime-limit-" name
-          ) host.systemd.services
-        ) == builtins.map (name: "microvm-runtime-limit-${name}") native
-      &&
-        builtins.map (name: (guest name).vsock.cid) native == [
-          3
-          4
-          201
-          101
-          102
+        builtins.map (share: { inherit (share) tag proto; }) a.shares == [
+          {
+            tag = "ro-store";
+            proto = "virtiofs";
+          }
         ]
-      &&
-        builtins.map (name: { inherit (guest name) hypervisor vcpu mem; }) native == builtins.map (name: {
-          hypervisor = "cloud-hypervisor";
-          vcpu = 2;
-          mem = if name == "b" then 1024 else 768;
-        }) native
-      && sharesOf "a" == [ roStore ]
-      && sharesOf "microvm-reset-1" == [ roStore ]
-      && sharesOf "microvm-slot-1" == slotShares "microvm-slot-1"
-      && sharesOf "microvm-slot-2" == slotShares "microvm-slot-2";
+      && a.declaredRunner.name == "microvm-cloud-hypervisor-a"
+      && b.config.microvm.hypervisor == defaultOf "hypervisor"
+      && b.config.microvm.vcpu == defaultOf "vcpu"
+      && b.config.microvm.mem == defaultOf "mem"
+      && b.config.microvm.vsock.cid == null
+      && b.config.microvm.shares == [ ];
 
     # A microvm configuration declared inside a host is the guest
     # itself: the host's `microvm.vms.upstream` has the evaluation of
@@ -2756,134 +2657,50 @@ let
           }
         ];
 
-    # The polkit rule of a host lets each user its
-    # `caisson.microvm-host.operators` names start, stop and restart
-    # the units of the guests listed for that user and no other unit.
-    # A name that no guest of the host is declared as is refused.
-    microvmOperatorsGetExactlyTheirUnits =
+    # The host refuses microvm.nix's `config` and `flake` forms for the
+    # name of a guest declared inside it: the assertion for `a` fails
+    # when the host sets `microvm.vms.a.flake`, and every assertion
+    # holds when it does not. The flake given holds the guest under
+    # `nixosConfigurations.a`, as microvm.nix's flake form reads it.
+    microvmHostRefusesASecondEvaluation =
       let
-        text = microvmHostTop.nixosConfigurations.host.config.security.polkit.extraConfig;
-        units = builtins.filter builtins.isList (builtins.split "microvm@[a-z0-9-]*\\.service" text);
-        refused = microvmHostTop.nixosConfigurations.host.extendModules {
-          modules = [ { caisson.microvm-host.operators.probe = [ "missing" ]; } ];
+        host = microvmHostTop.nixosConfigurations.host;
+        refused = host.extendModules {
+          modules = [
+            {
+              microvm.vms.a.flake = {
+                outPath = "/var/empty";
+                nixosConfigurations.a = host.config.microvm.vms.a.evaluatedConfig;
+              };
+            }
+          ];
         };
+        failing = configuration: builtins.filter (check: !check.assertion) configuration.config.assertions;
       in
-      pkgs.lib.hasInfix ''var units = {"probe":["microvm@a.service","microvm@microvm-slot-2.service"]};'' text
-      && builtins.length units == 2
-      && (builtins.tryEval microvmHostTop.nixosConfigurations.host.config.system.build.toplevel.drvPath)
-        .success
-      && !(builtins.tryEval refused.config.system.build.toplevel.drvPath).success;
-
-    # The operators of a guest on cloud-hypervisor that has a vsock CID
-    # may connect to the socket of its hybrid vsock. Of the guests of
-    # `microvmHostTop`, all on cloud-hypervisor with a CID except
-    # `upstream`, the user `probe` operates `a` and `microvm-slot-2`.
-    # Each of those two has the group `microvm-<guest>` with `probe` as
-    # its only member. Its working directory belongs to that group with
-    # the mode 0750, and its unit `microvm@<guest>.service` removes a
-    # socket a previous run left before it starts and gives the socket
-    # of this run to the group after it starts. The guests no user
-    # operates keep the directory that microvm.nix creates and get no
-    # such step. The slots of `pool` record their socket as
-    # `vsockSocket`.
-    microvmOperatorsReachTheirGuestsVsock =
-      let
-        host = microvmHostTop.nixosConfigurations.host.config;
-        pool =
-          microvmHostTop.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-microvm.pool;
-        socket = name: "/var/lib/microvms/${name}/notify.vsock";
-        directory = name: {
-          inherit (host.systemd.tmpfiles.settings."10-microvm"."/var/lib/microvms/${name}".d) user group mode;
-        };
-        unit = name: host.systemd.services."microvm@${name}".serviceConfig;
-        reached = [
-          "a"
-          "microvm-slot-2"
-        ];
-        unreached = [
-          "b"
-          "microvm-reset-1"
-          "microvm-slot-1"
-          "upstream"
-        ];
-      in
-      builtins.mapAttrs (_name: group: group.members) (
-        pkgs.lib.filterAttrs (name: _group: pkgs.lib.hasPrefix "microvm-" name) host.users.groups
-      ) == {
-        microvm-a = [ "probe" ];
-        microvm-microvm-slot-2 = [ "probe" ];
-      }
-      && builtins.all (
-        name:
-        directory name == {
-          user = "microvm";
-          group = "microvm-${name}";
-          mode = "0750";
-        }
-        && builtins.length (unit name).ExecStartPre == 1
-        && pkgs.lib.hasPrefix "+/nix/store/" (builtins.head (unit name).ExecStartPre)
-        && pkgs.lib.hasSuffix "/bin/rm -f ${socket name}" (builtins.head (unit name).ExecStartPre)
-        && builtins.length (unit name).ExecStartPost == 1
-        && pkgs.lib.hasPrefix "+/nix/store/" (builtins.head (unit name).ExecStartPost)
-        && pkgs.lib.hasSuffix "-microvm-vsock-access-${name}" (builtins.head (unit name).ExecStartPost)
-      ) reached
-      && builtins.all (
-        name:
-        directory name == {
-          user = "microvm";
-          group = "kvm";
-          mode = "0775";
-        }
-        && !((unit name) ? ExecStartPre)
-        && !((unit name) ? ExecStartPost)
-      ) unreached
+      failing host == [ ]
       &&
-        builtins.mapAttrs (_name: slot: slot.vsockSocket) pool.outputs.slots == {
-          microvm-reset-1 = socket "microvm-reset-1";
-          microvm-slot-1 = socket "microvm-slot-1";
-          microvm-slot-2 = socket "microvm-slot-2";
-        };
+        builtins.map (check: pkgs.lib.hasInfix "`microvm.vms.a.flake`" check.message) (failing refused) == [
+          true
+        ];
 
-    # A guest on qemu has the vsock of the kernel and no socket. The
-    # guest `microvm-slot-1` of `qemuMicrovmHostTop` has a CID and an
-    # operator, and the host gives it no group, keeps the directory that
-    # microvm.nix creates and adds no step to its unit. Its slot records
-    # a `vsockSocket` of null.
-    microvmQemuGuestsGetNoVsockSocket =
-      let
-        host = qemuMicrovmHostTop.nixosConfigurations.host.config;
-        pool =
-          qemuMicrovmHostTop.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-microvm.pool;
-        unit = host.systemd.services."microvm@microvm-slot-1".serviceConfig;
-        directory = host.systemd.tmpfiles.settings."10-microvm"."/var/lib/microvms/microvm-slot-1".d;
-      in
-      host.microvm.vms.microvm-slot-1.evaluatedConfig.config.microvm.vsock.cid == 301
-      && host.microvm.vms.microvm-slot-1.evaluatedConfig.config.microvm.hypervisor == "qemu"
-      && !(builtins.any (pkgs.lib.hasPrefix "microvm-") (builtins.attrNames host.users.groups))
-      && directory.group == "kvm"
-      && directory.mode == "0775"
-      && !(unit ? ExecStartPre)
-      && !(unit ? ExecStartPost)
-      && pool.outputs.slots.microvm-slot-1.vsockSocket == null
-      && pool.outputs.slots.microvm-slot-1.cid == 301;
-
-    # A slot kind that passes `moduleImports` replaces the default
-    # selection of the nixos class for its slots: `microvm-reset-1`
-    # selects caisson's `microvm-guest` NixOS module and nothing else,
-    # where `microvm-slot-1` takes the default of the class, caisson's
-    # `default` NixOS module among it, and the `microvm-guest` module
-    # the caisson-microvm configuration adds for its nearest NixOS
-    # configurations.
-    microvmSlotKindSelectsItsModules =
+    # A guest that passes `moduleImports` replaces the default selection
+    # of the nixos class: `c` selects caisson's `microvm-guest` NixOS
+    # module and nothing else, and microvm.nix's guest module reaches
+    # it through that module. `a` takes the default of the class,
+    # caisson's `default` NixOS module among it, and last the
+    # `microvm-guest` module the caisson-microvm configuration adds for
+    # its nearest NixOS configurations.
+    microvmGuestSelectsItsModules =
       let
         pool =
           microvmHostTop.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-microvm.pool;
-        slot = name: pool.children.system.x86_64-linux.children.nixos.${name};
-        reset = (slot "microvm-reset-1").moduleImports;
-        default = (slot "microvm-slot-1").moduleImports;
+        guest = name: pool.children.system.x86_64-linux.children.nixos.${name};
+        reset = (guest "c").moduleImports;
+        default = (guest "a").moduleImports;
       in
       reset.act == "reset"
       && reset.selected == [ "modules.nixos.caisson/microvm-guest" ]
+      && (guest "c").value.options.microvm ? declaredRunner
       && default.act == "default"
       && builtins.elem "modules.nixos.caisson/default" default.selected
       &&

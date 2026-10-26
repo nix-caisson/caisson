@@ -7,8 +7,10 @@
 # the NixOS host that runs it, as
 # `caisson.microvm.configurations.<name>`, and caisson's `microvm-host`
 # NixOS module of the host defines `microvm.vms.<name>` from it. The
-# native integration, caisson-microvm, takes caisson's form instead: a
-# set of guests that share their microvm options and slots.
+# native integration, caisson-microvm, takes caisson's form: a
+# caisson-microvm configuration whose guests are caisson NixOS
+# configurations declared inside it, which get microvm.nix's guest
+# module through the default of the class.
 #
 # The evaluation is the NixOS evaluation of the nixos integration:
 # eval-config over the composition the nixos integration publishes
