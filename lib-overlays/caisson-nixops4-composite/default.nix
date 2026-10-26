@@ -72,13 +72,13 @@
           '';
 
       # The members finalized with the args the composite gives them,
-      # by name: each a manifest.
+      # `memberArgs deploy name`, by name: each a manifest.
       finalizeMembers =
-        deploy: entries:
+        memberArgs: deploy: entries:
         builtins.mapAttrs (
           name: entry:
           entry.finalize {
-            args = nixops4.memberArgs deploy name;
+            args = memberArgs deploy name;
             argsSource = "the composite at ${showPath deploy.path}";
           }
         ) entries;
@@ -113,10 +113,11 @@
       # A composite configuration of the module class `class`, evaluated
       # with the modules `baseModules` returns for the NixOps4 source
       # and the args, and the `members` module argument `membersArg`
-      # returns. The native integration evaluates its class with
-      # NixOps4's provider declarations and the view of the members'
-      # outputs; the upstream-compatible one builds on this with
-      # NixOps4's class and its own modules.
+      # returns. It gives each member the args `memberArgs` returns. The
+      # native integration evaluates its class with NixOps4's provider
+      # declarations, and the view of the members' outputs as `members`
+      # in the composite and in each member; the upstream-compatible one
+      # builds on this with NixOps4's class and its own modules.
       compositeWith =
         {
           class,
@@ -125,6 +126,7 @@
           membersArg ?
             { deploy, ... }:
             nixops4.membersView deploy.path deploy.outputValues,
+          memberArgs ? nixops4.memberArgs,
         }:
         args:
         let
@@ -158,7 +160,7 @@
                 if manifest.childless then
                   { }
                 else
-                  finalizeMembers deploy (memberEntriesOf deploy evaluated.config);
+                  finalizeMembers memberArgs deploy (memberEntriesOf deploy evaluated.config);
               membersModule = selection.caissonModule {
                 key = "caisson.${type}.members";
                 file = "caisson-${type}:members";

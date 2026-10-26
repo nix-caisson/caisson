@@ -41,29 +41,11 @@ let
   holdsMachine = builtins.attrNames declared != [ ];
   # The NixOS configuration the resource deploys: the one declared
   # beneath it, evaluated for one system.
-  machine =
-    let
-      names = builtins.attrNames declared;
-      only = declared.${builtins.head names};
-      evaluations = builtins.attrValues only;
-    in
-    if builtins.length names != 1 then
-      throw ''
-        ${context}: the resource `${manifest.name}` declares the NixOS configurations
-        ${builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") names)}, and a resource deploys one.
-        Declare each as the NixOS configuration of a resource of its own.
-      ''
-    else if (only._type or null) == "caisson-manifest" then
-      only
-    else if builtins.length evaluations == 1 then
-      builtins.head evaluations
-    else
-      throw ''
-        ${context}: the NixOS configuration `${builtins.head names}` of the resource
-        `${manifest.name}` is evaluated for ${builtins.concatStringsSep ", " (builtins.attrNames only)},
-        and a resource deploys one evaluation. Declare it where a single system is in force.
-      '';
-  nixos = machine.value;
+  nixos =
+    (lib.caisson.caisson-nixops4.machineOf {
+      inherit context declared;
+      resource = manifest.name;
+    }).value;
   target = (if config.ssh.user == null then "" else "${config.ssh.user}@") + config.ssh.host;
   # The host key is the only key the SSH client accepts for the host,
   # as nixops4-nixos has it.
