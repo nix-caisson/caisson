@@ -173,6 +173,56 @@
             and a resource deploys one evaluation. Declare it where a single system is in force.
           '';
 
+      # The `discoverArgs` of a root composite, by system: a program
+      # that prints the args NixOps4 recorded, for every system the
+      # package configs at `manifest` build a set for. It runs
+      # `nixops4 state dump` for each of `stateResources` in the working
+      # directory, which NixOps4 finds the flake from, passes its own
+      # arguments to NixOps4, such as `--override-input`, and prints
+      # `{ outputValues, resourceProviderSystem }`. The state of a
+      # resource at `a.state` covers the composite `a`: its resources'
+      # recorded outputs, and its nested composites in turn. Only
+      # resources with a state have recorded outputs.
+      discoverArgsOf =
+        {
+          manifest,
+          src,
+          stateResources,
+        }:
+        let
+          systems = final.unique (
+            builtins.concatMap (config: builtins.attrNames ((config.children or { }).nixpkgs or { })) (
+              builtins.attrValues (manifest.pkgSets or { })
+            )
+          );
+          programFor =
+            system:
+            let
+              pkgs = pkgsFor manifest system;
+            in
+            pkgs.writeShellApplication {
+              name = "caisson-nixops4-discover";
+              runtimeInputs = [
+                src.packages.${system}.nixops4
+                pkgs.jq
+              ];
+              text = ''
+                merged='{}'
+                for state in ${final.escapeShellArgs stateResources}; do
+                  dump=$(nixops4 "$@" state dump "$state")
+                  merged=$(jq -cn --argjson merged "$merged" --argjson dump "$dump" --arg state "$state" '
+                    def outputValues:
+                      ((.resources // {}) | map_values(.output_properties))
+                      + ((.deployments // {}) | map_values(outputValues));
+                    $merged * ({} | setpath($state | split(".") | .[:-1]; $dump | outputValues))
+                  ')
+                done
+                jq -cn --argjson merged "$merged" '{ outputValues: $merged, resourceProviderSystem: "${system}" }'
+              '';
+            };
+        in
+        final.genAttrs systems programFor;
+
       # The arg `resourceProviderSystem`, which every component takes.
       # A system name is no secret, so it is cacheable.
       systemArg = final.caisson-core.mkArg {
@@ -378,6 +428,7 @@
             rootOf
             systemArg
             machineOf
+            discoverArgsOf
             ;
           # Where the NixOps4 source of a configuration came from, as a
           # manifest records it under `ecosystems.nixops4`.

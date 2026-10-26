@@ -390,6 +390,7 @@ let
   nixops4TopWith =
     {
       root ? { },
+      rootArgs ? { },
       resources ? { },
       defaultPkgs ? null,
       machineArgs ? { },
@@ -407,26 +408,29 @@ let
               {
                 caisson.caisson-nixops4-composite.configurations.root =
                   lib.caisson.caisson-nixops4-composite.mkConfiguration
-                    {
-                      configModule =
-                        { lib, ... }:
-                        {
-                          imports = [ root ];
-                          caisson.caisson-nixops4-resource.configurations = builtins.mapAttrs (
-                            name: nixosModule:
-                            lib.caisson.caisson-nixops4-resource.mkConfiguration {
-                              configModule =
-                                { lib, ... }:
-                                {
-                                  imports = [ (resources.${name} or { }) ];
-                                  caisson.nixos.configurations.${name} = lib.caisson.nixos.mkConfiguration (
-                                    { configModule = nixosModule; } // machineArgs
-                                  );
-                                };
-                            }
-                          ) machines;
-                        };
-                    };
+                    (
+                      rootArgs
+                      // {
+                        configModule =
+                          { lib, ... }:
+                          {
+                            imports = [ root ];
+                            caisson.caisson-nixops4-resource.configurations = builtins.mapAttrs (
+                              name: nixosModule:
+                              lib.caisson.caisson-nixops4-resource.mkConfiguration {
+                                configModule =
+                                  { lib, ... }:
+                                  {
+                                    imports = [ (resources.${name} or { }) ];
+                                    caisson.nixos.configurations.${name} = lib.caisson.nixos.mkConfiguration (
+                                      { configModule = nixosModule; } // machineArgs
+                                    );
+                                  };
+                              }
+                            ) machines;
+                          };
+                      }
+                    );
               };
           };
         };
@@ -2340,6 +2344,28 @@ let
         ]
       && needed.outputValues.probe.stdout.cacheable
       && (nixops4RootManifest top).deferred.argNames == core.argNamesOf needed;
+
+    # A root composite that lists the resources holding its state gives
+    # a program, for each system a package config builds a set for,
+    # that reads the outputs NixOps4 recorded; one that lists none gives
+    # nothing. A finalized composite tells a tool the args it gives a
+    # member (`deferredChildArgs`), so the tool can finalize the
+    # member's entry itself.
+    nixops4RootDiscoversRecordedOutputs =
+      let
+        entryOf =
+          top: top.caisson.manifest.children.caisson-nixops4.nixops4.children.caisson-nixops4-composite.root;
+        stateful = nixops4TopWith {
+          rootArgs.stateResources = [ "state" ];
+          resources.probe.ssh.hostPublicKey = nixops4HostKey;
+        } { probe = minimalNixosBase; };
+        discover = core.discoverArgsFor (entryOf stateful);
+        memberArgs = (nixops4RootManifest stateful).outputs.deferredChildArgs "probe";
+      in
+      core.discoverArgsFor (entryOf (nixops4TopWith { } { })) == null
+      && discover.x86_64-linux.name == "caisson-nixops4-discover"
+      && memberArgs.path == [ "probe" ]
+      && memberArgs.outputValues.stdout == "stub";
 
     # A provider is evaluated inside the component that declares it.
     # `getProviders` evaluates the root without outputs and builds the

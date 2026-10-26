@@ -201,6 +201,9 @@
                 inherit (deploy) path;
                 # The members, by name, each finalized with its args.
                 members = finalized;
+                # The args the composite gives its member of a name, for
+                # a tool that finalizes a member's entry itself.
+                deferredChildArgs = memberArgs deploy;
                 # What NixOps4 reads of the composite.
                 export.members = builtins.mapAttrs (_: member: member.outputs.export) finalized;
                 # The providers it declares, which `getProviders` builds
@@ -221,6 +224,21 @@
         in
         final.caisson-core.mkDeferredConfiguration {
           inherit type class;
+          # A program that reads the outputs NixOps4 recorded, for the
+          # composite that lists the resources holding its state.
+          discoverArgs =
+            if (args.stateResources or [ ]) == [ ] then
+              null
+            else
+              { parent, ... }:
+              nixops4.discoverArgsOf {
+                manifest = parent;
+                src = nixops4.ecosystemSrcOf {
+                  explicit = args.ecosystemSrc or null;
+                  manifest = parent;
+                };
+                inherit (args) stateResources;
+              };
           # The deploying system, and the outputs of the members, which
           # depend on the members the composite declares, so on the args
           # known so far.
@@ -282,6 +300,12 @@
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
+            # For the root composite: the member paths of the resources
+            # that hold the state of the deployment, as
+            # `nixops4 state dump` takes them, such as `default.state`.
+            # A tool reads the outputs NixOps4 recorded from them
+            # (`discoverArgs`).
+            stateResources ? [ ],
           }@args:
           configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
@@ -293,6 +317,7 @@
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
+            stateResources ? [ ],
             ecosystemArgs ? null,
           }@args:
           configuration args;
