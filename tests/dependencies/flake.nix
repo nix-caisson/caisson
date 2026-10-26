@@ -37,6 +37,12 @@
   inputs.nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
   inputs.microvm.url = "github:microvm-nix/microvm.nix";
   inputs.microvm.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nixops4.url = "github:nixops4/nixops4";
+  inputs.nixops4.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nixops4.inputs.flake-parts.follows = "flake-parts";
+  inputs.nixops4-nixos.url = "github:nixops4/nixops4-nixos";
+  inputs.nixops4-nixos.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nixops4-nixos.inputs.flake-parts.follows = "flake-parts";
   # The VMs of other distributions the system-manager VM test boots
   # (tests/system-manager).
   inputs.nix-vm-test.url = "github:numtide/nix-vm-test";
