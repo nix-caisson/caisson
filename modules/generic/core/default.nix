@@ -46,6 +46,7 @@
           "kubenix"
           "microvm"
           "nixidy"
+          "nixops4"
           "nixos"
           "nixpkgs"
           "nixvim"

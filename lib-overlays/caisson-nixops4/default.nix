@@ -141,6 +141,38 @@
           path = [ ];
         };
 
+      # The NixOS configuration a resource named `resource` deploys, from
+      # the NixOS configurations declared beneath it (`declared`): the
+      # only one, evaluated for one system. `context` names the module
+      # that asks, for the errors.
+      machineOf =
+        {
+          context,
+          resource,
+          declared,
+        }:
+        let
+          names = builtins.attrNames declared;
+          only = declared.${builtins.head names};
+          evaluations = builtins.attrValues only;
+        in
+        if builtins.length names != 1 then
+          throw ''
+            ${context}: the resource `${resource}` declares the NixOS configurations
+            ${builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") names)}, and a resource deploys one.
+            Declare each as the NixOS configuration of a resource of its own.
+          ''
+        else if (only._type or null) == "caisson-manifest" then
+          only
+        else if builtins.length evaluations == 1 then
+          builtins.head evaluations
+        else
+          throw ''
+            ${context}: the NixOS configuration `${builtins.head names}` of the resource
+            `${resource}` is evaluated for ${builtins.concatStringsSep ", " (builtins.attrNames only)},
+            and a resource deploys one evaluation. Declare it where a single system is in force.
+          '';
+
       # The arg `resourceProviderSystem`, which every component takes.
       # A system name is no secret, so it is cacheable.
       systemArg = final.caisson-core.mkArg {
@@ -343,7 +375,9 @@
             deployOf
             memberArgs
             rootArgs
+            rootOf
             systemArg
+            machineOf
             ;
           # Where the NixOps4 source of a configuration came from, as a
           # manifest records it under `ecosystems.nixops4`.

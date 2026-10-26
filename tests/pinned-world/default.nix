@@ -73,6 +73,7 @@ let
       registered."caisson/caisson-nixops4"
       registered."caisson/caisson-nixops4-composite"
       registered."caisson/caisson-nixops4-resource"
+      registered."caisson/nixops4"
       registered."caisson/darwin"
       registered."caisson/terranix"
       registered."caisson/system-manager"
@@ -132,6 +133,7 @@ let
     "mkPkgOverlays"
     "modules"
     "nixidy"
+    "nixops4"
     "nixos"
     "nixos-minimal"
     "nixpkgs"
@@ -437,30 +439,76 @@ let
   nixops4Export =
     root:
     let
-      outputsOf = builtins.mapAttrs (
-        _: member:
-        if member ? resource then
-          builtins.mapAttrs (_: _: "stub") member.resource.outputsSkeleton
-        else
-          outputsOf member.members
-      );
       fixpoint = root.rootFunction {
         resourceProviderSystem = "x86_64-linux";
-        outputValues = outputsOf fixpoint.members;
+        outputValues = nixops4StubOutputs fixpoint.members;
       };
     in
     fixpoint;
 
-  # The root composite of a top made by `nixops4TopWith`, finalized as
-  # NixOps4 finalizes it, with `stub` outputs: its manifest.
+  # The output values NixOps4 passes for the members of an export, with
+  # `stub` for every output a resource declares.
+  nixops4StubOutputs = builtins.mapAttrs (
+    _: member:
+    if member ? resource then
+      builtins.mapAttrs (_: _: "stub") member.resource.outputsSkeleton
+    else
+      nixops4StubOutputs member.members
+  );
+
+  # The root composite of a top's `nixops4`, finalized as NixOps4
+  # finalizes it, with `stub` outputs: its manifest.
   nixops4RootManifest =
     top:
     top.nixops4.caisson.deferredRoot.finalize {
       args = {
         resourceProviderSystem = "x86_64-linux";
-        outputValues = builtins.mapAttrs (
-          _: member: builtins.mapAttrs (_: _: "stub") member.resource.outputsSkeleton
-        ) (nixops4Export top.nixops4).members;
+        outputValues = nixops4StubOutputs (nixops4Export top.nixops4).members;
+      };
+    };
+
+  # A top holding a nixops4 configuration named `nixops4` made from the
+  # root modules given, as NixOps4's `mkRoot` takes them, with the
+  # allow-list `cacheableOutputs`.
+  nixops4UpstreamTopWith =
+    {
+      cacheableOutputs ? { },
+    }:
+    modules:
+    hiveLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.nixops4.configurations.nixops4 = lib.caisson.nixops4.mkConfiguration {
+            inherit modules cacheableOutputs;
+          };
+        };
+    };
+
+  # Root modules as a NixOps4 user writes them: a resource whose output
+  # another member reads, a NixOS machine through nixops4-nixos, and a
+  # nested composite holding a resource.
+  nixops4UpstreamRoot =
+    { providers, members, ... }:
+    {
+      _class = "nixops4Component";
+      providers.local = inputs.nixops4.modules.nixops4Provider.local;
+      members.address = {
+        type = providers.local.exec;
+        inputs.executable = "/bin/true";
+      };
+      members.probe = {
+        imports = [ inputs.nixops4-nixos.modules.nixops4Component.nixos ];
+        type = providers.local.exec;
+        nixpkgs = inputs.nixpkgs;
+        nixos.module = minimalNixosBase;
+        ssh.host = members.address.outputs.stdout;
+        ssh.hostPublicKey = nixops4HostKey;
+      };
+      members.group.members.inner = {
+        type = providers.local.exec;
+        inputs.executable = "/bin/false";
       };
     };
 
@@ -737,6 +785,7 @@ let
           "caisson/caisson-nixops4"
           "caisson/caisson-nixops4-composite"
           "caisson/caisson-nixops4-resource"
+          "caisson/nixops4"
           "caisson/darwin"
           "caisson/terranix"
           "caisson/system-manager"
@@ -847,6 +896,7 @@ let
       "caisson-nixops4"
       "caisson-nixops4-composite"
       "caisson-nixops4-resource"
+      "nixops4"
       "darwin"
       "terranix"
       "system-manager"
@@ -2302,6 +2352,125 @@ let
         built = top.nixops4.getProviders { system = "x86_64-linux"; };
       in
       pkgs.lib.isDerivation built && pkgs.lib.hasPrefix "nixops-root-providers" built.name;
+
+    # The upstream-compatible integration takes root modules as a
+    # NixOps4 user writes them, `_class` included, and NixOps4 reads
+    # the same export from it: a member that sets `type` is a resource,
+    # any other a composite, to any depth. A member reads another
+    # member's outputs through `members`.
+    nixops4UpstreamRootEvaluates =
+      let
+        top = nixops4UpstreamTopWith { } [ nixops4UpstreamRoot ];
+        export = nixops4Export top.nixops4;
+        probe = export.members.probe.resource;
+      in
+      top.nixops4._type == "nixops4Component"
+      &&
+        builtins.attrNames export.members == [
+          "address"
+          "group"
+          "probe"
+        ]
+      && export.members.address.resource.type == "exec"
+      && builtins.attrNames export.members.group.members == [ "inner" ]
+      && export.members.group.members.inner.resource.inputs.executable == "/bin/false"
+      && builtins.elemAt probe.inputs.args 2 == "root@stub";
+
+    # A member that imports nixops4-nixos gets its `nixos.module`
+    # evaluated as a caisson NixOS configuration beneath it, with the
+    # `bin/apply` NixOps4 runs, and builds the system NixOS builds from
+    # the same module and the `apply` module nixops4-nixos adds, named
+    # for the member as caisson names it. The shell comes from the
+    # package set caisson selects.
+    nixops4UpstreamNixosIsACaissonConfiguration =
+      let
+        top = nixops4UpstreamTopWith { } [ nixops4UpstreamRoot ];
+        probe = (nixops4Export top.nixops4).members.probe.resource;
+        member = (nixops4RootManifest top).outputs.members.probe;
+        machine = member.children.system.x86_64-linux.children.nixos.probe;
+        upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
+          system = null;
+          modules = [
+            minimalNixosBase
+            inputs.nixops4-nixos.modules.nixos.apply
+            {
+              nixpkgs.pkgs = pkgs;
+              networking.hostName = "probe";
+            }
+          ];
+        };
+      in
+      machine.type == "nixos"
+      && probe.inputs.executable == pkgs.lib.getExe pkgs.bash
+      && builtins.elemAt probe.inputs.args 3 == "${machine.value.config.system.build.toplevel}"
+      && pkgs.lib.hasInfix "$out/bin/apply" machine.value.config.system.activatableSystemBuilderCommands
+      &&
+        machine.value.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath;
+
+    # The shell of a nixops4-nixos member comes from the package set
+    # caisson selects for the nixops4 configuration, not from the
+    # nixpkgs of nixops4-nixos: here a selection whose `bash` is
+    # another shell.
+    nixops4UpstreamDeploysWithTheSelectedPackageSet =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixops4.configurations.nixops4 = lib.caisson.nixops4.mkConfiguration {
+                modules = [ nixops4UpstreamRoot ];
+                defaultPkgs = pkgSets: pkgSets.default // { bash = pkgSets.default.dash; };
+              };
+            };
+        };
+      in
+      (nixops4Export top.nixops4).members.probe.resource.inputs.executable == pkgs.lib.getExe pkgs.dash;
+
+    # Every upstream composite reads its members' configs through its
+    # full evaluation: each member records the composite as the level
+    # whose children it reads.
+    nixops4UpstreamMembersReadTheFullComposite =
+      let
+        root = nixops4RootManifest (nixops4UpstreamTopWith { } [ nixops4UpstreamRoot ]);
+        probe = root.outputs.members.probe;
+      in
+      probe.crossChildLevel != null
+      && !probe.crossChildLevel.childless
+      && probe.crossChildLevel.name == "root";
+
+    # A member that sets `type` and declares members is refused, where
+    # NixOps4 drops the members.
+    nixops4UpstreamRefusesAResourceWithMembers =
+      let
+        evaluates = top: (builtins.tryEval (builtins.deepSeq (nixops4Export top.nixops4) true)).success;
+        rootWith =
+          extra:
+          { providers, ... }:
+          {
+            providers.local = inputs.nixops4.modules.nixops4Provider.local;
+            members.probe = {
+              type = providers.local.exec;
+              inputs.executable = "/bin/true";
+            }
+            // extra;
+          };
+      in
+      evaluates (nixops4UpstreamTopWith { } [ (rootWith { }) ])
+      && !(evaluates (nixops4UpstreamTopWith { } [ (rootWith { members.extra = { }; }) ]));
+
+    # The allow-list of the nixops4 configuration says which outputs a
+    # tool may cache, by member path; every other output is not
+    # cacheable.
+    nixops4UpstreamCacheableOutputsAreAllowListed =
+      let
+        top = nixops4UpstreamTopWith {
+          cacheableOutputs."group.inner" = [ "stdout" ];
+        } [ nixops4UpstreamRoot ];
+        entry = top.caisson.manifest.children.nixops4.nixops4.children.caisson-nixops4-composite.root;
+        needed = core.argsNeededFor entry { resourceProviderSystem = "x86_64-linux"; };
+      in
+      needed.outputValues.group.inner.stdout.cacheable && !needed.outputValues.address.stdout.cacheable;
 
     # A node of the upstream-compatible integration builds the same
     # system as colmena builds from the same hive.
