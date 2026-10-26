@@ -339,15 +339,16 @@
             }) distros
           );
 
-        # A cloud-hypervisor guest whose operator connects to its hybrid
-        # vsock through the socket its slot records, and whose socket no
-        # other user reaches (tests/microvm-vsock-vm). The guest runs
-        # inside the test VM, so it needs nested KVM. On a CI runner,
-        # which is itself a VM, the guest is three levels deep and does
-        # not finish booting within the start timeout, so the test is
-        # not a check; it is built by name on a machine with KVM.
-        flake.nestedVmTests.x86_64-linux.microvm-vsock-vm =
-          import (self.outPath + "/tests/microvm-vsock-vm")
+        # A guest of a caisson-microvm configuration on cloud-hypervisor,
+        # which the host runs through caisson's `microvm-host` NixOS
+        # module and the units of microvm.nix's host module
+        # (tests/microvm-host-vm). The guest runs inside the test VM, so
+        # it needs nested KVM. On a CI runner, which is itself a VM, the
+        # guest is three levels deep and does not finish booting within
+        # the start timeout, so the test is not a check; it is built by
+        # name on a machine with KVM.
+        flake.nestedVmTests.x86_64-linux.microvm-host-vm =
+          import (self.outPath + "/tests/microvm-host-vm")
             {
               inputs = inputs // {
                 caisson = self;

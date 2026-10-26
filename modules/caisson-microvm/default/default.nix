@@ -4,9 +4,9 @@
 #
 # The nearest NixOS configurations beneath a caisson-microvm
 # configuration are its guests. This module adds caisson's NixOS module
-# `microvm-guest`, which imports microvm.nix's guest module and defines
-# the guest's microvm options from the caisson-microvm configuration,
-# to the modules that such a NixOS configuration imports by default. A
+# `microvm-guest`, which imports microvm.nix's guest module from the
+# microvm.nix source of the caisson-microvm configuration, to the
+# modules that such a NixOS configuration imports by default. A
 # NixOS configuration declared inside a guest is no guest and does not
 # get it. A guest that passes `moduleImports` selects its modules
 # itself, and then it lists `microvm-guest` itself, as
