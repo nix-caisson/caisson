@@ -28,7 +28,8 @@ The layer users reach for: the integrations (`structural`,
 `flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
 `home-manager-minimal`, `darwin`, `hjem`, `caisson-colmena`, `colmena`,
 `caisson-disko`, `disko`, `caisson-facter`, `facter`,
-`caisson-microvm`, `microvm`, `terranix`, `system-manager`, `treefmt`,
+`caisson-microvm`, `microvm`, `caisson-nixops4`, `terranix`,
+`system-manager`, `treefmt`,
 `nvf`, `nixvim`, `topology`, `kubenix`, `nixidy`), each
 a library overlay
 contributing its `lib.caisson` namespace, registering its module
@@ -53,7 +54,8 @@ inject the same names beside `self`.
 ## The pinned world
 
 The upstream world caisson is tested against (nixpkgs, home-manager,
-colmena, disko, nix-darwin, hjem, terranix, system-manager, microvm.nix, and the test
+colmena, disko, nix-darwin, hjem, terranix, system-manager, microvm.nix,
+NixOps4, nixops4-nixos, and the test
 tooling) is pinned in
 `tests/dependencies/flake.lock`, a lock only the checks and formatter
 partitions read, so caisson's `flake.nix` carries no churning pin. The

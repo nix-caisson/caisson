@@ -3,7 +3,8 @@
 # The pinned-world suite: caisson, the tree this file lives in,
 # composed with concrete pinned versions of the upstream world
 # (nixpkgs, home-manager, colmena, disko, nix-darwin, terranix,
-# system-manager, microvm.nix, read from tests/dependencies) and
+# system-manager, microvm.nix, NixOps4, nixops4-nixos, read from
+# tests/dependencies) and
 # exercised end to end. Every upstream
 # expectation caisson relies on is held by a probe here, so a pin
 # that moves and breaks an expectation fails at evaluation, in this
@@ -70,6 +71,7 @@ let
       registered."caisson/facter"
       registered."caisson/caisson-microvm"
       registered."caisson/microvm"
+      registered."caisson/caisson-nixops4"
       registered."caisson/darwin"
       registered."caisson/terranix"
       registered."caisson/system-manager"
@@ -94,6 +96,7 @@ let
     "caisson-disko"
     "caisson-facter"
     "caisson-microvm"
+    "caisson-nixops4"
     "callConsumerFlake"
     "callFlake"
     "colmena"
@@ -229,6 +232,8 @@ let
         hjem
         terranix
         microvm
+        nixops4
+        nixops4-nixos
         ;
     };
     projects = {
@@ -369,6 +374,62 @@ let
         };
     };
   colmenaTop = colmenaTopWith { };
+
+  # A top holding a nixops4 configuration named `default`, with a NixOS
+  # configuration declared inside it for each machine given, by name.
+  # `component` is the module of its root component, `defaultPkgs` the
+  # selection of the nixops4 configuration and `machineArgs` further
+  # arguments of each machine's constructor.
+  nixops4TopWith =
+    {
+      component ? { },
+      defaultPkgs ? null,
+      machineArgs ? { },
+    }:
+    machines:
+    hiveLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.caisson-nixops4.configurations.default = lib.caisson.caisson-nixops4.mkConfiguration {
+            inherit defaultPkgs;
+            configModule =
+              { lib, ... }:
+              {
+                inherit component;
+                caisson.nixos.configurations = builtins.mapAttrs (
+                  _: configModule: lib.caisson.nixos.mkConfiguration ({ inherit configModule; } // machineArgs)
+                ) machines;
+              };
+          };
+        };
+    };
+  nixops4Top = nixops4TopWith { };
+
+  # The members of a root component as NixOps4's command reads them: the
+  # root function called with the deploying system and the outputs of
+  # each resource, here `stub` for every output the resource declares,
+  # at the fixpoint, as the command closes it.
+  nixops4Export =
+    root:
+    let
+      outputsOf = builtins.mapAttrs (
+        _: member:
+        if member ? resource then
+          builtins.mapAttrs (_: _: "stub") member.resource.outputsSkeleton
+        else
+          outputsOf member.members
+      );
+      fixpoint = root.rootFunction {
+        resourceProviderSystem = "x86_64-linux";
+        outputValues = outputsOf fixpoint.members;
+      };
+    in
+    fixpoint;
+
+  # A host key for the machines NixOps4 deploys in the probes.
+  nixops4HostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAiszi43aOWWV7voNgQ1Ifa7LGKwGJfOuiLM1n42h2Y8";
 
   # What a microvm.nix guest needs beside what microvm.nix's guest
   # module gives it, which boots it and gives it its file systems.
@@ -675,6 +736,7 @@ let
           "caisson/facter"
           "caisson/caisson-microvm"
           "caisson/microvm"
+          "caisson/caisson-nixops4"
           "caisson/darwin"
           "caisson/terranix"
           "caisson/system-manager"
@@ -782,6 +844,7 @@ let
       "facter"
       "caisson-microvm"
       "microvm"
+      "caisson-nixops4"
       "darwin"
       "terranix"
       "system-manager"
@@ -4525,6 +4588,131 @@ let
           from = "ecosystemSrc";
           source = "flake-parts";
         };
+
+    # A nixops4 configuration declared under the name `default` beneath
+    # a top fills the top's `nixops4`, the root component NixOps4's
+    # command reads. Each machine declared inside it is a member under
+    # its name: an `exec` resource of NixOps4's `local` provider that
+    # copies the toplevel of the machine the top also publishes as
+    # `nixosConfigurations` and runs its `bin/apply switch` over SSH,
+    # to the machine's name as the host when the component sets none.
+    nixops4RootEvaluatesEndToEnd =
+      let
+        top = nixops4TopWith {
+          component.members.probe.ssh.hostPublicKey = nixops4HostKey;
+        } { probe = minimalNixosBase; };
+        export = nixops4Export top.nixops4;
+        resource = export.members.probe.resource;
+        args = resource.inputs.args;
+        toplevel = top.nixosConfigurations.probe.config.system.build.toplevel;
+      in
+      top.nixops4._type == "nixops4Component"
+      && builtins.attrNames export.members == [ "probe" ]
+      && resource.type == "exec"
+      && resource.inputs.executable == pkgs.lib.getExe pkgs.bash
+      && builtins.elemAt args 2 == "root@probe"
+      && builtins.elemAt args 3 == "${toplevel}"
+      && pkgs.lib.hasInfix "$1/bin/apply switch" (builtins.elemAt args 1)
+      && pkgs.lib.hasInfix nixops4HostKey (
+        builtins.readFile (
+          builtins.head (builtins.match ".*UserKnownHostsFile=([^ ]*) .*" (builtins.elemAt args 1))
+        )
+      );
+
+    # A machine is the NixOS configuration the top publishes, with the
+    # `nixops4-apply` module the default module of the class adds, which
+    # builds `bin/apply`. The member exposes it as `nixos.configuration`.
+    # A NixOS configuration that selects its modules itself leaves the
+    # module out.
+    nixops4MachinesCarryTheApplyScript =
+      let
+        builds =
+          configuration:
+          pkgs.lib.hasInfix "$out/bin/apply" configuration.config.system.activatableSystemBuilderCommands;
+        top = nixops4Top { probe = minimalNixosBase; };
+        member = (top.nixops4.getProviders { system = "x86_64-linux"; }).config.members.probe;
+        selecting = nixops4TopWith { machineArgs.moduleImports = _modules: [ ]; } {
+          probe = minimalNixosBase;
+        };
+      in
+      builds top.nixosConfigurations.probe
+      &&
+        member.nixos.configuration.config.system.build.toplevel.drvPath
+        == top.nixosConfigurations.probe.config.system.build.toplevel.drvPath
+      && !(builds selecting.nixosConfigurations.probe);
+
+    # The component's module sets the SSH settings of a machine's
+    # member, from the outputs of another resource: NixOps4 evaluates
+    # the root again with the outputs it learns, and the member's
+    # inputs follow them. The other settings change the command line
+    # as they do in NixOps4's NixOS resource.
+    nixops4ComponentReadsResourceOutputs =
+      let
+        top = nixops4TopWith {
+          component =
+            { members, providers, ... }:
+            {
+              members.address = {
+                type = providers.local.exec;
+                inputs.executable = "/bin/true";
+              };
+              members.probe = {
+                ssh.host = members.address.outputs.stdout;
+                ssh.hostPublicKey = nixops4HostKey;
+                ssh.user = "deploy";
+                ssh.opts = "-p 2222";
+                copy.substituteOnDestination = false;
+              };
+            };
+        } { probe = minimalNixosBase; };
+        export = nixops4Export top.nixops4;
+        script = builtins.elemAt export.members.probe.resource.inputs.args 1;
+      in
+      builtins.elemAt export.members.probe.resource.inputs.args 2 == "deploy@stub"
+      && pkgs.lib.hasInfix "sudo $1/bin/apply switch" script
+      && pkgs.lib.hasInfix "'-p 2222'" script
+      && !(pkgs.lib.hasInfix "--substitute-on-destination" script);
+
+    # The shell that runs the deployment comes from the package set
+    # caisson selects for the nixops4 configuration, for the deploying
+    # system: here a selection whose `bash` is another shell.
+    nixops4DeploysWithTheSelectedPackageSet =
+      let
+        top = nixops4TopWith {
+          component.members.probe.ssh.hostPublicKey = nixops4HostKey;
+          defaultPkgs = pkgSets: pkgSets.default // { bash = pkgSets.default.dash; };
+        } { probe = minimalNixosBase; };
+      in
+      (nixops4Export top.nixops4).members.probe.resource.inputs.executable == pkgs.lib.getExe pkgs.dash;
+
+    # Names NixOps4's command could not address in a member path are
+    # refused when the root reads the machines: a name containing a `.`.
+    nixops4RefusesUnaddressableNames =
+      !(builtins.tryEval (
+        builtins.attrNames (nixops4Export (nixops4Top { "a.b" = minimalNixosBase; }).nixops4).members
+      )).success
+      &&
+        builtins.attrNames
+          (nixops4Export
+            (nixops4TopWith {
+              component.members.a-b.ssh.hostPublicKey = nixops4HostKey;
+            } { a-b = minimalNixosBase; }).nixops4
+          ).members == [ "a-b" ];
+
+    # A nixops4 configuration records where NixOps4 came from: the
+    # source the tree pins under that name.
+    nixops4RecordsItsEcosystem =
+      (nixops4Top { probe = minimalNixosBase; })
+      .caisson.manifest.children.caisson-nixops4.default.ecosystems == {
+        nixpkgs-lib = {
+          from = "defaultEcosystemSrc";
+          source = "nixpkgs";
+        };
+        nixops4 = {
+          from = "sources";
+          source = "nixops4";
+        };
+      };
 
     # The modules that caisson exports work only inside an evaluation
     # that caisson makes. caisson publishes none of them in its
