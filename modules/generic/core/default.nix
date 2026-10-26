@@ -33,6 +33,7 @@
           "caisson-disko"
           "caisson-facter"
           "caisson-microvm"
+          "caisson-nixops4"
           "colmena"
           "darwin"
           "disko"

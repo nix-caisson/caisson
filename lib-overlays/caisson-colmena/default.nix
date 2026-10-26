@@ -107,30 +107,6 @@
       # could never be addressed, so the hive refuses it.
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
 
-      # A machine colmena deploys is one evaluation. A NixOS
-      # configuration with several systems in force is evaluated per
-      # system, and publishing would make each evaluation a node. The
-      # machines evaluated more than once, each with its name and its
-      # systems: the NixOS entries grouped by their path without the
-      # system segments, where a group has more than one entry.
-      evaluatedMoreThanOnce =
-        entries:
-        let
-          machines = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
-          nameOf =
-            entry:
-            final.caisson.integrations.displayName (
-              builtins.map (segment: segment.name) (
-                builtins.filter (segment: segment.type != "system") entry.path
-              )
-            );
-          grouped = builtins.groupBy nameOf machines;
-        in
-        final.mapAttrsToList (name: group: {
-          inherit name;
-          systems = builtins.map (entry: entry.system) group;
-        }) (final.filterAttrs (_: group: builtins.length group > 1) grouped);
-
       # The nodes, by the name each is published under: the NixOS
       # configurations among the entries the colmena configuration
       # passes up that belong to it (`integrations.belongsHere`), those
@@ -148,7 +124,8 @@
             entry:
             entry.attrset == "nixosConfigurations" && final.caisson.integrations.belongsHere "nixos" entry
           ) allEntries;
-          repeated = evaluatedMoreThanOnce entries;
+          # A machine colmena deploys is one evaluation.
+          repeated = final.caisson.integrations.evaluatedMoreThanOnce entries;
           published = (final.caisson.integrations.publish entries).nixosConfigurations or { };
           bad = builtins.filter unaddressable (builtins.attrNames published);
           checked =

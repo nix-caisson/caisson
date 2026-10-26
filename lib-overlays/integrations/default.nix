@@ -1187,6 +1187,34 @@
       # inside a node.
       belongsHere = type: entry: !(builtins.any (segment: segment.type == type) (init entry.path));
 
+      # A machine a deployment tool deploys is one evaluation. A NixOS
+      # configuration with several systems in force is evaluated per
+      # system, and publishing would make each evaluation a machine. Of
+      # `entries`, the NixOS configurations evaluated more than once,
+      # each with its name and its systems: the NixOS entries grouped by
+      # their path without the system segments, where a group has more
+      # than one entry. The colmena and NixOps4 integrations refuse
+      # them.
+      evaluatedMoreThanOnce =
+        entries:
+        let
+          machines = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
+          nameOf =
+            entry:
+            displayName (
+              builtins.map (segment: segment.name) (
+                builtins.filter (segment: segment.type != "system") entry.path
+              )
+            );
+          grouped = builtins.groupBy nameOf machines;
+        in
+        builtins.attrValues (
+          builtins.mapAttrs (name: group: {
+            inherit name;
+            systems = builtins.map (entry: entry.system) group;
+          }) (filterAttrs (_: group: builtins.length group > 1) grouped)
+        );
+
       # The nearest configuration above `manifest` whose integration is
       # one of `types`, null when there is none. The manifest records
       # the nearest ancestor of each integration; of those, the nearest
@@ -1916,6 +1944,7 @@
             integrationsDeclaringIn
             nearestOf
             belongsHere
+            evaluatedMoreThanOnce
             recordOf
             activatingAncestorOf
             machineActivation
