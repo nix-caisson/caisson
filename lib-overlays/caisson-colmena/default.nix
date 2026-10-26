@@ -19,8 +19,8 @@
 # `meta.nixpkgs`): every node is an evaluated NixOS configuration.
 #
 # A colmena configuration is published as `colmenaHive`, an output that
-# holds a single value, so the configuration declared under the name
-# `default` fills it. The nodes are published as well, as the NixOS
+# holds a single value, so the configuration declared under the name of
+# that output, `colmenaHive`, fills it. The nodes are published as well, as the NixOS
 # configurations they are, so `nixos-rebuild` and `colmena apply` build
 # the same machine.
 {

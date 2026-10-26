@@ -830,11 +830,19 @@
                 extraDefaultModuleImports = additionsOf options.caisson.forChildren config.caisson.forChildren;
                 defaultPkgs = config.caisson.forChildren.defaultPkgs;
                 systems = config.caisson.forChildren.systems;
+                inherit (config.caisson.forChildren) unsafeCrossChildReferences;
               };
               # What the modules give the nearest configurations of a
               # class beneath (`caisson.forNearestChildren`).
               forNearestChildren = {
                 extraDefaultModuleImports = additionsOf options.caisson.forNearestChildren config.caisson.forNearestChildren;
+                inherit (config.caisson.forNearestChildren) unsafeCrossChildReferences;
+              };
+              # What the modules give the configurations of a class
+              # declared directly beneath (`caisson.forDirectChildren`).
+              forDirectChildren = {
+                extraDefaultModuleImports = additionsOf options.caisson.forDirectChildren config.caisson.forDirectChildren;
+                inherit (config.caisson.forDirectChildren) unsafeCrossChildReferences;
               };
               # What the evaluator received, as `declaration` events:
               # the integration's `evaluate` returns `modules`, the list
@@ -1041,16 +1049,26 @@
           finalize =
             childName: child:
             let
-              finalized = lib.caisson-core.finalizeChild {
-                name = childName;
-                what = what childName;
-                parent = manifest.childlessManifest;
-              } child;
+              # A deferred configuration is held as an entry, finalized
+              # when its args are supplied.
+              finalized =
+                (
+                  if lib.caisson-core.isDeferredConfiguration child then
+                    lib.caisson-core.deferChild
+                  else
+                    lib.caisson-core.finalizeChild
+                )
+                  {
+                    name = childName;
+                    what = what childName;
+                    parent = manifest.childlessManifest;
+                  }
+                  child;
               # The integration of what was declared: of the
               # manifest, or of the evaluations of a configuration
               # evaluated per system, null where it has none.
               declaredType =
-                if isManifest finalized then
+                if isManifest finalized || lib.caisson-core.isDeferred finalized then
                   finalized.type
                 else if finalized == { } then
                   null
@@ -1685,7 +1703,10 @@
                 name = system;
               };
               beneath =
-                if isManifest finalized then
+                # A deferred child passes nothing up at flake time.
+                if final.caisson-core.isDeferred finalized then
+                  [ ]
+                else if isManifest finalized then
                   [
                     {
                       prefix = [ (segmentOf name) ];
@@ -1736,8 +1757,8 @@
       # paths.
       #
       # An output that holds a single value (`colmenaHive`) is the value
-      # of the entry named `default`, the entry whose `exportsTo` says
-      # `single`. Any other entry for that output is refused, since the
+      # of the entry named for that output, `colmenaHive`, the entry
+      # whose `exportsTo` says `single`. Any other entry for that output is refused, since the
       # output has no names to hold it under.
       #
       # An output whose entries' `exportsTo` says `bySystem` is keyed by
@@ -1807,15 +1828,18 @@
                 name: builtins.length (builtins.filter (other: other == name) names) > 1
               ) (unique names);
               single = builtins.any (entry: entry.single or false) members;
-              notDefault = builtins.filter (entry: (last entry.path).name != "default") members;
+              # A configuration with a single output is named for that
+              # output.
+              misnamed = builtins.filter (entry: (last entry.path).name != entry.attrset) members;
+              singleName = (builtins.head members).attrset;
             in
             if single then
-              if builtins.length members == 1 && notDefault == [ ] then
+              if builtins.length members == 1 && misnamed == [ ] then
                 of (builtins.head members)
               else
                 throw ''
                   ${attrset}: this output holds a single value, the configuration
-                  declared under the name `default`, but these configurations would
+                  declared under the name `${singleName}`, but these configurations would
                   be published there:
                   ${builtins.concatStringsSep "\n" (builtins.map (entry: "  ${showPath entry.path}") members)}
                 ''

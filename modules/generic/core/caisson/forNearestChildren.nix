@@ -49,5 +49,31 @@
       '';
     };
 
+    unsafeCrossChildReferences = lib.mkOption {
+      type = lib.types.attrsOf lib.types.bool;
+      default = { };
+      example = {
+        nixos = true;
+      };
+      description = ''
+        By class, whether the nearest configurations of that class
+        beneath this configuration read the full evaluation of this
+        configuration, with its children, in place of the childless
+        view of their parent (`lib.caisson-core.evalManifest.crossChildLevel`).
+        It passes through configurations of other classes, as the
+        additions above do, so a machine inside a structural group or a
+        disk layout beneath this configuration is reached. A
+        configuration it reaches can read every configuration beneath
+        this one, and a loop between them is a Nix infinite recursion,
+        which the childless view otherwise rules out.
+
+        A setting through `caisson.forDirectChildren` beats this one,
+        which beats one through `caisson.forChildren`, and within one
+        container the nearest parent that sets it wins. This setting
+        connects at the nearest configurations of its class whether or
+        not it wins there.
+      '';
+    };
+
   };
 }

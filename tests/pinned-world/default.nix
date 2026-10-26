@@ -344,7 +344,7 @@ let
   # The manifest of the disko configuration `nas-1` of a `layoutTop`.
   layoutManifest = integration: top: top.caisson.manifest.children.${integration}.nas-1;
 
-  # A top holding a colmena configuration named `default`, with a NixOS
+  # A top holding a colmena configuration named `colmenaHive`, with a NixOS
   # configuration declared inside it for each machine given, by name.
   # `machineArgs` are further arguments of each machine's constructor.
   # The colmena configuration disallows a bare `colmena apply`.
@@ -355,7 +355,7 @@ let
       configModule =
         { lib, ... }:
         {
-          caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+          caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
             pkgSets.pkgs = pkgs;
             configModule =
               { lib, ... }:
@@ -495,13 +495,13 @@ let
   };
 
   # A top holding the upstream hive as a colmena configuration named
-  # `default`.
+  # `colmenaHive`.
   upstreamHiveTop = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
       { lib, ... }:
       {
-        caisson.colmena.configurations.default = lib.caisson.colmena.mkConfiguration {
+        caisson.colmena.configurations.colmenaHive = lib.caisson.colmena.mkConfiguration {
           hive = upstreamHive;
         };
       };
@@ -781,7 +781,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                 ecosystemSrc = sources: { };
               };
             };
@@ -1016,8 +1016,8 @@ let
           upstreamHive = [ "top: inline/2" ];
           colmena = [
             "top: inline/2"
-            "caisson-colmena default: inline/4"
-            "caisson-colmena default / system x86_64-linux / nixos probe-node: inline/5"
+            "caisson-colmena colmenaHive: inline/4"
+            "caisson-colmena colmenaHive / system x86_64-linux / nixos probe-node: inline/5"
           ];
           caissonDisko = [
             "top: inline/2"
@@ -1237,9 +1237,10 @@ let
           source = "nixpkgs";
         };
         colmena =
-          (colmenaTop { probe-node = minimalNixosBase; }).caisson.manifest.children.caisson-colmena.default;
+          (colmenaTop { probe-node = minimalNixosBase; })
+          .caisson.manifest.children.caisson-colmena.colmenaHive;
         node = colmena.children.system.x86_64-linux.children.nixos.probe-node;
-        upstreamColmena = upstreamHiveTop.caisson.manifest.children.colmena.default;
+        upstreamColmena = upstreamHiveTop.caisson.manifest.children.colmena.colmenaHive;
         caissonDisko = layoutManifest "caisson-disko" (layoutTop {
           integration = "caisson-disko";
           layout = luksLvmLayout;
@@ -1588,7 +1589,7 @@ let
       && !(hiveLib.caisson.caisson-disko ? mkTopConfiguration)
       && !(hiveLib.caisson.disko ? mkTopConfiguration);
 
-    # A colmena configuration declared under the name `default` beneath
+    # A colmena configuration declared under the name `colmenaHive` beneath
     # a top fills the top's `colmenaHive`. Its nodes are the NixOS
     # configurations declared inside it, which the top also publishes
     # as `nixosConfigurations`, so the hive and the published machine
@@ -1727,7 +1728,7 @@ let
             configModule =
               { lib, ... }:
               {
-                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                   configModule =
                     { lib, ... }:
                     {
@@ -1771,7 +1772,7 @@ let
             configModule =
               { lib, ... }:
               {
-                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                   ecosystemSrc = _sources: ecosystemSrc;
                   configModule =
                     { lib, ... }:
@@ -1805,7 +1806,7 @@ let
             configModule =
               { lib, ... }:
               {
-                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                   configModule =
                     { lib, ... }:
                     {
@@ -1878,7 +1879,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
@@ -1944,7 +1945,7 @@ let
             configModule =
               { lib, ... }:
               {
-                caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                   configModule =
                     { lib, ... }:
                     {
@@ -2021,6 +2022,27 @@ let
       && hive.nodes.alpha.pkgs.hello.drvPath == pkgs.hello.drvPath
       && top.nixosConfigurations.beta.config.networking.hostName == "beta";
 
+    # `nodes` is the nodes themselves: the NixOS configurations declared
+    # beneath the colmena configuration, read from its full evaluation
+    # (`unsafeCrossChildReferences`), not second evaluations made apart
+    # from the tree. Each node records the colmena configuration as the
+    # level whose children it reads.
+    colmenaUpstreamNodesAreTheNodes =
+      let
+        colmena = upstreamHiveTop.caisson.manifest.children.colmena.colmenaHive;
+        alpha = colmena.children.system.x86_64-linux.children.nixos.alpha;
+      in
+      alpha.crossChildLevel != null
+      && !alpha.crossChildLevel.childless
+      && alpha.crossChildLevel.name == "colmenaHive"
+      &&
+        alpha.crossChildLevelPath == [
+          {
+            type = "colmena";
+            name = "colmenaHive";
+          }
+        ];
+
     # A node of the upstream-compatible integration builds the same
     # system as colmena builds from the same hive.
     colmenaUpstreamHiveBuildsWhatColmenaBuilds =
@@ -2032,9 +2054,9 @@ let
       && hive.toplevel.beta.drvPath == upstream.toplevel.beta.drvPath;
 
     # `colmenaHive` holds a single value, so only a colmena
-    # configuration declared under the name `default` is published
-    # there.
-    colmenaHiveIsTheDefaultConfiguration =
+    # configuration declared under the name of that output,
+    # `colmenaHive`, is published there.
+    colmenaHiveIsTheConfigurationNamedForIt =
       !(builtins.tryEval
         (hiveLib.caisson.structural.mkTopConfiguration {
           moduleImports = _modules: [ ];
@@ -2307,7 +2329,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
@@ -2360,7 +2382,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
@@ -2739,7 +2761,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+              caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
@@ -3351,7 +3373,7 @@ let
             ];
           }).hash;
 
-    # A treefmt configuration declared under the name `default` is
+    # A treefmt configuration declared under the name `formatter` is
     # published as `formatter.<system>`, and its wrapper is the
     # derivation treefmt-nix's own `mkWrapper` builds from the same
     # module on the same package set. Its outputs carry the
@@ -3368,7 +3390,7 @@ let
         declares =
           { lib, ... }:
           {
-            caisson.treefmt.configurations.default = lib.caisson.treefmt.mkConfiguration {
+            caisson.treefmt.configurations.formatter = lib.caisson.treefmt.mkConfiguration {
               ecosystemSrc = sources: sources.treefmt-nix;
               configModule = module;
             };
@@ -3401,8 +3423,8 @@ let
           configModule = declares;
         };
         children = top.caisson.manifest.children.system.x86_64-linux.children.treefmt;
-        evaluation = children.default;
-        rootedEvaluation = rooted.caisson.manifest.children.system.x86_64-linux.children.treefmt.default;
+        evaluation = children.formatter;
+        rootedEvaluation = rooted.caisson.manifest.children.system.x86_64-linux.children.treefmt.formatter;
         upstream = inputs.treefmt-nix.lib.mkWrapper pkgs module;
       in
       builtins.attrNames top.formatter == [ "x86_64-linux" ]
@@ -3635,7 +3657,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.topology.configurations.default = lib.caisson.topology.mkConfiguration {
+              caisson.topology.configurations.topology = lib.caisson.topology.mkConfiguration {
                 ecosystemSrc = sources: sources.nix-topology;
                 configModule =
                   { lib, ... }:
@@ -3672,7 +3694,7 @@ let
           ];
         };
         topology = top.topology.x86_64-linux;
-        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.topology.default;
+        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.topology.topology;
       in
       builtins.attrNames top.nixosConfigurations == [
         "alpha"

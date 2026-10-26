@@ -16,10 +16,12 @@
 # configuration the node also gets what caisson's NixOS evaluator gives
 # any configuration: the framework modules and the default selection.
 #
-# `nodes` is what colmena hands its nodes: every node, evaluated again
-# with type checking off, for one node to read another. A configuration
-# never reads a sibling in the tree, so these evaluations are tops of
-# their own, made only when a module reads them.
+# `nodes` is what colmena hands its nodes: every node, for one node to
+# read another. The colmena configuration sets
+# `unsafeCrossChildReferences` for its nearest NixOS configurations, so
+# each node reads the full evaluation of the colmena configuration and
+# `nodes` is the nodes themselves. A loop among nodes that read each
+# other is a Nix infinite recursion, as it is in colmena.
 #
 # The colmena configuration builds the hive from the NixOS
 # configurations it passes up, as caisson-colmena does, and is
@@ -166,19 +168,31 @@
         src: hive:
         { lib, ... }:
         let
-          # Every node again, with type checking off, for the `nodes`
-          # special argument.
-          uncheckedNodes = builtins.mapAttrs (
-            name: _:
-            lib.caisson.nixos.mkTopConfiguration (
-              nodeArgs src hive uncheckedNodes name [ { _module.check = false; } ]
-            )
-          ) hive.nodes;
+          # The nodes as the `nodes` special argument: the NixOS
+          # configurations declared beneath this colmena configuration,
+          # each evaluated, from the full evaluation of this
+          # configuration. A node reads that evaluation through
+          # `unsafeCrossChildReferences`, set below, which records the
+          # read on each node; it is the configuration this module runs
+          # in, so its manifest here holds the same children.
+          full = lib.caisson-core.evalManifest;
+          nodes =
+            builtins.foldl'
+              (
+                found: system:
+                found
+                // builtins.mapAttrs (_: node: node.value) (full.children.system.${system}.children.nixos or { })
+              )
+              (builtins.mapAttrs (_: node: node.value) (full.children.nixos or { }))
+              (builtins.attrNames (full.children.system or { }));
         in
         {
           meta = builtins.removeAttrs hive.meta evaluationMetaKeys;
+          # Colmena hands every node the other nodes, so the nodes read
+          # the full evaluation of this configuration.
+          caisson.forNearestChildren.unsafeCrossChildReferences.nixos = true;
           caisson.nixos.configurations = builtins.mapAttrs (
-            name: _: lib.caisson.nixos.mkConfiguration (nodeArgs src hive uncheckedNodes name [ ])
+            name: _: lib.caisson.nixos.mkConfiguration (nodeArgs src hive nodes name [ ])
           ) hive.nodes;
         };
 
