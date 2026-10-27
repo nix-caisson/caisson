@@ -166,10 +166,12 @@
       # member paths of the resources that hold state joined with `.`,
       # in the working directory, which NixOps4 finds the flake from. It
       # passes its own arguments to NixOps4, such as `--override-input`,
-      # and prints `{ outputValues, resourceProviderSystem }`. The state
-      # of a resource at `a.state` covers the composite `a`: its
-      # resources' recorded outputs, and its nested composites in turn.
-      # Only resources with a state have recorded outputs.
+      # and prints `{ outputValues, resourceProviderSystem }`. A dump
+      # holds the resources that record their outputs in that state, at
+      # their member paths from the root: the resources of the root
+      # under `resources`, and those of a composite `a` under
+      # `deployments.a`, in the same shape. Only resources with a state
+      # have recorded outputs.
       discoverArgsOf =
         {
           manifest,
@@ -188,13 +190,14 @@
           ];
           text = ''
             merged='{}'
-            for state in ${final.escapeShellArgs stateResources}; do
+            states=(${final.escapeShellArgs stateResources})
+            for state in "''${states[@]}"; do
               dump=$(nixops4 "$@" state dump "$state")
-              merged=$(jq -cn --argjson merged "$merged" --argjson dump "$dump" --arg state "$state" '
+              merged=$(jq -cn --argjson merged "$merged" --argjson dump "$dump" '
                 def outputValues:
                   ((.resources // {}) | map_values(.output_properties))
                   + ((.deployments // {}) | map_values(outputValues));
-                $merged * ({} | setpath($state | split(".") | .[:-1]; $dump | outputValues))
+                $merged * ($dump | outputValues)
               ')
             done
             jq -cn --argjson merged "$merged" '{ outputValues: $merged, resourceProviderSystem: "${system}" }'
@@ -266,36 +269,54 @@
                 inherit lib name class;
                 configModule = settings.configModule or null;
               };
-              # What NixOps4 gives a resource: its outputs, from the
-              # output values it passes, and its member path. An output
-              # NixOps4 has not passed fails when it is read, naming
-              # itself.
-              outputsModule = selection.caissonModule {
-                key = "caisson.${type}.outputs";
-                file = "caisson-${type}:outputs";
-                module = {
-                  config.outputs = _: { config = args.outputValues; };
-                  config.absoluteMemberPath = path;
-                };
-              };
-              moduleList =
+              # The modules of an evaluation in which the resource's
+              # outputs are `outputs`, with what NixOps4 gives a
+              # resource beside them, its member path.
+              modulesWith =
+                outputs:
                 baseModules { inherit src path; }
-                ++ [ outputsModule ]
+                ++ [
+                  (selection.caissonModule {
+                    key = "caisson.${type}.outputs";
+                    file = "caisson-${type}:outputs";
+                    module = {
+                      config.outputs = _: { config = outputs; };
+                      config.absoluteMemberPath = path;
+                    };
+                  })
+                ]
                 ++ frameworkModules
                 ++ moduleImports registry
                 ++ (if configModule == null then [ ] else [ configModule ]);
-              evaluated = lib.evalModules (
-                {
-                  inherit class;
-                  specialArgs = {
-                    inherit lib;
-                    inputs = manifest.sources;
-                    inherit (args) resourceProviderSystem;
+              evaluationOf =
+                modules:
+                lib.evalModules (
+                  {
+                    inherit class modules;
+                    specialArgs = {
+                      inherit lib;
+                      inputs = manifest.sources;
+                      inherit (args) resourceProviderSystem;
+                    }
+                    // (if (settings.specialArgs or null) != null then settings.specialArgs else { });
                   }
-                  // (if (settings.specialArgs or null) != null then settings.specialArgs else { });
-                  modules = moduleList;
-                }
-                // (if (settings.ecosystemArgs or null) != null then settings.ecosystemArgs else { })
+                  // (if (settings.ecosystemArgs or null) != null then settings.ecosystemArgs else { })
+                );
+              # The outputs are the output values NixOps4 passes. An
+              # output NixOps4 has not passed fails when it is read,
+              # naming itself.
+              moduleList = modulesWith args.outputValues;
+              evaluated = evaluationOf moduleList;
+              # The evaluation that names the outputs, for `argsNeeded`.
+              # Reading an output fails there with an error that names
+              # the resource, since NixOps4 needs the names of the
+              # outputs before it has their values.
+              naming = evaluationOf (
+                modulesWith (throw ''
+                  ${context}: the resource at ${showPath path} reads its own outputs in its
+                  `outputsSkeleton`, which names its outputs. NixOps4 needs the names of the
+                  outputs of a resource before it has their values.
+                '')
               );
               cacheableOutputs = evaluated.config.cacheableOutputs or [ ];
             in
@@ -323,7 +344,7 @@
                     cacheable = builtins.elem output cacheableOutputs;
                     description = "An output of the resource at ${showPath path}.";
                   }
-                ) evaluated.config.outputsSkeleton;
+                ) naming.config.outputsSkeleton;
               };
             };
         in
