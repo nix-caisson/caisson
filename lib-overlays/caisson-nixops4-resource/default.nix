@@ -90,7 +90,7 @@
       # NixOps4's resource, provider-value and provider-declaration
       # modules; the upstream-compatible one builds on this with
       # NixOps4's class and its own modules.
-      resourceWith =
+      mkResourceConfiguration =
         {
           class,
           type ? resourceType,
@@ -201,7 +201,7 @@
             configurationFor (nixops4.deployOf name args) { inherit name parent; };
         };
 
-      configuration = resourceWith {
+      configuration = mkResourceConfiguration {
         class = resourceType;
         baseModules =
           { src, ... }:
@@ -263,7 +263,7 @@
           configuration args;
         # What the upstream-compatible integration builds on.
         extra = {
-          inherit resourceWith deployModule resourceOptions;
+          inherit mkResourceConfiguration deployModule resourceOptions;
         };
       };
     in

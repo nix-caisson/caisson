@@ -2296,7 +2296,7 @@ let
     nixops4CompositeAndResourceAreTwoClasses =
       let
         evaluates = top: (builtins.tryEval (builtins.deepSeq (nixops4Export top.nixops4) true)).success;
-        resourceWith =
+        resourceTop =
           extra:
           nixops4TopWith {
             resources.probe = {
@@ -2307,8 +2307,8 @@ let
       in
       evaluates (nixops4TopWith { } { })
       && !(evaluates (nixops4TopWith { root.type = "exec"; } { }))
-      && evaluates (resourceWith { })
-      && !(evaluates (resourceWith {
+      && evaluates (resourceTop { })
+      && !(evaluates (resourceTop {
         members.extra = { };
       }));
 
