@@ -2346,8 +2346,8 @@ let
       && (nixops4RootManifest top).deferred.argNames == core.argNamesOf needed;
 
     # A root composite that lists the resources holding its state gives
-    # a program, for each system a package config builds a set for,
-    # that reads the outputs NixOps4 recorded; one that lists none gives
+    # a program, built for the system of the tool that asks, that
+    # reads the outputs NixOps4 recorded; one that lists none gives
     # nothing. A finalized composite tells a tool the args it gives a
     # member (`deferredChildArgs`), so the tool can finalize the
     # member's entry itself.
@@ -2359,11 +2359,12 @@ let
           rootArgs.stateResources = [ "state" ];
           resources.probe.ssh.hostPublicKey = nixops4HostKey;
         } { probe = minimalNixosBase; };
-        discover = core.discoverArgsFor (entryOf stateful);
+        discover = core.discoverArgsFor (entryOf stateful) "x86_64-linux";
         memberArgs = (nixops4RootManifest stateful).outputs.deferredChildArgs "probe";
       in
-      core.discoverArgsFor (entryOf (nixops4TopWith { } { })) == null
-      && discover.x86_64-linux.name == "caisson-nixops4-discover"
+      core.discoverArgsFor (entryOf (nixops4TopWith { } { })) "x86_64-linux" == null
+      && discover.name == "caisson-nixops4-discover"
+      && discover.system == "x86_64-linux"
       && memberArgs.path == [ "probe" ]
       && memberArgs.outputValues.stdout == "stub";
 

@@ -227,10 +227,14 @@
           # A program that reads the outputs NixOps4 recorded, for the
           # composite that lists the resources holding its state.
           discoverArgs =
+            {
+              name,
+              parent,
+              system,
+            }:
             if (args.stateResources or [ ]) == [ ] then
               null
             else
-              { parent, ... }:
               nixops4.discoverArgsOf {
                 manifest = parent;
                 src = nixops4.ecosystemSrcOf {
@@ -238,6 +242,7 @@
                   manifest = parent;
                 };
                 inherit (args) stateResources;
+                inherit system;
               };
           # The deploying system, and the outputs of the members, which
           # depend on the members the composite declares, so on the args
