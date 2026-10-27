@@ -118,7 +118,7 @@
       # declarations, and the view of the members' outputs as `members`
       # in the composite and in each member; the upstream-compatible one
       # builds on this with NixOps4's class and its own modules.
-      compositeWith =
+      mkCompositeConfiguration =
         {
           class,
           type ? compositeType,
@@ -269,7 +269,7 @@
             configurationFor (nixops4.deployOf name args) { inherit name parent; };
         };
 
-      configuration = compositeWith {
+      configuration = mkCompositeConfiguration {
         class = compositeType;
         baseModules =
           { src, ... }:
@@ -328,7 +328,7 @@
           configuration args;
         # What the upstream-compatible integration builds on.
         extra = {
-          inherit compositeWith showPath;
+          inherit mkCompositeConfiguration showPath;
         };
       };
     in

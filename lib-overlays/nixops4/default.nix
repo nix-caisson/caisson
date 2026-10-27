@@ -201,7 +201,7 @@
       # own `members` argument holds the members it declares itself.
       compositeOf =
         ctx: modules:
-        composites.compositeWith {
+        composites.mkCompositeConfiguration {
           class = upstreamClass;
           baseModules =
             { src, deploy }:
@@ -217,7 +217,7 @@
       # outputs the configuration allows a tool to cache.
       resourceOf =
         ctx: modules:
-        resources.resourceWith {
+        resources.mkResourceConfiguration {
           class = upstreamClass;
           baseModules = { src, deploy }: componentBase src ++ [ (cacheableModule ctx deploy) ];
         } (componentArgs ctx modules);
