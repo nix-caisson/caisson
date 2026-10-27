@@ -553,6 +553,65 @@ let
     in
     walk [ ];
 
+  # A native composite whose module is `module`, under `lib`.
+  nixops4Composite =
+    lib: module:
+    lib.caisson.caisson-nixops4-composite.mkConfiguration {
+      configModule = module;
+    };
+
+  # A native resource of the `exec` type of NixOps4's `local` provider,
+  # with the further module `module`.
+  nixops4Exec =
+    lib: module:
+    lib.caisson.caisson-nixops4-resource.mkConfiguration {
+      configModule =
+        { providers, ... }:
+        {
+          imports = [ module ];
+          providers.local = inputs.nixops4.modules.nixops4Provider.local;
+          type = providers.local.exec;
+          inputs.executable = "/bin/true";
+        };
+    };
+
+  # A native resource of the `state_file` type of NixOps4's `local`
+  # provider, a resource that holds the state of others.
+  nixops4StateFile =
+    lib:
+    lib.caisson.caisson-nixops4-resource.mkConfiguration {
+      configModule =
+        { providers, ... }:
+        {
+          providers.local = inputs.nixops4.modules.nixops4Provider.local;
+          type = providers.local.state_file;
+          inputs.name = "state.json";
+        };
+    };
+
+  # A composite module that records its `members` argument as `seen`.
+  nixops4SeesMembers =
+    { lib, members, ... }:
+    {
+      options.seen = lib.mkOption { type = lib.types.raw; };
+      config.seen = members;
+    };
+
+  # A top whose root composite `nixops4` has the module `module`.
+  nixops4RootTopWith =
+    module:
+    hiveLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          caisson.caisson-nixops4-composite.configurations.nixops4 = nixops4Composite lib module;
+        };
+    };
+
+  # Whether forcing a value fails with an error a probe can catch.
+  nixops4Fails = value: !(builtins.tryEval (builtins.deepSeq value true)).success;
+
   # A deferred configuration of a tool that is not NixOps4, declared
   # beside a NixOps4 deployment: it takes the cacheable arg `who` and
   # greets it. Its entry is published as `greetings.<name>`, a function
@@ -2768,6 +2827,503 @@ let
         needed = (nixops4RootManifest top).argsNeeded;
       in
       needed.outputValues.group.inner.stdout.cacheable && !needed.outputValues.address.stdout.cacheable;
+
+    # Native composites nest to any depth. Each composite finalizes its
+    # members with their part of its args: its member path, the
+    # `members` argument of each composite, the `argsSource` of each
+    # member, the args the root names and the export all follow the
+    # nesting. The `members` argument holds, for a composite member, the
+    # outputs of its members by name. The root collects the state
+    # resources of the whole tree, each once, and only the root gives a
+    # discovery program.
+    nixops4NestedCompositesFollowTheNesting =
+      let
+        top = nixops4RootTopWith (
+          { lib, members, ... }:
+          {
+            imports = [ nixops4SeesMembers ];
+            caisson.caisson-nixops4-resource.configurations.state = nixops4StateFile lib;
+            caisson.caisson-nixops4-resource.configurations.m = nixops4Exec lib { state = members.state; };
+            caisson.caisson-nixops4-composite.configurations.a = nixops4Composite lib (
+              { lib, members, ... }:
+              {
+                imports = [ nixops4SeesMembers ];
+                caisson.caisson-nixops4-resource.configurations.s = nixops4StateFile lib;
+                caisson.caisson-nixops4-resource.configurations.w = nixops4Exec lib { state = members.s; };
+                caisson.caisson-nixops4-resource.configurations.w2 = nixops4Exec lib { state = members.s; };
+                caisson.caisson-nixops4-composite.configurations.b = nixops4Composite lib (
+                  { lib, ... }:
+                  {
+                    imports = [ nixops4SeesMembers ];
+                    caisson.caisson-nixops4-resource.configurations.r = nixops4Exec lib {
+                      cacheableOutputs = [ "stdout" ];
+                    };
+                  }
+                );
+              }
+            );
+          }
+        );
+        root = nixops4RootManifest top;
+        export = nixops4Export top.nixops4;
+        a = root.children.caisson-nixops4-composite.a;
+        b = a.children.caisson-nixops4-composite.b;
+        r = b.children.caisson-nixops4-resource.r;
+        discover = root.discoverArgs { system = "x86_64-linux"; };
+      in
+      [
+        root.outputs.path
+        a.outputs.path
+        b.outputs.path
+        r.value.config.absoluteMemberPath
+      ] == [
+        [ ]
+        [ "a" ]
+        [
+          "a"
+          "b"
+        ]
+        [
+          "a"
+          "b"
+          "r"
+        ]
+      ]
+      && root.value.config.seen.a.absoluteMemberPath == [ "a" ]
+      && root.value.config.seen.a.outputs.b.r.stdout == "stub"
+      && root.value.config.seen.a.outputs.w.stdout == "stub"
+      && a.value.config.seen.b.outputs.r.stdout == "stub"
+      &&
+        b.value.config.seen.r == {
+          absoluteMemberPath = [
+            "a"
+            "b"
+            "r"
+          ];
+          outputs.stdout = "stub";
+        }
+      && a.argsSource [ ] == "the composite at the root"
+      && b.argsSource [ ] == "the composite at a"
+      && r.argsSource [ ] == "the composite at a.b"
+      &&
+        nixops4ArgPathsOf root.argsNeeded == [
+          [
+            "outputValues"
+            "a"
+            "b"
+            "r"
+            "stdout"
+          ]
+          [
+            "outputValues"
+            "a"
+            "w"
+            "stdout"
+          ]
+          [
+            "outputValues"
+            "a"
+            "w2"
+            "stdout"
+          ]
+          [
+            "outputValues"
+            "m"
+            "stdout"
+          ]
+          [ "resourceProviderSystem" ]
+        ]
+      && root.argsNeeded.outputValues.a.b.r.stdout.cacheable
+      && !root.argsNeeded.outputValues.a.w.stdout.cacheable
+      && export.members.a.members.b.members.r.resource.type == "exec"
+      &&
+        export.members.a.members.w.resource.state == [
+          "a"
+          "s"
+        ]
+      &&
+        root.outputs.stateResources == [
+          [
+            "a"
+            "s"
+          ]
+          [ "state" ]
+        ]
+      && a.discoverArgs { system = "x86_64-linux"; } == null
+      && pkgs.lib.hasInfix "states=(a.s state)" discover.text;
+
+    # A NixOS configuration declared beneath a resource inside a nested
+    # composite is deployed by that resource, as one beneath a resource
+    # of the root is.
+    nixops4MachineInsideANestedComposite =
+      let
+        top = nixops4RootTopWith (
+          { lib, ... }:
+          {
+            caisson.caisson-nixops4-composite.configurations.site = nixops4Composite lib (
+              { lib, ... }:
+              {
+                caisson.caisson-nixops4-resource.configurations.web =
+                  lib.caisson.caisson-nixops4-resource.mkConfiguration
+                    {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          ssh.hostPublicKey = nixops4HostKey;
+                          caisson.nixos.configurations.web = lib.caisson.nixos.mkConfiguration {
+                            configModule = minimalNixosBase;
+                          };
+                        };
+                    };
+              }
+            );
+          }
+        );
+        args = (nixops4Export top.nixops4).members.site.members.web.resource.inputs.args;
+        web =
+          (nixops4RootManifest top)
+          .children.caisson-nixops4-composite.site.children.caisson-nixops4-resource.web;
+        machine = web.children.system.x86_64-linux.children.nixos.web;
+      in
+      web.value.config.absoluteMemberPath == [
+        "site"
+        "web"
+      ]
+      && builtins.elemAt args 2 == "root@web"
+      && builtins.elemAt args 3 == "${machine.value.config.system.build.toplevel}";
+
+    # Which members a composite has, and whether each is a composite or
+    # a resource, may not depend on its members or on their outputs:
+    # the composite that reads them there is refused with an error that
+    # names it, in place of an infinite recursion. Reading `members`
+    # anywhere else stays allowed. tests/deferred-errors reads the text.
+    nixops4MembersDecidedFromOutputsAreRefused =
+      let
+        argsNeededOf = top: (nixops4RootManifest top).argsNeeded;
+        native = nixops4RootTopWith (
+          { lib, members, ... }:
+          {
+            imports = [ nixops4AddressRoot ];
+            caisson.caisson-nixops4-resource.configurations = lib.optionalAttrs (
+              members.address.outputs.stdout == "more"
+            ) { extra = nixops4Exec lib { }; };
+          }
+        );
+        nested = nixops4RootTopWith (
+          { lib, ... }:
+          {
+            caisson.caisson-nixops4-composite.configurations.a = nixops4Composite lib (
+              { lib, members, ... }:
+              {
+                caisson.caisson-nixops4-resource.configurations = lib.optionalAttrs (members ? x) {
+                  x = nixops4Exec lib { };
+                };
+              }
+            );
+          }
+        );
+        upstreamNames = nixops4UpstreamTopWith { } [
+          (
+            { providers, config, ... }:
+            {
+              providers.local = inputs.nixops4.modules.nixops4Provider.local;
+              members = {
+                address = {
+                  type = providers.local.exec;
+                  inputs.executable = "/bin/true";
+                };
+              }
+              // (if config.members.address.outputs.stdout == "more" then { extra = { }; } else { });
+            }
+          )
+        ];
+        upstreamKind = nixops4UpstreamTopWith { } [
+          (
+            { providers, members, ... }:
+            {
+              providers.local = inputs.nixops4.modules.nixops4Provider.local;
+              members.address = {
+                type = providers.local.exec;
+                inputs.executable = "/bin/true";
+              };
+              members.dynamic =
+                if members.address.outputs.stdout == "resource" then
+                  { type = providers.local.exec; }
+                else
+                  { members.inner.type = providers.local.exec; };
+            }
+          )
+        ];
+      in
+      nixops4Fails (argsNeededOf native)
+      && nixops4Fails (argsNeededOf nested)
+      && nixops4Fails (argsNeededOf upstreamNames)
+      && nixops4Fails (argsNeededOf upstreamKind)
+      && !(nixops4Fails (argsNeededOf (nixops4TopWith { root = nixops4AddressRoot; } { })));
+
+    # A resource whose `outputsSkeleton` reads its own outputs is
+    # refused with an error that names it, in place of an infinite
+    # recursion. tests/deferred-errors reads the text.
+    nixops4OutputsNamedFromOwnOutputsAreRefused =
+      let
+        top = nixops4RootTopWith (
+          { lib, ... }:
+          {
+            caisson.caisson-nixops4-resource.configurations.selfish = nixops4Exec lib (
+              { config, ... }:
+              {
+                outputsSkeleton = lib.mkForce (
+                  {
+                    stdout = { };
+                  }
+                  // lib.optionalAttrs (config.outputs.stdout == "more") { extra = { }; }
+                );
+              }
+            );
+          }
+        );
+      in
+      nixops4Fails (nixops4RootManifest top).argsNeeded;
+
+    # A name declared both as a composite and as a resource is refused,
+    # since NixOps4 holds one member under a name.
+    nixops4OneMemberUnderAName =
+      nixops4Fails
+        (nixops4RootManifest (
+          nixops4RootTopWith (
+            { lib, ... }:
+            {
+              caisson.caisson-nixops4-resource.configurations.x = nixops4Exec lib { };
+              caisson.caisson-nixops4-composite.configurations.x = nixops4Composite lib { };
+            }
+          )
+        )).argsNeeded;
+
+    # A flake publishes one root as `nixops4`: two roots, declared side
+    # by side or in two groups, are refused, and so is a root declared
+    # under another name. tests/deferred-errors reads the text.
+    nixops4OneRootPerFlake =
+      let
+        topWith =
+          module:
+          hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule = module;
+          };
+        rootIn =
+          lib:
+          lib.caisson.structural.mkConfiguration {
+            configModule.caisson.caisson-nixops4-composite.configurations.nixops4 =
+              nixops4Composite lib nixops4AddressRoot;
+          };
+      in
+      nixops4Fails
+        (topWith (
+          { lib, ... }:
+          {
+            caisson.caisson-nixops4-composite.configurations.nixops4 = nixops4Composite lib nixops4AddressRoot;
+            caisson.nixops4.configurations.nixops4 = lib.caisson.nixops4.mkConfiguration { };
+          }
+        )).nixops4._type
+      &&
+        nixops4Fails
+          (topWith (
+            { lib, ... }:
+            {
+              caisson.structural.configurations.one = rootIn lib;
+              caisson.structural.configurations.two = rootIn lib;
+            }
+          )).nixops4._type
+      &&
+        nixops4Fails
+          (topWith (
+            { lib, ... }:
+            {
+              caisson.caisson-nixops4-composite.configurations.deploy = nixops4Composite lib nixops4AddressRoot;
+            }
+          )).nixops4._type;
+
+    # A root declared inside a NixOS configuration, which is evaluated
+    # per system, is published as `nixops4` where one system is in
+    # force. Its entry stands beneath that system.
+    nixops4RootInsideAMachine =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.host = lib.caisson.nixos.mkConfiguration {
+                configModule = {
+                  imports = [ minimalNixosBase ];
+                  caisson.caisson-nixops4-composite.configurations.nixops4 = nixops4Composite lib nixops4AddressRoot;
+                };
+              };
+            };
+        };
+        entry =
+          top.caisson.manifest.children.system.x86_64-linux.children.nixos.host.children.caisson-nixops4-composite.nixops4;
+      in
+      core.isDeferred entry
+      && entry.parent.type == "nixos"
+      && (nixops4Export top.nixops4).members.address.resource.type == "exec";
+
+    # A deferred configuration whose parent does not finalize it stays
+    # an entry in the children of that parent, for a tool to finalize:
+    # a resource declared at the top, and a composite declared beneath
+    # a resource. Neither has a composite above it, so each is at the
+    # root of its member paths, and neither is published.
+    nixops4EntriesAParentDoesNotFinalize =
+      let
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.caisson-nixops4-resource.configurations.lone = nixops4Exec lib { };
+              caisson.caisson-nixops4-composite.configurations.nixops4 = nixops4Composite lib (
+                { lib, ... }:
+                {
+                  caisson.caisson-nixops4-resource.configurations.holder = nixops4Exec lib {
+                    caisson.caisson-nixops4-composite.configurations.inner = nixops4Composite lib nixops4AddressRoot;
+                  };
+                }
+              );
+            };
+        };
+        finalizeWith =
+          entry: outputValues:
+          entry.finalize {
+            args = {
+              resourceProviderSystem = "x86_64-linux";
+              inherit outputValues;
+            };
+            argsSource = _: "the probe";
+          };
+        lone = top.caisson.manifest.children.caisson-nixops4-resource.lone;
+        inner =
+          (nixops4RootManifest top)
+          .children.caisson-nixops4-resource.holder.children.caisson-nixops4-composite.inner;
+        loneFinalized = finalizeWith lone { stdout = "out"; };
+        innerFinalized = finalizeWith inner { address.stdout = "out"; };
+      in
+      core.isDeferred lone
+      && core.isDeferred inner
+      && loneFinalized.outputs.path == [ ]
+      && loneFinalized.outputs.export.resource.type == "exec"
+      && innerFinalized.outputs.path == [ ]
+      && innerFinalized.outputs.export.members.address.resource.type == "exec"
+      &&
+        builtins.attrNames top == [
+          "caisson"
+          "libOverlays"
+          "modules"
+          "nixops4"
+          "pkgOverlays"
+        ];
+
+    # `getProviders` finalizes the root without outputs, so a provider
+    # of the root configured from an output fails, as it does upstream.
+    # It builds the providers of the root alone, not those a composite
+    # beneath declares, as upstream collects them.
+    nixops4ProvidersOfTheRootAlone =
+      let
+        providersOf =
+          top:
+          builtins.fromJSON (
+            builtins.elemAt (pkgs.lib.splitString "\n"
+              (top.nixops4.getProviders { system = "x86_64-linux"; }).text
+            ) 1
+          );
+        fromOutputs = nixops4RootTopWith (
+          { members, ... }:
+          {
+            imports = [ nixops4AddressRoot ];
+            providers.reader = {
+              executable = "/bin/reader";
+              args = [ members.address.outputs.stdout ];
+              resourceTypes = { };
+            };
+          }
+        );
+        nested = nixops4RootTopWith (
+          { lib, ... }:
+          {
+            providers.root = {
+              executable = "/bin/root";
+              resourceTypes = { };
+            };
+            caisson.caisson-nixops4-composite.configurations.sub = nixops4Composite lib {
+              providers.nested = {
+                executable = "/bin/nested";
+                resourceTypes = { };
+              };
+            };
+          }
+        );
+      in
+      nixops4Fails (providersOf fromOutputs)
+      &&
+        providersOf nested == {
+          root = {
+            executable = "/bin/root";
+            args = [ ];
+          };
+        };
+
+    # Upstream composites nest to any depth, as native ones do: the
+    # member paths, the args the root names, the allow-list by member
+    # path, and a member reading the output of a member two levels
+    # down.
+    nixops4UpstreamCompositesFollowTheNesting =
+      let
+        top = nixops4UpstreamTopWith { cacheableOutputs."g.h.r" = [ "stdout" ]; } [
+          (
+            { providers, members, ... }:
+            {
+              providers.local = inputs.nixops4.modules.nixops4Provider.local;
+              members.g.members.h.members.r = {
+                type = providers.local.exec;
+                inputs.executable = "/bin/true";
+              };
+              members.g.members.reader = {
+                type = providers.local.exec;
+                inputs.executable = "/bin/echo";
+                inputs.args = [ members.g.members.h.members.r.outputs.stdout ];
+              };
+            }
+          )
+        ];
+        root = nixops4RootManifest top;
+        r =
+          root.children.caisson-nixops4-composite.g.children.caisson-nixops4-composite.h.children.caisson-nixops4-resource.r;
+      in
+      nixops4ArgPathsOf root.argsNeeded == [
+        [
+          "outputValues"
+          "g"
+          "h"
+          "r"
+          "stdout"
+        ]
+        [
+          "outputValues"
+          "g"
+          "reader"
+          "stdout"
+        ]
+        [ "resourceProviderSystem" ]
+      ]
+      && root.argsNeeded.outputValues.g.h.r.stdout.cacheable
+      && !root.argsNeeded.outputValues.g.reader.stdout.cacheable
+      &&
+        r.value.config.absoluteMemberPath == [
+          "g"
+          "h"
+          "r"
+        ]
+      && r.crossChildLevel.name == "h"
+      && (nixops4Export top.nixops4).members.g.members.reader.resource.inputs.args == [ "stub" ];
 
     # A node of the upstream-compatible integration builds the same
     # system as colmena builds from the same hive.
@@ -5122,6 +5678,15 @@ let
 in
 {
   inherit results failures;
+  # What the checks that build from the same world read.
+  fixtures = {
+    inherit
+      hiveLib
+      pkgs
+      nixops4ArgPathsOf
+      nixops4Entry
+      ;
+  };
   ok = failures == [ ];
   summary =
     if failures == [ ] then

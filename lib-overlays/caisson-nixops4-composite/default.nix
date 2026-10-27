@@ -192,7 +192,12 @@
                 inherit lib name class;
                 configModule = settings.configModule or null;
               };
-              entries = memberEntriesOf path evaluated.config;
+              # The members, by name. The names come from `naming`, and
+              # each entry comes from the evaluation, so the composite's
+              # module may read `members` wherever it does not decide
+              # which members there are.
+              declared = memberEntriesOf path evaluated.config;
+              entries = builtins.mapAttrs (member: _: declared.${member}) (memberEntriesOf path naming.config);
               # The members, each finalized once with its part of the
               # composite's args, from the full evaluation. The
               # childless view finalizes none.
@@ -211,41 +216,70 @@
                     }
                   ) entries;
               ofType = memberType: final.filterAttrs (_: member: member.type == memberType) finalized;
-              membersModule = selection.caissonModule {
-                key = "caisson.${type}.members";
-                file = "caisson-${type}:members";
-                module =
-                  { config, ... }:
-                  {
-                    _module.args.members = membersArg {
-                      inherit
-                        args
-                        path
-                        entries
-                        config
-                        ;
-                    };
-                  };
-              };
-              moduleList =
+              # The modules of an evaluation in which the `members`
+              # module argument is what `members` returns for the
+              # evaluation's config, and the base modules receive
+              # `finalized`.
+              modulesWith =
+                { members, finalized }:
                 baseModules { inherit src path finalized; }
-                ++ [ membersModule ]
+                ++ [
+                  (selection.caissonModule {
+                    key = "caisson.${type}.members";
+                    file = "caisson-${type}:members";
+                    module =
+                      { config, ... }:
+                      {
+                        _module.args.members = members config;
+                      };
+                  })
+                ]
                 ++ frameworkModules
                 ++ moduleImports registry
                 ++ (if configModule == null then [ ] else [ configModule ]);
-              evaluated = lib.evalModules (
-                {
-                  inherit class;
-                  specialArgs = {
-                    inherit lib;
-                    inputs = manifest.sources;
-                    inherit (args) resourceProviderSystem;
+              evaluationOf =
+                modules:
+                lib.evalModules (
+                  {
+                    inherit class modules;
+                    specialArgs = {
+                      inherit lib;
+                      inputs = manifest.sources;
+                      inherit (args) resourceProviderSystem;
+                    }
+                    // (if (settings.specialArgs or null) != null then settings.specialArgs else { });
                   }
-                  // (if (settings.specialArgs or null) != null then settings.specialArgs else { });
-                  modules = moduleList;
-                }
-                // (if (settings.ecosystemArgs or null) != null then settings.ecosystemArgs else { })
-              );
+                  // (if (settings.ecosystemArgs or null) != null then settings.ecosystemArgs else { })
+                );
+              moduleList = modulesWith {
+                inherit finalized;
+                members =
+                  config:
+                  membersArg {
+                    inherit
+                      args
+                      path
+                      entries
+                      config
+                      ;
+                  };
+              };
+              evaluated = evaluationOf moduleList;
+              # The evaluation that decides which members there are. The
+              # members and their outputs fail there when they are read,
+              # with an error that names the composite, since the names
+              # of the members must be known before any member is
+              # finalized.
+              naming = evaluationOf (modulesWith {
+                members = _: membersUnknown;
+                finalized = membersUnknown;
+              });
+              membersUnknown = throw ''
+                ${context}: the composite at ${showPath path} reads its members, or their
+                outputs, where it decides which members it has. Which members a composite
+                has, and whether each is a composite or a resource, must not depend on its
+                members or on their outputs.
+              '';
               # The member paths of the resources in the tree of this
               # composite that hold state, each once.
               stateResources = final.unique (
