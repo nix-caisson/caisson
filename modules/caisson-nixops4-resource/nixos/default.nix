@@ -42,7 +42,7 @@ let
   # The NixOS configuration the resource deploys: the one declared
   # beneath it, evaluated for one system.
   nixos =
-    (lib.caisson.caisson-nixops4.machineOf {
+    (lib.caisson.caisson-nixops4-resource.machineOf {
       inherit context declared;
       resource = manifest.name;
     }).value;
@@ -52,11 +52,12 @@ let
   knownHosts = builtins.toFile "known_hosts" ''
     ${config.ssh.host} ${config.ssh.hostPublicKey}
   '';
-  src = lib.caisson.caisson-nixops4.ecosystemSrcOf {
+  src = lib.caisson.caisson-nixops4-resource.ecosystemSrcOf {
     explicit = null;
     inherit manifest;
   };
-  bash = lib.getExe (lib.caisson.caisson-nixops4.pkgsFor manifest resourceProviderSystem).bash;
+  bash = lib.getExe (lib.caisson.caisson-nixops4-resource.pkgsFor manifest resourceProviderSystem)
+    .bash;
 in
 {
   _file = "caisson:caisson-nixops4-resource/nixos";

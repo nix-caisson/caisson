@@ -38,11 +38,18 @@ let
       );
 
   # The manifests passed up: a configuration evaluated per system
-  # stands for each of its evaluations.
+  # stands for each of its evaluations. The entry of a deferred
+  # configuration is no manifest and exports no registries.
   exported = builtins.concatMap (
     integration:
     builtins.concatMap (
-      finalized: if isManifest finalized then [ finalized ] else builtins.attrValues finalized
+      finalized:
+      if isManifest finalized then
+        [ finalized ]
+      else if lib.caisson-core.isDeferred finalized then
+        [ ]
+      else
+        builtins.attrValues finalized
     ) (builtins.attrValues selected.${integration})
   ) (builtins.attrNames selected);
 

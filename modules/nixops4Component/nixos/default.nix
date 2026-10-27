@@ -30,12 +30,13 @@
 let
   manifest = lib.caisson-core.evalManifest;
   usesNixos = options ? nixos && options.nixos ? module;
-  machine = lib.caisson.caisson-nixops4.machineOf {
+  machine = lib.caisson.caisson-nixops4-resource.machineOf {
     context = "caisson's `nixos` module of the nixops4Component class";
     resource = manifest.name;
     declared = config.caisson.nixos.configurations;
   };
-  bash = lib.getExe (lib.caisson.caisson-nixops4.pkgsFor manifest resourceProviderSystem).bash;
+  bash = lib.getExe (lib.caisson.caisson-nixops4-resource.pkgsFor manifest resourceProviderSystem)
+    .bash;
 in
 {
   _file = "caisson:nixops4Component/nixos";

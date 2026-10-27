@@ -4,33 +4,34 @@
 # modules of a root component as NixOps4 users write them for NixOps4's
 # `mkRoot`, of NixOps4's class `nixops4Component`, and caisson evaluates
 # every component of the deployment. The native integrations,
-# caisson-nixops4 and its composite and resource, take caisson's form
-# instead.
+# caisson-nixops4-composite and caisson-nixops4-resource, take
+# caisson's form instead.
 #
-# A nixops4 configuration, named `nixops4` for the output it fills,
-# declares the root composite beneath it under the name `root` from
-# those modules, and publishes the root as the caisson-nixops4
-# configuration does. Every component is evaluated with NixOps4's
-# class name, so a module that sets `_class = "nixops4Component"`
-# loads, and with NixOps4's resource, type and providers options.
+# A nixops4 configuration is the root composite of the deployment, a
+# deferred configuration as a native composite is. Declared under the
+# name `nixops4`, for the output it fills, it is published as the
+# native root is. Every component is evaluated with NixOps4's class
+# name, so a module that sets `_class = "nixops4Component"` loads, and
+# with NixOps4's resource, type and providers options.
 #
 # Upstream declares `members` and the resource options on every
 # component and decides which kind a component is when its export is
 # read: a component whose `resourceType` is defined is a resource. A
-# composite here collects the definitions of each member under
-# `members.<name>` and decides the same way, with a probe evaluation
-# of the member's modules over NixOps4's own base modules. A member
-# becomes a caisson-nixops4-resource or a caisson-nixops4-composite
-# configuration declared beneath the composite, evaluated with the
-# same modules. A member that sets `type` and also has members is
-# refused; upstream drops the members.
+# composite here declares `members` again, as `lazyAttrsOf
+# deferredModule`, and decides the same way for each member, with a
+# probe evaluation of the member's modules over NixOps4's own base
+# modules. A member becomes a caisson-nixops4-resource or a
+# caisson-nixops4-composite configuration declared beneath the
+# composite, evaluated with the same modules. A member that sets `type`
+# and also has members is refused; upstream drops the members.
 #
-# The `members` module argument is the one upstream gives: in a
-# composite, the configs of its members, which a composite reads to
-# wire one member to another (`members.db.outputs.address`); in a
-# resource, nothing. A composite reads its members' configs through its
-# full evaluation, so every composite sets `unsafeCrossChildReferences`
-# for the class of its members.
+# The `members` module argument and `config.members` are what upstream
+# gives: in a composite, the configs of its members, which a composite
+# reads to wire one member to another (`members.db.outputs.address`)
+# and to name the resource that holds the state of another
+# (`state = members.state`); in a resource, nothing. A composite reads
+# its members' configs through its full evaluation, so every composite
+# sets `unsafeCrossChildReferences` for the class of its members.
 #
 # A member that imports nixops4-nixos's module gets its `nixos.module`
 # evaluated as a caisson NixOS configuration beneath it, rather than by
@@ -51,7 +52,6 @@
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
     # The native integrations, whose evaluators this one builds on.
-    ((mkLibOverlay ../caisson-nixops4) // { key = "caisson-nixops4"; })
     ((mkLibOverlay ../caisson-nixops4-composite) // { key = "caisson-nixops4-composite"; })
     ((mkLibOverlay ../caisson-nixops4-resource) // { key = "caisson-nixops4-resource"; })
   ];
@@ -59,18 +59,19 @@
   overlay =
     final: prev:
     let
-      native = final.caisson.caisson-nixops4;
       composites = final.caisson.caisson-nixops4-composite;
       resources = final.caisson.caisson-nixops4-resource;
       context = "lib.caisson.nixops4";
       upstreamClass = "nixops4Component";
+      compositeType = "caisson-nixops4-composite";
+      resourceType = "caisson-nixops4-resource";
 
       # The options every upstream component has beside `members`:
       # NixOps4's resource, type and providers options.
       componentBase = src: [
-        (native.componentModule src "resource")
-        (native.componentModule src "provider-values")
-        (native.componentModule src "provider-declarations")
+        (resources.componentModule src "resource")
+        (resources.componentModule src "provider-values")
+        (resources.componentModule src "provider-declarations")
       ];
 
       # The modules of a component, as the configuration's module.
@@ -111,63 +112,91 @@
         in
         if isResource && hasMembers then
           throw ''
-            ${context}: the member ${composites.showPath (path ++ [ name ])} sets `type`, which makes it a
+            ${context}: the member ${resources.showPath (path ++ [ name ])} sets `type`, which makes it a
             resource, and declares members, which a resource does not hold.
             NixOps4 would drop them; declare them in a composite instead.
           ''
         else if isResource then
-          "caisson-nixops4-resource"
+          resourceType
         else
-          "caisson-nixops4-composite";
+          compositeType;
 
-      # The module of an upstream composite that turns `members.<name>`
-      # into the configurations declared beneath it.
+      # The module of an upstream composite at `path` that declares
+      # `members` and turns the modules defined there into the
+      # configurations declared beneath it. The members are computed
+      # from the definitions of `members`, since its value is the
+      # members' configs: in the full evaluation those of the members
+      # the composite finalized (`finalized`), and in the childless view
+      # those of the full evaluation, which the composite reads through
+      # `unsafeCrossChildReferences`.
       membersModule =
         ctx:
-        { src, deploy }:
+        {
+          src,
+          path,
+          finalized,
+        }:
         final.caisson.integrations.caissonModule {
-          key = "caisson.nixops4.members";
-          file = "caisson-nixops4:members";
+          key = "caisson.nixops4.memberComponents";
+          file = "caisson-nixops4:memberComponents";
           module =
-            { config, lib, ... }:
+            {
+              lib,
+              options,
+              inputs,
+              resourceProviderSystem,
+              ...
+            }:
             let
+              manifest = lib.caisson-core.evalManifest;
+              declared = options.members.type.merge options.members.loc options.members.definitionsWithLocations;
               kinds = builtins.mapAttrs (kindOf {
-                inherit lib src;
-                inherit (deploy) path;
-                specialArgs = ctx.specialArgs // {
-                  inherit lib;
-                  inherit (deploy) resourceProviderSystem;
+                inherit lib src path;
+                specialArgs = {
+                  inherit inputs;
+                }
+                // ctx.specialArgs
+                // {
+                  inherit lib resourceProviderSystem;
                 };
-              }) config.members;
-              ofKind = kind: lib.filterAttrs (name: _: kinds.${name} == kind) config.members;
-              # The state resources are the root's to list.
-              memberCtx = builtins.removeAttrs ctx [ "stateResources" ];
+              }) declared;
+              ofKind = kind: lib.filterAttrs (name: _: kinds.${name} == kind) declared;
+              members =
+                if manifest.childless then
+                  let
+                    full = manifest.crossChildFull;
+                  in
+                  (full.children.${compositeType} or { }) // (full.children.${resourceType} or { })
+                else
+                  finalized;
             in
             {
               options.members = lib.mkOption {
                 type = lib.types.lazyAttrsOf lib.types.deferredModule;
                 default = { };
+                apply = _: builtins.mapAttrs (_: member: member.value.config) members;
                 description = ''
                   The member components, by name, as NixOps4 declares them: a
                   member that sets `type` is a resource, any other a composite.
+                  Read back, each is the config of that member.
                 '';
               };
               # A composite reads its members' configs, through its full
               # evaluation.
               config.caisson.forDirectChildren.unsafeCrossChildReferences.${upstreamClass} = true;
-              config.caisson.caisson-nixops4-composite.configurations = builtins.mapAttrs (
-                _: module: compositeOf memberCtx [ module ]
-              ) (ofKind "caisson-nixops4-composite");
-              config.caisson.caisson-nixops4-resource.configurations = builtins.mapAttrs (
-                _: module: resourceOf memberCtx [ module ]
-              ) (ofKind "caisson-nixops4-resource");
+              config.caisson.${compositeType}.configurations = builtins.mapAttrs (
+                _: module: compositeOf ctx [ module ]
+              ) (ofKind compositeType);
+              config.caisson.${resourceType}.configurations = builtins.mapAttrs (
+                _: module: resourceOf ctx [ module ]
+              ) (ofKind resourceType);
             };
         };
 
       # The outputs of the resource at `path` that a tool may cache, from
       # the allow-list of the nixops4 configuration.
       cacheableModule =
-        ctx: deploy:
+        ctx: path:
         final.caisson.integrations.caissonModule {
           key = "caisson.nixops4.cacheableOutputs";
           file = "caisson-nixops4:cacheableOutputs";
@@ -176,7 +205,7 @@
             {
               options.cacheableOutputs = lib.mkOption {
                 type = lib.types.listOf lib.types.str;
-                default = ctx.cacheableOutputs.${builtins.concatStringsSep "." deploy.path} or [ ];
+                default = ctx.cacheableOutputs.${builtins.concatStringsSep "." path} or [ ];
                 readOnly = true;
                 description = ''
                   The outputs of this resource a tool may cache, from
@@ -186,32 +215,51 @@
             };
         };
 
+      # A resource holds no members, so its `members` module argument is
+      # empty, as it is upstream.
+      resourceMembersModule = final.caisson.integrations.caissonModule {
+        key = "caisson.nixops4.resourceMembers";
+        file = "caisson-nixops4:resourceMembers";
+        module = {
+          _module.args.members = { };
+        };
+      };
+
       # The arguments the native constructors receive for a component
       # with `modules`.
       componentArgs = ctx: modules: {
         configModule = modulesModule modules;
-        inherit (ctx) ecosystemSrc;
-        specialArgs = ctx.specialArgs;
-        stateResources = ctx.stateResources or [ ];
+        inherit (ctx) ecosystemSrc specialArgs;
       };
 
-      # An upstream composite: NixOps4's class and options, `members`
-      # collected and declared beneath as configurations, and the
-      # configs of the members as its `members` argument. A member's
-      # own `members` argument holds the members it declares itself.
-      compositeOf =
+      # An upstream composite of the integration `type`: NixOps4's class
+      # and options, `members` declared and its definitions declared
+      # beneath as configurations, and `config.members` as its `members`
+      # argument. `settings` are further arguments of the native
+      # constructor.
+      compositeWith =
+        {
+          type ? compositeType,
+          settings ? { },
+        }:
         ctx: modules:
         composites.mkCompositeConfiguration {
+          inherit type;
           class = upstreamClass;
           baseModules =
-            { src, deploy }:
+            {
+              src,
+              path,
+              finalized,
+            }:
             componentBase src
             ++ [
-              (membersModule ctx { inherit src deploy; })
+              (membersModule ctx { inherit src path finalized; })
             ];
-          membersArg = { finalized, ... }: builtins.mapAttrs (_: member: member.value.config) finalized;
-          memberArgs = deploy: name: native.memberArgs deploy name // { members = { }; };
-        } (componentArgs ctx modules);
+          membersArg = { config, ... }: config.members;
+        } (componentArgs ctx modules // settings);
+
+      compositeOf = compositeWith { };
 
       # An upstream resource: NixOps4's class and options, and the
       # outputs the configuration allows a tool to cache.
@@ -219,84 +267,43 @@
         ctx: modules:
         resources.mkResourceConfiguration {
           class = upstreamClass;
-          baseModules = { src, deploy }: componentBase src ++ [ (cacheableModule ctx deploy) ];
+          baseModules =
+            { src, path }:
+            componentBase src
+            ++ [
+              (cacheableModule ctx path)
+              resourceMembersModule
+            ];
         } (componentArgs ctx modules);
 
-      # The evaluator's call, on the lib of the view being evaluated:
-      # the framework modules of the class, the selection, the
-      # configuration's module and the root composite made from
-      # `modules`, with the composition's pinned sources as the `inputs`
-      # special argument. `ecosystemArgs`, which only the twin's pattern
-      # admits, is merged over the call last.
-      evaluate =
-        args:
-        { lib, manifest }:
-        let
-          selection = lib.caisson.integrations;
-          registry = lib.caisson.modules.nixops4 or { };
-          frameworkModules = selection.frameworkModules "nixops4" registry;
-          moduleImports = selection.moduleImportsOf "nixops4" { inherit lib manifest; } args;
-          ctx = {
-            ecosystemSrc = args.ecosystemSrc or null;
-            specialArgs = {
-              inputs = manifest.sources;
-            }
-            // (if (args.specialArgs or null) != null then args.specialArgs else { });
-            cacheableOutputs = args.cacheableOutputs or { };
-            stateResources = args.stateResources or [ ];
-          };
-          rootModule = selection.caissonModule {
-            key = "caisson.nixops4.root";
-            file = "caisson-nixops4:root";
-            module = {
-              caisson.caisson-nixops4-composite.configurations.root = compositeOf ctx (args.modules or [ ]);
-            };
-          };
-          moduleList = frameworkModules ++ moduleImports registry ++ [ rootModule ];
-          evaluated = lib.evalModules (
-            {
-              class = "nixops4";
-              specialArgs = {
-                inherit lib;
-                inputs = manifest.sources;
-              };
-              modules = moduleList;
-            }
-            // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
-          );
-        in
-        {
-          value = evaluated;
-          ecosystems.nixops4 = native.ecosystemAccountOf {
-            explicit = args.ecosystemSrc or null;
-            inherit manifest;
-          };
-          modules = moduleList;
-          outputs.root = native.rootOf {
-            inherit manifest;
-            root = evaluated.config.caisson.caisson-nixops4-composite.configurations.root;
-          };
-        };
-
+      # The root composite made from `modules`, as `mkRoot` takes them,
+      # of the integration `nixops4`, with the allow-list, the package
+      # set and the selection of the configuration.
       configuration =
-        args:
-        final.caisson.integrations.mkModuleConfiguration {
-          selection = {
-            class = "nixops4";
-            inherit args;
-          };
-          type = "nixops4";
-          defaultPkgs = args.defaultPkgs or null;
-          inherit (native) exportsTo;
-          evaluate = evaluate args;
-        };
+        settings:
+        compositeWith
+          {
+            type = "nixops4";
+            settings = builtins.intersectAttrs {
+              defaultPkgs = null;
+              moduleImports = null;
+              extraModuleImports = null;
+              ecosystemArgs = null;
+            } settings;
+          }
+          {
+            ecosystemSrc = settings.ecosystemSrc or null;
+            specialArgs = if (settings.specialArgs or null) != null then settings.specialArgs else { };
+            cacheableOutputs = settings.cacheableOutputs or { };
+          }
+          (settings.modules or [ ]);
 
       integration = final.caisson.integrations.mkIntegration {
         name = "nixops4";
-        class = "nixops4";
-        # What these return is a configuration, a function of
-        # `{ name, parent }`: the parent that declares it under
-        # `caisson.nixops4.configurations.<name>` finalizes it.
+        class = upstreamClass;
+        # What these return is a deferred configuration, a function of
+        # `{ name, parent, args }`: declared under the name `nixops4`,
+        # it is the root, finalized when NixOps4 calls `rootFunction`.
         mkConfiguration =
           {
             # The modules of the root component, as NixOps4's `mkRoot`
@@ -311,11 +318,6 @@
             # NixOps4 marks no output as secret, so none is cacheable
             # unless listed.
             cacheableOutputs ? { },
-            # The member paths of the resources that hold the state of
-            # the deployment, as `nixops4 state dump` takes them, such
-            # as `default.state`. A tool reads the outputs NixOps4
-            # recorded from them.
-            stateResources ? [ ],
             # The package set the deployment runs on: a function that
             # receives the package sets available, by package config
             # name, and returns the set to run on.
@@ -323,13 +325,14 @@
             # The NixOps4 flake; resolved from the composition's
             # declarations when absent.
             ecosystemSrc ? null,
-            # The selection over the nixops4 class of the registry,
-            # replacing the default of the class.
+            # The selection over the nixops4Component class of the
+            # registry for the root, replacing the default of the
+            # class.
             moduleImports ? null,
             # A selection added to that selection, whichever it is.
             extraModuleImports ? null,
-          }@args:
-          configuration args;
+          }@settings:
+          configuration settings;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
@@ -337,14 +340,13 @@
             modules ? [ ],
             specialArgs ? null,
             cacheableOutputs ? { },
-            stateResources ? [ ],
             defaultPkgs ? null,
             ecosystemSrc ? null,
             moduleImports ? null,
             extraModuleImports ? null,
             ecosystemArgs ? null,
-          }@args:
-          configuration args;
+          }@settings:
+          configuration settings;
       };
     in
     {
