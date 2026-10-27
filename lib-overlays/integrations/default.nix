@@ -722,7 +722,20 @@
       # The configurations its modules declare under
       # `caisson.<integration>.configurations`, of any integration,
       # are its children, and `caisson.exports`, which carries what
-      # they pass up, is its `exports` output.
+      # they pass up, is its `exports` output. An integration whose
+      # evaluation finalizes its children itself returns them as
+      # `children`, by integration and then name, and they are its
+      # children in place of those values. A deferred configuration
+      # (`caisson-core.mkDeferredConfiguration`) finalizes the deferred
+      # configurations declared beneath it this way, with their part of
+      # its args.
+      #
+      # `evaluate` may also return `argsNeeded`, the args a deferred
+      # configuration takes, and `discoverArgs`, the function of
+      # `{ system }` that returns the program which finds them, or
+      # null. The manifest carries both, as caisson-core describes
+      # them. A configuration whose `evaluate` returns neither takes no
+      # args.
       #
       # `defaultPkgs` is the selection of a package set the configuration
       # was constructed with, null when it was given none. It is
@@ -739,7 +752,7 @@
       # returning `value`, the name to publish it under, and
       # optionally `description`, a sentence saying what it did. It may
       # carry `single`, for an output that holds the one configuration
-      # named `default`, and `bySystem`, for an output keyed by the
+      # named for that output, and `bySystem`, for an output keyed by the
       # system of each evaluation first (`packages.<system>.<name>`). It
       # may carry `only`, a function of the manifest that says whether
       # the configuration is published there at all; a configuration it
@@ -823,7 +836,8 @@
               outputs = (evaluated.outputs or { }) // {
                 exports = config.caisson.exports;
               };
-              children = view.lib.caisson.integrations.childrenOf { inherit options config; };
+              children =
+                evaluated.children or (view.lib.caisson.integrations.childrenOf { inherit options config; });
               # What the modules give the configurations beneath
               # (`caisson.forChildren`).
               forChildren = {
@@ -889,7 +903,12 @@
               }
               # How the evaluation selected its modules.
               // (if selection == null then { } else { moduleImports = selectionAccountOf selection view; });
-            };
+            }
+            # The args of a deferred configuration and the program that
+            # finds them, where the integration's `evaluate` returns
+            # them.
+            // (if evaluated ? argsNeeded then { inherit (evaluated) argsNeeded; } else { })
+            // (if evaluated ? discoverArgs then { inherit (evaluated) discoverArgs; } else { });
         };
 
       # The body of both entry points, from the caisson arguments a
@@ -1568,7 +1587,10 @@
       # that is not published under a name (structural, flake-parts).
       # An integration may give one export or a list of them; an export
       # with `only` applies to the configurations whose manifest it
-      # holds true for.
+      # holds true for. The entry of a deferred configuration
+      # (`caisson-core.deferChild`) is published in the same way, from
+      # the `exportsTo` its `record` holds: `value` and `only` receive
+      # the entry, which holds its name, type, class and parent.
       exportsOf =
         manifest:
         let
@@ -1703,10 +1725,7 @@
                 name = system;
               };
               beneath =
-                # A deferred child passes nothing up at flake time.
-                if final.caisson-core.isDeferred finalized then
-                  [ ]
-                else if isManifest finalized then
+                if isManifest finalized || final.caisson-core.isDeferred finalized then
                   [
                     {
                       prefix = [ (segmentOf name) ];
@@ -1734,16 +1753,24 @@
                 manifest,
               }:
               builtins.map (entryOf level declared prefix manifest) (exportsOf manifest)
-              ++ builtins.map (
-                entry:
-                entry
-                // {
-                  path = prefix ++ entry.path;
-                  namePath = declared ++ entry.namePath;
-                  notes = entry.notes ++ level.notes;
-                  code = entry.code ++ level.code;
-                }
-              ) (manifest.outputs.exports.configurations or [ ])
+              # The entry of a deferred child is published as its
+              # `exportsTo` says, and nothing beneath it is evaluated at
+              # flake time, so it passes nothing else up.
+              ++ (
+                if final.caisson-core.isDeferred manifest then
+                  [ ]
+                else
+                  builtins.map (
+                    entry:
+                    entry
+                    // {
+                      path = prefix ++ entry.path;
+                      namePath = declared ++ entry.namePath;
+                      notes = entry.notes ++ level.notes;
+                      code = entry.code ++ level.code;
+                    }
+                  ) (manifest.outputs.exports.configurations or [ ])
+              )
             ) beneath
           ) (builtins.attrNames selected.${integration})
         ) (builtins.attrNames selected);
@@ -1935,6 +1962,7 @@
             ecosystemUnit
             inEcosystem
             entriesOf
+            positionOf
             configurationsModuleFor
             integrationsIn
             integrationsDeclaringIn

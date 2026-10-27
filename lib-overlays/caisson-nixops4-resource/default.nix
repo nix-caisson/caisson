@@ -3,19 +3,21 @@
 # The caisson-nixops4-resource integration: a resource of a NixOps4
 # deployment, one real thing a provider creates, updates and deletes.
 # A resource is a member of a caisson-nixops4-composite configuration,
-# declared beneath it, and a deferred configuration like the composite:
-# the composite finalizes it with the resource's outputs, as NixOps4
-# passes them, the composite's view of its members and the deploying
-# system.
+# declared beneath it, and a deferred configuration like the composite
+# (caisson-core's `mkDeferredConfiguration`). Its args are
+# `outputValues`, its outputs as NixOps4 passes them, and
+# `resourceProviderSystem`, the system NixOps4 runs providers on. The
+# composite finalizes it with its part of the composite's args.
 #
 # A resource is evaluated with NixOps4's own resource options
 # (`nix/component/resource.nix`), its `type` option and its
 # `providers` option. `type` is a resource type of a provider, which
 # the composite usually writes from its `providers`. The resource
-# reads its own outputs as `config.outputs`, and the outputs of the
-# other members of its composite through the `members` module
-# argument. It holds no NixOps4 members: `members` is not an option
-# here, and setting it is refused where it is set.
+# reads its own outputs as `config.outputs`. It reads the outputs of
+# the other members of its composite through what the composite writes
+# into it, from the composite's `members` module argument. It holds no
+# NixOps4 members: `members` is not an option here, and setting it is
+# refused where it is set.
 #
 # A resource may hold caisson configurations beneath it, such as a
 # NixOS configuration with its home-manager configurations. NixOps4
@@ -28,6 +30,10 @@
 # deployment ahead of time may keep in a cache (`cacheableOutputs`);
 # NixOps4 marks no output as secret, so none is cacheable unless
 # listed.
+#
+# The helpers the composite integration, the upstream-compatible
+# integration and the NixOS adapters build on are published under
+# `extra`, as `lib.caisson.caisson-nixops4-resource.<helper>`.
 {
   mkLibOverlay,
   ...
@@ -42,15 +48,166 @@
     # What an integration is written from, imported by key so it is
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
-    # The declaration, whose helpers this integration builds on.
-    ((mkLibOverlay ../caisson-nixops4) // { key = "caisson-nixops4"; })
   ];
 
   overlay =
     final: prev:
     let
-      nixops4 = final.caisson.caisson-nixops4;
       resourceType = "caisson-nixops4-resource";
+      context = "lib.caisson.${resourceType}";
+
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
+        name = "nixops4";
+        context = "caisson.${resourceType}";
+      };
+
+      # NixOps4's component modules are files of its source, which the
+      # composite and resource integrations evaluate in caisson's
+      # evaluations; its `local` provider is a module its flake
+      # publishes.
+      assertNixops4EcosystemSrc =
+        ecosystemSrc:
+        if
+          ecosystemSrc ? modules
+          && ecosystemSrc.modules ? nixops4Provider
+          && builtins.pathExists "${ecosystemSrc}/nix/component/resource.nix"
+          && builtins.pathExists "${ecosystemSrc}/nix/component/provider-values.nix"
+          && builtins.pathExists "${ecosystemSrc}/nix/component/provider-declarations.nix"
+        then
+          ecosystemSrc
+        else
+          throw "${context} requires `ecosystemSrc.modules.nixops4Provider` and NixOps4's component modules under `nix/component` (a NixOps4 flake).";
+
+      # The NixOps4 source of a configuration: `explicit` when given,
+      # else what the composition declares or pins under the name
+      # `nixops4`, as recorded on `manifest`.
+      ecosystemSrcOf =
+        { explicit, manifest }:
+        assertNixops4EcosystemSrc (resolveEcosystemSrc {
+          inherit explicit manifest;
+        });
+
+      # A component module of NixOps4, by its file name under
+      # `nix/component`.
+      componentModule = src: name: "${src}/nix/component/${name}.nix";
+
+      # The package set of a deploying system: the set the selection in
+      # force at `manifest` returns, for that system.
+      pkgsFor =
+        manifest: system:
+        let
+          what = "the deployment for ${system}";
+          pkgSets = final.caisson.integrations.pkgSetsForSystem { inherit context what; } manifest system;
+        in
+        final.caisson.integrations.pkgSetOf { inherit context what; } manifest pkgSets;
+
+      # The member path of a component, as NixOps4 writes it.
+      showPath = path: if path == [ ] then "the root" else builtins.concatStringsSep "." path;
+
+      # The integrations whose configurations are composites: the
+      # native composite and the root of the upstream-compatible
+      # integration.
+      compositeTypes = [
+        "caisson-nixops4-composite"
+        "nixops4"
+      ];
+
+      # The member path of the component `manifest` describes, from the
+      # root, as NixOps4's `absoluteMemberPath` holds it: empty for a
+      # component whose parent is not a composite, which is the root,
+      # else the path of the parent, the childless manifest of the
+      # composite, and the name of the component. It is built from the
+      # names the components are declared under.
+      absoluteMemberPathOf =
+        manifest:
+        if builtins.elem (manifest.parent.type or null) compositeTypes then
+          manifest.parent.outputs.path ++ [ manifest.name ]
+        else
+          [ ];
+
+      # The NixOS configuration a resource named `resource` deploys, from
+      # the NixOS configurations declared beneath it (`declared`): the
+      # only one, evaluated for one system. `context` names the module
+      # that asks, for the errors.
+      machineOf =
+        {
+          context,
+          resource,
+          declared,
+        }:
+        let
+          names = builtins.attrNames declared;
+          only = declared.${builtins.head names};
+          evaluations = builtins.attrValues only;
+        in
+        if builtins.length names != 1 then
+          throw ''
+            ${context}: the resource `${resource}` declares the NixOS configurations
+            ${builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") names)}, and a resource deploys one.
+            Declare each as the NixOS configuration of a resource of its own.
+          ''
+        else if (only._type or null) == "caisson-manifest" then
+          only
+        else if builtins.length evaluations == 1 then
+          builtins.head evaluations
+        else
+          throw ''
+            ${context}: the NixOS configuration `${builtins.head names}` of the resource
+            `${resource}` is evaluated for ${builtins.concatStringsSep ", " (builtins.attrNames only)},
+            and a resource deploys one evaluation. Declare it where a single system is in force.
+          '';
+
+      # The discovery program of a root composite for `system`, the
+      # system of the tool that runs it, on the package set selected at
+      # `manifest` for that system: it prints the args NixOps4 recorded.
+      # It runs `nixops4 state dump` for each of `stateResources`, the
+      # member paths of the resources that hold state joined with `.`,
+      # in the working directory, which NixOps4 finds the flake from. It
+      # passes its own arguments to NixOps4, such as `--override-input`,
+      # and prints `{ outputValues, resourceProviderSystem }`. The state
+      # of a resource at `a.state` covers the composite `a`: its
+      # resources' recorded outputs, and its nested composites in turn.
+      # Only resources with a state have recorded outputs.
+      discoverArgsOf =
+        {
+          manifest,
+          src,
+          stateResources,
+          system,
+        }:
+        let
+          pkgs = pkgsFor manifest system;
+        in
+        pkgs.writeShellApplication {
+          name = "caisson-nixops4-discover";
+          runtimeInputs = [
+            src.packages.${system}.nixops4
+            pkgs.jq
+          ];
+          text = ''
+            merged='{}'
+            for state in ${final.escapeShellArgs stateResources}; do
+              dump=$(nixops4 "$@" state dump "$state")
+              merged=$(jq -cn --argjson merged "$merged" --argjson dump "$dump" --arg state "$state" '
+                def outputValues:
+                  ((.resources // {}) | map_values(.output_properties))
+                  + ((.deployments // {}) | map_values(outputValues));
+                $merged * ({} | setpath($state | split(".") | .[:-1]; $dump | outputValues))
+              ')
+            done
+            jq -cn --argjson merged "$merged" '{ outputValues: $merged, resourceProviderSystem: "${system}" }'
+          '';
+        };
+
+      # The arg `resourceProviderSystem`, which every component takes.
+      # A system name is no secret, so it is cacheable.
+      systemArg = final.caisson-core.mkArg {
+        cacheable = true;
+        type = "string";
+        description = "The system NixOps4 runs providers and the programs of resources on.";
+      };
 
       # The options of the class beside the options NixOps4 declares.
       resourceOptions =
@@ -68,63 +225,62 @@
           };
         };
 
-      # What NixOps4 gives a resource when it evaluates the root: its
-      # outputs, from the output values it passes, and its member path.
-      # The outputs of a resource NixOps4 has not applied yet are calls
-      # that abort the evaluation, recoverably, when read.
-      deployModule =
-        deploy:
-        final.caisson.integrations.caissonModule {
-          key = "caisson.${resourceType}.deploy";
-          file = "caisson-${resourceType}:deploy";
-          module = {
-            config.outputs = _: { config = deploy.outputValues; };
-            config.absoluteMemberPath = deploy.path;
-            config._module.args.members = deploy.members;
-          };
-        };
-
       # A resource configuration of the module class `class`, evaluated
       # with the modules `baseModules` returns for the NixOps4 source
-      # and the args. The native integration evaluates its class with
-      # NixOps4's resource, provider-value and provider-declaration
-      # modules; the upstream-compatible one builds on this with
-      # NixOps4's class and its own modules.
+      # and the member path, and the settings the constructor received.
+      # The native integration evaluates its class with NixOps4's
+      # resource, provider-value and provider-declaration modules; the
+      # upstream-compatible one builds on this with NixOps4's class and
+      # its own modules.
       mkResourceConfiguration =
         {
           class,
           type ? resourceType,
           baseModules,
         }:
-        args:
+        settings:
         let
-          # The evaluator's call, on the lib of the view being
-          # evaluated: the base modules, the framework modules of the
-          # class, the selection and the configuration's module, with
-          # the composition's pinned sources as the `inputs` special
+          # The evaluator's call with the args `args`, on the lib of the
+          # view being evaluated: the base modules, the outputs and the
+          # member path, the framework modules of the class, the
+          # selection and the configuration's module, with the
+          # composition's pinned sources as the `inputs` special
           # argument and the deploying system as
           # `resourceProviderSystem`, as NixOps4 passes it.
           # `ecosystemArgs` is merged over the call last.
           evaluate =
-            deploy:
+            args:
             { lib, manifest }:
             let
               selection = lib.caisson.integrations;
-              src = nixops4.ecosystemSrcOf {
-                explicit = args.ecosystemSrc or null;
+              path = absoluteMemberPathOf manifest;
+              src = ecosystemSrcOf {
+                explicit = settings.ecosystemSrc or null;
                 inherit manifest;
               };
               registry = lib.caisson.modules.${class} or { };
               frameworkModules = selection.frameworkModules class registry;
-              moduleImports = selection.moduleImportsOf class { inherit lib manifest; } args;
+              moduleImports = selection.moduleImportsOf class { inherit lib manifest; } settings;
               name = manifest.name or null;
               configModule = selection.configModuleOf {
                 inherit lib name class;
-                configModule = args.configModule or null;
+                configModule = settings.configModule or null;
+              };
+              # What NixOps4 gives a resource: its outputs, from the
+              # output values it passes, and its member path. An output
+              # NixOps4 has not passed fails when it is read, naming
+              # itself.
+              outputsModule = selection.caissonModule {
+                key = "caisson.${type}.outputs";
+                file = "caisson-${type}:outputs";
+                module = {
+                  config.outputs = _: { config = args.outputValues; };
+                  config.absoluteMemberPath = path;
+                };
               };
               moduleList =
-                baseModules { inherit src deploy; }
-                ++ [ (deployModule deploy) ]
+                baseModules { inherit src path; }
+                ++ [ outputsModule ]
                 ++ frameworkModules
                 ++ moduleImports registry
                 ++ (if configModule == null then [ ] else [ configModule ]);
@@ -134,71 +290,60 @@
                   specialArgs = {
                     inherit lib;
                     inputs = manifest.sources;
-                    inherit (deploy) resourceProviderSystem;
+                    inherit (args) resourceProviderSystem;
                   }
-                  // (if (args.specialArgs or null) != null then args.specialArgs else { });
+                  // (if (settings.specialArgs or null) != null then settings.specialArgs else { });
                   modules = moduleList;
                 }
-                // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
+                // (if (settings.ecosystemArgs or null) != null then settings.ecosystemArgs else { })
               );
+              cacheableOutputs = evaluated.config.cacheableOutputs or [ ];
             in
             {
               value = evaluated;
-              ecosystems.nixops4 = nixops4.ecosystemAccountOf {
-                explicit = args.ecosystemSrc or null;
+              ecosystems.nixops4 = ecosystemAccountOf {
+                explicit = settings.ecosystemSrc or null;
                 inherit manifest;
               };
               modules = moduleList;
               outputs = {
-                inherit (deploy) path;
+                inherit path cacheableOutputs;
                 # What NixOps4 reads of the resource.
                 export.resource = evaluated.config._resourceForNixOps;
-                cacheableOutputs = evaluated.config.cacheableOutputs or [ ];
                 providerConfigs = evaluated.config.providers;
               };
-            };
-
-          configurationFor =
-            deploy:
-            final.caisson.integrations.mkModuleConfiguration {
-              selection = {
-                inherit class args;
+              # The deploying system and the resource's own outputs,
+              # which its type names. An output is cacheable when the
+              # resource lists it.
+              argsNeeded = {
+                resourceProviderSystem = systemArg;
+                outputValues = builtins.mapAttrs (
+                  output: _:
+                  final.caisson-core.mkArg {
+                    cacheable = builtins.elem output cacheableOutputs;
+                    description = "An output of the resource at ${showPath path}.";
+                  }
+                ) evaluated.config.outputsSkeleton;
               };
-              inherit type;
-              defaultPkgs = args.defaultPkgs or null;
-              evaluate = evaluate deploy;
             };
         in
         final.caisson-core.mkDeferredConfiguration {
           inherit type class;
-          # The deploying system and the resource's own outputs, which
-          # its type declares.
-          argsNeeded =
-            {
-              name,
-              parent,
-              args,
-            }:
-            let
-              manifest = configurationFor (nixops4.deployOf name args) { inherit name parent; };
-            in
-            {
-              resourceProviderSystem = nixops4.systemArg;
-              outputValues = builtins.mapAttrs (
-                output: _:
-                final.caisson-core.mkArg {
-                  cacheable = builtins.elem output manifest.outputs.cacheableOutputs;
-                  description = "An output of this resource.";
-                }
-              ) manifest.outputs.export.resource.outputsSkeleton;
-            };
           configuration =
             {
               name,
               parent,
               args,
             }:
-            configurationFor (nixops4.deployOf name args) { inherit name parent; };
+            final.caisson.integrations.mkModuleConfiguration {
+              selection = {
+                inherit class;
+                args = settings;
+              };
+              inherit type;
+              defaultPkgs = settings.defaultPkgs or null;
+              evaluate = evaluate args;
+            } { inherit name parent; };
         };
 
       configuration = mkResourceConfiguration {
@@ -206,9 +351,9 @@
         baseModules =
           { src, ... }:
           [
-            (nixops4.componentModule src "resource")
-            (nixops4.componentModule src "provider-values")
-            (nixops4.componentModule src "provider-declarations")
+            (componentModule src "resource")
+            (componentModule src "provider-values")
+            (componentModule src "provider-declarations")
             (final.caisson.integrations.caissonModule {
               key = "caisson.${resourceType}.resourceOptions";
               file = "caisson-${resourceType}:resourceOptions";
@@ -223,7 +368,7 @@
         # What these return is a deferred configuration, a function of
         # `{ name, parent, args }`: the composite that declares it under
         # `caisson.caisson-nixops4-resource.configurations.<name>`
-        # finalizes it when NixOps4 deploys.
+        # finalizes it with its part of the composite's args.
         mkConfiguration =
           {
             # The resource's module: its `type`, `inputs`, the options
@@ -246,8 +391,8 @@
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
-          }@args:
-          configuration args;
+          }@settings:
+          configuration settings;
         # The same arguments and `ecosystemArgs`, the evaluator's
         # arguments merged over the composed call last.
         mkConfigurationWithEcosystemArgs =
@@ -259,11 +404,26 @@
             extraModuleImports ? null,
             specialArgs ? null,
             ecosystemArgs ? null,
-          }@args:
-          configuration args;
-        # What the upstream-compatible integration builds on.
+          }@settings:
+          configuration settings;
+        # What the composite integration, the upstream-compatible
+        # integration and the NixOS adapters build on.
         extra = {
-          inherit mkResourceConfiguration deployModule resourceOptions;
+          inherit
+            mkResourceConfiguration
+            resourceOptions
+            ecosystemSrcOf
+            componentModule
+            pkgsFor
+            showPath
+            absoluteMemberPathOf
+            machineOf
+            discoverArgsOf
+            systemArg
+            ;
+          # Where the NixOps4 source of a configuration came from, as a
+          # manifest records it under `ecosystems.nixops4`.
+          ecosystemAccountOf = { explicit, manifest }: ecosystemAccountOf { inherit explicit manifest; };
         };
       };
     in

@@ -33,7 +33,6 @@
           "caisson-disko"
           "caisson-facter"
           "caisson-microvm"
-          "caisson-nixops4"
           "caisson-nixops4-composite"
           "caisson-nixops4-resource"
           "colmena"
