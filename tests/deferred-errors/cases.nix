@@ -117,6 +117,21 @@ in
     message = "caisson-deferred: needs outputValues.source.stdout";
   };
 
+  # Output values given as a string where the root declares an attrset
+  # of members name the path they were given at, rather than failing
+  # with Nix's own `expected a set`.
+  outputValuesNotASet = {
+    value =
+      ((topWith readerModule).caisson.manifest.children.caisson-nixops4-composite.nixops4.finalize {
+        args = {
+          resourceProviderSystem = system;
+          outputValues = "none";
+        };
+        argsSource = _: "the check";
+      }).outputs.export;
+    message = "caisson-deferred: the args given at outputValues are a string";
+  };
+
   # The member path of an output inside nested composites holds each
   # composite.
   missingNestedOutput = {
