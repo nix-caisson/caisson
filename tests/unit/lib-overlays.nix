@@ -277,21 +277,21 @@ in
         let
           module =
             {
-              closure-inputs,
+              closure-sources,
               closure-lib,
               mkModule,
               ...
             }:
             { config, ... }:
             {
-              hasInputs = builtins.isAttrs closure-inputs;
+              hasSources = builtins.isAttrs closure-sources;
               hasLib = builtins.isAttrs closure-lib;
               hasMkMod = builtins.isFunction mkModule;
             };
           result = mkFlakePartsModule module;
           evaluated = result { config = { }; };
         in
-        evaluated.hasInputs && evaluated.hasLib && evaluated.hasMkMod;
+        evaluated.hasSources && evaluated.hasLib && evaluated.hasMkMod;
       expected = true;
     };
 
@@ -465,14 +465,14 @@ in
         let
           module =
             {
-              closure-inputs,
+              closure-sources,
               closure-lib,
               mkModule,
               ...
             }:
             { config, ... }:
             {
-              hasInputs = builtins.isAttrs closure-inputs;
+              hasSources = builtins.isAttrs closure-sources;
               hasLib = builtins.isAttrs closure-lib;
               nestedOk =
                 (mkModule (
@@ -490,24 +490,24 @@ in
         in
         {
           viaAlias = {
-            hasInputs = viaAlias.hasInputs;
+            hasSources = viaAlias.hasSources;
             hasLib = viaAlias.hasLib;
             nestedOk = viaAlias.nestedOk.ok or false;
           };
           viaFactory = {
-            hasInputs = viaFactory.hasInputs;
+            hasSources = viaFactory.hasSources;
             hasLib = viaFactory.hasLib;
             nestedOk = viaFactory.nestedOk.ok or false;
           };
         };
       expected = {
         viaAlias = {
-          hasInputs = true;
+          hasSources = true;
           hasLib = true;
           nestedOk = true;
         };
         viaFactory = {
-          hasInputs = true;
+          hasSources = true;
           hasLib = true;
           nestedOk = true;
         };
@@ -519,9 +519,9 @@ in
     "test: applies the closure attrset to the overlay" = {
       expr =
         (caisson.mkLibOverlay (
-          { closure-inputs, ... }:
+          { closure-sources, ... }:
           {
-            overlay = final: prev: { hasPkgs = builtins.hasAttr "nixpkgs-lib" closure-inputs; };
+            overlay = final: prev: { hasPkgs = builtins.hasAttr "nixpkgs-lib" closure-sources; };
           }
         )).overlay
           { }

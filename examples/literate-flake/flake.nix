@@ -63,7 +63,7 @@
           conventional layout, `modules/<class>/<name>/default.nix`:
           each entry directory becomes `modules.<class>.<name>`, built
           with `caisson.mkModule <class>`. Everything passed to
-          mkModule takes the closure attrset ({ closure-inputs,
+          mkModule takes the closure attrset ({ closure-sources,
           closure-lib, mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
         - `configs` is the same registration for `configs/<class>/<name>`,

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: MIT
-{ closure-inputs, ... }:
+{ closure-sources, ... }:
 {
   imports = [ ];
   overlay = final: prev: {
     middleChain = (prev.middleChain or { }) // {
       closure = {
-        hasMiddleMarker = closure-inputs ? middleMarker;
-        hasFinalMarker = closure-inputs ? finalMarker;
+        hasMiddleMarker = closure-sources ? middleMarker;
+        hasFinalMarker = closure-sources ? finalMarker;
         hasCaisson = builtins.hasAttr "caisson" final;
       };
     };
