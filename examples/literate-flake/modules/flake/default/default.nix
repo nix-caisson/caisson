@@ -7,7 +7,7 @@
   Here we use `lib.literate-flake.greet` which was added by our library overlay.
 
   Modules registered via mkModule take the closure attrset
-  ({ closure-inputs, closure-lib, mkModule, ... }) as their first arg list.
+  ({ closure-sources, closure-lib, mkModule, ... }) as their first arg list.
   This module does not use any of it, so it takes `{ ... }:`.
 */
 { ... }:

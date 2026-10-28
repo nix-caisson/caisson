@@ -155,8 +155,8 @@ evaluated.
 
 ## Going deeper
 
-- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-inputs.html):
-  closed inputs, module classes, library overlays, and ecosystem sources,
+- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-over-sources.html):
+  closed-over sources, module classes, library overlays, and ecosystem sources,
   each explained with the reasoning behind the design.
 - [Reference](https://nix-caisson.github.io/docs/reference/lib.html):
   the `lib.caisson` API and module options.

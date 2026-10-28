@@ -43,7 +43,7 @@
 # that overlay composes this. A tree outside caisson imports it from
 # the caisson source tree, as it imports `integrations`:
 #
-#   (mkLibOverlay (closure-inputs.caisson.outPath + "/lib-overlays/nixpkgs-lib"))
+#   (mkLibOverlay (closure-sources.caisson.outPath + "/lib-overlays/nixpkgs-lib"))
 #   // { key = "nixpkgs-lib"; }
 { ... }:
 {
