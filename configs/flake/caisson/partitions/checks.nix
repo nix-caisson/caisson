@@ -234,6 +234,14 @@
                     caisson = self;
                   };
                 };
+                # The discovery program of a NixOps4 root, built and run
+                # against recorded state dumps, with a stand-in for
+                # NixOps4 that prints them (tests/nixops4-discovery).
+                nixops4-discovery = import (self.outPath + "/tests/nixops4-discovery") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # A machine booted in a VM that activates the
                 # home-manager configurations, the hjem configurations
                 # and the profiles declared inside it, and a standalone
@@ -261,6 +269,26 @@
                       export NIX_STORE_DIR=${builtins.storeDir}
                       export NIX_REMOTE="$HOME/storedata"
                       bash ${self.outPath}/tests/argument-errors/check.sh ${lib.escapeShellArg argumentErrorsLib} \
+                        --impure --extra-experimental-features nix-command
+                      touch $out
+                    '';
+                # The errors of deferred configurations and the NixOps4
+                # integrations, read as text by the real evaluator, as
+                # a tool that finalizes a deferred configuration reads
+                # them. It runs as the argument-error check does, on
+                # the same library.
+                deferred-errors =
+                  pkgs.runCommand "deferred-errors"
+                    {
+                      nativeBuildInputs = [ pkgs.nix ];
+                    }
+                    ''
+                      export HOME="$(realpath .)"
+                      unset NIX_STORE
+                      export NIX_STORE_DIR=${builtins.storeDir}
+                      export NIX_REMOTE="$HOME/storedata"
+                      bash ${self.outPath}/tests/deferred-errors/check.sh ${lib.escapeShellArg argumentErrorsLib} \
+                        ${inputs.nixops4.outPath} \
                         --impure --extra-experimental-features nix-command
                       touch $out
                     '';

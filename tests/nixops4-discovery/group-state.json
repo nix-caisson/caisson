@@ -1,0 +1,23 @@
+{
+  "_type": "nixopsState",
+  "resources": {},
+  "deployments": {
+    "group": {
+      "resources": {
+        "inner": {
+          "type": "exec",
+          "input_properties": {
+            "args": ["-c", "printf %s nested-state-value"],
+            "executable": "/bin/sh",
+            "once": false,
+            "stdin": null
+          },
+          "output_properties": {
+            "stdout": "nested-state-value"
+          }
+        }
+      },
+      "deployments": {}
+    }
+  }
+}

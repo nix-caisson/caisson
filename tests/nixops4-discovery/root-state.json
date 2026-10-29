@@ -1,0 +1,18 @@
+{
+  "_type": "nixopsState",
+  "resources": {
+    "a": {
+      "type": "exec",
+      "input_properties": {
+        "args": ["-c", "printf %s alpha-42"],
+        "executable": "/bin/sh",
+        "once": false,
+        "stdin": null
+      },
+      "output_properties": {
+        "stdout": "alpha-42"
+      }
+    }
+  },
+  "deployments": {}
+}

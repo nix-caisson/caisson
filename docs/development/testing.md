@@ -76,6 +76,25 @@ plumbing works.
     'let f = builtins.getFlake "path:'"$PWD"'"; in f.lib' --impure
   ```
 
+## Deferred Configuration Errors (Message Text)
+
+- **Scope:** The text of the errors of deferred configurations and the
+  NixOps4 integrations. A tool tells an arg it lacks from a failure by
+  `caisson-deferred: needs <path>`, and `builtins.tryEval` in the
+  pinned-world suite sees only that an evaluation failed.
+- **Location:** `tests/deferred-errors/check.sh` and its cases in
+  `tests/deferred-errors/cases.nix`.
+- **Mechanism:** the script runs `nix eval` on each case and looks for
+  the line of the message the case names. The `deferred-errors` check
+  runs it in the sandbox over the library of the `argument-errors`
+  check and the NixOps4 source.
+- **Execution against the flake's library, from a checkout:**
+  ```bash
+  tests/deferred-errors/check.sh \
+    'let f = builtins.getFlake "path:'"$PWD"'"; in f.lib' \
+    <path of the NixOps4 source> --impure
+  ```
+
 ## Integration Testing (Test Flakes)
 
 - **Scope:** Module composition, end-to-end evaluation, and build success.
