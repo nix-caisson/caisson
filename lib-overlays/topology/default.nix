@@ -177,8 +177,8 @@
           outputs.output = value.config.output;
         };
 
-      # The configuration named `default` is published as
-      # `topology.<system>`, the evaluation.
+      # The configuration named `topology`, for the output it fills, is
+      # published as `topology.<system>`, the evaluation.
       exportsTo = {
         attrset = "topology";
         single = true;

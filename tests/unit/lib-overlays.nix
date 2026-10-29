@@ -3267,11 +3267,11 @@ in
               (entryFor "aarch64-linux" "a" { })
             ];
             single = publish [
-              (entryFor "x86_64-linux" "default" {
+              (entryFor "x86_64-linux" "formatter" {
                 attrset = "formatter";
                 single = true;
               })
-              (entryFor "aarch64-linux" "default" {
+              (entryFor "aarch64-linux" "formatter" {
                 attrset = "formatter";
                 single = true;
               })
@@ -3290,8 +3290,8 @@ in
             aarch64-linux.a = "a for aarch64-linux";
           };
           single.formatter = {
-            x86_64-linux = "default for x86_64-linux";
-            aarch64-linux = "default for aarch64-linux";
+            x86_64-linux = "formatter for x86_64-linux";
+            aarch64-linux = "formatter for aarch64-linux";
           };
           withoutSystem = true;
         };
@@ -5735,7 +5735,7 @@ in
         expected = builtins.functionArgs lib.caisson.nixos.mkConfiguration;
       };
 
-      # A colmena configuration declared under the name `default` fills
+      # A colmena configuration declared under the name `colmenaHive` fills
       # the `colmenaHive` of the top it is declared beneath, an output
       # that holds a single value: the hive, with the colmena
       # configuration's `meta` and no nodes when no NixOS configuration
@@ -5749,7 +5749,7 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.caisson-colmena.configurations.default = lib.caisson.caisson-colmena.mkConfiguration {
+                    caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
                       ecosystemSrc = _sources: colmenaStub;
                       configModule.meta.description = "probe";
                     };

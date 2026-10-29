@@ -157,27 +157,27 @@
           };
         };
 
-      # Only the configuration named `default` is published: as
-      # `formatter.<system>`, its wrapper, which `nix fmt` reads, and,
-      # in a tree that knows its root, as `checks.<system>.treefmt`,
-      # its check over that tree, which fails `nix flake check` when
-      # the tree is not formatted.
-      isDefault = manifest: (manifest.name or null) == "default";
+      # Only the configuration named `formatter`, for the output it
+      # fills, is published: as `formatter.<system>`, its wrapper,
+      # which `nix fmt` reads, and, in a tree that knows its root, as
+      # `checks.<system>.treefmt`, its check over that tree, which
+      # fails `nix flake check` when the tree is not formatted.
+      isFormatter = manifest: (manifest.name or null) == "formatter";
       exportsTo = [
         {
           attrset = "formatter";
           single = true;
           bySystem = true;
-          only = isDefault;
+          only = isFormatter;
           value = manifest: manifest.outputs.wrapper;
         }
         {
           attrset = "checks";
           bySystem = true;
-          only = manifest: isDefault manifest && (manifest.root or null) != null;
+          only = manifest: isFormatter manifest && (manifest.root or null) != null;
           name = _: {
             value = "treefmt";
-            description = "named `treefmt`, the check of the configuration named `default`";
+            description = "named `treefmt`, the check of the configuration named `formatter`";
           };
           value = manifest: manifest.outputs.check manifest.root;
         }
