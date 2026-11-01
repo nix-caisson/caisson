@@ -16,7 +16,7 @@
     let
       core = parent.lib.caisson;
       lib = core.mkLib {
-        inherit (core.pins.flake inputs) sources root;
+        inherit (core.pins.flake inputs) dependencies root;
         name = "nixpkgs-lib-only";
         systems = [ "x86_64-linux" ];
         projects = {
@@ -25,9 +25,9 @@
         # The library comes from a copy of the `lib` directory alone,
         # laid out as the nixpkgs.lib mirror is. The package set comes
         # from the full checkout, pinned as `nixpkgs`.
-        defaultEcosystemSrc = sources: {
+        defaultEcosystemSrc = dependencies: {
           nixpkgs-lib = builtins.path {
-            path = "${sources.nixpkgs}/lib";
+            path = "${dependencies.nixpkgs}/lib";
             name = "nixpkgs-lib-only";
           };
         };

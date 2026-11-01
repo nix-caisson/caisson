@@ -22,7 +22,7 @@ let
   pins = import ./lib-overlays/framework/pins;
 
   lib = core.mkLib {
-    inherit (pins.flake-compat ./.) sources;
+    inherit (pins.flake-compat ./.) dependencies;
     root = pins.gitRoot ./.;
     name = "caisson";
     systems = import ./systems.nix;

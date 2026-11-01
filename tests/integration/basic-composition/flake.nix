@@ -28,8 +28,8 @@
       # Compose a library with mkLib. parent.lib mirrors the framework
       # namespaces of the composed library (`caisson`, `caisson-core`).
       lib = parent.lib.caisson.mkLib {
-        inherit (parent.lib.caisson.pins.flake inputs) sources root;
-        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
+        inherit (parent.lib.caisson.pins.flake inputs) dependencies root;
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         projects = {
           caisson = parent;
         };

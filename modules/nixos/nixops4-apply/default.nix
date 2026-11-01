@@ -25,7 +25,7 @@ let
       throw ''
         caisson's `nixops4-apply` NixOS module needs the nixops4-nixos source.
         Declare `defaultEcosystemSrc.nixops4-nixos` in the mkLib call, or pin a
-        source named `nixops4-nixos` in the `sources` passed to mkLib.
+        source named `nixops4-nixos` in the `dependencies` passed to mkLib.
       ''
     else
       found;

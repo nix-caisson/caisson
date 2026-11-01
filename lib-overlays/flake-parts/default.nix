@@ -13,7 +13,7 @@
 # flake-parts itself comes from the composition, resolved like every
 # ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
 # in the mkLib call, the pinned source named `flake-parts` in the
-# `sources` passed to mkLib), and is taken as a source: its flake.nix is
+# `dependencies` passed to mkLib), and is taken as a source: its flake.nix is
 # called with the
 # composed library standing in for its `nixpkgs-lib` input, so the
 # module evaluation runs on the same library everything else in the
@@ -75,7 +75,7 @@
       types = import ../../modules/generic/core/types.nix { lib = final; };
 
       # The evaluator's call, on the lib of the view being evaluated:
-      # the manifest's sources as the flake's `inputs`, the special
+      # the flake's `inputs` from the manifest's dependencies, the special
       # arguments and the module location when the configuration is
       # named, beside the flake-parts it runs on and the module it
       # evaluates. `ecosystemArgs`, which only the twin's pattern
@@ -88,7 +88,7 @@
 
           # The flake-parts the configuration runs on. A configuration
           # that selects a source with `ecosystemSrc` selects it from
-          # the sources of the lib manifest of the evaluation. A
+          # the dependencies of the lib manifest of the evaluation. A
           # configuration that selects none runs on the declared
           # flake-parts.
           explicit = args.ecosystemSrc or null;
@@ -136,12 +136,12 @@
           # deduplicate. It comes from the manifest rather than the
           # module evaluation because moduleLocation is consumed before
           # that evaluation exists.
-          # flake-parts' `inputs` are the composition's pinned sources,
+          # flake-parts' `inputs` are the composition's dependencies,
           # with `self` added below.
           callArgs =
             (if name != null then { moduleLocation = name; } else { })
             // {
-              inputs = manifest.sources;
+              inputs = manifest.dependencies;
               specialArgs = {
                 inherit lib;
               }
@@ -209,7 +209,7 @@
           # integration ties that knot the way Nix does for a flake:
           # `self` is the evaluation's outputs with the root's source
           # info (out path, revision, last-modified) beside them, and
-          # `self.inputs` the pinned sources. A composition with no root
+          # `self.inputs` the dependencies. A composition with no root
           # names no tree, so its `self` has no out path. An `inputs`
           # handed in through the WithEcosystemArgs twin that carries a
           # `self` is taken as it is.
@@ -231,7 +231,7 @@
                   throw ''
                     caisson.flake-parts.mkConfiguration: `self.outPath` was read, but the
                     composition names no root. Pass `root` to mkLib
-                    (`inherit (caisson.lib.caisson.pins.flake inputs) sources root;`
+                    (`inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;`
                     at a flake top).
                   ''
                 else

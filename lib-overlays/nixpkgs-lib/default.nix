@@ -41,9 +41,10 @@
 # An overlay that calls nixpkgs' functions through the composed
 # library imports this entry by the key `nixpkgs-lib`, so composing
 # that overlay composes this. A tree outside caisson imports it from
-# the caisson source tree, as it imports `integrations`:
+# the caisson source tree, as it imports `integrations`, where `caisson`
+# is the flake input of that tree:
 #
-#   (mkLibOverlay (closure-inputs.caisson.outPath + "/lib-overlays/nixpkgs-lib"))
+#   (mkLibOverlay (caisson.outPath + "/lib-overlays/nixpkgs-lib"))
 #   // { key = "nixpkgs-lib"; }
 { ... }:
 {
@@ -62,7 +63,7 @@
             `defaultEcosystemSrc.nixpkgs-lib` in the mkLib call (the nixpkgs.lib
             mirror, or a nixpkgs checkout: `defaultEcosystemSrc.nixpkgs-lib =
             inputs.nixpkgs;`), or pin a source named exactly `nixpkgs-lib` in the
-            `sources` passed to mkLib.
+            `dependencies` passed to mkLib.
           ''
         else
           "${src}";

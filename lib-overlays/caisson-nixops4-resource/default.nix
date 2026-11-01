@@ -247,7 +247,7 @@
           # view being evaluated: the base modules, the outputs and the
           # member path, the framework modules of the class, the
           # selection and the configuration's module, with the
-          # composition's pinned sources as the `inputs` special
+          # composition's dependencies as the `inputs` special
           # argument and the deploying system as
           # `resourceProviderSystem`, as NixOps4 passes it.
           # `ecosystemArgs` is merged over the call last.
@@ -295,7 +295,7 @@
                     inherit class modules;
                     specialArgs = {
                       inherit lib;
-                      inputs = manifest.sources;
+                      inputs = manifest.dependencies;
                       inherit (args) resourceProviderSystem;
                     }
                     // (if (settings.specialArgs or null) != null then settings.specialArgs else { });

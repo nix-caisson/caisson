@@ -32,7 +32,7 @@ let
       throw ''
         caisson's `colmena-deployment` NixOS module needs the colmena source.
         Declare `defaultEcosystemSrc.colmena` in the mkLib call, or pin a
-        source named `colmena` in the `sources` passed to mkLib.
+        source named `colmena` in the `dependencies` passed to mkLib.
       ''
     else
       found;

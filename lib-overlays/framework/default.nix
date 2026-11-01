@@ -12,7 +12,9 @@
 # The registries are the exception: caisson-core keeps them in the
 # manifest of the library, and `lib.caisson.modules`,
 # `lib.caisson.configs`, `lib.caisson.libOverlays` and
-# `lib.caisson.pkgOverlays` read them from there. The rest of
+# `lib.caisson.pkgOverlays` read them from there. So does
+# `lib.caisson.dependencies`, the pinned trees the library was built
+# from, which a registered file reads through its `closure-lib`. The rest of
 # `lib.caisson-core` is what integrations and caisson itself are
 # written on.
 #
@@ -25,7 +27,7 @@
 # argument is written the same way:
 #
 #   lib = caisson.lib.caisson.mkLib {
-#     inherit (caisson.lib.caisson.pins.flake inputs) sources root;
+#     inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;
 #     projects = { inherit caisson; };
 #     modules = lib: lib.caisson.mkModules ./modules;
 #     libOverlays = lib: lib.caisson.mkLibOverlays ./lib-overlays;
@@ -36,7 +38,7 @@
 let
 
   # What caisson holds itself, bound to no library: the readers of pin
-  # files, which hand `mkLib` its `sources` and `root`, the functions
+  # files, which hand `mkLib` its `dependencies` and `root`, the functions
   # that evaluate a flake from source over inputs supplied by hand,
   # which a flake uses to check consumer-style flakes, and the
   # function that realizes resolved inputs, for a tool that
@@ -77,6 +79,8 @@ let
       ecosystemSrc
       ;
     mkLib = mkLibIn lib;
+    # the pinned trees the library was built from
+    dependencies = lib.caisson-core.libManifest.dependencies;
     # the registries
     modules = keyedModules lib (registryIn lib "modules");
     configs = keyedConfigs lib (registryIn lib "configs");

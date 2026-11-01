@@ -25,7 +25,7 @@ let
       throw ''
         caisson's `disko` NixOS module needs the disko source.
         Declare `defaultEcosystemSrc.disko` in the mkLib call, or pin a
-        source named `disko` in the `sources` passed to mkLib.
+        source named `disko` in the `dependencies` passed to mkLib.
       ''
     else
       found;

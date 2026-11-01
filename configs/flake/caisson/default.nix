@@ -6,14 +6,14 @@
 # only a flake evaluation carries. What the shared configuration
 # exports is passed up into this top's exports, and from there into
 # the flake outputs.
-{ closure-inputs, ... }:
+{ closure-lib, ... }:
 { lib, ... }:
 {
 
   imports = [
     # flake-parts' partitions module, from the flake-parts input of
-    # this flake (a module file; it binds no library).
-    closure-inputs.flake-parts.flakeModules.partitions
+    # this flake's dependencies (a module file; it binds no library).
+    closure-lib.caisson.dependencies.flake-parts.flakeModules.partitions
     ./partitions
   ];
 

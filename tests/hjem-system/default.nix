@@ -24,7 +24,7 @@ let
   pkgs = import inputs.nixpkgs { inherit system; };
 
   lib = core.mkLib {
-    sources = {
+    dependencies = {
       inherit (inputs)
         nixpkgs
         hjem
@@ -34,9 +34,9 @@ let
     };
     systems = [ system ];
     projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = sources: {
-      nixpkgs-lib = sources.nixpkgs;
-      nixos = sources.nixpkgs;
+    defaultEcosystemSrc = dependencies: {
+      nixpkgs-lib = dependencies.nixpkgs;
+      nixos = dependencies.nixpkgs;
     };
     pkgSets = _lib: {
       default =

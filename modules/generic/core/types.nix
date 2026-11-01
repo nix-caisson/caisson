@@ -84,12 +84,12 @@ in
   # consumers assume shape.
   manifest = lib.mkOptionType {
     name = "caissonManifest";
-    description = "caisson-core lib manifest ({ sources, root, modules, libOverlays, defaultEcosystemSrc, projects, systems })";
+    description = "caisson-core lib manifest ({ dependencies, root, modules, libOverlays, defaultEcosystemSrc, projects, systems })";
     descriptionClass = "noun";
     check =
       v:
       builtins.isAttrs v
-      && builtins.isAttrs (v.sources or null)
+      && builtins.isAttrs (v.dependencies or null)
       && ((v.root or null) == null || (builtins.isAttrs v.root && v.root ? outPath))
       && builtins.isAttrs (v.defaultEcosystemSrc or { })
       && builtins.isAttrs (v.projects or { })

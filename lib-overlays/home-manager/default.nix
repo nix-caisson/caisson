@@ -71,7 +71,7 @@
           final.caisson-core.resolve {
             name = "home-manager";
             defaults = manifest.defaultEcosystemSrc or { };
-            sources = manifest.sources or { };
+            dependencies = manifest.dependencies or { };
           }
         );
 
@@ -93,7 +93,7 @@
           throw ''
             lib.hm: this composition declares no home-manager. Declare it as
             `defaultEcosystemSrc.home-manager` in the mkLib call, or pin a
-            source named `home-manager` in the `sources` passed to mkLib; an evaluation
+            source named `home-manager` in the `dependencies` passed to mkLib; an evaluation
             that names its home-manager through `ecosystemSrc` runs on the
             composed library carrying `hm` from that tree.
           '';
