@@ -47,7 +47,7 @@
       # The pin readers of the parent, read by path like its overlays.
       pins = import (parent.outPath + "/lib-overlays/framework/pins");
       lib = core.mkLib {
-        inherit (pins.flake inputs) sources root;
+        inherit (pins.flake inputs) dependencies root;
         # Registered from the parent's source path: a flake cannot
         # reference files outside its tree, and reading the
         # source forces none of the parent's outputs. The overlays

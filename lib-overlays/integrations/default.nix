@@ -46,8 +46,8 @@
 #                        integration knows what to say; the resolver
 #                        itself never formats a message, because a miss
 #                        is the plain value null. The declarations and
-#                        sources are read from the composition's
-#                        manifest; a manifest-less
+#                        dependencies are read from the manifest
+#                        of the composition; a manifest-less
 #                        composition resolves only the explicit
 #                        argument.
 #   coreModules          the selections every integration draws
@@ -105,21 +105,21 @@
       inherit (final.caisson-core.functions) functionArgs setFunctionArgs;
 
       # The source a configuration's `ecosystemSrc` selects: the
-      # argument is a function of the tree's pinned sources, as
+      # argument is a function of the tree's dependencies, as
       # `defaultEcosystemSrc` on mkLib is, so a configuration chooses
-      # among the sources the tree pins. Null when the configuration
-      # passes none. `manifest` is the manifest whose `sources` it
+      # among the dependencies the tree pins. Null when the configuration
+      # passes none. `manifest` is the manifest whose `dependencies` it
       # selects from, the lib manifest of the evaluation.
       selectedEcosystemSrc =
         context: manifest: explicit:
         if explicit == null then
           null
         else if builtins.isFunction explicit then
-          explicit (manifest.sources or { })
+          explicit (manifest.dependencies or { })
         else
           throw ''
-            ${context}: `ecosystemSrc` is a function of the tree's sources that
-            returns the source to use, `ecosystemSrc = sources: sources.<name>;`,
+            ${context}: `ecosystemSrc` is a function of the tree's dependencies that
+            returns the source to use, `ecosystemSrc = dependencies: dependencies.<name>;`,
             but got a ${builtins.typeOf explicit}.
           '';
 
@@ -139,7 +139,7 @@
             inherit name;
             explicit = selectedEcosystemSrc context manifest explicit;
             defaults = manifest.defaultEcosystemSrc or { };
-            sources = manifest.sources or { };
+            dependencies = manifest.dependencies or { };
           };
         in
         if resolved != null then
@@ -147,9 +147,9 @@
         else
           throw ''
             ${context}: no ${name} ecosystem source. Select one with
-            `ecosystemSrc = sources: sources.<name>;` on the configuration,
+            `ecosystemSrc = dependencies: dependencies.<name>;` on the configuration,
             return a `${name}` from the `defaultEcosystemSrc` function of the
-            mkLib call, or pin a source named `${name}` in the `sources` passed
+            mkLib call, or pin a dependency named `${name}` in the `dependencies` passed
             to mkLib.
           '';
 
@@ -159,8 +159,8 @@
       # order. `from` names the declaration that supplied the source:
       # `ecosystemSrc` for the selection of the configuration,
       # `defaultEcosystemSrc` for the selection of the tree, and
-      # `sources` for the source the tree pins under exactly that name.
-      # `source` is the name of that source among the pinned sources,
+      # `dependencies` for the dependency the tree pins under exactly that name.
+      # `source` is the name of that dependency among the pinned dependencies,
       # where `pin` records its revision, or null where a selection
       # builds the value in another way. Reading the account forces no
       # source a selection does not read.
@@ -174,14 +174,14 @@
           manifest ? final.caisson-core.libManifest or { },
         }:
         let
-          sources = manifest.sources or { };
+          dependencies = manifest.dependencies or { };
         in
         if explicit != null then
           {
             from = "ecosystemSrc";
             source = final.caisson-core.selectedSourceName {
-              inherit sources;
-              selection = sources: selectedEcosystemSrc context { inherit sources; } explicit;
+              inherit dependencies;
+              selection = dependencies: selectedEcosystemSrc context { inherit dependencies; } explicit;
             };
           }
         else if (manifest.defaultEcosystemSrc or { }) ? ${name} then
@@ -189,9 +189,9 @@
             from = "defaultEcosystemSrc";
             source = (manifest.defaultEcosystemSrcNames or { }).${name} or null;
           }
-        else if sources ? ${name} then
+        else if dependencies ? ${name} then
           {
-            from = "sources";
+            from = "dependencies";
             source = name;
           }
         else

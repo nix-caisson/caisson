@@ -50,8 +50,10 @@
         manifest) are under `lib.caisson`, beside the integrations. Your
         overlays contribute your extensions (here, `lib.literate-flake`).
 
-        - `inputs` are closed over so that modules and overlays can reference
-          them without threading inputs explicitly through every call site.
+        - `dependencies` are the pinned trees the composition is built
+          from. A module or overlay reads them through `closure-lib`, as
+          `closure-lib.caisson.dependencies.<name>`, without threading
+          them through every call site.
         - `projects` registers whole upstream contributions: a consumed
           project's exported overlays and modules become available under
           `<project>/<name>`, and the usual selections pick from them per
@@ -63,26 +65,26 @@
           conventional layout, `modules/<class>/<name>/default.nix`:
           each entry directory becomes `modules.<class>.<name>`, built
           with `caisson.mkModule <class>`. Everything passed to
-          mkModule takes the closure attrset ({ closure-inputs,
-          closure-lib, mkModule, ... }) as its first arg list; files
+          mkModule takes the closure attrset ({ closure-lib,
+          mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
         - `configs` is the same registration for `configs/<class>/<name>`,
           the configurations a top evaluates.
-        - `libOverlays` is a function from an input-closed `mkLibOverlay`
+        - `libOverlays` is a function from the `mkLibOverlay`
           helper returning the registered library overlays; `mkLibOverlays`
           derives it from `lib-overlays/<name>/default.nix`. Registering
           by hand stays useful for cherry-picking or renaming an
           overlay from elsewhere.
       */
       lib = caisson.lib.caisson.mkLib {
-        # The flake pin reader: the inputs as the pinned sources the
-        # composition closes over, and the root from `self`.
-        inherit (caisson.lib.caisson.pins.flake inputs) sources root;
+        # The flake pin reader: the inputs as the pinned dependencies of
+        # the composition, and the root from `self`.
+        inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;
 
         # The library the composition runs on: the `lib` of the
         # nixpkgs input, selected under the `nixpkgs-lib` key since
         # this flake names no separate nixpkgs.lib mirror.
-        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
 
         # The project's name, which this flake holds and which is the
         # namespace it contributes to the composed library: the `lib`

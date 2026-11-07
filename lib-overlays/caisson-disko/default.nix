@@ -205,7 +205,7 @@
       # The evaluator's call, on the lib of the view being evaluated:
       # the devices option and the assertions, the framework modules of
       # the class, the selection and the configuration's module, with
-      # the composition's pinned sources as the `inputs` special
+      # the composition's dependencies as the `inputs` special
       # argument. `ecosystemArgs`, which only the twin's pattern admits,
       # is merged over the call last.
       evaluate =
@@ -254,7 +254,7 @@
               class = "caisson-disko";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });

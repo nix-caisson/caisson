@@ -20,12 +20,12 @@
     inputs@{ parent, ... }:
     let
       lib = parent.lib.caisson.mkLib {
-        inherit (parent.lib.caisson.pins.flake inputs) sources root;
+        inherit (parent.lib.caisson.pins.flake inputs) dependencies root;
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
         systems = [ "x86_64-linux" ];
-        defaultEcosystemSrc = sources: { nixpkgs-lib = sources.nixpkgs; };
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         projects = {
           caisson = parent;
         };

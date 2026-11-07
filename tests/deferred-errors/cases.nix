@@ -40,7 +40,7 @@ let
   composite =
     lib: module:
     lib.caisson.caisson-nixops4-composite.mkConfiguration {
-      ecosystemSrc = _sources: ecosystemSrc;
+      ecosystemSrc = _dependencies: ecosystemSrc;
       configModule = module;
     };
 
@@ -48,7 +48,7 @@ let
   resource =
     lib: module:
     lib.caisson.caisson-nixops4-resource.mkConfiguration {
-      ecosystemSrc = _sources: ecosystemSrc;
+      ecosystemSrc = _dependencies: ecosystemSrc;
       configModule =
         { providers, ... }:
         {
@@ -80,7 +80,7 @@ let
         { lib, ... }:
         {
           caisson.nixops4.configurations.nixops4 = lib.caisson.nixops4.mkConfiguration {
-            ecosystemSrc = _sources: ecosystemSrc;
+            ecosystemSrc = _dependencies: ecosystemSrc;
             inherit modules;
           };
         };
@@ -282,7 +282,7 @@ in
           {
             caisson.caisson-nixops4-composite.configurations.nixops4 = composite lib { };
             caisson.nixops4.configurations.nixops4 = lib.caisson.nixops4.mkConfiguration {
-              ecosystemSrc = _sources: ecosystemSrc;
+              ecosystemSrc = _dependencies: ecosystemSrc;
             };
           };
       }).nixops4;

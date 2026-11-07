@@ -24,7 +24,7 @@ let
         user = "probe";
         directory = "/home/probe";
         caisson.nvf.configurations.editor = lib.caisson.nvf.mkConfiguration {
-          ecosystemSrc = sources: sources.nvf;
+          ecosystemSrc = dependencies: dependencies.nvf;
           configModule.vim.viAlias = true;
         };
       };

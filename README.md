@@ -62,9 +62,9 @@ and `lib-overlays/<name>`.
       # mkModules, the registries, the manifest) and one namespace
       # per integration (lib.caisson.flake-parts, lib.caisson.nixos).
       lib = caisson.lib.caisson.mkLib {
-        # The flake pin reader: your inputs as the pinned sources the
-        # composition closes over, and the root from `self`.
-        inherit (caisson.lib.caisson.pins.flake inputs) sources root;
+        # The flake pin reader: your inputs as the pinned dependencies
+        # of the composition, and the root from `self`.
+        inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;
 
         # The project's name: the name of the configuration below,
         # which no parent declares, and the namespace this flake
@@ -76,7 +76,7 @@ and `lib-overlays/<name>`.
         projects = { inherit caisson; };
 
         # The class-keyed modules this flake defines, read from
-        # modules/<class>/<name>/default.nix: closed over your pinned sources,
+        # modules/<class>/<name>/default.nix: closed over your dependencies,
         # importable here, exportable to downstream consumers. A flake
         # with another layout writes the registration by hand
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
@@ -155,13 +155,13 @@ evaluated.
 
 ## Going deeper
 
-- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-inputs.html):
-  closed inputs, module classes, library overlays, and ecosystem sources,
+- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-over-dependencies.html):
+  closed-over dependencies, module classes, library overlays, and ecosystem sources,
   each explained with the reasoning behind the design.
 - [Reference](https://nix-caisson.github.io/docs/reference/lib.html):
   the `lib.caisson` API and module options.
 - [Deep dives](https://nix-caisson.github.io/docs/deep-dives/how-lib-is-composed.html):
-  how `lib` is composed and how inputs are closed over.
+  how `lib` is composed and how dependencies are closed over.
 - [`examples/literate-flake/`](examples/literate-flake/): a working,
   annotated flake demonstrating the whole structure end to end.
 

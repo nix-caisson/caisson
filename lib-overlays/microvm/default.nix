@@ -149,7 +149,7 @@
             # declarations when absent.
             ecosystemSrc ? null,
             # The microvm.nix flake or source tree, as a function of the
-            # tree's sources (`microvmSrc = sources: sources.<name>;`);
+            # tree's dependencies (`microvmSrc = dependencies: dependencies.<name>;`);
             # resolved from the composition's declarations under the
             # name `microvm` when absent.
             microvmSrc ? null,

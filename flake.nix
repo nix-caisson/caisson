@@ -34,9 +34,9 @@
       pins = import ./lib-overlays/framework/pins;
 
       lib = core.mkLib {
-        # The flake pin reader: the inputs as the pinned sources, and
-        # the root from `self`.
-        inherit (pins.flake inputs) sources root;
+        # The flake pin reader: the inputs as the pinned dependencies,
+        # and the root from `self`.
+        inherit (pins.flake inputs) dependencies root;
         name = "caisson";
         systems = import ./systems.nix;
         modules = lib: lib.caisson-core.mkModules ./modules;

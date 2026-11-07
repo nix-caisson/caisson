@@ -48,12 +48,12 @@ polluting the main flake's input set or forcing consumers to fetch them.
 The partition declares:
 
 ```nix
-extraInputs = (lib.caisson-core.pins.flake-compat ../../../../tests/dependencies).sources;
+extraInputs = (lib.caisson-core.pins.flake-compat ../../../../tests/dependencies).dependencies;
 ```
 
 `pins.flake-compat` (one of caisson-core's pin readers) resolves the lock of
 the dependencies flake the way flake-compat does and returns its inputs as
-pinned sources, each flake input with its outputs, without evaluating the
+pinned dependencies, each flake input with its outputs, without evaluating the
 dependencies flake itself. It does not go through `builtins.getFlake`, which
 cannot handle paths in pure evaluation mode, and it stays safe under
 read-only evaluation (`nix flake check --no-build`). The returned inputs are merged into
@@ -146,7 +146,7 @@ source path with the directory readers.
 ```nix
 core = inputs.caisson-core.lib.caisson-core;
 lib = core.mkLib {
-  inherit (core.pins.flake inputs) sources root;
+  inherit (core.pins.flake inputs) dependencies root;
   defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
   modules = lib: lib.caisson-core.mkModules (parent.outPath + "/modules");
   libOverlays = lib: lib.caisson-core.mkLibOverlays (parent.outPath + "/lib-overlays");
@@ -225,7 +225,7 @@ module composition behave as expected from a consumer's perspective.
 Each integration test is a standalone flake under `tests/integration/<name>/` that:
 
 1. Takes `parent` (caisson's evaluated outputs, from the pool) as an input
-2. Calls `parent.lib.caisson-core.mkLib { inherit (parent.lib.caisson-core.pins.flake inputs) sources root; ... }` to bootstrap
+2. Calls `parent.lib.caisson-core.mkLib { inherit (parent.lib.caisson-core.pins.flake inputs) dependencies root; ... }` to bootstrap
 3. Uses `lib.caisson.flake-parts.mkTopConfiguration` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
    worked

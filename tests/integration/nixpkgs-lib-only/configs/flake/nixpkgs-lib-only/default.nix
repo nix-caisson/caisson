@@ -56,7 +56,7 @@
             from = "defaultEcosystemSrc";
             source = null;
           };
-        assert ecosystems.nixpkgs.from == "sources" && ecosystems.nixpkgs.source == "nixpkgs";
+        assert ecosystems.nixpkgs.from == "dependencies" && ecosystems.nixpkgs.source == "nixpkgs";
         assert builtins.all (name: builtins.elem name ecosystems.nixpkgs.libraries) [
           "systems"
           "licenses"

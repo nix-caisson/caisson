@@ -34,14 +34,14 @@ let
 
   lib = core.mkLib {
     name = "microvm-host-vm";
-    sources = {
+    dependencies = {
       inherit (inputs) nixpkgs microvm;
     };
     systems = [ system ];
     projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = sources: {
-      nixpkgs-lib = sources.nixpkgs;
-      nixos = sources.nixpkgs;
+    defaultEcosystemSrc = dependencies: {
+      nixpkgs-lib = dependencies.nixpkgs;
+      nixos = dependencies.nixpkgs;
     };
     configs = lib: lib.caisson-core.mkModules ./configs;
     pkgSets = _lib: {

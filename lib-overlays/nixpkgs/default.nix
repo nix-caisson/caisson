@@ -17,7 +17,6 @@
 # `stage.nix` the composed lib with `pkgsManifest` filled in, so
 # `pkgs.lib` carries the set's manifest.
 {
-  closure-inputs,
   mkLibOverlay,
   ...
 }:
@@ -592,7 +591,6 @@
             pkgs:
             let
               finalLib = final;
-              closedInputs = closure-inputs;
               reifiedPkgs = if builtins.isFunction pkgs then pkgs else import pkgs;
               reifiedPkgsArgs =
                 if builtins.isFunction reifiedPkgs then builtins.functionArgs reifiedPkgs else { };
@@ -606,7 +604,6 @@
                   if pkgsExpectsContext then
                     reifiedPkgs {
                       inherit callPackage;
-                      inputs = closedInputs;
                       lib = finalLib;
                     }
                   else
@@ -619,19 +616,12 @@
             overlayFn:
             let
               finalLib = final;
-              closedInputs = closure-inputs;
               reifiedOverlayFn = if builtins.isFunction overlayFn then overlayFn else import overlayFn;
               reifiedOverlayFnArgs =
                 if builtins.isFunction reifiedOverlayFn then builtins.functionArgs reifiedOverlayFn else { };
               overlayExpectsContext = reifiedOverlayFnArgs != { };
               resolvedOverlayFn =
-                if overlayExpectsContext then
-                  reifiedOverlayFn {
-                    inputs = closedInputs;
-                    lib = finalLib;
-                  }
-                else
-                  reifiedOverlayFn;
+                if overlayExpectsContext then reifiedOverlayFn { lib = finalLib; } else reifiedOverlayFn;
             in
             _name: pkgsFinal: pkgsPrev:
             resolvedOverlayFn pkgsFinal pkgsPrev

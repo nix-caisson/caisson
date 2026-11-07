@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The pin readers: a function per pin system that reads its files into
-# `sources`, the pinned source trees a project is built from, each carrying the
-# identity its pin files record. Everything caisson does with a source
+# `dependencies`, the pinned trees a project is built from, each carrying the
+# identity its pin files record. Everything caisson does with a dependency
 # is the same under every pin system; a reader is the whole of what a
 # pin system contributes.
 #
@@ -10,15 +10,15 @@
 #                                for the flake being evaluated (the
 #                                `inputs` its `outputs` receives), with
 #                                any `--override-input` in force; returns
-#                                { sources; root; }, `root` from `self`
+#                                { dependencies; root; }, `root` from `self`
 #   pins.flake-compat ./dir      the flake.lock beside a flake.nix in
 #                                `dir`, resolved the way flake-compat
 #                                does, stopping before the flake's
 #                                `outputs`; nothing overrides it and it
-#                                has no `self`; returns { sources; }
+#                                has no `self`; returns { dependencies; }
 #   pins.npins ./npins           npins' sources.json in `dir`, each pin
 #                                fetched as npins' generated default.nix
-#                                fetches it; returns { sources; }
+#                                fetches it; returns { dependencies; }
 #   pins.gitRoot ./.             the `root` of a flakeless top in a git
 #                                working tree: its revision when clean,
 #                                marked dirty otherwise
@@ -167,7 +167,7 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (builtins.removeAttrs inputs [ "self" ]);
+      dependencies = builtins.mapAttrs sourceOf (builtins.removeAttrs inputs [ "self" ]);
       root = mkRoot self.outPath (self ? dirtyRev) self;
     };
 
@@ -259,7 +259,7 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (flakeLock.descriptors lock);
+      dependencies = builtins.mapAttrs sourceOf (flakeLock.descriptors lock);
     };
 
   npinsReader =
@@ -291,7 +291,7 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (npins.describe "pins.npins" data);
+      dependencies = builtins.mapAttrs sourceOf (npins.describe "pins.npins" data);
     };
 
   # The root of a flakeless top whose tree is a git working tree. It

@@ -53,7 +53,7 @@ let
     mkLib = testMkLib;
   };
 
-  mockSources = {
+  mockDependencies = {
     # The real mirror: a tree with lib/ (the nixpkgs-lib entry reads it
     # by input name) whose `lib` is what test bodies read.
     nixpkgs-lib = inputs.nixpkgs-lib;
@@ -72,7 +72,7 @@ let
       libOverlays ? { },
       ...
     }@args:
-    caisson.mkLib ({ sources = mockSources; } // args);
+    caisson.mkLib ({ dependencies = mockDependencies; } // args);
 
   # The errors Nix raises when a call does not match the pattern of an
   # entry point, as `expectedError` values: the entry point is named
@@ -277,21 +277,20 @@ in
         let
           module =
             {
-              closure-inputs,
               closure-lib,
               mkModule,
               ...
             }:
             { config, ... }:
             {
-              hasInputs = builtins.isAttrs closure-inputs;
+              hasDependencies = builtins.isAttrs closure-lib.caisson.dependencies;
               hasLib = builtins.isAttrs closure-lib;
               hasMkMod = builtins.isFunction mkModule;
             };
           result = mkFlakePartsModule module;
           evaluated = result { config = { }; };
         in
-        evaluated.hasInputs && evaluated.hasLib && evaluated.hasMkMod;
+        evaluated.hasDependencies && evaluated.hasLib && evaluated.hasMkMod;
       expected = true;
     };
 
@@ -465,14 +464,13 @@ in
         let
           module =
             {
-              closure-inputs,
               closure-lib,
               mkModule,
               ...
             }:
             { config, ... }:
             {
-              hasInputs = builtins.isAttrs closure-inputs;
+              hasDependencies = builtins.isAttrs closure-lib.caisson.dependencies;
               hasLib = builtins.isAttrs closure-lib;
               nestedOk =
                 (mkModule (
@@ -490,24 +488,24 @@ in
         in
         {
           viaAlias = {
-            hasInputs = viaAlias.hasInputs;
+            hasDependencies = viaAlias.hasDependencies;
             hasLib = viaAlias.hasLib;
             nestedOk = viaAlias.nestedOk.ok or false;
           };
           viaFactory = {
-            hasInputs = viaFactory.hasInputs;
+            hasDependencies = viaFactory.hasDependencies;
             hasLib = viaFactory.hasLib;
             nestedOk = viaFactory.nestedOk.ok or false;
           };
         };
       expected = {
         viaAlias = {
-          hasInputs = true;
+          hasDependencies = true;
           hasLib = true;
           nestedOk = true;
         };
         viaFactory = {
-          hasInputs = true;
+          hasDependencies = true;
           hasLib = true;
           nestedOk = true;
         };
@@ -519,9 +517,11 @@ in
     "test: applies the closure attrset to the overlay" = {
       expr =
         (caisson.mkLibOverlay (
-          { closure-inputs, ... }:
+          { closure-lib, ... }:
           {
-            overlay = final: prev: { hasPkgs = builtins.hasAttr "nixpkgs-lib" closure-inputs; };
+            overlay = final: prev: {
+              hasPkgs = builtins.hasAttr "nixpkgs-lib" closure-lib.caisson.dependencies;
+            };
           }
         )).overlay
           { }
@@ -784,12 +784,12 @@ in
                 config.counted = [ "counter" ];
               };
             projectLib = caisson.mkLib {
-              sources = mockSources;
+              dependencies = mockDependencies;
               name = "counter-project";
               modules = _lib: { generic.counter = counter; };
             };
             treeLib = caisson.mkLib {
-              sources = mockSources;
+              dependencies = mockDependencies;
               name = "tree";
               projects.counter-project = {
                 modules.generic.counter = counter;
@@ -1016,7 +1016,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             modules = callbackLib: {
               flake = {
                 inspect = callbackLib.caisson.flake-parts.mkModule (
@@ -1058,7 +1058,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = _lib: {
               provider = mkLibOverlay (
                 { ... }:
@@ -1098,7 +1098,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = _lib: {
               marker = mkLibOverlay (
                 { ... }:
@@ -1197,7 +1197,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             modules = callbackLib: {
               flake = {
                 fromAlias = callbackLib.caisson.flake-parts.mkModule (
@@ -1227,7 +1227,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = _lib: {
               fromAlias = lib.caisson-core.mkLibOverlay (
                 { ... }:
@@ -1248,7 +1248,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = coreLib: {
               fromFunction = coreLib.caisson-core.mkLibOverlay (
                 { ... }:
@@ -1269,7 +1269,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = coreLib: {
               marker = coreLib.caisson-core.mkLibOverlay (
                 { ... }:
@@ -1319,7 +1319,7 @@ in
       expr =
         let
           myLib = lib.caisson-core.mkLib {
-            sources = { };
+            dependencies = { };
             libOverlays = coreLib: {
               integrations = coreLib.caisson-core.mkLibOverlay (
                 inputs.parent.outPath + "/lib-overlays/integrations"
@@ -1361,7 +1361,7 @@ in
                 == builtins.attrNames given.caisson-core.libManifest.libOverlays;
           };
           myLib = lib.caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = given: {
               probe = given.caisson.mkLibOverlay (
                 { ... }:
@@ -1399,7 +1399,7 @@ in
           malformed =
             (builtins.tryEval (
               lib.caisson.mkLib {
-                sources = mockSources;
+                dependencies = mockDependencies;
                 modules = 42;
               }
             )).success;
@@ -1421,7 +1421,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             libOverlays = _lib: {
               nixpkgs-lib = mkLibOverlay (
                 { ... }:
@@ -1656,7 +1656,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
 
             modules = _lib: {
               testClass = {
@@ -1692,7 +1692,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
 
             modules = _lib: {
               flake = {
@@ -1725,7 +1725,7 @@ in
       expr =
         let
           myLib = caisson.mkLib {
-            sources = mockSources;
+            dependencies = mockDependencies;
             modules = _lib: {
               testClass = {
                 only = mkModule "test-class" ({ ... }: { });
@@ -1843,7 +1843,7 @@ in
         extra:
         caisson.mkLib (
           {
-            sources = mockSources;
+            dependencies = mockDependencies;
             systems = [ "x86_64-linux" ];
             libOverlays = _lib: {
               terranix = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/terranix");
@@ -1856,7 +1856,9 @@ in
       "test: a declared ecosystem resolves for an adapter" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
+            myLib = mkResolutionLib {
+              defaultEcosystemSrc = dependencies: { terranix = terranixStub "declared"; };
+            };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
             configModule = { };
@@ -1867,16 +1869,18 @@ in
       "test: an explicit ecosystemSrc beats the declaration" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
+            myLib = mkResolutionLib {
+              defaultEcosystemSrc = dependencies: { terranix = terranixStub "declared"; };
+            };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
-            ecosystemSrc = sources: terranixStub "explicit";
+            ecosystemSrc = dependencies: terranixStub "explicit";
             configModule = { };
           }).stubbed;
         expected = "explicit";
       };
 
-      # `ecosystemSrc` selects from the tree's sources, so a
+      # `ecosystemSrc` selects from the tree's dependencies, so a
       # configuration gives it as a function; a value is refused before
       # resolution runs.
       "test: an ecosystemSrc given as a value is refused" = {
@@ -1890,7 +1894,7 @@ in
           }).stubbed;
         expectedError = {
           type = "ThrownError";
-          msg = "caisson\\.terranix: `ecosystemSrc` is a function of the tree's sources that\\s+returns the source to use, `ecosystemSrc = sources: sources\\.<name>;`,\\s+but got a set\\.";
+          msg = "caisson\\.terranix: `ecosystemSrc` is a function of the tree's dependencies that\\s+returns the source to use, `ecosystemSrc = dependencies: dependencies\\.<name>;`,\\s+but got a set\\.";
         };
       };
 
@@ -1898,7 +1902,7 @@ in
         expr =
           let
             myLib = mkResolutionLib {
-              sources = mockSources // {
+              dependencies = mockDependencies // {
                 terranix = terranixStub "input";
               };
             };
@@ -1913,10 +1917,10 @@ in
         expr =
           let
             myLib = mkResolutionLib {
-              sources = mockSources // {
+              dependencies = mockDependencies // {
                 terranix = terranixStub "input";
               };
-              defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; };
+              defaultEcosystemSrc = dependencies: { terranix = terranixStub "declared"; };
             };
           in
           (myLib.caisson.terranix.mkTopConfiguration {
@@ -1940,7 +1944,9 @@ in
       "test: declarations join the manifest" = {
         expr =
           let
-            myLib = mkResolutionLib { defaultEcosystemSrc = sources: { terranix = terranixStub "declared"; }; };
+            myLib = mkResolutionLib {
+              defaultEcosystemSrc = dependencies: { terranix = terranixStub "declared"; };
+            };
           in
           (myLib.caisson-core.libManifest.defaultEcosystemSrc.terranix.lib.terranixConfiguration { }).stubbed;
         expected = "declared";
@@ -1960,19 +1966,19 @@ in
   nixosLib =
     let
       nixosStub = ./nixos-stub;
-      # mockSources with the nixos stub added, under a name a
+      # mockDependencies with the nixos stub added, under a name a
       # composition's `defaultEcosystemSrc` selects.
-      sourcesWithNixos = mockSources // {
+      dependenciesWithNixos = mockDependencies // {
         inherit nixosStub;
       };
-      nixosEcosystemSrc = sources: {
-        nixpkgs = sources.nixosStub;
-        nixos = sources.nixosStub;
+      nixosEcosystemSrc = dependencies: {
+        nixpkgs = dependencies.nixosStub;
+        nixos = dependencies.nixosStub;
       };
       mkComposition =
         extraOverlays:
         caisson.mkLib {
-          sources = sourcesWithNixos;
+          dependencies = dependenciesWithNixos;
           defaultEcosystemSrc = nixosEcosystemSrc;
           # A configuration takes its system and its package set from
           # the composition.
@@ -2010,7 +2016,7 @@ in
       # `machine`, which records the name and the system its evaluation
       # carries.
       publishingLib = caisson.mkLib {
-        sources = sourcesWithNixos;
+        dependencies = dependenciesWithNixos;
         name = "publishing";
         defaultEcosystemSrc = nixosEcosystemSrc;
         systems = [ "x86_64-linux" ];
@@ -2453,7 +2459,7 @@ in
         expr =
           let
             noDefault = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "no-default";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
@@ -2517,7 +2523,7 @@ in
             on =
               systems:
               caisson.mkLib {
-                sources = sourcesWithNixos;
+                dependencies = dependenciesWithNixos;
                 name = "machine";
                 defaultEcosystemSrc = nixosEcosystemSrc;
                 inherit systems;
@@ -2610,7 +2616,7 @@ in
         expr =
           let
             minimalLib = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "publishing";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
@@ -2722,7 +2728,7 @@ in
                 };
               };
             everyLib = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "publishing";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
@@ -2828,7 +2834,7 @@ in
             # The modules are registered in the composition. A
             # configuration selects from that registry.
             registeringModulesLib = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "registering-modules";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
@@ -3127,7 +3133,7 @@ in
         expr =
           let
             severalLib = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "several";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [
@@ -3172,7 +3178,7 @@ in
         expr =
           let
             oneSystemLib = caisson.mkLib {
-              sources = sourcesWithNixos;
+              dependencies = dependenciesWithNixos;
               name = "one-system";
               defaultEcosystemSrc = nixosEcosystemSrc;
               systems = [ "x86_64-linux" ];
@@ -3356,7 +3362,7 @@ in
         caisson.mkLib (
           homeComposition
           // {
-            sources = mockSources // {
+            dependencies = mockDependencies // {
               inherit hmStub hmStubCopy;
             };
             libOverlays =
@@ -3380,7 +3386,7 @@ in
           // declaration
         );
       mkComposition = mkCompositionWith {
-        defaultEcosystemSrc = sources: { home-manager = sources.hmStub; };
+        defaultEcosystemSrc = dependencies: { home-manager = dependencies.hmStub; };
       };
       myLib = mkComposition { };
       # A composition that declares no home-manager: no
@@ -3403,7 +3409,7 @@ in
         caisson.mkLib (
           homeComposition
           // {
-            sources = mockSources // {
+            dependencies = mockDependencies // {
               inherit hmStub;
             };
             libOverlays = _lib: {
@@ -3452,15 +3458,15 @@ in
       treeLibWith =
         systems:
         caisson.mkLib {
-          sources = mockSources // {
+          dependencies = mockDependencies // {
             nixosStub = ./nixos-stub;
             inherit hmStub;
           };
           name = "homes";
-          defaultEcosystemSrc = sources: {
-            nixpkgs = sources.nixosStub;
-            nixos = sources.nixosStub;
-            home-manager = sources.hmStub;
+          defaultEcosystemSrc = dependencies: {
+            nixpkgs = dependencies.nixosStub;
+            nixos = dependencies.nixosStub;
+            home-manager = dependencies.hmStub;
           };
           inherit systems;
           pkgSets =
@@ -3601,8 +3607,9 @@ in
       "test: lib.maintainers carries both lists" = {
         expr =
           builtins.attrNames
-            (mkMaintainersComposition { defaultEcosystemSrc = sources: { home-manager = sources.hmStub; }; })
-            .maintainers;
+            (mkMaintainersComposition {
+              defaultEcosystemSrc = dependencies: { home-manager = dependencies.hmStub; };
+            }).maintainers;
         expected = [
           "a-nixpkgs-maintainer"
           "home-manager-stub-maintainer"
@@ -3622,7 +3629,7 @@ in
       "test: an evaluation naming its home-manager merges its maintainers" = {
         expr =
           ((mkMaintainersComposition { }).caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = sources: sources.hmStub;
+            ecosystemSrc = dependencies: dependencies.hmStub;
             configModule =
               { lib, ... }:
               {
@@ -3743,7 +3750,7 @@ in
       "test: an evaluation naming the declared tree runs on the composed library" = {
         expr =
           (myLib.caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = sources: sources.hmStub;
+            ecosystemSrc = dependencies: dependencies.hmStub;
             configModule = probeModule;
             check = false;
           }).config.seenLib;
@@ -3764,7 +3771,7 @@ in
         expr =
           builtins.deepSeq
             (myLib.caisson.home-manager.mkTopConfiguration {
-              ecosystemSrc = sources: sources.hmStubCopy;
+              ecosystemSrc = dependencies: dependencies.hmStubCopy;
               configModule = probeModule;
               check = false;
             }).config.seenLib
@@ -3783,7 +3790,7 @@ in
       "test: an evaluation names its home-manager when the composition declares none" = {
         expr =
           (undeclaredLib.caisson.home-manager.mkTopConfiguration {
-            ecosystemSrc = sources: sources.hmStub;
+            ecosystemSrc = dependencies: dependencies.hmStub;
             configModule = probeModule;
             check = false;
           }).config.seenLib;
@@ -3803,7 +3810,7 @@ in
         expr =
           let
             evaluated = undeclaredLib.caisson.home-manager.mkTopConfiguration {
-              ecosystemSrc = sources: sources.hmStub;
+              ecosystemSrc = dependencies: dependencies.hmStub;
               configModule =
                 { config, lib, ... }:
                 {
@@ -3865,7 +3872,7 @@ in
           in
           {
             declared = seenUnder myLib { };
-            named = seenUnder undeclaredLib { ecosystemSrc = sources: sources.hmStub; };
+            named = seenUnder undeclaredLib { ecosystemSrc = dependencies: dependencies.hmStub; };
           };
         expected = {
           declared = {
@@ -4494,7 +4501,7 @@ in
               }
             );
             entries = top.outputs.exports.configurations;
-            elsewhere = caisson.mkLib { sources = mockSources; };
+            elsewhere = caisson.mkLib { dependencies = mockDependencies; };
             published = elsewhere.caisson.integrations.publish entries;
           in
           {
@@ -4558,7 +4565,7 @@ in
   structural =
     let
       registeringLib = caisson.mkLib {
-        sources = mockSources;
+        dependencies = mockDependencies;
         modules = callbackLib: {
           flake = {
             thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
@@ -4608,7 +4615,7 @@ in
       # The same composition with a name declared, contributing the
       # namespace of that name to the composed library.
       namespacedLib = caisson.mkLib {
-        sources = mockSources;
+        dependencies = mockDependencies;
         name = "named-composition";
         libOverlays = _lib: {
           named-composition = mkLibOverlay (
@@ -4636,7 +4643,7 @@ in
       # `inner` declares `leaf`, which reads the marker of the
       # configuration it is declared in.
       nestingLib = caisson.mkLib {
-        sources = mockSources;
+        dependencies = mockDependencies;
         name = "nesting";
         configs = callbackLib: {
           structural = {
@@ -4839,7 +4846,7 @@ in
             mkOutputs =
               tag:
               (caisson.mkLib {
-                sources = mockSources;
+                dependencies = mockDependencies;
                 name = "rev-independent";
                 modules = callbackLib: {
                   flake = {
@@ -4884,7 +4891,7 @@ in
           let
             outputs =
               (caisson.mkLib {
-                sources = mockSources;
+                dependencies = mockDependencies;
                 modules = callbackLib: {
                   flake = {
                     thing = callbackLib.caisson.flake-parts.mkModule ({ ... }: { });
@@ -5203,17 +5210,19 @@ in
       "test: a flake with no system in force has no per-system outputs" = {
         expr =
           let
-            outputs = (caisson.mkLib { sources = mockSources; }).caisson.flake-parts.mkTopConfiguration {
-              configModule = {
-                perSystem =
-                  { ... }:
-                  {
-                    packages.probe = throw "evaluated with no system";
+            outputs =
+              (caisson.mkLib { dependencies = mockDependencies; }).caisson.flake-parts.mkTopConfiguration
+                {
+                  configModule = {
+                    perSystem =
+                      { ... }:
+                      {
+                        packages.probe = throw "evaluated with no system";
+                      };
+                    flake.reached = true;
                   };
-                flake.reached = true;
-              };
-              moduleImports = _modules: [ ];
-            };
+                  moduleImports = _modules: [ ];
+                };
           in
           {
             inherit (outputs) reached;
@@ -5244,7 +5253,7 @@ in
   integrations =
     let
       declaringLib = caisson.mkLib {
-        sources = mockSources;
+        dependencies = mockDependencies;
         libOverlays = _lib: {
           # An owner whose pattern requires nothing.
           probe = mkLibOverlay (
@@ -5756,7 +5765,7 @@ in
                   { lib, ... }:
                   {
                     caisson.caisson-colmena.configurations.colmenaHive = lib.caisson.caisson-colmena.mkConfiguration {
-                      ecosystemSrc = _sources: colmenaStub;
+                      ecosystemSrc = _dependencies: colmenaStub;
                       configModule.meta.description = "probe";
                     };
                   };
@@ -5806,10 +5815,10 @@ in
       mkCompositionWith =
         sets:
         caisson.mkLib {
-          sources = mockSources // {
+          dependencies = mockDependencies // {
             inherit hmStub;
           };
-          defaultEcosystemSrc = sources: { home-manager = sources.hmStub; };
+          defaultEcosystemSrc = dependencies: { home-manager = dependencies.hmStub; };
           # A home-manager configuration takes its system and its
           # package set from the composition.
           systems = [ "x86_64-linux" ];

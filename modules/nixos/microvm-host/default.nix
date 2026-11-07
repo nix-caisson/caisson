@@ -50,7 +50,7 @@ let
       throw ''
         caisson's `microvm-host` NixOS module needs the microvm.nix source.
         Declare `defaultEcosystemSrc.microvm` in the mkLib call, or pin a
-        source named `microvm` in the `sources` passed to mkLib.
+        source named `microvm` in the `dependencies` passed to mkLib.
       ''
     else
       lib.caisson.caisson-microvm.assertMicrovmEcosystemSrc "caisson's `microvm-host` NixOS module" found;

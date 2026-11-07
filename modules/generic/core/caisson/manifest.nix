@@ -17,7 +17,7 @@ in
       The manifest of this evaluation, which carries the registries
       and declared facts of the composition it is declared under; in
       an evaluation that carries none, the composition's manifest.
-      Of the composition: `sources` and `root` as the pin
+      Of the composition: `dependencies` and `root` as the pin
       reader gave them to mkLib (each pin recorded against the root),
       `defaultEcosystemSrc`, `systems` and `projects` as given to mkLib,
       plus the registered

@@ -87,7 +87,7 @@ let
           caisson.caisson-nixops4-composite.configurations.nixops4 =
             lib.caisson.caisson-nixops4-composite.mkConfiguration
               {
-                ecosystemSrc = _sources: ecosystemSrc;
+                ecosystemSrc = _dependencies: ecosystemSrc;
                 configModule =
                   { lib, members, ... }:
                   {
