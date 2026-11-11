@@ -108,11 +108,13 @@ let
       };
     };
 
-  machine =
+  # The machine with the declarations of a version.
+  machineOf =
+    version:
     { lib, ... }:
     {
       config = lib.mkMerge [
-        (declarationsOf "v1" lib)
+        (declarationsOf version lib)
         {
           users.users.carol = {
             isNormalUser = true;
@@ -123,33 +125,78 @@ let
             uid = 1006;
           };
           caisson.home-manager.activation.usersDeclaredElsewhere = [ "dave" ];
+          # `home-manager switch --flake` evaluates with `nix build`.
+          nix.settings.experimental-features = [
+            "nix-command"
+            "flakes"
+          ];
+          nix.settings.flake-registry = "";
         }
       ];
     };
 
-  # The library of the caisson evaluation of the machine, which carries
-  # the manifest of that evaluation. A module of the evaluation hands
-  # the library out through an option.
-  machineLib =
-    (lib.caisson.nixos.mkTopConfiguration {
+  machine = machineOf "v1";
+
+  # A structural top with the machine of a version declared inside it as
+  # `machine`, which publishes the NixOS configuration and its
+  # home-manager configurations, `homeConfigurations."carol@machine"`
+  # among them. A module of the machine hands out the library of the
+  # caisson evaluation of the machine, which carries the manifest of that
+  # evaluation, through an option.
+  topOf =
+    version:
+    lib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
       configModule =
         { lib, ... }:
         {
-          imports = [ machine ];
-          options.userPackagesVmLib = lib.mkOption { type = lib.types.raw; };
-          config = {
-            userPackagesVmLib = lib;
-            boot.loader.grub.enable = false;
-            fileSystems."/" = {
-              device = "none";
-              fsType = "tmpfs";
-            };
-            system.stateVersion = "25.05";
+          caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                imports = [ (machineOf version) ];
+                options.userPackagesVmLib = lib.mkOption { type = lib.types.raw; };
+                config = {
+                  userPackagesVmLib = lib;
+                  boot.loader.grub.enable = false;
+                  fileSystems."/" = {
+                    device = "none";
+                    fsType = "tmpfs";
+                  };
+                  system.stateVersion = "25.05";
+                };
+              };
           };
         };
-    }).config.userPackagesVmLib;
+    };
+
+  machineLib = (topOf "v1").nixosConfigurations.machine.config.userPackagesVmLib;
 
   registry = machineLib.caisson.modules.nixos;
+
+  # A flake whose `homeConfigurations."carol@machine"` is the published
+  # home-manager configuration of `carol` in a version, as far as
+  # `home-manager switch --flake` reads it: the activation package, and
+  # the news file it builds after the activation. The flake names the
+  # store paths with `builtins.storePath`, so it evaluates inside the
+  # machine with `--impure` and builds nothing there, and the file
+  # refers to the store paths, which keeps them in the closure of the
+  # machine.
+  carolFlakeOf =
+    version:
+    let
+      home = (topOf version).homeConfigurations."carol@machine";
+    in
+    pkgs.writeTextDir "flake.nix" ''
+      {
+        outputs = _: {
+          homeConfigurations."carol@machine" = {
+            activationPackage = builtins.storePath "${home.activationPackage}";
+            config.news.json.output = builtins.storePath "${home.config.news.json.output}";
+          };
+        };
+      }
+    '';
 in
 pkgs.testers.runNixOSTest {
   name = "caisson-user-packages-vm";
@@ -169,6 +216,14 @@ pkgs.testers.runNixOSTest {
     # boot recorded must still be in the store.
     virtualisation.writableStoreUseTmpfs = false;
     specialisation.v2.configuration = { lib, ... }: declarationsOf "v2" lib;
+    # The flakes of the home-manager configuration of `carol` that the
+    # test switches to with `home-manager switch`, and the home-manager
+    # source, where the command reads `build-news.nix` from `NIX_PATH`.
+    environment.etc = {
+      "caisson/carol-v1".source = carolFlakeOf "v1";
+      "caisson/carol-v2".source = carolFlakeOf "v2";
+      "caisson/home-manager".source = inputs.home-manager;
+    };
   };
 
   testScript =
@@ -298,5 +353,65 @@ pkgs.testers.runNixOSTest {
       carol_is("v1", 5)
       plain_is("v1")
       packages_are("dave", "v1")
+
+      # `carol` runs `home-manager switch` on the flake that publishes
+      # `homeConfigurations."carol@machine"` in `version`, and the test
+      # returns what it printed.
+      def home_manager_switch(version):
+          machine.succeed(
+              f"rm -rf /home/carol/hm-{version} && cp -rL /etc/caisson/carol-{version} /home/carol/hm-{version}"
+              f" && chmod -R u+w /home/carol/hm-{version} && chown -R carol /home/carol/hm-{version}"
+          )
+          output = login(
+              "carol",
+              "NIX_PATH=home-manager=/etc/caisson/home-manager home-manager switch --impure"
+              f" --flake path:/home/carol/hm-{version}#carol@machine 2>&1",
+          )
+          print(f"home-manager switch of carol to {version}:\n{output}")
+          return output
+
+      def profile_target():
+          return machine.succeed(
+              "readlink -f /home/carol/.local/state/nix/profiles/home-manager"
+          ).strip()
+
+      def packages_target():
+          return machine.succeed("readlink -f /etc/profiles/per-user/carol").strip()
+
+      packages_warning = "WARNING: the `packages` profile of the home-manager configuration `carol`"
+
+      # The machine runs v1. `home-manager switch` of v1, the
+      # home-manager configuration the machine activated, activates the
+      # same generation, warns of nothing, and leaves the packages as the
+      # machine set them.
+      generation = profile_target()
+      packages = packages_target()
+      output = home_manager_switch("v1")
+      assert "WARNING" not in output, f"home-manager switch of v1 warned:\n{output}"
+      assert profile_target() == generation, "home-manager switch of v1 changed the generation"
+      assert packages_target() == packages, "home-manager switch of v1 changed the packages"
+      files_are("carol", "v1")
+
+      # `home-manager switch` of v2, newer than the machine, links the
+      # files of v2 and warns that the packages profile, which the
+      # machine set, holds v1.
+      output = home_manager_switch("v2")
+      assert packages_warning in output, f"home-manager switch of v2 did not warn:\n{output}"
+      files_are("carol", "v2")
+      packages_are("carol", "v1")
+      assert packages_target() == packages, "home-manager switch of v2 changed the packages"
+
+      # The machine switches to v2, which activates v2 for `carol` and
+      # sets her packages. `home-manager switch` of v1, older than the
+      # machine, links the files of v1 and warns that the packages
+      # profile holds v2.
+      switch_to("${v1}/specialisation/v2")
+      machine.wait_for_unit("home-manager-carol.service")
+      files_are("carol", "v2")
+      packages_are("carol", "v2")
+      output = home_manager_switch("v1")
+      assert packages_warning in output, f"home-manager switch of v1 did not warn:\n{output}"
+      files_are("carol", "v1")
+      packages_are("carol", "v2")
     '';
 }

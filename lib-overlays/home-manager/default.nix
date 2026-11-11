@@ -600,7 +600,12 @@
       profileAdapter =
         manifest:
         let
-          inherit (manifest.value.config) home submoduleSupport;
+          inherit (manifest.value.config) home;
+          # A module list written for a test may leave out the file of
+          # home-manager that declares `submoduleSupport`, and then the
+          # activation installs the packages, as with the option false.
+          externalPackageInstall =
+            (manifest.value.config.submoduleSupport or { }).externalPackageInstall or false;
         in
         {
           activate = "${manifest.outputs.activationPackage}/activate";
@@ -613,7 +618,7 @@
             packages = {
               path = home.profileDirectory;
               holds = home.path;
-              setBy = if submoduleSupport.externalPackageInstall then "machine" else "activation";
+              setBy = if externalPackageInstall then "machine" else "activation";
             };
           };
         };

@@ -1371,6 +1371,25 @@
             text = builtins.toJSON { identity = digestOf identity; };
           };
 
+      # The profiles of the configuration of `manifest` that a switch of
+      # the machine above sets, `setBy = "machine"` in its profile
+      # adapter (`profileAdapter` of `activation`), by profile name. Each
+      # is the digest of the store path the profile holds once the
+      # configuration is applied (`digestOf`). The marker of the machine
+      # records these digests for each configuration whose profiles it
+      # sets, and the drift check of the configuration compares them
+      # (`driftCheckOf`). Empty for a configuration without a profile
+      # adapter, or whose profiles the machine does not set.
+      machineProfilesOf =
+        manifest:
+        let
+          adapter = (manifest.activation or { }).profileAdapter or null;
+          profiles = if adapter == null then { } else (adapter manifest).profiles;
+        in
+        builtins.mapAttrs (_: profile: digestOf (toString profile.holds)) (
+          final.filterAttrs (_: profile: profile.setBy == "machine") profiles
+        );
+
       # True when `entry`, an entry of `caisson.exports.configurations`
       # of the configuration of `manifest`, checks the marker of that
       # configuration when it is activated: the entry has an activation,
@@ -1411,8 +1430,23 @@
       # configuration, or it has no identity. `jq` is the path of a jq
       # executable, and `optionText` names the option that turns the
       # warning off, for the message.
+      #
+      # `profiles` are the profiles of this configuration that a switch
+      # of the machine sets (`machineProfilesOf`). The identity of the
+      # machine leaves out the configurations declared inside it, so it
+      # is the same when this configuration changes. For each such
+      # profile, the check also compares the digest that the marker of
+      # the machine records for this configuration with the digest of
+      # what the profile holds in this configuration, and prints a
+      # warning when they differ: then this configuration was built from
+      # another version than the machine applied, and the profile holds
+      # what the machine applied.
       driftCheckOf =
-        { jq, optionText }:
+        {
+          jq,
+          optionText,
+          profiles ? { },
+        }:
         manifest:
         let
           ancestor =
@@ -1428,6 +1462,27 @@
           # names in it are in backticks, which the shell would run
           # inside double quotes.
           say = text: "echo ${final.escapeShellArg text} >&2";
+          # The name under which the marker of the machine records the
+          # profiles of this configuration.
+          key = markerFileName manifest;
+          profileCheck = name: digest: ''
+            _caissonProfile="$(${jq} -r --arg key ${final.escapeShellArg key} --arg name ${final.escapeShellArg name} '.profiles[$key][$name] // empty' < "$_caissonMarker")"
+            if [ "$_caissonProfile" != '${digest}' ]; then
+              ${say "WARNING: the `${name}` profile of ${self}, which ${above} sets, holds another version than this configuration was built with."}
+              ${say "  digest of what ${above} put in the profile:"}
+              echo "    ''${_caissonProfile:-unknown}" >&2
+              ${say "  digest of what this configuration puts in the profile:"}
+              echo "    ${digest}" >&2
+              ${say "  Activate ${above} with this version of ${self},"}
+              ${say "  or set ${optionText} to false in ${self}."}
+            fi
+          '';
+          # The checks of the profiles, each on lines of its own after the
+          # check of the identity. A configuration without such profiles
+          # gets no text here.
+          profileChecks = final.concatStrings (
+            final.mapAttrsToList (name: digest: "\n" + profileCheck name digest) profiles
+          );
         in
         if expected == null then
           ""
@@ -1450,7 +1505,7 @@
                 echo "    "${escaped} >&2
                 ${say "  Activate ${above} as this configuration was built with it,"}
                 ${say "  or set ${optionText} to false in ${self}."}
-              fi
+              fi${profileChecks}
             fi
           '';
 
@@ -2023,6 +2078,7 @@
             belongsHere
             recordOf
             activatingAncestorOf
+            machineProfilesOf
             machineActivation
             markerFileName
             markerOf

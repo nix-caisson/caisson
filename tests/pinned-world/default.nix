@@ -1854,6 +1854,51 @@ let
       && machine.systemd.services ? home-manager-plain
       && machine.systemd.user.services ? home-manager-undeclared;
 
+    # The home-manager configuration published as
+    # `homeConfigurations."<user>@<host>"`, which a standalone
+    # `home-manager switch` builds, is the one the machine activates:
+    # its activation package is the one the unit of the machine runs,
+    # with the option set as without it. The marker of the machine
+    # records the digest of the `home.path` it installed for each
+    # home-manager configuration that sets `caisson.useUserPackages`,
+    # by the name of the marker file of that home-manager
+    # configuration, and the drift step of that home-manager
+    # configuration compares it with its own `home.path`. The
+    # home-manager configuration that leaves the option unset has no
+    # entry and no such comparison.
+    aHomeThatSetsUseUserPackagesIsTheSameHomeStandalone =
+      let
+        machine = machineWithUserPackages.nixosConfigurations.probe.config;
+        homes =
+          machineWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+        published = name: machineWithUserPackages.homeConfigurations."${name}@probe";
+        unitRuns =
+          unit: name:
+          builtins.elem (published name).activationPackage.drvPath (
+            builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart.text)
+          );
+        record = builtins.fromJSON machine.environment.etc."caisson/marker.json".text;
+        digestOf = name: builtins.hashString "sha256" (toString (published name).config.home.path);
+        step = name: (published name).config.home.activation.caissonDrift.data;
+      in
+      (published "declared").activationPackage.drvPath == homes.declared.outputs.activationPackage.drvPath
+      && unitRuns machine.systemd.services.home-manager-declared "declared"
+      && unitRuns machine.systemd.user.services.home-manager-undeclared "undeclared"
+      && unitRuns machine.systemd.services.home-manager-plain "plain"
+      &&
+        builtins.attrNames record == [
+          "identity"
+          "profiles"
+        ]
+      &&
+        record.profiles == {
+          "home-manager-declared.json".packages = digestOf "declared";
+          "home-manager-undeclared.json".packages = digestOf "undeclared";
+        }
+      && pkgs.lib.hasInfix "home-manager-declared.json" (step "declared")
+      && pkgs.lib.hasInfix (digestOf "declared") (step "declared")
+      && !(pkgs.lib.hasInfix ".profiles[$key][$name]" (step "plain"));
+
     # The same machine writes the file `/etc/caisson/marker.json`. The
     # file holds the digest of the system of the machine with the
     # configurations declared inside it left out.
@@ -6014,6 +6059,7 @@ in
   fixtures = {
     inherit
       hiveLib
+      machineWithUserPackages
       pkgs
       nixops4ArgPathsOf
       nixops4Entry

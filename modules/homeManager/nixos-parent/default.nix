@@ -85,7 +85,11 @@ in
       packages, and it removes the package `home-manager-path` from
       `~/.nix-profile` when it finds it there. A `home-manager switch`
       run by hand changes the files of the home-manager configuration,
-      and its packages change at the next switch of the machine.
+      and its packages change at the next switch of the machine. The
+      marker of the machine records the digest of the `home.path` it
+      installed. When the `home.path` of the home-manager configuration
+      that `home-manager switch` activates differs from it, the
+      activation prints a warning, unless `caisson.drift.warn` is false.
       `home-manager packages` lists the packages of `~/.nix-profile`,
       so it finds none of these.
 
