@@ -844,6 +844,59 @@ let
       };
   };
 
+  # The same machine, with home-manager configurations that set
+  # `caisson.useUserPackages`, one for the account the machine declares
+  # and one for the user declared elsewhere, and a third home-manager
+  # configuration, for another declared account, that leaves it unset.
+  machineWithUserPackages = hiveLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+          ecosystemSrc = dependencies: dependencies.nixpkgs;
+          configModule =
+            { lib, ... }:
+            let
+              home =
+                module:
+                lib.caisson.home-manager.mkConfiguration {
+                  ecosystemSrc = dependencies: dependencies.home-manager;
+                  configModule =
+                    { pkgs, ... }:
+                    {
+                      imports = [ module ];
+                      home.stateVersion = "25.05";
+                      home.packages = [ pkgs.hello ];
+                    };
+                };
+            in
+            {
+              imports = [ minimalNixosBase ];
+              users.users.declared = {
+                isNormalUser = true;
+                home = "/home/declared";
+                uid = 1001;
+              };
+              users.users.plain = {
+                isNormalUser = true;
+                home = "/home/plain";
+                uid = 1002;
+              };
+              caisson.home-manager.activation.usersDeclaredElsewhere = [ "undeclared" ];
+              caisson.home-manager.configurations = {
+                declared = home { caisson.useUserPackages = true; };
+                undeclared = home {
+                  home.homeDirectory = "/home/undeclared";
+                  caisson.useUserPackages = true;
+                };
+                plain = home { };
+              };
+            };
+        };
+      };
+  };
+
   # The library of a NixOS evaluation that caisson runs. It has
   # `lib.caisson`, and it carries the manifest of that evaluation.
   #
@@ -1705,6 +1758,146 @@ let
       && !(machine.systemd.services ? home-manager-undeclared)
       && !(machine.systemd.user.services ? home-manager-declared)
       && builtins.isString machine.system.build.toplevel.drvPath;
+
+    # A home-manager configuration that leaves `caisson.useUserPackages`
+    # unset installs its packages itself: home-manager's option
+    # `submoduleSupport.externalPackageInstall` is false, the profile of
+    # the packages is `~/.nix-profile`, the `activate` script installs
+    # `home.path` into it, and the profile adapter says that the
+    # activation sets both profiles. The machine adds no packages to the
+    # account, builds no `/etc/profiles/per-user/<user>`, and links no
+    # `/etc/profile.d`.
+    aHomeInstallsItsOwnPackagesByDefault =
+      let
+        machine = machineWithHomes.nixosConfigurations.probe.config;
+        homes =
+          machineWithHomes.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+        installsItsOwn =
+          name: directory:
+          let
+            manifest = homes.${name};
+            config = manifest.value.config;
+            adapter = manifest.activation.profileAdapter manifest;
+            inherit (manifest.outputs) activationPackage;
+          in
+          !config.submoduleSupport.externalPackageInstall
+          && config.home.profileDirectory == "${directory}/.nix-profile"
+          && pkgs.lib.hasInfix "INSTALL_CMD_ACTUAL" config.home.activation.installPackages.data
+          && adapter.activate == "${activationPackage}/activate"
+          &&
+            adapter.profiles.generations.path
+            == "\${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager"
+          && adapter.profiles.generations.holds.drvPath == activationPackage.drvPath
+          && adapter.profiles.generations.setBy == "activation"
+          && adapter.profiles.packages.path == "${directory}/.nix-profile"
+          && adapter.profiles.packages.holds.drvPath == config.home.path.drvPath
+          && adapter.profiles.packages.setBy == "activation";
+      in
+      installsItsOwn "declared" "/home/declared"
+      && installsItsOwn "undeclared" "/home/undeclared"
+      && machine.users.users.declared.packages == [ ]
+      && !(machine.environment.etc ? "profiles/per-user/declared")
+      && !(machine.environment.etc ? "profiles/per-user/undeclared")
+      && !(builtins.elem "/etc/profile.d" machine.environment.pathsToLink);
+
+    # A home-manager configuration that sets `caisson.useUserPackages`
+    # leaves its packages to the machine. home-manager's option
+    # `submoduleSupport.externalPackageInstall` is true, so the profile of
+    # the packages is `/etc/profiles/per-user/<user>`, and the `activate`
+    # script removes `home-manager-path` from the profile in the home
+    # directory instead of installing it. The machine adds `home.path` to
+    # the packages of the account it declares, builds
+    # `/etc/profiles/per-user/<user>` from `home.path` for the user
+    # declared elsewhere, and links `/etc/profile.d`. The home-manager
+    # configuration beside them that leaves the option unset installs
+    # its packages itself, and the units of all three are as without the
+    # option.
+    aMachineInstallsThePackagesOfAHomeThatSetsUseUserPackages =
+      let
+        machine = machineWithUserPackages.nixosConfigurations.probe.config;
+        homes =
+          machineWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+        configOf = name: homes.${name}.value.config;
+        adapterOf = name: homes.${name}.activation.profileAdapter homes.${name};
+        drvPaths = builtins.map (package: package.drvPath);
+        installedByMachine =
+          name:
+          let
+            config = configOf name;
+            adapter = adapterOf name;
+            step = config.home.activation.installPackages.data;
+          in
+          config.submoduleSupport.externalPackageInstall
+          && config.home.profileDirectory == "/etc/profiles/per-user/${name}"
+          && pkgs.lib.hasInfix "nixProfileRemove home-manager-path" step
+          && !(pkgs.lib.hasInfix "INSTALL_CMD" step)
+          && adapter.profiles.packages.path == "/etc/profiles/per-user/${name}"
+          && adapter.profiles.packages.holds.drvPath == config.home.path.drvPath
+          && adapter.profiles.packages.setBy == "machine"
+          && adapter.profiles.generations.setBy == "activation";
+      in
+      installedByMachine "declared"
+      && installedByMachine "undeclared"
+      && (adapterOf "plain").profiles.packages.setBy == "activation"
+      && (configOf "plain").home.profileDirectory == "/home/plain/.nix-profile"
+      && drvPaths machine.users.users.declared.packages == [ (configOf "declared").home.path.drvPath ]
+      && machine.users.users.plain.packages == [ ]
+      && !(machine.users.users ? undeclared)
+      && machine.environment.etc ? "profiles/per-user/declared"
+      &&
+        drvPaths machine.environment.etc."profiles/per-user/undeclared".source.paths == [
+          (configOf "undeclared").home.path.drvPath
+        ]
+      && !(machine.environment.etc ? "profiles/per-user/plain")
+      && builtins.elem "/etc/profile.d" machine.environment.pathsToLink
+      && machine.systemd.services ? home-manager-declared
+      && machine.systemd.services ? home-manager-plain
+      && machine.systemd.user.services ? home-manager-undeclared;
+
+    # The home-manager configuration published as
+    # `homeConfigurations."<user>@<host>"`, which a standalone
+    # `home-manager switch` builds, is the one the machine activates:
+    # its activation package is the one the unit of the machine runs,
+    # with the option set as without it. The marker of the machine
+    # records the digest of the `home.path` it installed for each
+    # home-manager configuration that sets `caisson.useUserPackages`,
+    # by the name of the marker file of that home-manager
+    # configuration, and the drift step of that home-manager
+    # configuration compares it with its own `home.path`. The
+    # home-manager configuration that leaves the option unset has no
+    # entry and no such comparison.
+    aHomeThatSetsUseUserPackagesIsTheSameHomeStandalone =
+      let
+        machine = machineWithUserPackages.nixosConfigurations.probe.config;
+        homes =
+          machineWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+        published = name: machineWithUserPackages.homeConfigurations."${name}@probe";
+        unitRuns =
+          unit: name:
+          builtins.elem (published name).activationPackage.drvPath (
+            builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart.text)
+          );
+        record = builtins.fromJSON machine.environment.etc."caisson/marker.json".text;
+        digestOf = name: builtins.hashString "sha256" (toString (published name).config.home.path);
+        step = name: (published name).config.home.activation.caissonDrift.data;
+      in
+      (published "declared").activationPackage.drvPath == homes.declared.outputs.activationPackage.drvPath
+      && unitRuns machine.systemd.services.home-manager-declared "declared"
+      && unitRuns machine.systemd.user.services.home-manager-undeclared "undeclared"
+      && unitRuns machine.systemd.services.home-manager-plain "plain"
+      &&
+        builtins.attrNames record == [
+          "identity"
+          "profiles"
+        ]
+      &&
+        record.profiles == {
+          "home-manager-declared.json".packages = digestOf "declared";
+          "home-manager-undeclared.json".packages = digestOf "undeclared";
+        }
+      && pkgs.lib.hasInfix "home-manager-declared.json" (step "declared")
+      && pkgs.lib.hasInfix (digestOf "declared") (step "declared")
+      && !(pkgs.lib.hasInfix ".profiles[$key][$name]" (step "plain"));
 
     # The same machine writes the file `/etc/caisson/marker.json`. The
     # file holds the digest of the system of the machine with the
@@ -5225,6 +5418,50 @@ let
       && services.caisson-profile-alice-nvf-alice-editor.serviceConfig.User == "alice"
       && services.caisson-profile-bob-nvf-bob-editor.serviceConfig.User == "bob";
 
+    # A system-manager machine refuses a home-manager configuration that
+    # sets `caisson.useUserPackages`, with an assertion that names the
+    # home-manager configuration and the user. system-manager throws
+    # the failed assertions where `systemConfigs.box` is read, so the
+    # check reads whether it throws, and that the same machine with the
+    # option unset evaluates.
+    systemManagerRefusesUseUserPackages =
+      let
+        topWith =
+          useUserPackages:
+          hiveLib.caisson.structural.mkTopConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.system-manager.configurations.box = lib.caisson.system-manager.mkConfiguration {
+                  ecosystemSrc = dependencies: dependencies.system-manager;
+                  configModule =
+                    { lib, ... }:
+                    {
+                      system-manager.allowAnyDistro = true;
+                      users.groups.probe.gid = 5000;
+                      users.users.probe = {
+                        isNormalUser = true;
+                        uid = 5000;
+                        group = "probe";
+                        home = "/home/probe";
+                      };
+                      caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
+                        ecosystemSrc = dependencies: dependencies.home-manager;
+                        configModule = {
+                          home.stateVersion = "25.05";
+                          caisson.useUserPackages = useUserPackages;
+                        };
+                      };
+                    };
+                };
+              };
+          };
+        evaluates =
+          useUserPackages: (builtins.tryEval (topWith useUserPackages).systemConfigs.box.drvPath).success;
+      in
+      evaluates false && !(evaluates true);
+
     # A system-manager machine activates the home-manager configuration,
     # the hjem configuration and the nvf configurations declared inside
     # it, as a NixOS machine does: the home-manager configuration and the
@@ -5822,6 +6059,7 @@ in
   fixtures = {
     inherit
       hiveLib
+      machineWithUserPackages
       pkgs
       nixops4ArgPathsOf
       nixops4Entry

@@ -18,7 +18,7 @@
 #
 # What the file holds
 #
-# The module writes `/etc/caisson/marker.json`, with one field,
+# The module writes `/etc/caisson/marker.json`, with the field
 # `identity`: the SHA-256 digest of the store path of the system that
 # the childless evaluation of this machine builds, which is the
 # evaluation without the configurations declared inside it. Computing
@@ -26,6 +26,15 @@
 # digest names no store path, so the file depends on nothing. Changing
 # one of the configurations declared inside leaves the identity the
 # same; changing anything else about the machine changes it.
+#
+# When the machine sets profiles of a configuration declared inside it,
+# such as the packages of a home-manager configuration that sets
+# `caisson.useUserPackages`, the file also holds `profiles`: for each
+# such configuration, by the name of its own marker file, the digest of
+# what each profile holds (`lib.caisson.integrations.machineProfilesOf`).
+# The identity leaves those configurations out, so these digests are
+# what tells a configuration built from another version that the
+# machine set its profile to something else.
 #
 # A configuration declared inside the machine reads the same childless
 # evaluation through its own manifest, so it computes the same identity
@@ -63,9 +72,40 @@ let
     }
     .${evalManifest.type or "nixos"} or closure-lib.caisson.modules.nixos.core;
 
-  checked = builtins.any (selection.checksMarkerOf evalManifest) config.caisson.exports.configurations;
+  checking = builtins.filter (selection.checksMarkerOf evalManifest) config.caisson.exports.configurations;
+  checked = checking != [ ];
 
   marker = selection.markerOf evalManifest;
+
+  # The profiles this machine sets for the configurations that check its
+  # marker (`machineProfilesOf`), by the name of the marker file of each
+  # configuration.
+  profiles = builtins.listToAttrs (
+    builtins.concatMap (
+      entry:
+      let
+        digests = selection.machineProfilesOf entry.manifest;
+      in
+      if digests == { } then
+        [ ]
+      else
+        [
+          {
+            name = selection.markerFileName entry.manifest;
+            value = digests;
+          }
+        ]
+    ) checking
+  );
+
+  text =
+    if profiles == { } then
+      marker.text
+    else
+      builtins.toJSON {
+        inherit (marker) identity;
+        inherit profiles;
+      };
 in
 {
   imports = [ coreModule ];
@@ -75,7 +115,7 @@ in
   # NixOS refuses a definition of an option that no module declares.
   config = lib.optionalAttrs hasEtc (
     lib.mkIf (!evalManifest.childless && checked && marker != null) {
-      environment.etc."caisson/marker.json".text = marker.text;
+      environment.etc."caisson/marker.json".text = text;
     }
   );
 }

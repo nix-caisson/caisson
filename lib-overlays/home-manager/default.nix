@@ -563,6 +563,66 @@
             };
       };
 
+      # The profile adapter of a home-manager configuration: where the
+      # Nix profiles of the home-manager configuration are, what each
+      # holds, and what sets each, as data read from the evaluated
+      # home-manager configuration of `manifest`. The activation
+      # module of a machine reads it to install the packages it sets,
+      # and topside reads it to show the profiles.
+      #
+      # `activate` is the program that activates the home-manager
+      # configuration, the `activate` script of its activation
+      # package. Each profile has `path`, the shell text of its path,
+      # `holds`, the store path it holds once the home-manager
+      # configuration is applied, and `setBy`, what sets it:
+      # `activation`, the `activate` script run as the user, or
+      # `machine`, a switch of the machine the home-manager
+      # configuration is declared inside, which builds the profile as
+      # part of the system.
+      #
+      # `generations` is the home-manager profile, whose generations
+      # `home-manager generations` lists. Each generation is an
+      # activation package. home-manager puts it in
+      # `$XDG_STATE_HOME/nix/profiles` when that directory exists, and
+      # in `/nix/var/nix/profiles/per-user/$USER` otherwise
+      # (`modules/lib-bash/activation-init.sh` of home-manager).
+      # `activate` sets it when it is run with no driver version, as
+      # the units of a machine run it, and `home-manager switch` sets
+      # it before it runs `activate`.
+      #
+      # `packages` is the profile that holds `home.path`, the packages
+      # of the home-manager configuration, at `home.profileDirectory`.
+      # By default `activate` installs `home.path` there with `nix-env`
+      # or `nix profile`. Where home-manager's option
+      # `submoduleSupport.externalPackageInstall` is true, which
+      # `caisson.useUserPackages` sets, the path is
+      # `/etc/profiles/per-user/<user>` and the machine sets it.
+      profileAdapter =
+        manifest:
+        let
+          inherit (manifest.value.config) home;
+          # A module list written for a test may leave out the file of
+          # home-manager that declares `submoduleSupport`, and then the
+          # activation installs the packages, as with the option false.
+          externalPackageInstall =
+            (manifest.value.config.submoduleSupport or { }).externalPackageInstall or false;
+        in
+        {
+          activate = "${manifest.outputs.activationPackage}/activate";
+          profiles = {
+            generations = {
+              path = "\${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager";
+              holds = manifest.outputs.activationPackage;
+              setBy = "activation";
+            };
+            packages = {
+              path = home.profileDirectory;
+              holds = home.path;
+              setBy = if externalPackageInstall then "machine" else "activation";
+            };
+          };
+        };
+
       configuration =
         variant: args:
         selection.mkModuleConfiguration {
@@ -584,10 +644,12 @@
           # may see differently. The home-manager module
           # `activation-marker` writes. The configurations with an
           # activation declared inside the home-manager configuration
-          # check it.
+          # check it. Its profile adapter (`profileAdapter`) says where
+          # its profiles are and what sets each.
           activation = {
             identity = manifest: manifest.outputs.activationPackage.outPath;
             marker = manifest: "$HOME/.local/state/caisson/markers/${selection.markerFileName manifest}";
+            inherit profileAdapter;
           };
           evaluate = evaluation variant args;
         };

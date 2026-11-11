@@ -19,6 +19,14 @@
 # marker belongs to the generation being activated, and the step prints
 # nothing.
 #
+# When the machine installs the packages of the home-manager
+# configuration (`caisson.useUserPackages`), the marker of the machine
+# also records the digest of the `home.path` it installed, and the step
+# warns when it differs from the `home.path` of this home-manager
+# configuration. A `home-manager switch` built from a newer source than
+# the machine then warns that the packages are those the machine
+# applied.
+#
 # The check is `lib.caisson.integrations.driftCheckOf`, the same check
 # every configuration with an activation runs against the nearest
 # configuration above it that has one. A home-manager configuration
@@ -37,6 +45,12 @@ let
   check = lib.caisson.integrations.driftCheckOf {
     jq = lib.getExe' pkgs.jq "jq";
     optionText = "`caisson.drift.warn`";
+    # The profiles of this home-manager configuration that the machine
+    # sets, read from the profile adapter of the home-manager
+    # integration over this evaluation.
+    profiles = lib.caisson.integrations.machineProfilesOf (
+      lib.caisson.evalManifest // { value = { inherit config; }; }
+    );
   } lib.caisson.evalManifest;
 in
 {
@@ -56,6 +70,12 @@ in
       from. The comparison leaves out the configurations declared
       inside the configuration above, so a change to a home-manager
       configuration does not cause a warning.
+
+      A home-manager configuration that sets `caisson.useUserPackages`
+      has its packages installed by the machine. The marker of the
+      machine also records the digest of the `home.path` it installed,
+      and the activation of the home-manager configuration warns when
+      its own `home.path` differs from it.
     '';
   };
 

@@ -64,6 +64,25 @@
 # profile. home-manager's NixOS module passes `--driver-version 1`,
 # which leaves the profile alone.
 #
+# The packages of the home-manager configuration
+#
+# By default the `activate` script also installs the packages of the
+# home-manager configuration, `home.path`, into a profile in the home
+# directory. A home-manager configuration that sets
+# `caisson.useUserPackages` leaves its packages to the machine, and on
+# a NixOS machine this module installs them in
+# `/etc/profiles/per-user/<user>`, which NixOS builds as part of the
+# system. A switch of the machine then changes them while the home
+# directory is locked. For an account the machine declares, the module
+# adds `home.path` to `users.users.<user>.packages`, as home-manager's
+# NixOS module does with `home-manager.useUserPackages`. For a user
+# listed in `usersDeclaredElsewhere`, which has no entry in
+# `users.users`, the module builds `/etc/profiles/per-user/<user>` from
+# `home.path` as NixOS builds it from `users.users.<user>.packages`.
+# The module reads the path of the profile and what it holds from the
+# profile adapter of the home-manager configuration
+# (`activation.profileAdapter` of the home-manager integration).
+#
 # The module reads the home-manager configurations from the full
 # evaluation of the NixOS configuration. The childless evaluation
 # leaves out the configurations declared inside the NixOS
@@ -102,6 +121,14 @@ let
     && options.systemd ? services
     && options.systemd ? user
     && options ? users;
+
+  # True when this evaluation declares the options with which the module
+  # installs packages for a user, as a NixOS evaluation does.
+  hasUserPackages =
+    !onSystemManager
+    && options ? environment
+    && options.environment ? etc
+    && options.environment ? pathsToLink;
 
   # The core module of the class of this evaluation: of the
   # `systemManager` class in a system-manager evaluation, else of the
@@ -142,7 +169,34 @@ let
     name = entry.manifest.name;
     inherit (entry.value.config.home) username homeDirectory;
     inherit (entry.value) activationPackage;
+    # The profile that holds the packages of the home-manager
+    # configuration, from its profile adapter.
+    packages = (entry.manifest.activation.profileAdapter entry.manifest).profiles.packages;
   }) (builtins.filter isActivatedHere config.caisson.exports.configurations);
+
+  onSystemManager = (lib.caisson-core.evalManifest.type or null) == "system-manager";
+
+  # The home-manager configurations whose packages the machine installs
+  # (`caisson.useUserPackages`).
+  installedHere = builtins.filter (home: home.packages.setBy == "machine") homes;
+
+  # The accounts of the childless evaluation of the machine. The
+  # accounts of this evaluation include the entries this module adds to
+  # `users.users`, so they cannot say which accounts the machine
+  # declares.
+  declaredAccounts = (evalManifest.childlessManifest.value.config.users.users or { });
+
+  # The environment NixOS builds for `/etc/profiles/per-user/<user>`
+  # from `users.users.<user>.packages` (`nixos/modules/config/users-groups.nix`
+  # of nixpkgs), here from `home.path` alone.
+  userEnvironment =
+    home:
+    pkgs.buildEnv {
+      name = "user-environment";
+      paths = [ home.packages.holds ];
+      inherit (config.environment) pathsToLink extraOutputsToInstall;
+      inherit (config.system.path) ignoreCollisions postBuild;
+    };
 
   # True when the machine declares the account of the user of the
   # home-manager configuration in `users.users`.
@@ -296,47 +350,84 @@ in
   # definition, and NixOS refuses a definition of an option that no
   # module declares.
   config = lib.optionalAttrs hasUnits (
-    lib.mkIf (!evalManifest.childless) {
-      assertions = [
-        {
-          assertion = withoutAccount == [ ];
-          message = ''
-            caisson: this machine has a home-manager configuration whose user has no account in `users.users`.
-            ${lib.concatMapStringsSep "\n" (
-              home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
-            ) withoutAccount}
-            Check `home.username` of the home-manager configuration, and that the home-manager configuration is declared inside the right machine.
-            If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
-          '';
-        }
-        {
-          assertion = inBoth == [ ];
-          message = ''
-            caisson: `caisson.home-manager.activation.usersDeclaredElsewhere` lists a user that `users.users` also declares: ${lib.concatStringsSep ", " inBoth}.
-            Remove the user from one of the two.
-          '';
-        }
-        {
-          assertion = repeated == [ ];
-          message = ''
-            caisson: this machine activates more than one home-manager configuration for the same user.
-            ${lib.concatMapStringsSep "\n" (
-              username:
-              "  ${username}: ${
-                  lib.concatStringsSep ", " (
-                    builtins.map (home: home.name) (builtins.filter (home: home.username == username) homes)
-                  )
-                }"
-            ) repeated}
-            Set a different `home.username` in one of them, or leave one out with `caisson.home-manager.exported`.
-          '';
-        }
-      ];
+    lib.mkIf (!evalManifest.childless) (
+      {
+        assertions = [
+          {
+            assertion = withoutAccount == [ ];
+            message = ''
+              caisson: this machine has a home-manager configuration whose user has no account in `users.users`.
+              ${lib.concatMapStringsSep "\n" (
+                home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
+              ) withoutAccount}
+              Check `home.username` of the home-manager configuration, and that the home-manager configuration is declared inside the right machine.
+              If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
+            '';
+          }
+          {
+            assertion = inBoth == [ ];
+            message = ''
+              caisson: `caisson.home-manager.activation.usersDeclaredElsewhere` lists a user that `users.users` also declares: ${lib.concatStringsSep ", " inBoth}.
+              Remove the user from one of the two.
+            '';
+          }
+          {
+            assertion = !onSystemManager || installedHere == [ ];
+            message = ''
+              caisson: this system-manager machine has a home-manager configuration that sets `caisson.useUserPackages`.
+              ${lib.concatMapStringsSep "\n" (
+                home: "  the home-manager configuration `${home.name}` for the user `${home.username}`"
+              ) installedHere}
+              Only a NixOS machine installs the packages of a home-manager configuration. Remove the setting, so that the activation of the home-manager configuration installs them.
+            '';
+          }
+          {
+            assertion = repeated == [ ];
+            message = ''
+              caisson: this machine activates more than one home-manager configuration for the same user.
+              ${lib.concatMapStringsSep "\n" (
+                username:
+                "  ${username}: ${
+                    lib.concatStringsSep ", " (
+                      builtins.map (home: home.name) (builtins.filter (home: home.username == username) homes)
+                    )
+                  }"
+              ) repeated}
+              Set a different `home.username` in one of them, or leave one out with `caisson.home-manager.exported`.
+            '';
+          }
+        ];
 
-      systemd.services = unitsOf systemUnit (builtins.filter isDeclared homes);
-      systemd.user.services = unitsOf userUnit (
-        builtins.filter (home: !(isDeclared home) && isElsewhere home) homes
-      );
-    }
+        systemd.services = unitsOf systemUnit (builtins.filter isDeclared homes);
+        systemd.user.services = unitsOf userUnit (
+          builtins.filter (home: !(isDeclared home) && isElsewhere home) homes
+        );
+      }
+      // lib.optionalAttrs hasUserPackages {
+        # An account the machine declares gets `home.path` among its
+        # packages. A home-manager configuration whose user has no
+        # account gets no entry here, so the assertion above names it.
+        users.users = builtins.listToAttrs (
+          builtins.map (home: {
+            name = home.username;
+            value.packages = [ home.packages.holds ];
+          }) (builtins.filter (home: declaredAccounts ? ${home.username}) installedHere)
+        );
+        environment.etc = builtins.listToAttrs (
+          builtins.map
+            (home: {
+              name = "profiles/per-user/${home.username}";
+              value.source = userEnvironment home;
+            })
+            (builtins.filter (home: !(declaredAccounts ? ${home.username}) && isElsewhere home) installedHere)
+        );
+        # home-manager puts the file that sets the session variables of
+        # the home-manager configuration in `etc/profile.d` of `home.path`.
+        # Its `xsession` module reads the file from
+        # `home.profileDirectory`, here `/etc/profiles/per-user/<user>`.
+        # home-manager's NixOS module links the same directory.
+        environment.pathsToLink = lib.mkIf (installedHere != [ ]) [ "/etc/profile.d" ];
+      }
+    )
   );
 }
