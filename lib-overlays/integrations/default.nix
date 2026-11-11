@@ -1102,11 +1102,14 @@
               ''
             else if manifest.childless then
               throw ''
-                The result of the ${name} configuration `${childName}` is not
-                readable from the ${manifest.type} configuration it is declared in, or
-                from another configuration beneath that configuration; only the
-                options of the ${manifest.type} configuration are readable there.
-                Put the value in one of those options and read it there.
+                ${what childName} was read in the evaluation of the ${manifest.type}
+                configuration that the configurations beneath it read. That evaluation
+                leaves out the configurations declared beneath the ${manifest.type}
+                configuration, so `${childName}` has no value there. A configuration
+                beneath read `${childName}` through its parent, or it read a value of the
+                ${manifest.type} configuration whose definition reads `${childName}`.
+                Guard such a definition with `!lib.caisson-core.evalManifest.childless`.
+                The configurations beneath then read the value without that definition.
               ''
             else if declaredType != null && declaredType != name then
               throw (
