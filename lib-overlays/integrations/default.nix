@@ -981,14 +981,190 @@
           functionArgs mkConfiguration
         );
 
+      # The class a module states it belongs to, or null where it
+      # states none. A module states its class in one of two ways. A
+      # module with `_class` states it as the module system reads it.
+      # A module read from the registry (`lib.caisson.modules.<class>.<name>`)
+      # carries the class in its key, `modules.<class>.<name>@<project>`,
+      # and a registered configuration carries it in
+      # `configs.<class>.<name>@<project>` (`keyedModules` and
+      # `keyedConfigs` in lib-overlays/framework). A function or a path
+      # states no class, because reading one would call the function or
+      # import the file.
+      classOfModule =
+        module:
+        let
+          key = module.key or null;
+          registered =
+            if builtins.isString key then
+              builtins.match "(registered\\.)?(modules|configs)\\.([^.]+)\\..*@.*" key
+            else
+              null;
+        in
+        if !builtins.isAttrs module then
+          null
+        else if (module._class or null) != null then
+          module._class
+        else if registered != null then
+          builtins.elemAt registered 2
+        else
+          null;
+
+      # The option type of a module of the class `class`: the
+      # `deferredModule` type of nixpkgs, which refuses a definition
+      # whose module states another class (`classOfModule`). A module
+      # that states no class is taken as it is, and the evaluation it
+      # is imported into checks what it declares.
+      moduleTypeOf =
+        lib: class:
+        let
+          checked =
+            loc: def:
+            let
+              stated = classOfModule def.value;
+            in
+            if stated == null || stated == class then
+              def
+            else
+              throw ''
+                The definition of `${lib.showOption loc}` in `${def.file}` is a module of
+                the class `${stated}`, and the option takes a module of the class `${class}`.
+              '';
+          # The module system rebuilds the type of an option from the
+          # type it is declared with: `substSubModules` when it adds the
+          # modules of the declaration, `typeMerge` when the option is
+          # declared twice. Each rebuilt type checks the class again.
+          classChecked =
+            base:
+            base
+            // {
+              description = "module of the class `${class}`";
+              # Each definition is checked when the option is merged,
+              # before the merged module is imported anywhere.
+              merge =
+                loc: defs:
+                let
+                  checkedDefs = map (checked loc) defs;
+                  allChecked = builtins.foldl' (forced: def: builtins.seq def forced) null checkedDefs;
+                in
+                builtins.seq allChecked (base.merge loc checkedDefs);
+              substSubModules = modules: classChecked (base.substSubModules modules);
+              typeMerge =
+                functor:
+                let
+                  merged = base.typeMerge functor;
+                in
+                if merged == null then null else classChecked merged;
+            };
+        in
+        classChecked lib.types.deferredModule;
+
+      # The integration a configuration belongs to, read from what
+      # finalizing it returned: the type of the manifest, or of the
+      # evaluations of a configuration evaluated per system, null where
+      # it has none.
+      typeOfFinalized =
+        finalized:
+        if !builtins.isAttrs finalized then
+          null
+        else if isManifest finalized || final.caisson-core.isDeferred finalized then
+          finalized.type
+        else if finalized == { } then
+          null
+        else
+          (builtins.head (builtins.attrValues finalized)).type or null;
+
+      # The option type of a configuration of the integration
+      # `integration`: what `lib.caisson.<integration>.mkConfiguration`
+      # returns, a function of exactly `{ name, parent }`, or a deferred
+      # configuration (`caisson-core.mkDeferredConfiguration`). A
+      # configuration of another integration is refused when it is
+      # finalized, with the option and the file that define it. The
+      # type reads the integration of a configuration from the manifest
+      # that finalizing it returns, and it forces nothing more of that
+      # manifest than its `type`. A deferred configuration states its
+      # type before any args are given, so the type reads it there.
+      configurationTypeOf =
+        lib: integration:
+        let
+          isConfiguration =
+            value:
+            builtins.isFunction value
+            &&
+              builtins.functionArgs value == {
+                name = false;
+                parent = false;
+              };
+          refusal =
+            loc: def: declared:
+            let
+              defined = ''
+                `${lib.showOption loc}` in `${def.file}`
+                is defined with a ${declared} configuration, and the option takes a
+                ${integration} configuration.'';
+            in
+            if (lib.caisson.${declared} or { }) ? configurationsModule then
+              ''
+                ${defined} Declare it under `caisson.${declared}.configurations`.
+              ''
+            else
+              ''
+                ${defined} No integration of this library declares
+                `caisson.${declared}.configurations`, so a ${declared} configuration
+                cannot be declared beneath another configuration.
+              '';
+          checked =
+            loc: def:
+            let
+              child = def.value;
+            in
+            def
+            // {
+              value =
+                if isConfiguration child then
+                  { name, parent }:
+                  let
+                    finalized = child { inherit name parent; };
+                    declared = typeOfFinalized finalized;
+                  in
+                  if declared == null || declared == integration then finalized else throw (refusal loc def declared)
+                else if child.type == integration then
+                  child
+                else
+                  throw (refusal loc def child.type);
+            };
+        in
+        lib.mkOptionType {
+          name = "caissonConfiguration";
+          description = "${integration} configuration (what `lib.caisson.${integration}.mkConfiguration` returns)";
+          descriptionClass = "noun";
+          check = value: isConfiguration value || final.caisson-core.isDeferredConfiguration value;
+          merge = loc: defs: lib.mergeOneOption loc (map (checked loc) defs);
+        };
+
+      # The option types of the integration `name`, whose modules are of
+      # the class `class`, built on the library of nixpkgs in `lib`:
+      # `module` (`moduleTypeOf`) and `configuration`
+      # (`configurationTypeOf`). `mkIntegration` publishes them as
+      # `lib.caisson.<name>.types`, built on the library the
+      # integration is composed into.
+      typesOf =
+        lib:
+        { name, class }:
+        {
+          module = moduleTypeOf lib class;
+          configuration = configurationTypeOf lib name;
+        };
+
       # An integration that owns a module class, declared. The
       # declaration carries the entry points as pattern functions,
       # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
       # result holds `namespace`, the value of `lib.caisson.<name>`: the
       # entry points, the registration form `mkModule` bound to the
-      # class, `configurationsModule`, and whatever `extra` adds beside
-      # them (variants, and the composition an alt over the class
-      # reads). The overlay file writes the namespace under its key,
+      # class, the option types `types` (`typesOf`) built from the
+      # name and the class, `configurationsModule`, and whatever
+      # `extra` adds beside them (variants, and the composition an alt
+      # over the class reads). The overlay file writes the namespace under its key,
       # since the output attribute names of an overlay must not depend
       # on `final`:
       #
@@ -1046,6 +1222,7 @@
               mkConfigurationWithEcosystemArgs
               mkModule
               ;
+            types = typesOf final { inherit name class; };
             configurationsModule = configurationsModuleOf name;
           }
           // (if findsModuleByName then { inherit mkConfigurations; } else { })
@@ -1070,41 +1247,35 @@
       # The module that declares the options `configurationsModuleOf`
       # declares, for several integrations at once. The core module of
       # caisson imports it once, for all the integrations of caisson.
-      # The types of the options are built once for all of them.
       configurationsModuleFor = names: {
         key = "caisson-configurations:${builtins.concatStringsSep "," names}";
         imports = [
           (
-            { lib, options, ... }:
+            { lib, ... }:
             let
-              types = configurationsTypesOf lib;
+              exported = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
             in
             {
-              options.caisson = genAttrs names (
-                name: configurationsOptionsOf { inherit lib options types; } name
-              );
+              options.caisson = genAttrs names (name: configurationsOptionsOf { inherit lib exported; } name);
             }
           )
         ];
       };
 
-      # The types of `caisson.<name>.configurations` and
-      # `caisson.<name>.exported`, the same for every integration.
-      configurationsTypesOf = lib: {
-        configurations = lib.types.lazyAttrsOf lib.types.raw;
-        exported = lib.types.functionTo (lib.types.lazyAttrsOf lib.types.raw);
-      };
-
       # The options `caisson.<name>.configurations` and
       # `caisson.<name>.exported` of the integration `name`, in the
-      # evaluation whose `lib` and `options` are given, with `types` from
-      # `configurationsTypesOf`.
+      # evaluation whose `lib` is given. Each entry of
+      # `configurations` has the configuration type of the integration
+      # (`configurationTypeOf`), built on the `lib` of the evaluation.
+      # A library that composes the integration publishes the same type
+      # as `lib.caisson.<name>.types.configuration`. The module system
+      # builds the type of an option when the value of the option is
+      # read, and the evaluation reads the configurations of an
+      # integration only where a module defines them
+      # (`integrationsDeclaringIn`). `exported` is the type of
+      # `exported`, the same for every integration.
       configurationsOptionsOf =
-        {
-          lib,
-          options,
-          types ? configurationsTypesOf lib,
-        }:
+        { lib, exported }:
         name:
         let
           manifest = lib.caisson-core.evalManifest;
@@ -1127,16 +1298,6 @@
                     parent = manifest.childlessManifest;
                   }
                   child;
-              # The integration of what was declared: of the
-              # manifest, or of the evaluations of a configuration
-              # evaluated per system, null where it has none.
-              declaredType =
-                if isManifest finalized || lib.caisson-core.isDeferred finalized then
-                  finalized.type
-                else if finalized == { } then
-                  null
-                else
-                  (builtins.head (builtins.attrValues finalized)).type;
             in
             if manifest == null then
               throw ''
@@ -1155,26 +1316,12 @@
                 Guard such a definition with `!lib.caisson-core.evalManifest.childless`.
                 The configurations beneath then read the value without that definition.
               ''
-            else if declaredType != null && declaredType != name then
-              throw (
-                if builtins.elem declaredType (integrationsIn options) then
-                  ''
-                    ${what childName} is declared with a ${declaredType} configuration.
-                    Declare it under `caisson.${declaredType}.configurations`.
-                  ''
-                else
-                  ''
-                    ${what childName} is declared with a ${declaredType} configuration, and a
-                    ${declaredType} configuration cannot be declared beneath another
-                    configuration.
-                  ''
-              )
             else
               finalized;
         in
         {
           exported = lib.mkOption {
-            type = types.exported;
+            type = exported;
             default = configurations: configurations;
             defaultText = lib.literalMD "every configuration declared";
             description = ''
@@ -1199,7 +1346,7 @@
             '';
           };
           configurations = lib.mkOption {
-            type = types.configurations;
+            type = lib.types.lazyAttrsOf (configurationTypeOf lib name);
             default = { };
             apply = builtins.mapAttrs finalize;
             description = ''
@@ -1980,8 +2127,8 @@
       # build on the composition that integration publishes, so the
       # evaluators cannot express different configurations from the
       # same arguments. The result is the value of `lib.caisson.<name>`:
-      # the entry points and `extra`, no `mkModule`, and no class
-      # declaration.
+      # the entry points, the `types` of the owner and `extra`, no
+      # `mkModule`, and no class declaration.
       mkAltIntegration =
         {
           over,
@@ -1994,12 +2141,25 @@
         assert builtins.isAttrs over && over ? mkModule;
         {
           inherit mkConfiguration mkConfigurationWithEcosystemArgs;
+          # Its modules are of the class of the owner, and its
+          # configurations are configurations of the owner.
+          inherit (over) types;
         }
         // (if top == null then { } else { mkTopConfiguration = topConfiguration top mkConfiguration; })
         // extra;
 
     in
     {
+      # The option types the core module of caisson declares its
+      # options with (modules/generic/core/types.nix), built on the
+      # library of nixpkgs in this library. caisson-core is written on
+      # builtins alone, and an option type is built on the library of
+      # nixpkgs, so caisson adds the types to the namespace of
+      # caisson-core here, beside the manifests they type.
+      caisson-core = (prev.caisson-core or { }) // {
+        types = import ../../modules/generic/core/types.nix { lib = final; };
+      };
+
       caisson = (prev.caisson or { }) // {
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
@@ -2037,6 +2197,7 @@
             namespacesOf
             mkIntegration
             mkAltIntegration
+            typesOf
             frameworkModules
             configModuleOf
             caissonModule

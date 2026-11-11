@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The option types the core module declares its options with. The
-# definition is referenced by the core module and re-exported under
-# `lib.caisson.flake-parts.types` for the readers of that name.
+# core module imports this file, and the integrations overlay
+# publishes it as `lib.caisson-core.types`.
 { lib }:
 let
   isLibOverlay =

@@ -3,8 +3,7 @@
 # The flake-parts integration: projecting a composition into
 # flake outputs. It owns the `flake` class and evaluates it with
 # flake-parts' `evalFlakeModule`, as `mkFlake` does. Beside the entry
-# points it carries the option types (option types are this
-# integration's medium), the export machinery (the core flake-parts
+# points it carries the export machinery (the core flake-parts
 # module reads the manifest of the evaluation, projects the
 # `libOverlays` and `modules` flake outputs from it, and defaults
 # flake-parts' `systems` from the `systems` the composition declared),
@@ -69,10 +68,6 @@
       flakePartsDefault = flakePartsOf (resolveEcosystemSrc {
         manifest = defaultManifest;
       });
-
-      # The option types of the core module, re-exported under this
-      # namespace for the readers of that name.
-      types = import ../../modules/generic/core/types.nix { lib = final; };
 
       # The evaluator's call, on the lib of the view being evaluated:
       # the flake's `inputs` from the manifest's dependencies, the special
@@ -350,9 +345,6 @@
             ecosystemArgs ? null,
           }@args:
           configuration args;
-        extra = {
-          inherit types;
-        };
       };
 
     in
