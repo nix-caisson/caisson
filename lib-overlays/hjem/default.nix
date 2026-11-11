@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
 # The hjem integration: it owns the `hjem` class, hjem's class for the
-# files and packages of a user. A hjem configuration is the home of a
-# user, evaluated per system, once for each system in force where it is declared.
+# files and packages of a user. A hjem configuration declares the home
+# directory of a user, evaluated per system, once for each system in force where it is declared.
 #
 # hjem itself evaluates a user only inside its NixOS and nix-darwin
 # modules, as a submodule of `hjem.users`; its standalone CLI evaluates
