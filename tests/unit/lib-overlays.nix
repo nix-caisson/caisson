@@ -3551,7 +3551,7 @@ in
         outPath = "/nix/store/00000000000000000000000000000000-${name}";
         drvPath = "/nix/store/00000000000000000000000000000000-${name}.drv";
       };
-      machine =
+      nixosConfiguration =
         lib: module:
         lib.caisson.nixos.mkConfiguration {
           configModule = module;
@@ -3569,13 +3569,13 @@ in
       gathering = topWith (
         { lib, ... }:
         {
-          caisson.nixos.configurations.nas-1 = machine lib {
+          caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
             caisson.checks.smoke = {
-              derivation = check "nas-1-smoke";
+              derivation = _: check "nas-1-smoke";
               category = "eval";
             };
             caisson.checks.off = {
-              derivation = check "nas-1-off";
+              derivation = _: check "nas-1-off";
               category = "eval";
               enable = false;
             };
@@ -3585,9 +3585,9 @@ in
             configModule =
               { lib, ... }:
               {
-                caisson.nixos.configurations.arm = machine lib {
+                caisson.nixos.configurations.arm = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = check "arm-smoke";
+                    derivation = _: check "arm-smoke";
                     category = "eval";
                   };
                 };
@@ -3681,9 +3681,9 @@ in
                   description = "the machine boots on its hardware";
                   volatile = true;
                 };
-                caisson.nixos.configurations.nas-1 = machine lib {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.boots = {
-                    derivation = check "boots";
+                    derivation = _: check "boots";
                     category = "hardware";
                   };
                 };
@@ -3714,9 +3714,9 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = check "smoke";
+                    derivation = _: check "smoke";
                     category = "undeclared";
                   };
                 };
@@ -3736,15 +3736,15 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = check "smoke";
+                    derivation = _: check "smoke";
                     category = "eval";
                   };
                 };
-                caisson.nixos.configurations.nas = machine lib {
+                caisson.nixos.configurations.nas = nixosConfiguration lib {
                   caisson.checks."1-smoke" = {
-                    derivation = check "other-smoke";
+                    derivation = _: check "other-smoke";
                     category = "eval";
                   };
                 };
@@ -3764,8 +3764,8 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib {
-                  caisson.checks.smoke.derivation = check "smoke";
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.smoke.derivation = _: check "smoke";
                 };
               }
             );
@@ -3783,7 +3783,7 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.toplevel.enable = false;
                 };
               }
@@ -3822,7 +3822,7 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checkStages.inner = {
                     description = "a stage inside the top";
                     select = _: true;
@@ -3851,14 +3851,14 @@ in
                     checks.bare = check "bare";
                     caisson.checks.treefmt.category = "format";
                     caisson.checks.declared = {
-                      derivation = check "declared";
+                      derivation = _: check "declared";
                       category = "unit";
                       description = "the unit tests pass";
                     };
                   };
-                  caisson.nixos.configurations.nas-1 = machine lib {
+                  caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                     caisson.checks.smoke = {
-                      derivation = check "smoke";
+                      derivation = _: check "smoke";
                       category = "eval";
                     };
                   };
@@ -3896,7 +3896,7 @@ in
             top = topWith (
               { lib, ... }:
               {
-                caisson.nixos.configurations.nas-1 = machine lib { };
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib { };
               }
             );
           in

@@ -28,7 +28,7 @@
 # A flake can hand its `checks` output to a partition, with the option
 # `partitionedAttrs.checks` of flake-parts. flake-parts then evaluates
 # the modules of the flake again for the partition, these modules
-# among them, and publishes the `checks` of that evaluation with
+# among them, and publishes the `checks` of the partition with
 # `lib.mkForce`. In a flake that does, the gathered checks stay out of
 # the `checks` output, and the checks published through `exportsTo` are
 # defined at the default priority, beside the entries flake-parts

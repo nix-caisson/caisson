@@ -849,12 +849,16 @@
       # `checks` are the default checks of the integration, which every
       # configuration it builds carries, by name. Each is
       # `{ derivation; category; description; }`: `derivation` is a
-      # function of the outputs of the configuration, as its manifest
-      # holds them, that returns the derivation of the check,
-      # `category` the name of a category of checks, and `description`
-      # a sentence saying what the check checks. The nixos integration
-      # declares `toplevel`, `{ derivation = outputs: outputs.toplevel; …
-      # }`. A configuration annotates a default check, or turns it off,
+      # function of `{ outputs, pkgs, pkgSets }` that returns the
+      # derivation of the check for a system the check is built for:
+      # `outputs` are the outputs of the configuration as its manifest
+      # holds them, `pkgSets` the package sets for that system by the
+      # name of the package config, and `pkgs` the set the selection of
+      # the configuration picks of them. `category` is the name of a category of
+      # checks, and `description` a sentence saying what the check
+      # checks. A nixos integration that declares `toplevel` writes
+      # `{ derivation = { outputs, ... }: outputs.toplevel; … }`. A
+      # configuration annotates a default check, or turns it off,
       # with the entry of the same name in `caisson.checks`.
       # `checkCategories` are the categories of checks the integration
       # declares, by name, each `{ description; volatile ? false; }`,
@@ -863,11 +867,11 @@
       #
       # The manifest records the checks of the configuration in
       # `checks`, by system and then name (`checksOfConfiguration`):
-      # the default checks of the integration and the checks the
-      # evaluation declares, each with its `derivation`, `category`,
-      # `description`, `enable` and `code`. It records the categories
-      # of checks the integration and the evaluation declare in
-      # `checkCategories`, and the stages the evaluation declares in
+      # the default checks of the integration and the checks the modules
+      # of the configuration declare, each with its `derivation`,
+      # `category`, `description`, `enable` and `code`. It records the
+      # categories of checks the integration and the modules declare in
+      # `checkCategories`, and the stages the modules declare in
       # `checkStages`. The checks gathered at and inside the
       # configuration are `checks` of its outputs (`checksOf`).
       mkModuleConfiguration =
@@ -940,52 +944,63 @@
                 checks = checksOf given.manifest;
               };
 
+              what = "the ${type} configuration ${
+                if given.manifest ? name then "`${toString given.manifest.name}`" else "at the top"
+              }";
+
               # The checks of the configuration for a system, from the
-              # declarations of the evaluation for that system.
-              checksFor = checksOfConfiguration {
-                what = "the ${type} configuration ${
-                  if given.manifest ? name then "`${toString given.manifest.name}`" else "at the top"
-                }";
-                inherit type outputs;
-                defaults = checks;
-                defaultsCode = defaultChecksCode;
-              };
-              # An integration whose evaluation builds for every system
-              # of a list, as flake-parts does, returns the declarations
-              # of each system as `checkDeclarations`. Any other
-              # evaluation declares its checks in `caisson.checks`, for
-              # the system the configuration is evaluated for.
+              # declarations of its modules. caisson calls each `derivation`
+              # with the package sets for that system, by the name of the
+              # package config, as `pkgSets`, and the set the selection
+              # of the configuration picks of them as `pkgs`.
+              checksFor =
+                system:
+                let
+                  messages = {
+                    context = "caisson.checks";
+                    what = "the checks of ${what} for ${system}";
+                  };
+                  pkgSets = pkgSetsForSystem messages given.manifest system;
+                in
+                checksOfConfiguration {
+                  inherit
+                    what
+                    type
+                    outputs
+                    pkgSets
+                    ;
+                  pkgs = pkgSetOf messages given.manifest pkgSets;
+                  defaults = checks;
+                  defaultsCode = defaultChecksCode;
+                };
+
+              # The systems the configuration is evaluated for, which
+              # its manifest records in `systems`. The configuration has
+              # an evaluation result for each of them, and caisson calls
+              # the `derivation` of each check once for each of them.
+              checkSystems = if (given.manifest.systems or null) != null then given.manifest.systems else [ ];
+
+              declaredHere =
+                if caissonOptions ? checks then
+                  checkDeclarationsOf {
+                    option = caissonOptions.checks;
+                    value = config.caisson.checks;
+                  }
+                else
+                  { };
+
+              # The flake-parts integration returns the declarations of
+              # each system of the flake as `checkDeclarations`, read from
+              # `perSystem`. In any other configuration the modules
+              # declare the checks in `caisson.checks`, and they are built
+              # for each system of `checkSystems`.
               recordedChecks =
                 if evaluated ? checkDeclarations then
-                  builtins.mapAttrs (_: checksFor) evaluated.checkDeclarations
+                  builtins.mapAttrs checksFor evaluated.checkDeclarations
+                else if checks == { } && declaredHere == { } then
+                  { }
                 else
-                  let
-                    system = evaluatedSystemOf given.manifest;
-                    entries = checksFor (
-                      if caissonOptions ? checks then
-                        checkDeclarationsOf {
-                          option = caissonOptions.checks;
-                          value = config.caisson.checks;
-                        }
-                      else
-                        { }
-                    );
-                  in
-                  if entries == { } then
-                    { }
-                  else if system == null then
-                    throw ''
-                      caisson: the ${type} configuration ${
-                        if given.manifest ? name then "`${toString given.manifest.name}`" else "at the top"
-                      } has the checks ${
-                        builtins.concatStringsSep ", " (builtins.map (name: "`${name}`") (builtins.attrNames entries))
-                      }, and it is evaluated for no system: neither it nor a
-                      configuration above it is evaluated per system. Declare the checks in a
-                      configuration evaluated for a system, such as a NixOS configuration, or
-                      under `perSystem` in a flake-parts configuration.
-                    ''
-                  else
-                    { ${system} = entries; };
+                  genAttrs checkSystems (system: checksFor system declaredHere);
 
               recordedCategories = categoriesUnion [
                 declaredCategories
@@ -2006,8 +2021,8 @@
       positionOf = position: if position == null then null else { inherit (position) file line; };
 
       # The positions of the definitions of the entry `name` of
-      # `option`, an option of an evaluation whose value is an attribute
-      # set, as the record writes code: for each definition that defines
+      # `option`, an option of a configuration whose value is an
+      # attribute set, as the record writes code: for each definition that defines
       # the entry, the file and the line number where the definition
       # writes the name. A definition that carries no position for the
       # name, because a function built the attribute set, has the file
@@ -2048,9 +2063,10 @@
           ) code
         );
 
-      # The checks an evaluation declares in `caisson.checks`, by name,
+      # The checks the modules of a configuration declare in `caisson.checks`, by name,
       # from the option and its value: each entry with its
-      # `derivation`, null for an annotation, `category`,
+      # `derivation`, a function of `{ pkgs, pkgSets }` or null for an
+      # annotation, `category`,
       # `description`, `enable` and `code`, the positions of the
       # definitions of the entry (`definitionCodeOf`).
       checkDeclarationsOf =
@@ -2065,32 +2081,17 @@
           code = definitionCodeOf option name;
         }) value;
 
-      # The system a configuration is evaluated for: the system of its
-      # evaluation where it is evaluated per system, and otherwise the
-      # system of the nearest configuration above it that is evaluated
-      # per system. A structural configuration declared inside a NixOS
-      # machine evaluated for aarch64-linux is evaluated for
-      # aarch64-linux. Null for a configuration with no such
-      # configuration above it.
-      evaluatedSystemOf =
-        manifest:
-        let
-          above = builtins.filter (ancestor: ancestor ? system) (manifest.ancestors or [ ]);
-        in
-        if manifest ? system then
-          manifest.system
-        else if above == [ ] then
-          null
-        else
-          (last above).system;
-
       # The checks a configuration records for a system, by name: the
-      # default checks of its integration and the checks its evaluation
-      # declares for that system (`checkDeclarationsOf`). `what` names
-      # the configuration in the messages, `type` its integration,
-      # `outputs` are the outputs of the configuration, which each
-      # default check is a function of, and `defaultsCode` is where the
-      # integration declares its default checks.
+      # default checks of its integration and the checks its modules
+      # declare (`checkDeclarationsOf`), each with the derivation built
+      # for that system. `what` names the configuration in the messages,
+      # `type` its integration, `outputs` are the outputs of the
+      # configuration, `pkgSets` are the package sets for the system by
+      # the name of the package config, `pkgs` is the set the selection
+      # of the configuration picks of them, and `defaultsCode` is where
+      # the integration declares its default checks. The `derivation`
+      # of a declaration is called with `{ pkgs, pkgSets }`, and the
+      # `derivation` of a default check with `{ outputs, pkgs, pkgSets }`.
       #
       # A declaration with a `derivation` declares a check, and it
       # names its category. A declaration without a `derivation`
@@ -2106,11 +2107,14 @@
           what,
           type,
           outputs,
+          pkgs,
+          pkgSets,
           defaults,
           defaultsCode,
         }:
         declarations:
         let
+          ofDefault = default: default.derivation { inherit outputs pkgs pkgSets; };
           entryOf =
             name:
             let
@@ -2133,10 +2137,10 @@
                   category declared in `caisson.checkCategories`, such as `build` or `eval`.
                 ''
               else
-                declaration
+                declaration // { derivation = declaration.derivation { inherit pkgs pkgSets; }; }
             else if declaration == null then
               {
-                derivation = default.derivation outputs;
+                derivation = ofDefault default;
                 inherit (default) category description;
                 enable = true;
                 code = defaultsCode;
@@ -2149,7 +2153,7 @@
               ''
             else
               {
-                derivation = default.derivation outputs;
+                derivation = ofDefault default;
                 category = if declaration.category != null then declaration.category else default.category;
                 description =
                   if declaration.description != null then declaration.description else default.description;
@@ -2816,7 +2820,6 @@
             childrenOf
             definitionCodeOf
             displayName
-            evaluatedSystemOf
             declarationEventsOf
             ecosystemUnit
             inEcosystem

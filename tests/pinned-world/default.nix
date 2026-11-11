@@ -977,7 +977,7 @@ let
     }
   );
   checkMarker = name: pkgs.runCommand name { } "touch $out";
-  checksMachine =
+  checksNixosConfiguration =
     lib: module:
     lib.caisson.nixos.mkConfiguration {
       ecosystemSrc = dependencies: dependencies.nixpkgs;
@@ -1016,27 +1016,28 @@ let
               { lib, ... }:
               {
                 caisson.forChildren.systems = [ "aarch64-linux" ];
-                caisson.nixos.configurations.arm = checksMachine lib {
+                caisson.nixos.configurations.arm = checksNixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = checkMarker "arm-smoke";
+                    derivation = _: checkMarker "arm-smoke";
                     category = "eval";
-                    description = "the machine evaluates";
+                    description = "the NixOS configuration evaluates";
                   };
                 };
               };
           };
-          caisson.nixos.configurations.nas-1 = checksMachine lib {
+          caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib {
             caisson.checks.smoke = {
-              derivation = checkMarker "nas-1-smoke";
+              derivation = _: checkMarker "nas-1-smoke";
               category = "eval";
-              description = "the machine evaluates";
+              description = "the NixOS configuration evaluates";
             };
             caisson.checks.boots = {
-              derivation = pkgs.runCommand "nas-1-boots" { requiredSystemFeatures = [ "kvm" ]; } "touch $out";
+              derivation =
+                { pkgs, ... }: pkgs.runCommand "nas-1-boots" { requiredSystemFeatures = [ "kvm" ]; } "touch $out";
               category = "hardware";
             };
             caisson.checks.off = {
-              derivation = checkMarker "nas-1-off";
+              derivation = _: checkMarker "nas-1-off";
               category = "eval";
               enable = false;
             };
@@ -1078,18 +1079,18 @@ let
               description = "the files are formatted";
             };
             caisson.checks.declared = {
-              derivation = checkMarker "declared";
+              derivation = _: checkMarker "declared";
               category = "unit";
             };
             caisson.checks.hidden = {
-              derivation = checkMarker "hidden";
+              derivation = _: checkMarker "hidden";
               category = "eval";
               enable = false;
             };
           };
-        caisson.nixos.configurations.nas-1 = checksMachine lib {
+        caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib {
           caisson.checks.smoke = {
-            derivation = checkMarker "nas-1-smoke";
+            derivation = _: checkMarker "nas-1-smoke";
             category = "eval";
           };
         };
@@ -1116,7 +1117,7 @@ let
         type = "stub";
         perSystem = true;
         checks.artifact = {
-          derivation = outputs: outputs.artifact;
+          derivation = { outputs, ... }: outputs.artifact;
           category = "probe";
           description = "the artifact of the configuration builds";
         };
@@ -6320,6 +6321,86 @@ let
       && drvPaths checksTop.checks == drvPaths checksTop.caisson.manifest.outputs.checks
       && checksTop.checks.x86_64-linux.nas-1-smoke.drvPath == (checkMarker "nas-1-smoke").drvPath;
 
+    # A configuration has an evaluation result for each system it is
+    # evaluated for, and caisson calls the `derivation` of each of its
+    # checks once for each evaluation result, with the package sets for
+    # that system. The structural top, the structural configuration
+    # `lab` and the NixOS configuration `nas-1` are evaluated for both
+    # systems of the composition. `lab` evaluates its children for
+    # aarch64-linux, so the NixOS configuration `arm` inside it is
+    # evaluated for aarch64-linux alone.
+    checksBuiltForEachEvaluationResult =
+      let
+        smoke =
+          { pkgs, pkgSets }:
+          pkgs.runCommand
+            "smoke-${pkgs.stdenv.hostPlatform.system}-${builtins.concatStringsSep "," (builtins.attrNames pkgSets)}"
+            { }
+            "touch $out";
+        top = checksLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.checks.top = {
+                derivation = smoke;
+                category = "eval";
+              };
+              caisson.structural.configurations.lab = lib.caisson.structural.mkConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.forChildren.systems = [ "aarch64-linux" ];
+                    caisson.checks.wide = {
+                      derivation = smoke;
+                      category = "eval";
+                    };
+                    caisson.nixos.configurations.arm = checksNixosConfiguration lib {
+                      caisson.checks.smoke = {
+                        derivation = smoke;
+                        category = "eval";
+                      };
+                    };
+                  };
+              };
+              caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib {
+                caisson.checks.smoke = {
+                  derivation = smoke;
+                  category = "eval";
+                };
+              };
+            };
+        };
+        nas-1 = top.caisson.manifest.children.system.aarch64-linux.children.nixos.nas-1;
+        both = [
+          "aarch64-linux"
+          "x86_64-linux"
+        ];
+      in
+      builtins.mapAttrs (_: builtins.attrNames) top.checks == {
+        aarch64-linux = [
+          "lab-arm-smoke"
+          "lab-wide"
+          "nas-1-smoke"
+          "top"
+        ];
+        x86_64-linux = [
+          "lab-wide"
+          "nas-1-smoke"
+          "top"
+        ];
+      }
+      && builtins.attrNames top.caisson.manifest.checks == both
+      && builtins.attrNames top.caisson.manifest.children.structural.lab.checks == both
+      && builtins.attrNames nas-1.checks == [ "aarch64-linux" ]
+      && top.checks.x86_64-linux.top.name == "smoke-x86_64-linux-default"
+      &&
+        top.checks.aarch64-linux.lab-wide.drvPath == (smoke {
+          inherit pkgs;
+          pkgSets.default = pkgs;
+        }).drvPath;
+
     # The manifest of a configuration records its checks by system and
     # then name, the check turned off included, with the definition
     # that turned it off.
@@ -6336,7 +6417,7 @@ let
       && recorded.off.enable == false
       && recorded.smoke.enable
       && recorded.smoke.category == "eval"
-      && recorded.smoke.description == "the machine evaluates"
+      && recorded.smoke.description == "the NixOS configuration evaluates"
       && builtins.map (position: position.file) recorded.off.code == [ "tests/pinned-world/default.nix" ]
       && builtins.all (position: builtins.isInt position.line) recorded.off.code;
 
@@ -6420,9 +6501,9 @@ let
         undeclared = checksTopWith (
           { lib, ... }:
           {
-            caisson.nixos.configurations.other = checksMachine lib {
+            caisson.nixos.configurations.other = checksNixosConfiguration lib {
               caisson.checks.smoke = {
-                derivation = checkMarker "other-smoke";
+                derivation = _: checkMarker "other-smoke";
                 category = "undeclared";
               };
             };
@@ -6431,9 +6512,9 @@ let
         clashing = checksTopWith (
           { lib, ... }:
           {
-            caisson.nixos.configurations.nas = checksMachine lib {
+            caisson.nixos.configurations.nas = checksNixosConfiguration lib {
               caisson.checks."1-smoke" = {
-                derivation = checkMarker "nas-1-smoke-again";
+                derivation = _: checkMarker "nas-1-smoke-again";
                 category = "eval";
               };
             };
@@ -6463,7 +6544,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.nixos.configurations.nas-1 = checksMachine lib {
+              caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib {
                 caisson.checkStages.inner = {
                   description = "a stage inside the top";
                   select = _: true;
@@ -6582,7 +6663,7 @@ let
         };
         off = stubChecksTopWith { caisson.checks.artifact.enable = false; };
         redefined = stubChecksTopWith {
-          caisson.checks.artifact.derivation = checkMarker "another";
+          caisson.checks.artifact.derivation = _: checkMarker "another";
         };
         checksOf = top: top.aarch64-linux.outputs.checks;
         recordOf = checksLib.caisson.integrations.checkRecordOf;

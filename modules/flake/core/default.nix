@@ -15,9 +15,9 @@
     ./perSystem.nix
   ];
 
-  # A flake-parts evaluation builds for every system of its `systems`,
-  # so a flake declares its checks under `perSystem` (./perSystem.nix)
-  # and not at the top of the evaluation, where caisson's core module
-  # declares them for an evaluation that builds for a single platform.
-  disabledModules = [ { key = "caisson.checks.single-system"; } ];
+  # A flake declares its checks under `perSystem` (./perSystem.nix),
+  # where `perSystem` has the `pkgs` of each system of the flake, and
+  # not at the top level of the options of the flake, where the core
+  # module of caisson declares them for every other class.
+  disabledModules = [ { key = "caisson.checks.top-level"; } ];
 }
