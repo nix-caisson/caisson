@@ -524,6 +524,45 @@
           );
         };
 
+      # The arguments a configuration, constructed with `args`, handed
+      # to its evaluator as it gave them, as its manifest records them
+      # in `evaluatorArgs`. Every entry point takes `specialArgs`, which
+      # the integration merges over the special arguments it supplies.
+      # The `WithEcosystemArgs` twin takes `ecosystemArgs`, which the
+      # integration merges over the evaluator's call last. For each of
+      # the two that the configuration gave, the record holds:
+      #
+      # - `names`: the names of the attributes it gave;
+      # - `position`: where the configuration gave it, the file and
+      #   line number.
+      #
+      # The record holds the names alone, since a value may be a
+      # function or a whole package set. A configuration that gave
+      # neither records `{ }`.
+      evaluatorArgsAccountOf =
+        args:
+        let
+          accountOf =
+            argument:
+            let
+              given = args.${argument} or null;
+              position = positionOf (builtins.unsafeGetAttrPos argument args);
+            in
+            if given == null then
+              [ ]
+            else
+              [
+                {
+                  name = argument;
+                  value = {
+                    names = builtins.attrNames given;
+                    position = if position == null then null else position // { file = inSource position.file; };
+                  };
+                }
+              ];
+        in
+        builtins.listToAttrs (accountOf "specialArgs" ++ accountOf "ecosystemArgs");
+
       # The selection of an evaluation over the registry of its class,
       # from the arguments of the configuration, as a function of that
       # registry: what `moduleImports` selects, and with none
@@ -785,7 +824,9 @@
       # `selection` is `{ class; args; }`, the class of the evaluation
       # and the arguments the configuration was constructed with, from
       # which the manifest records how the evaluation selected its
-      # modules as `moduleImports` (`selectionAccountOf`). Null for a
+      # modules as `moduleImports` (`selectionAccountOf`), and which
+      # arguments it handed to the evaluator as it gave them as
+      # `evaluatorArgs` (`evaluatorArgsAccountOf`). Null for a
       # configuration whose modules are not selected from a class.
       #
       # What the modules give the configurations beneath is read from
@@ -823,7 +864,10 @@
                   exportsToPosition = positionOf (builtins.unsafeGetAttrPos "exportsTo" args);
                 }
             )
-            // (if activation == null then { } else { inherit activation; });
+            // (if activation == null then { } else { inherit activation; })
+            # Which arguments the configuration handed to the evaluator
+            # as it gave them, and where.
+            // (if selection == null then { } else { evaluatorArgs = evaluatorArgsAccountOf selection.args; });
           evaluate =
             view:
             let

@@ -5484,6 +5484,59 @@ let
       && builtins.isString terraform.drvPath
       && builtins.isString home.activationPackage.drvPath;
 
+    # The manifest of each evaluation records the arguments its
+    # configuration handed to the evaluator as it gave them: the names
+    # of the attributes of `ecosystemArgs` and of `specialArgs`, and the
+    # file and line number where the configuration gave each. This
+    # holds for the twin of every integration here, on its real
+    # evaluator.
+    evaluatorArgsRecordWhatEachTwinGave =
+      let
+        recordOf =
+          configuration:
+          builtins.mapAttrs (_: entry: {
+            inherit (entry) names;
+            inherit (entry.position) file;
+            numbered = builtins.isInt entry.position.line;
+          }) (hiveLib.caisson-core.finalizeTop configuration).x86_64-linux.evaluatorArgs;
+        given = names: {
+          inherit names;
+          file = "tests/pinned-world/default.nix";
+          numbered = true;
+        };
+      in
+      recordOf (
+        hiveLib.caisson.nixos-minimal.mkConfigurationWithEcosystemArgs {
+          ecosystemSrc = dependencies: dependencies.nixpkgs;
+          configModule = { };
+          ecosystemArgs.prefix = [ "probe-prefix" ];
+        }
+      ) == {
+        ecosystemArgs = given [ "prefix" ];
+      }
+      &&
+        recordOf (
+          hiveLib.caisson.terranix.mkConfigurationWithEcosystemArgs {
+            ecosystemSrc = dependencies: dependencies.terranix;
+            configModule = { };
+            ecosystemArgs.strip_nulls = false;
+          }
+        ) == {
+          ecosystemArgs = given [ "strip_nulls" ];
+        }
+      &&
+        recordOf (
+          hiveLib.caisson.home-manager.mkConfigurationWithEcosystemArgs {
+            ecosystemSrc = dependencies: dependencies.home-manager;
+            configModule = { };
+            specialArgs.probe = "given";
+            ecosystemArgs.check = false;
+          }
+        ) == {
+          specialArgs = given [ "probe" ];
+          ecosystemArgs = given [ "check" ];
+        };
+
     registeredModulesReachAdapters =
       let
         registeringLib = core.mkLib (

@@ -2163,6 +2163,92 @@ in
         expected = "from-ecosystemArgs";
       };
 
+      # The manifest of a configuration records the arguments it handed
+      # to its evaluator as it gave them: the names of the attributes of
+      # `specialArgs` and of `ecosystemArgs`, and the file and line
+      # number where the configuration gave each. A configuration built
+      # by `mkConfiguration` can give `specialArgs`, and one built by
+      # the twin can give both. The modules still receive what was
+      # given.
+      "test: a configuration records the evaluator arguments it gave" =
+        let
+          manifestOf =
+            mkConfiguration: args: (myLib.caisson-core.finalizeTop (mkConfiguration args)).x86_64-linux;
+          # The record names this file relative to the source of the
+          # unit tests, the flake in `tests/unit`, which holds it.
+          positionIn = args: argument: {
+            file = "lib-overlays.nix";
+            inherit (builtins.unsafeGetAttrPos argument args) line;
+          };
+          plainArgs = {
+            configModule =
+              { fromSpecialArgs, ... }:
+              {
+                imports = [ probeModule ];
+                config.seenLib.fromSpecialArgs = fromSpecialArgs;
+              };
+            specialArgs = {
+              fromSpecialArgs = "given";
+              unused = _: null;
+            };
+          };
+          twinArgs = {
+            configModule = probeModule;
+            specialArgs.fromSpecialArgs = "given";
+            ecosystemArgs.lib = myLib // {
+              caissonMarker = "from-ecosystemArgs";
+            };
+          };
+          plain = manifestOf myLib.caisson.nixos.mkConfiguration plainArgs;
+          twin = manifestOf myLib.caisson.nixos.mkConfigurationWithEcosystemArgs twinArgs;
+        in
+        {
+          expr = {
+            plain = plain.evaluatorArgs;
+            twin = twin.evaluatorArgs;
+            received = plain.value.config.seenLib.fromSpecialArgs;
+          };
+          expected = {
+            plain.specialArgs = {
+              names = [
+                "fromSpecialArgs"
+                "unused"
+              ];
+              position = positionIn plainArgs "specialArgs";
+            };
+            twin = {
+              specialArgs = {
+                names = [ "fromSpecialArgs" ];
+                position = positionIn twinArgs "specialArgs";
+              };
+              ecosystemArgs = {
+                names = [ "lib" ];
+                position = positionIn twinArgs "ecosystemArgs";
+              };
+            };
+            received = "given";
+          };
+        };
+
+      # A configuration that gives neither `specialArgs` nor
+      # `ecosystemArgs` records an empty set, on either entry point.
+      "test: a configuration without evaluator arguments records none" = {
+        expr = {
+          plain =
+            (myLib.caisson-core.finalizeTop (
+              myLib.caisson.nixos.mkConfiguration { configModule = probeModule; }
+            )).x86_64-linux.evaluatorArgs;
+          twin =
+            (myLib.caisson-core.finalizeTop (
+              myLib.caisson.nixos.mkConfigurationWithEcosystemArgs { configModule = probeModule; }
+            )).x86_64-linux.evaluatorArgs;
+        };
+        expected = {
+          plain = { };
+          twin = { };
+        };
+      };
+
       # A NixOS configuration takes its package set from the
       # composition, for the system the composition declares: the set
       # the `defaultPkgs` argument selects from the available sets, and
