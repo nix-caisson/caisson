@@ -818,8 +818,14 @@
       # variables such as `$HOME`. It is recorded on the manifest. A
       # configuration with an activation declared beneath one checks
       # the marker of the nearest such configuration above it when it
-      # is activated (`driftCheckOf`). Null for a configuration that is
-      # not activated.
+      # is activated (`driftCheckOf`). `profileAdapter`, where an
+      # integration gives it, is a function of a full manifest of the
+      # configuration that returns the Nix profiles of the
+      # configuration as data: `activate`, the program that activates
+      # it, and `profiles`, by name, each with its `path`, the store
+      # path it `holds` once the configuration is applied, and `setBy`,
+      # what sets it. The home-manager integration gives one. Null for
+      # a configuration that is not activated.
       #
       # `selection` is `{ class; args; }`, the class of the evaluation
       # and the arguments the configuration was constructed with, from

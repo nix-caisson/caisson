@@ -53,15 +53,57 @@ let
   account = (machine.users.users or { }).${config.home.username} or null;
 in
 {
+  options.caisson.useUserPackages = lib.mkOption {
+    type = lib.types.bool;
+    default = false;
+    description = ''
+      Whether the NixOS machine installs the packages of this
+      home-manager configuration in `/etc/profiles/per-user/<user>`.
+
+      When it is false, the activation of the home-manager
+      configuration installs its packages into a Nix profile in the
+      home directory, `~/.nix-profile`. The activation runs as the
+      user, and it can write the home directory only while the home
+      directory is mounted and unlocked. On a machine whose home
+      directories are encrypted, or managed by systemd-homed, that is
+      only while the user is logged in. A switch of the machine then
+      changes the packages of the user at the next login.
+
+      When it is true, the machine builds `/etc/profiles/per-user/<user>`
+      from the packages of the home-manager configuration, `home.path`,
+      as part of the system. Every switch of the machine changes them,
+      whether the user is logged in or not. NixOS puts
+      `/etc/profiles/per-user/$USER` on the `PATH` of every login
+      shell. home-manager's NixOS option `home-manager.useUserPackages`
+      does the same for every home-manager configuration it embeds: it
+      sets the home-manager option `submoduleSupport.externalPackageInstall`,
+      and installs `home.path` through `users.users.<name>.packages`.
+
+      The activation of the home-manager configuration links its files
+      and records its generation in the home-manager profile in the home
+      directory, which `home-manager generations` lists. It installs no
+      packages, and it removes the package `home-manager-path` from
+      `~/.nix-profile` when it finds it there. A `home-manager switch`
+      run by hand changes the files of the home-manager configuration,
+      and its packages change at the next switch of the machine.
+      `home-manager packages` lists the packages of `~/.nix-profile`,
+      so it finds none of these.
+
+      A system-manager machine refuses a home-manager configuration
+      that sets this option.
+    '';
+  };
+
   config = lib.mkMerge [
     {
       # home-manager reads this option to tell that the home-manager
       # configuration is activated by a machine.
-      # `externalPackageInstall` stays false, so the activation of the
-      # home-manager configuration installs the packages of the
-      # home-manager configuration. The NixOS configuration installs
-      # none of them.
       submoduleSupport.enable = true;
+      # When it is false, the activation of the home-manager
+      # configuration installs the packages of the home-manager
+      # configuration into a profile in the home directory. When it is
+      # true, the machine installs them (`caisson.useUserPackages`).
+      submoduleSupport.externalPackageInstall = config.caisson.useUserPackages;
     }
 
     # The home-manager configuration is activated with the Nix that the
