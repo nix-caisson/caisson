@@ -6,7 +6,7 @@
 # whether the user is logged in or not, and the activation of each
 # home-manager configuration links its files and records its
 # generation. `inputs` is the dependency pool of the checks partition
-# with `caisson` set to the tree itself.
+# with `caisson` set to the source of this repository.
 #
 # The home-manager configurations come in the versions v1 and v2. Each
 # version installs `hello`, v2 also installs `tree`, and a file and a
@@ -74,7 +74,7 @@ let
   # bash is managed by the home-manager configuration, so a login shell
   # reads the session variables of the home-manager configuration from
   # `home.profileDirectory`.
-  homeOf =
+  homeManagerConfigurationOf =
     version: lib: extra:
     lib.caisson.home-manager.mkConfiguration {
       configModule =
@@ -99,12 +99,12 @@ let
     in
     {
       caisson.home-manager.configurations = force {
-        carol = homeOf version lib { caisson.useUserPackages = true; };
-        dave = homeOf version lib {
+        carol = homeManagerConfigurationOf version lib { caisson.useUserPackages = true; };
+        dave = homeManagerConfigurationOf version lib {
           home.homeDirectory = "/home/dave";
           caisson.useUserPackages = true;
         };
-        plain = homeOf version lib { };
+        plain = homeManagerConfigurationOf version lib { };
       };
     };
 
@@ -141,7 +141,7 @@ let
   # `machine`, which publishes the NixOS configuration and its
   # home-manager configurations, `homeConfigurations."carol@machine"`
   # among them. A module of the machine hands out the library of the
-  # caisson evaluation of the machine, which carries the manifest of that
+  # caisson evaluation of the machine, which holds the manifest of that
   # evaluation, through an option.
   topOf =
     version:
@@ -185,14 +185,14 @@ let
   carolFlakeOf =
     version:
     let
-      home = (topOf version).homeConfigurations."carol@machine";
+      homeManagerConfiguration = (topOf version).homeConfigurations."carol@machine";
     in
     pkgs.writeTextDir "flake.nix" ''
       {
         outputs = _: {
           homeConfigurations."carol@machine" = {
-            activationPackage = builtins.storePath "${home.activationPackage}";
-            config.news.json.output = builtins.storePath "${home.config.news.json.output}";
+            activationPackage = builtins.storePath "${homeManagerConfiguration.activationPackage}";
+            config.news.json.output = builtins.storePath "${homeManagerConfiguration.config.news.json.output}";
           };
         };
       }
@@ -270,7 +270,7 @@ pkgs.testers.runNixOSTest {
           machine.fail(f"test -e /home/{user}/.nix-profile/bin/hello")
 
       # The generations `home-manager generations` lists for `user`: the
-      # last line is the first generation, and the current one is marked.
+      # last line is the first generation, and the current generation is marked.
       def generations_of(user):
           return login(user, "home-manager generations").splitlines()
 

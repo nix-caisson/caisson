@@ -5,13 +5,13 @@
 # it is given is what `evalModules` runs on, what the `pkgsModule` and
 # the module locations are built with, and what the result publishes
 # as `lib`. `lib` defaults to `import ../../lib`, the library of the
-# tree this file lives in, so an evaluation handed no `lib`
-# lands in the `lib` directory beside this one.
+# source tree this file lives in, so an evaluation handed no `lib`
+# lands in the `lib` directory beside the directory of this file.
 #
 # The real file draws `evalModules` from `./default.nix` of this
 # directory with the `minimalModules` feature flag, and this file does
-# the same, so the library reaches the module system by the route it
-# reaches it upstream.
+# the same, so the library is passed to the module system by the
+# route upstream passes it.
 evalConfigArgs@{
   system ? builtins.currentSystem,
   pkgs ? null,
@@ -40,8 +40,8 @@ let
 
   # The options this stand-in declares in place of the NixOS module
   # tree, so a configuration module has somewhere to record what it
-  # saw. The real base modules arrive through `baseModules`, which
-  # `mkConfigurationFull` fills from the tree's module list.
+  # saw. The real base modules are passed in `baseModules`, which
+  # `mkConfigurationFull` fills from the module list of the source tree.
   optionsModule =
     { ... }:
     {

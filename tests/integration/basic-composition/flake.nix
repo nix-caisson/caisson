@@ -25,7 +25,7 @@
       ...
     }:
     let
-      # Compose a library with mkLib. parent.lib mirrors the framework
+      # Compose a library with mkLib. parent.lib has the framework
       # namespaces of the composed library (`caisson`, `caisson-core`).
       lib = parent.lib.caisson.mkLib {
         inherit (parent.lib.caisson.pins.flake inputs) dependencies root;

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # pins.flake-compat test fixture: a relative path input that is not a
 # flake and one that is (both read without fetching), a follows of the
-# first, a remote input (described, never fetched by the suite), and an
+# first, a remote input that the suite describes and does not fetch, and an
 # input landing on a relative path inside another input (refused).
 {
   inputs = {

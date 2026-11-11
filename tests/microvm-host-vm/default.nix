@@ -4,7 +4,7 @@
 # host runs through caisson's NixOS module `microvm-host` and the units
 # of microvm.nix's host module, in a VM that runs the guest on nested
 # KVM. `inputs` is the dependency pool of the checks partition with
-# `caisson` set to the tree itself.
+# `caisson` set to the source of this repository.
 #
 # The test host holds the caisson-microvm configuration `pool`,
 # registered as `configs/caisson-microvm/pool` here. Its one guest is

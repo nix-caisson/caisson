@@ -3,7 +3,7 @@
 # The sequence of changes of the system-manager test, which
 # `container.nix` runs in a container of a distribution and `vm.nix` in
 # a VM of a distribution. `inputs` is the dependency pool of the checks
-# partition with `caisson` set to the tree itself.
+# partition with `caisson` set to the source of this repository.
 #
 # It returns the systems of the machine in each version (`v1`, `v2`),
 # the activation packages of the home-manager configuration of `carol`
@@ -79,7 +79,7 @@ let
     erin = 5004;
   };
 
-  homeOf =
+  homeManagerConfigurationOf =
     version: lib:
     lib.caisson.home-manager.mkConfiguration {
       configModule =
@@ -135,10 +135,10 @@ let
                     };
                 };
                 caisson.home-manager.configurations = {
-                  carol = homeOf version lib;
+                  carol = homeManagerConfigurationOf version lib;
                 }
                 // lib.optionalAttrs (version == "v2") {
-                  erin = homeOf version lib;
+                  erin = homeManagerConfigurationOf version lib;
                 };
               };
           };

@@ -50,8 +50,8 @@ namespaces=(
 
 failures=0
 
-# The trace of a failing evaluation, with the warnings a dirty tree
-# prints dropped.
+# The trace of a failing evaluation, with the warnings a dirty git
+# working tree prints dropped.
 trace_of() {
   local expr="let lib = $lib_expr; in $1"
   local out
@@ -67,7 +67,7 @@ frame_locations() {
   awk '/^[[:space:]]*… /{f=1;next} f&&/^[[:space:]]*at /{print;f=0}' <<< "$1"
 }
 
-# check LABEL CALL MESSAGE_REGEX: the trace of CALL carries a message
+# check LABEL CALL MESSAGE_REGEX: the trace of CALL contains a message
 # matching MESSAGE_REGEX and exactly one frame, the call site in this
 # expression.
 check() {
@@ -103,7 +103,8 @@ for ns in "${namespaces[@]}"; do
     check "$ns.$fn { bogus, ... }" \
       "$ep { bogus = 1; $given }" "$(printf "$unexpected" "$fn")"
   done
-  # The twin admits `ecosystemArgs`; the entry point refuses it.
+  # The `WithEcosystemArgs` variant admits `ecosystemArgs`, and the
+  # entry point refuses it.
   # shellcheck disable=SC2059
   check "$ns.mkConfigurationWithEcosystemArgs { bogus, ecosystemArgs, ... }" \
     "lib.caisson.$ns.mkConfigurationWithEcosystemArgs { bogus = 1; $given ecosystemArgs = { }; }" \

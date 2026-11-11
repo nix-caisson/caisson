@@ -2,7 +2,7 @@
 #
 # The discovery program of a NixOps4 root, built and run. `inputs` is
 # the dependency pool of the checks partition with `caisson` set to
-# the tree itself.
+# the source of this repository.
 #
 # Each deployment below holds resources that record their outputs in a
 # state resource. Its root composite takes NixOps4 from a source whose

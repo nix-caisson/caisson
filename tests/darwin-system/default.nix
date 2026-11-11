@@ -3,7 +3,7 @@
 # A macOS machine declared through caisson's darwin integration, for
 # the pinned-world suite and the darwin build check. `inputs` is the
 # dependency pool of the checks partition with `caisson` set to the
-# tree itself.
+# source of this repository.
 #
 # The composition is for aarch64-darwin, with a package config whose set
 # there is nixpkgs for aarch64-darwin, and with nixpkgs, nix-darwin,
@@ -73,7 +73,7 @@ let
 
   # A home-manager configuration and a hjem configuration for the user
   # `probe`.
-  home = {
+  homeManagerModule = {
     home.stateVersion = "25.05";
     home.file.".probe".text = "home";
   };
@@ -185,7 +185,7 @@ let
             {
               imports = [ machine ];
               caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
-                configModule = home;
+                configModule = homeManagerModule;
               };
               caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
                 configModule = hjemUser;
@@ -198,7 +198,7 @@ in
 {
   inherit
     hjemUser
-    home
+    homeManagerModule
     lib
     machine
     pkgs

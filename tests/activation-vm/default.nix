@@ -5,7 +5,7 @@
 # home-manager configurations, the hjem configurations and the profiles
 # declared inside the machine, and a standalone hjem configuration.
 # `inputs` is the dependency pool of the checks partition with `caisson`
-# set to the tree itself.
+# set to the source of this repository.
 #
 # The declarations come in the versions v1 and v2. The Neovim of v2
 # has `vim` beside `nvim` and `vi`, and a file of each home-manager
@@ -150,7 +150,7 @@ let
   # A home-manager configuration in a version: the file that names the
   # version, and the nvf configuration `home-editor` inside it, which
   # the home-manager configuration activates.
-  homeOf =
+  homeManagerConfigurationOf =
     version: lib: extra:
     lib.caisson.home-manager.mkConfiguration {
       configModule =
@@ -224,11 +224,11 @@ let
       };
       caisson.home-manager.configurations = force (
         {
-          carol = homeOf version lib { };
-          dave = homeOf version lib { home.homeDirectory = "/home/dave"; };
+          carol = homeManagerConfigurationOf version lib { };
+          dave = homeManagerConfigurationOf version lib { home.homeDirectory = "/home/dave"; };
         }
         // lib.optionalAttrs (version == "v2") {
-          erin = homeOf version lib { };
+          erin = homeManagerConfigurationOf version lib { };
         }
       );
     };
@@ -287,7 +287,7 @@ let
       ];
     };
 
-  # The library of the caisson evaluation of the machine, which carries
+  # The library of the caisson evaluation of the machine, which holds
   # the manifest of that evaluation. A module of the evaluation hands
   # the library out through an option.
   machineLib =

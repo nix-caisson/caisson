@@ -2,7 +2,7 @@
 #
 # Builds a package set on a library whose source holds only nixpkgs'
 # `lib` directory. nixpkgs checks the maintainers of every derivation
-# it creates, so the set evaluates only if its lib carries the
+# it creates, so the set evaluates only if its lib has the
 # `maintainers` and `teams` of the package set's source. The checks
 # read where each function of the set's lib is defined: the
 # package-set libraries and their top-level names come from the

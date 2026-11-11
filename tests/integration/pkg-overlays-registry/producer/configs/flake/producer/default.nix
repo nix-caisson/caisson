@@ -18,7 +18,7 @@
     {
       checks.pkg-overlays-registry-producer =
         let
-          # A consumer that is not caisson: the plain overlay carries the
+          # A consumer that is not caisson: the plain overlay applies the
           # entries its entry imports.
           plain = import inputs.nixpkgs {
             inherit system;

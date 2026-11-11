@@ -8,10 +8,12 @@
 # The VM boots the cloud image the distribution publishes, with the
 # kernel and the systemd of the distribution. nix-vm-test adds a unit
 # that gives the test driver a shell, masks the SSH server, configures
-# the network with DHCP, and mounts the Nix store of the host at
+# the network with DHCP, and mounts the Nix store of the machine that
+# runs the VM at
 # `/nix/.ro-store` with an overlay on `/nix/store`.
 #
-# The test installs Nix as a host of system-manager has it, with `nix-installer`, in the version
+# The test installs Nix as a machine that system-manager manages has it,
+# with `nix-installer`, in the version
 # system-manager's container test driver installs in a container.
 # `nix-installer` renames what it unpacks into `/nix/store`, which
 # fails across filesystems, so the test first unmounts the overlay. It

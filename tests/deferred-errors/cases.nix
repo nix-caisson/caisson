@@ -118,8 +118,8 @@ in
   };
 
   # Output values given as a string where the root declares an attrset
-  # of members name the path they were given at, rather than failing
-  # with Nix's own `expected a set`.
+  # of members fail with an error that names the path they were given
+  # at.
   outputValuesNotASet = {
     value =
       ((topWith readerModule).caisson.manifest.children.caisson-nixops4-composite.nixops4.finalize {
@@ -190,8 +190,8 @@ in
     message = "the composite at the root reads its members, or their";
   };
 
-  # The error names the composite that reads them, here one beneath the
-  # root.
+  # The error names the composite that reads them, here a composite
+  # declared inside the root.
   nestedMembersFromOutputs = {
     value =
       (rootOf (
@@ -233,7 +233,8 @@ in
     message = "the composite at the root reads its members, or their";
   };
 
-  # A resource may not name its outputs from its own outputs.
+  # A resource may not compute the names of its outputs from the values
+  # of those outputs.
   skeletonFromOwnOutputs = {
     value =
       (rootOf (

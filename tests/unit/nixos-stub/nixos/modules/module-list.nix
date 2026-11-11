@@ -5,9 +5,9 @@
 # and `lib.caisson.nixos.mkConfigurationFull` passes explicitly. The
 # real list is the NixOS module tree, which is where `nixpkgs.pkgs`
 # and the rest of the NixOS options are declared; this list declares
-# `nixpkgs.pkgs`, so an evaluation carrying NixOS' nixpkgs module has
-# the option that module defines, and an option a configuration reads
-# to show the list reached the evaluation. It also declares the
+# `nixpkgs.pkgs`, so an evaluation that imports NixOS' nixpkgs module
+# has the option that module defines, and an option a configuration
+# reads to show the list was passed to the evaluation. It also declares the
 # options of a machine that a home-manager configuration declared
 # inside it is given: the accounts under `users.users`, and the Nix the
 # machine runs.

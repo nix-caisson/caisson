@@ -3,7 +3,7 @@
 # hjem configurations declared through caisson's hjem integration, for
 # the pinned-world suite and the hjem manifest check. `inputs` is the
 # dependency pool of the checks partition with `caisson` set to the
-# tree itself.
+# source of this repository.
 #
 # The composition is for x86_64-linux, with a package config whose set
 # there is nixpkgs, and with nixpkgs, hjem, the library and the NixOS
