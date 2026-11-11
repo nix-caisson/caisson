@@ -906,6 +906,46 @@ let
         "activation-marker"
       ];
 
+    # A user who is not on caisson imports a module from the `modules`
+    # output of a caisson flake into a machine that `nixosSystem` of
+    # nixpkgs evaluates. The library of that evaluation is the library
+    # of nixpkgs.
+    #
+    # The flake `publisher` registers the module from
+    # tests/pinned-world/modules and publishes it as
+    # `modules.nixos.published`. The machine builds, and the file that
+    # the module writes shows two things. The module reached the
+    # library of `publisher` through `closure-lib`. The `lib` that the
+    # machine gave the module has no `caisson`.
+    aPublishedModuleEvaluatesUnderPlainNixosSystem =
+      let
+        publisher =
+          (core.mkLib (
+            hiveLibArgs
+            // {
+              name = "publisher";
+              modules = lib: lib.caisson-core.mkModules ./modules;
+            }
+          )).caisson.flake-parts.mkTopConfiguration
+            { };
+        machine = inputs.nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            minimalNixosBase
+            publisher.modules.nixos.published
+          ];
+        };
+        written = builtins.fromJSON machine.config.environment.etc."pinned-world/published.json".text;
+      in
+      !(inputs.nixpkgs.lib ? caisson)
+      && builtins.attrNames publisher.modules.nixos == [ "published" ]
+      &&
+        written == {
+          definedIn = "publisher";
+          evaluatorLibHasCaisson = false;
+        }
+      && builtins.isString machine.config.system.build.toplevel.drvPath;
+
     composesTheCaissonLibrary =
       builtins.attrNames composed.lib.caisson == expectedCaissonNames
       && includesAll expectedCoreNames (builtins.attrNames composed.lib.caisson-core)
@@ -1871,6 +1911,52 @@ let
       in
       builtins.attrNames alone.libOverlays == [ "caisson/structural" ]
       && builtins.attrNames parent.libOverlays == builtins.attrNames alone.libOverlays;
+
+    # The same for a flake. A flake-parts configuration can be the top
+    # of a flake, or it can be declared inside another configuration,
+    # under `caisson.flake-parts.configurations`. A flake declared
+    # inside another publishes its machines through its parent.
+    #
+    # The flake here declares a machine. It is evaluated alone, inside
+    # a flake-parts configuration, and inside a structural
+    # configuration. The parents give their children nothing. Each of
+    # the three publishes the machine as `nixosConfigurations.probe`,
+    # and the system of the machine is the same derivation in all
+    # three.
+    aFlakeInsideAParentPublishesTheSameMachine =
+      let
+        flake = {
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
+                ecosystemSrc = dependencies: dependencies.nixpkgs;
+                configModule = {
+                  imports = [ minimalNixosBase ];
+                  networking.hostName = "probe";
+                };
+              };
+            };
+        };
+        declaresTheFlake =
+          { lib, ... }:
+          {
+            caisson.flake-parts.configurations.inner = lib.caisson.flake-parts.mkConfiguration flake;
+          };
+        alone = hiveLib.caisson.flake-parts.mkTopConfiguration flake;
+        insideFlake = hiveLib.caisson.flake-parts.mkTopConfiguration {
+          configModule = declaresTheFlake;
+        };
+        insideStructural = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = declaresTheFlake;
+        };
+        systemOf = top: top.nixosConfigurations.probe.config.system.build.toplevel.drvPath;
+      in
+      builtins.attrNames insideFlake.nixosConfigurations == [ "probe" ]
+      && builtins.attrNames insideStructural.nixosConfigurations == [ "probe" ]
+      && systemOf insideFlake == systemOf alone
+      && systemOf insideStructural == systemOf alone;
 
     # An integration declares `top` when a configuration of it can be
     # a top, and only then has `mkTopConfiguration`. A colmena
