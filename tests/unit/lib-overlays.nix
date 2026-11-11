@@ -5100,6 +5100,42 @@ in
         };
       };
 
+      # A user who meets this error needs three facts from it: the option
+      # that was read, that the configurations beneath read their parent
+      # without the configurations declared beneath it, and the guard that
+      # keeps a definition out of that evaluation.
+      "test: the refusal of a read beneath names the option, the reason and the guard" = {
+        expr =
+          (nestingLib.caisson-core.finalizeTop (
+            nestingLib.caisson.structural.mkConfiguration {
+              configModule =
+                { config, lib, ... }:
+                {
+                  imports = [ markerOption ];
+                  marker = config.caisson.structural.configurations.quiet.value.config.marker;
+                  caisson.structural.configurations.quiet = lib.caisson.structural.mkConfiguration {
+                    configModule = {
+                      imports = [ markerOption ];
+                      marker = "quiet";
+                    };
+                  };
+                  caisson.structural.configurations.reader = lib.caisson.structural.mkConfiguration {
+                    configModule =
+                      { lib, ... }:
+                      {
+                        imports = [ markerOption ];
+                        marker = lib.caisson-core.evalManifest.parent.value.config.marker;
+                      };
+                  };
+                };
+            }
+          )).children.structural.reader.value.config.marker;
+        expectedError = {
+          type = "ThrownError";
+          msg = "`caisson\\.structural\\.configurations\\.quiet` was read in the evaluation[\\s\\S]*leaves out the configurations declared beneath the structural\\s+configuration[\\s\\S]*Guard such a definition with `!lib\\.caisson-core\\.evalManifest\\.childless`";
+        };
+      };
+
       "test: what is declared beneath must be a configuration of that integration" = {
         expr =
           let
