@@ -108,6 +108,19 @@ let
       }
     ) sets;
 
+  # The value of an option of the type `type` that one module defines
+  # as `value`.
+  moduleOption =
+    type: value:
+    (lib.evalModules {
+      modules = [
+        {
+          options.value = lib.mkOption { inherit type; };
+          config.value = value;
+        }
+      ];
+    }).config.value;
+
   # The integrations the parent registers, each with its entry
   # points.
   integrationNames = [
@@ -1768,14 +1781,14 @@ in
 
   types = {
     "test: libOverlay type accepts a built overlay" = {
-      expr = caisson.flake-parts.types.libOverlay.check (
+      expr = lib.caisson-core.types.libOverlay.check (
         mkLibOverlay ({ ... }: { overlay = final: prev: { }; })
       );
       expected = true;
     };
 
     "test: libOverlay type accepts nested imports" = {
-      expr = caisson.flake-parts.types.libOverlay.check {
+      expr = lib.caisson-core.types.libOverlay.check {
         imports = [
           {
             imports = [ ];
@@ -1788,15 +1801,93 @@ in
     };
 
     "test: libOverlay type rejects a bare overlay function" = {
-      expr = caisson.flake-parts.types.libOverlay.check (final: prev: { });
+      expr = lib.caisson-core.types.libOverlay.check (final: prev: { });
       expected = false;
     };
 
     "test: libOverlay type rejects a malformed import" = {
-      expr = caisson.flake-parts.types.libOverlay.check {
+      expr = lib.caisson-core.types.libOverlay.check {
         imports = [ (final: prev: { }) ];
         overlay = final: prev: { };
       };
+      expected = false;
+    };
+
+    # `mkIntegration` generates the types of every integration from its
+    # name and its class.
+    "test: every integration has a module type and a configuration type" = {
+      expr = builtins.listToAttrs (
+        builtins.map (name: {
+          inherit name;
+          value = builtins.attrNames lib.caisson.${name}.types;
+        }) integrationNames
+      );
+      expected = builtins.listToAttrs (
+        builtins.map (name: {
+          inherit name;
+          value = [
+            "configuration"
+            "module"
+          ];
+        }) integrationNames
+      );
+    };
+
+    "test: the types name the class and the integration" = {
+      expr = {
+        module = lib.caisson.home-manager.types.module.description;
+        configuration = lib.caisson.home-manager.types.configuration.description;
+      };
+      expected = {
+        module = "module of the class `homeManager`";
+        configuration = "home-manager configuration (what `lib.caisson.home-manager.mkConfiguration` returns)";
+      };
+    };
+
+    # A configuration of nixos-minimal is a nixos configuration, and
+    # its modules are of the class nixos.
+    "test: an integration over the class of another has the types of the owner" = {
+      expr = builtins.mapAttrs (_: type: type.description) lib.caisson.nixos-minimal.types;
+      expected = builtins.mapAttrs (_: type: type.description) lib.caisson.nixos.types;
+    };
+
+    "test: the module type takes a registered module of its class" = {
+      expr = builtins.isAttrs (
+        moduleOption lib.caisson.nixos.types.module lib.caisson.modules.nixos.default
+      );
+      expected = true;
+    };
+
+    "test: the module type takes a module that states no class" = {
+      expr = builtins.length (moduleOption lib.caisson.nixos.types.module ({ ... }: { })).imports;
+      expected = 1;
+    };
+
+    "test: the module type refuses a registered module of another class" = {
+      expr = moduleOption lib.caisson.nixos.types.module lib.caisson.modules.homeManager.default;
+      expectedError = {
+        type = "ThrownError";
+        msg = "is a module of[[:space:]]+the class `homeManager`, and the option takes a module of the class `nixos`";
+      };
+    };
+
+    "test: the module type refuses a module whose _class is another" = {
+      expr = moduleOption lib.caisson.nixos.types.module { _class = "darwin"; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "the class `darwin`, and the option takes a module of the class `nixos`";
+      };
+    };
+
+    "test: the configuration type takes what mkConfiguration returns" = {
+      expr = lib.caisson.structural.types.configuration.check (
+        lib.caisson.structural.mkConfiguration { moduleImports = _modules: [ ]; }
+      );
+      expected = true;
+    };
+
+    "test: the configuration type refuses a value that is not a configuration" = {
+      expr = lib.caisson.structural.types.configuration.check { };
       expected = false;
     };
   };
@@ -5672,7 +5763,7 @@ in
         expectedError = unexpectedArgument "mkConfiguration" "ecosystemArgs";
       };
 
-      "test: an alt carries entry points only" = {
+      "test: an alt carries entry points and the types of the owner" = {
         expr = {
           names = builtins.attrNames declaringLib.caisson.probe-alt;
           alt = (declaringLib.caisson.probe-alt.mkConfiguration { configModule = { }; }).alt;
@@ -5681,6 +5772,7 @@ in
           names = [
             "mkConfiguration"
             "mkConfigurationWithEcosystemArgs"
+            "types"
           ];
           alt = true;
         };
@@ -6022,12 +6114,13 @@ in
       # The alt carries constructors only: the class, its registration
       # form and its composition belong to the integration that owns
       # the class.
-      "test: the alt carries entry points only" = {
+      "test: the alt carries entry points and the types of the owner" = {
         expr = builtins.attrNames myLib.caisson.home-manager-minimal;
         expected = [
           "mkConfiguration"
           "mkConfigurationWithEcosystemArgs"
           "mkTopConfiguration"
+          "types"
         ];
       };
 
