@@ -3,8 +3,8 @@
 # What the selectors chose: a top returns it, the flake-parts
 # integration copies it into the flake outputs, and a parent passes
 # it up. Each part is defined by the module that declares its
-# selector, and a configuration that holds another beneath it merges
-# the exports of the configuration beneath in as a further definition.
+# selector, and a configuration with another declared inside it merges
+# the exports of that configuration in as a further definition.
 { lib, ... }:
 let
   types = import ../types.nix { inherit lib; };
@@ -14,20 +14,20 @@ in
 
     libOverlays = lib.mkOption {
       type = types.libOverlays;
-      description = "The registered library overlays `caisson.libOverlays.exported` selected, merged with what lies beneath.";
+      description = "The registered library overlays `caisson.libOverlays.exported` selected, merged with what the configurations declared inside this configuration pass up.";
     };
 
     modules = lib.mkOption {
       type = lib.types.attrsOf (lib.types.attrsOf lib.types.deferredModule);
-      description = "Per class, the registered modules `caisson.modules.<class>.exported` selected, merged with what lies beneath.";
+      description = "Per class, the registered modules `caisson.modules.<class>.exported` selected, merged with what the configurations declared inside this configuration pass up.";
     };
 
     configurations = lib.mkOption {
       type = lib.types.listOf lib.types.raw;
       internal = true;
       description = ''
-        The configurations declared beneath this configuration, at any
-        depth, that it passes up: for each, its manifest and its path
+        The configurations declared inside this configuration, nested
+        configurations included, that it passes up: for each, its manifest and its path
         from here, a list of `{ type, name }` segments. A top names
         them from their paths and publishes each under the output
         attribute set its integration declares.
@@ -36,7 +36,7 @@ in
 
     pkgOverlays = lib.mkOption {
       type = types.pkgOverlays;
-      description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what lies beneath.";
+      description = "The registered package overlays `caisson.pkgOverlays.exported` selected, merged with what the configurations declared inside this configuration pass up.";
     };
 
   };

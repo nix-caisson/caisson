@@ -1985,7 +1985,7 @@ in
           }).stubbed;
         expectedError = {
           type = "ThrownError";
-          msg = "caisson\\.terranix: `ecosystemSrc` is a function of the tree's dependencies that\\s+returns the source to use, `ecosystemSrc = dependencies: dependencies\\.<name>;`,\\s+but got a set\\.";
+          msg = "caisson\\.terranix: `ecosystemSrc` is a function of the dependencies passed to mkLib that\\s+returns the source to use, `ecosystemSrc = dependencies: dependencies\\.<name>;`,\\s+but got a set\\.";
         };
       };
 
@@ -3955,7 +3955,7 @@ in
             true;
         expectedError = {
           type = "ThrownError";
-          msg = "as its home-manager, and the composed library carries `lib\\.hm`";
+          msg = "as its home-manager, and the composed library holds `lib\\.hm`";
         };
       };
 
@@ -5309,7 +5309,7 @@ in
           )).children.structural.reader.value.config.marker;
         expectedError = {
           type = "ThrownError";
-          msg = "`caisson\\.structural\\.configurations\\.quiet` was read in the evaluation[\\s\\S]*leaves out the configurations declared beneath the structural\\s+configuration[\\s\\S]*Guard such a definition with `!lib\\.caisson-core\\.evalManifest\\.childless`";
+          msg = "`caisson\\.structural\\.configurations\\.quiet` was read in the evaluation[\\s\\S]*leaves out the configurations declared inside the structural\\s+configuration[\\s\\S]*Guard such a definition with `!lib\\.caisson-core\\.evalManifest\\.childless`";
         };
       };
 

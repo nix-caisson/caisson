@@ -22,7 +22,7 @@
 # and `hjem-cleanup` removes the stored manifests of users that are no
 # longer activated. The target `hjem` requires them all, and starts at
 # boot and when the machine switches to a new generation. The units
-# link with hjem's own CLI and the backup prefix of hjem's NixOS
+# link with the CLI of hjem and the backup prefix of hjem's NixOS
 # module; hjem's options for another linker are not offered here.
 #
 # The module also installs each user's `packages` for that user and
@@ -31,7 +31,7 @@
 #
 # Which configurations: the hjem configurations this NixOS
 # configuration passes up, leaving out those declared inside a NixOS
-# configuration that is itself inside this one, and those evaluated for
+# configuration that is itself inside this configuration, and those evaluated for
 # another system. caisson's `default` NixOS module imports this module.
 # A NixOS configuration that passes `moduleImports` activates its hjem
 # configurations only if it lists it.
@@ -70,7 +70,7 @@ let
   # The core module of the class of this evaluation: of the
   # `systemManager` class in a system-manager evaluation, else of the
   # `nixos` class. The registered core modules of the two classes are
-  # one file under two names, so a module imports the one its
+  # one file under two names, so a module imports the name its
   # evaluation already holds.
   coreModule =
     if (lib.caisson-core.evalManifest.type or null) == "system-manager" then

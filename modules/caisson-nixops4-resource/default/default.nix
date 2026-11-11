@@ -3,16 +3,17 @@
 # The default module of the caisson-nixops4-resource class.
 #
 # It selects the NixOS adapter, registered as `nixos` in the class,
-# which deploys the NixOS configuration declared beneath a resource.
+# which deploys the NixOS configuration declared inside a resource.
 # A resource that holds no NixOS configuration is not changed by it.
 #
 # NixOps4 runs `bin/apply` from the toplevel of the NixOS
 # configuration it deploys. This module adds caisson's NixOS module
 # `nixops4-apply`, which builds that script, to the modules that the
-# nearest NixOS configurations beneath a resource import by default.
-# It reaches a NixOS configuration inside a structural group or a disk
-# layout beneath the resource. A NixOS configuration declared inside
-# that one is not deployed by the resource and does not get it.
+# nearest NixOS configurations declared inside a resource import by
+# default. A NixOS configuration inside a structural group or a disk
+# layout declared inside the resource gets it too. A NixOS
+# configuration declared inside that NixOS configuration is not
+# deployed by the resource and does not get it.
 #
 # A NixOS configuration that passes `moduleImports` selects its modules
 # itself, and then it lists `nixops4-apply` itself, as

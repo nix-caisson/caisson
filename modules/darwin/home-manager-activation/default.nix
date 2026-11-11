@@ -21,7 +21,7 @@
 #
 # The module activates the home-manager configurations that this
 # darwin configuration passes up, leaving out those declared inside a
-# machine that is itself inside this one, and those evaluated for
+# machine that is itself inside this machine, and those evaluated for
 # another system. It expects the machine to declare the account of the
 # user of each home-manager configuration in `users.users`, as
 # home-manager's nix-darwin module does. It refuses a home-manager
@@ -66,7 +66,7 @@ let
     ) above)
     && entry.manifest.system == evalManifest.system;
 
-  homes = builtins.map (entry: {
+  homeManagerConfigurations = builtins.map (entry: {
     # The name the home-manager configuration is published under, for
     # messages.
     name = entry.manifest.name;
@@ -74,15 +74,21 @@ let
     inherit (entry.value) activationPackage;
   }) (builtins.filter isActivatedHere config.caisson.exports.configurations);
 
-  withoutAccount = builtins.filter (home: !(config.users.users ? ${home.username})) homes;
+  withoutAccount = builtins.filter (
+    homeManagerConfiguration: !(config.users.users ? ${homeManagerConfiguration.username})
+  ) homeManagerConfigurations;
 
   # nix-darwin leaves the home directory of an account at `null` until
-  # the machine sets it, and a home-manager configuration needs one.
+  # the machine sets it, and a home-manager configuration needs a home directory.
   withoutHomeDirectory = builtins.filter (
-    home: config.users.users ? ${home.username} && config.users.users.${home.username}.home == null
-  ) homes;
+    homeManagerConfiguration:
+    config.users.users ? ${homeManagerConfiguration.username}
+    && config.users.users.${homeManagerConfiguration.username}.home == null
+  ) homeManagerConfigurations;
 
-  usernames = builtins.map (home: home.username) homes;
+  usernames = builtins.map (
+    homeManagerConfiguration: homeManagerConfiguration.username
+  ) homeManagerConfigurations;
   repeated = lib.lists.unique (
     builtins.filter (username: lib.lists.count (other: other == username) usernames > 1) usernames
   );
@@ -90,15 +96,15 @@ let
   # The step for a home-manager configuration: the step that the
   # nix-darwin module of home-manager writes, with `DRY_RUN` passed on
   # when the machine is activated dry.
-  stepOf = home: ''
-    echo Activating home-manager configuration for ${home.username} >&2
+  stepOf = homeManagerConfiguration: ''
+    echo Activating home-manager configuration for ${homeManagerConfiguration.username} >&2
     hmDryRunArgs=()
     hmParentArgs="$(ps -p "$PPID" -ww -o args= || true)"
     if [[ -v DRY_RUN || "$hmParentArgs" == *" --dry-run"* ]]; then
       hmDryRunArgs=(env DRY_RUN=1)
     fi
-    launchctl asuser "$(id -u ${home.username})" sudo -u ${home.username} --set-home "''${hmDryRunArgs[@]}" ${pkgs.writeShellScript "activation-${home.username}" ''
-      exec ${home.activationPackage}/activate >&2
+    launchctl asuser "$(id -u ${homeManagerConfiguration.username})" sudo -u ${homeManagerConfiguration.username} --set-home "''${hmDryRunArgs[@]}" ${pkgs.writeShellScript "activation-${homeManagerConfiguration.username}" ''
+      exec ${homeManagerConfiguration.activationPackage}/activate >&2
     ''}
   '';
 in
@@ -107,14 +113,15 @@ in
   # module declares that option.
   imports = [ closure-lib.caisson.modules.darwin.core ];
 
-  config = lib.mkIf (!evalManifest.childless && homes != [ ]) {
+  config = lib.mkIf (!evalManifest.childless && homeManagerConfigurations != [ ]) {
     assertions = [
       {
         assertion = withoutAccount == [ ];
         message = ''
           caisson: this darwin configuration has a home-manager configuration whose user has no account in `users.users`.
           ${lib.concatMapStringsSep "\n" (
-            home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
+            homeManagerConfiguration:
+            "  the home-manager configuration `${homeManagerConfiguration.name}` is for the user `${homeManagerConfiguration.username}`"
           ) withoutAccount}
           Declare the account in `users.users`, or check `home.username` of the home-manager configuration.
         '';
@@ -124,7 +131,8 @@ in
         message = ''
           caisson: this darwin configuration has a home-manager configuration whose user's account sets no home directory.
           ${lib.concatMapStringsSep "\n" (
-            home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
+            homeManagerConfiguration:
+            "  the home-manager configuration `${homeManagerConfiguration.name}` is for the user `${homeManagerConfiguration.username}`"
           ) withoutHomeDirectory}
           Set `users.users.<user>.home`, which nix-darwin leaves at `null`.
         '';
@@ -135,6 +143,8 @@ in
       }
     ];
 
-    system.activationScripts.postActivation.text = lib.concatMapStringsSep "\n" stepOf homes;
+    system.activationScripts.postActivation.text =
+      lib.concatMapStringsSep "\n" stepOf
+        homeManagerConfigurations;
   };
 }

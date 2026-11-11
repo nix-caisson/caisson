@@ -2,7 +2,7 @@
 #
 # The hjem integration: it owns the `hjem` class, hjem's class for the
 # files and packages of a user. A hjem configuration declares the home
-# directory of a user, evaluated per system, once for each system in force where it is declared.
+# directory of a user, evaluated per system, once for each system its parent evaluates its children for.
 #
 # hjem itself evaluates a user only inside its NixOS and nix-darwin
 # modules, as a submodule of `hjem.users`; its standalone CLI evaluates
@@ -283,7 +283,7 @@
       # `nix eval --json`, and an attribute set with `outPath` is
       # serialized as that string, so the live manifest stays out of
       # what the CLI reads.
-      projection = manifest: {
+      topOf = manifest: {
         inherit (manifest.outputs) manifest packages;
         caisson = {
           outPath = "caisson manifest: read caisson.manifest";
@@ -291,17 +291,17 @@
         };
       };
 
-      # A top evaluated for a single system is the projection of that
-      # evaluation; for several, the projections by system.
+      # A top evaluated for a single system returns `topOf` that
+      # evaluation; for several, `topOf` each evaluation, by system.
       top =
         evaluations:
         let
           systems = builtins.attrNames evaluations;
         in
         if builtins.length systems == 1 then
-          projection evaluations.${builtins.head systems}
+          topOf evaluations.${builtins.head systems}
         else
-          builtins.mapAttrs (_: projection) evaluations;
+          builtins.mapAttrs (_: topOf) evaluations;
 
       configuration =
         args:
@@ -312,7 +312,7 @@
           };
           type = "hjem";
           # A hjem configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;

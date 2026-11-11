@@ -5,8 +5,8 @@
 # class imports every registered module named `default` unless it
 # passes `moduleImports`.
 #
-# It declares `caisson.drift.warn`. The configuration is kept in a Nix
-# profile of its own, and its `activate` checks for drift against the
+# It declares `caisson.drift.warn`. The configuration is kept in a
+# separate Nix profile, and its `activate` checks for drift against the
 # configuration it is declared inside, as a home-manager configuration
 # does (`lib.caisson.integrations.profileOf`). The option turns the
 # warning off.

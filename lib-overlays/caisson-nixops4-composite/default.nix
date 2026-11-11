@@ -13,12 +13,12 @@
 # of its members by member name as NixOps4 passes them, and
 # `resourceProviderSystem`, the system NixOps4 runs providers on. Its
 # members are the caisson-nixops4-composite and
-# caisson-nixops4-resource configurations declared beneath it. It
+# caisson-nixops4-resource configurations declared inside it. It
 # finalizes each member with that member's part of its args, so its
 # manifest holds the members' manifests as its children.
 #
 # A composite declares providers, as NixOps4's components do, with
-# NixOps4's own `providers` option, and its module reads its members'
+# the `providers` option of NixOps4, and its module reads its members'
 # outputs through the `members` module argument: for each member, its
 # `outputs` and its `absoluteMemberPath`, both from the args and the
 # names the members are declared under. A member's config is not
@@ -60,7 +60,7 @@
       resourceType = "caisson-nixops4-resource";
 
       # The members of a composite at `path`, by name, from its
-      # evaluation: the composites and resources declared beneath it,
+      # evaluation: the composites and resources declared inside it,
       # each the entry caisson-core holds for a deferred child. Their
       # names are readable in the childless view too, and the entries
       # only in the full evaluation. A name declared as both is refused,
@@ -102,8 +102,8 @@
       # `getProviders` finalizes it with the deploying system alone and
       # builds the providers the root declares, as the `getProviders`
       # of NixOps4 does; reading an output there fails, as it does
-      # upstream. Providers declared beneath the root are not
-      # collected, as upstream collects none of them either.
+      # upstream. Providers declared inside the members of the root are
+      # not collected, as upstream collects none of them either.
       rootOf = entry: {
         _type = "nixops4Component";
         rootFunction =
@@ -135,7 +135,7 @@
 
       # How a composite is published. A composite whose parent is not a
       # composite is a root, published as `nixops4`, an output that
-      # holds a single value. A composite beneath another is a member
+      # holds a single value. A composite declared inside another is a member
       # and is not published.
       published = {
         exportsTo = {
@@ -156,8 +156,8 @@
       # the member path and the finalized members, and the `members`
       # module argument `membersArg` returns. The native integration
       # evaluates its class with NixOps4's provider declarations and
-      # `nativeMembersArg`; the upstream-compatible one builds on this
-      # with NixOps4's class and its own modules.
+      # `nativeMembersArg`; the upstream-compatible integration builds on
+      # this with NixOps4's class and the modules of that integration.
       mkCompositeConfiguration =
         {
           class,

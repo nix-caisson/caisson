@@ -70,10 +70,10 @@ let
       ) registeredModules;
 in
 {
-  # The export settings of each class, in one option for every class:
-  # a class no module sets costs nothing to evaluate, where options per
-  # class would be merged in every evaluation for every class, and a
-  # submodule per class would be an evaluation of its own.
+  # The export settings of each class, in a single option holding all
+  # classes: a class no module sets costs nothing to evaluate, where
+  # options per class would be merged in every evaluation for every
+  # class, and a submodule per class would be a further evaluation.
   options.caisson.modules = lib.mkOption {
     type = lib.types.lazyAttrsOf (lib.types.lazyAttrsOf lib.types.raw);
     default = { };

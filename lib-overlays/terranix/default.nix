@@ -3,7 +3,7 @@
 # The terranix integration: it owns the `terranix` class and
 # evaluates it with `terranixConfiguration` from the terranix flake. A
 # terranix configuration is a Terraform configuration written as
-# modules, evaluated per system, once for each system in force where it is declared,
+# modules, evaluated per system, once for each system its parent evaluates its children for,
 # on the package set selected for it.
 #
 # Its output is `json`, the `config.tf.json` file Terraform reads,
@@ -12,12 +12,13 @@
 # published as `terranixConfigurations.<name>`, the name terranix's
 # flake-parts module gives its configurations.
 #
-# terranix runs its own module system on the library of its package
-# set, so the composed library reaches the modules as the `lib`
-# argument while terranix merges and checks the options with its own.
-# terranix returns only the configuration Terraform reads and its
-# `_meta`, so caisson reads its own options through `_meta.caisson`,
-# and a terranix configuration holds no configurations beneath it.
+# terranix runs a separate module system on the library of its package
+# set, so the modules receive the composed library as the `lib`
+# argument while terranix merges and checks the options with the
+# library of that package set. terranix returns only the configuration
+# Terraform reads and its `_meta`, so caisson reads the `caisson`
+# options through `_meta.caisson`, and no configurations can be
+# declared inside a terranix configuration.
 {
   mkLibOverlay,
   ...
@@ -57,7 +58,7 @@
       # `terranixConfiguration` over the framework modules, the
       # selection and the configuration's module, on the package set
       # selected for the configuration. `ecosystemArgs`, which only the
-      # twin's pattern admits, is merged over the call last; everything
+      # pattern of the `WithEcosystemArgs` variant admits, is merged over the call last; everything
       # `terranixConfiguration` takes (`pkgs`, `modules`, `extraArgs`,
       # `strip_nulls`) can be set or replaced there.
       evaluate =
@@ -148,8 +149,8 @@
           # What Terraform reads: the `config.tf.json` file.
           outputs.json = value;
           # caisson's options, from `_meta`. terranix keeps the options
-          # of the evaluation to itself, so a terranix configuration
-          # holds no configurations beneath it.
+          # of the evaluation to itself, so no configurations can be
+          # declared inside a terranix configuration.
           config.caisson = value._meta.caisson;
           options = { };
         };
@@ -170,7 +171,7 @@
           };
           type = "terranix";
           # A terranix configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -182,7 +183,7 @@
         class = "terranix";
         # A terranix configuration that is a top, as a tool reads it:
         # the `config.tf.json` file, or the files by system where
-        # several systems are in force.
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under

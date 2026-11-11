@@ -28,7 +28,7 @@
         final.caisson.home-manager
           or (throw "lib.caisson.home-manager-minimal evaluates the homeManager class and needs the home-manager integration composed beside it.");
 
-      # In the tree an evaluation of an alt is a configuration of the
+      # Among the nested configurations, an evaluation of an alt is a configuration of the
       # integration that owns the class: it is declared under
       # `caisson.home-manager.configurations` and published where
       # home-manager configurations are.

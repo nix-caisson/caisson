@@ -32,7 +32,7 @@
 #
 # Which configurations: the enabled hjem configurations this darwin
 # configuration passes up, leaving out those declared inside a machine
-# that is itself inside this one, and those evaluated for another
+# that is itself inside this machine, and those evaluated for another
 # system. caisson's `default` darwin module imports this module.
 #
 # The module reads the hjem configurations from the full evaluation of

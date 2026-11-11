@@ -2,7 +2,7 @@
 #
 # What caisson exports: every registered overlay and module, and the
 # composed library's framework namespaces. The flake top and the
-# structural top evaluate this configuration beneath themselves and
+# structural top declare this configuration inside themselves and
 # merge in what it exports.
 { ... }:
 { ... }:

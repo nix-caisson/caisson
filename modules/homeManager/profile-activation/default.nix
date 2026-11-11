@@ -3,7 +3,7 @@
 # A home-manager module with which a home-manager configuration
 # activates the profiles declared inside it: the configurations that
 # are programs a person runs, such as an nvf or nixvim Neovim, each kept
-# in a Nix profile of its own, here a profile of the user,
+# in a separate Nix profile, here a profile of the user,
 # `$HOME/.local/state/caisson/profiles/<kind>/<name>`
 # (`lib.caisson.integrations.profileOf`).
 #

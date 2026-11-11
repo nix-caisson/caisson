@@ -4,8 +4,8 @@
 # nix-topology's modules. A topology configuration is the diagram of a
 # network of machines: the NixOS configurations declared inside it,
 # whose `topology` options nix-topology reads, and the modules of the
-# class, which add nodes and networks of their own. It is evaluated per
-# system, for every system in force where it is declared, on the package set
+# class, which add further nodes and networks. It is evaluated per
+# system, for each system its parent evaluates its children for, on the package set
 # selected for it.
 #
 # nix-topology evaluates its modules with `evalModules` over its
@@ -195,7 +195,7 @@
           };
           type = "topology";
           # A topology configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -206,8 +206,8 @@
         name = "topology";
         class = "topology";
         # A topology configuration that is a top, as a tool reads it:
-        # the evaluation, or the evaluations by system where several
-        # are in force.
+        # the evaluation, or the evaluations by system where the
+        # composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under

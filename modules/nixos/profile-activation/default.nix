@@ -2,7 +2,7 @@
 #
 # A module with which a machine activates the profiles declared inside
 # it: the configurations that are programs a person runs, such as an
-# nvf or nixvim Neovim, each kept in a Nix profile of its own
+# nvf or nixvim Neovim, each kept in a separate Nix profile
 # (`lib.caisson.integrations.profileOf`).
 #
 # A profile declared directly inside the machine is a profile of the
@@ -30,7 +30,7 @@
 # (`lib.caisson.integrations.profileShimsOf`): `nvim` runs the Neovim of
 # the profile `$CAISSON_NVIM_PROFILE` names, and of the default profile
 # of the machine when it is unset. A home-manager configuration or a
-# hjem configuration sets the variable to its own profile.
+# hjem configuration sets the variable to a profile declared inside it.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
 # under the same name, and the `default` module of each imports it.

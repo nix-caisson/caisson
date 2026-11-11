@@ -41,10 +41,9 @@
 # does: commit the generated artifact, ship a check that it is still current,
 # and thereby keep it out of evaluation.
 
-# Imported by the core lib overlay as `{ lib = final; }`, exposing
-# `lib.caisson.mkMemoizedDerivationRead` for every consumer (mirrors how
-# `eval-weight` is wired). Lives in the tooling overlay so every consumer
-# that composes it sees the helper.
+# Imported by the tooling lib overlay as `{ lib = final; }`, as
+# `eval-weight` is, exposing `lib.caisson.mkMemoizedDerivationRead` to a
+# consumer that composes the tooling overlay.
 { lib }:
 
 # { pkgs, drv, subpath, memo, normalize ? id, canonicalize ? null }
@@ -61,8 +60,8 @@
 #                writes its canonical form to stdout. Applied to the
 #                freshly built `${drv}/${subpath}` before diffing against
 #                the (already-canonical) memo. Omit for a raw byte
-#                compare. The same filter should have been used to
-#                produce the committed memo (see the regenerate helper).
+#                compare. The committed memo is produced with the same
+#                filter (see the regenerate helper).
 {
   pkgs,
   drv,

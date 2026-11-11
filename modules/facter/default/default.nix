@@ -2,7 +2,7 @@
 #
 # The default module of the facter class.
 #
-# The nearest NixOS configurations beneath a facter configuration run
+# The nearest NixOS configurations declared inside a facter configuration run
 # on its hardware. This module adds caisson's NixOS module
 # `facter-hardware`, which sets `hardware.facter.reportPath` to the
 # report file, to the modules that such a NixOS configuration imports

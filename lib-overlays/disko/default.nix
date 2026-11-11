@@ -35,7 +35,7 @@
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
     # The native disko integration, whose type library, devices option,
-    # layout product and publishing this one builds on.
+    # layout product and publishing this integration builds on.
     ((mkLibOverlay ../caisson-disko) // { key = "caisson-disko"; })
   ];
 
@@ -48,8 +48,8 @@
       # the devices option, the framework modules of the class, the
       # selection and the configuration's module, with the
       # composition's dependencies as the `inputs` special argument.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -154,7 +154,7 @@
             # special argument.
             pkgSets ? null,
             # The package set the layout's scripts are built with, and
-            # the one the configurations beneath this one run on: a
+            # the set the configurations declared inside this configuration run on: a
             # function that receives the package sets available, by
             # package config name, and returns the set to run on.
             defaultPkgs ? null,

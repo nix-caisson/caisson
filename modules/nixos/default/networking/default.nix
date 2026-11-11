@@ -3,7 +3,7 @@
 # The host name of a NixOS configuration defaults to the name the
 # configuration is declared under, so the machine declared as `nas-1`
 # names itself `nas-1`. The default is at `mkDefault` priority, so a
-# definition of `networking.hostName` in the machine's own modules
+# definition of `networking.hostName` in a module of the machine
 # replaces it. A NixOS configuration with no name, a top of a
 # composition that declares none on mkLib, keeps NixOS's default. An
 # evaluation without NixOS's networking module, such as one of the

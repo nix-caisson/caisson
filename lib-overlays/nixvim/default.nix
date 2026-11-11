@@ -3,7 +3,7 @@
 # The nixvim integration: it owns the `nixvim` class, the class of
 # nixvim's modules. A nixvim configuration is a Neovim, written as
 # nixvim modules (`plugins.*`, `opts`, `keymaps`), evaluated per
-# system, once for each system in force where it is declared, on the package set selected for
+# system, once for each system its parent evaluates its children for, on the package set selected for
 # it.
 #
 # nixvim evaluates its modules with `evalNixvim`: `evalModules` over
@@ -16,10 +16,10 @@
 #
 # The output is `package`, the Neovim, `config.build.package`. A
 # configuration is published as `nixvimConfigurations.<system>.<name>`,
-# the evaluated configuration, under the name nixvim's flake publishes
-# its own configurations under.
+# the evaluated configuration, under the output name the nixvim flake
+# uses for nixvim configurations.
 #
-# A nixvim configuration is kept in a Nix profile of its own, as an nvf
+# A nixvim configuration is kept in a separate Nix profile, as an nvf
 # configuration is (`lib.caisson.integrations.profileOf`): its output
 # `activationPackage` holds `activate`, and the configuration it is
 # declared inside activates it with the module `profile-activation` of
@@ -198,7 +198,7 @@
           };
           type = "nixvim";
           # A nixvim configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;

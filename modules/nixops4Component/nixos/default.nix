@@ -9,9 +9,9 @@
 # (`nixpkgs`, `nixos.module`, `nixos.specialArgs`, `ssh.*`,
 # `copy.substituteOnDestination`, `sudo.enable`), evaluates
 # `nixos.module` with `config.nixpkgs.lib.nixosSystem`, and takes the
-# shell its deploy script runs in from its own nixpkgs. In caisson the
+# shell its deploy script runs in from the nixpkgs of the member. In caisson the
 # member's `nixos.module` is a caisson NixOS configuration declared
-# beneath the member, under the member's name, with
+# inside the member, under the member's name, with
 # `nixos.specialArgs` as its special arguments. This module declares
 # it, makes `nixpkgs.lib.nixosSystem` return it in place of evaluating
 # one, and takes the shell from the package set caisson selects for the

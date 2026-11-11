@@ -10,11 +10,11 @@
 # have an activation. A user
 # can also activate such a configuration by hand, built from the source
 # the user has checked out, for example with `home-manager switch`.
-# That source can describe a different machine than the one that is
+# That source can describe a different machine than the machine that is
 # applied: the user changed the machine and has not switched it yet, or
 # the checkout is older than the machine. A configuration declared
 # inside a machine reads settings of the machine, so it was then built
-# for a machine that is not the one it is activated on.
+# for a machine that is not the machine it is activated on.
 #
 # What the file holds
 #
@@ -30,14 +30,14 @@
 # When the machine sets profiles of a configuration declared inside it,
 # such as the packages of a home-manager configuration that sets
 # `caisson.useUserPackages`, the file also holds `profiles`: for each
-# such configuration, by the name of its own marker file, the digest of
+# such configuration, by the name of the marker file of that configuration, the digest of
 # what each profile holds (`lib.caisson.integrations.machineProfilesOf`).
 # The identity leaves those configurations out, so these digests are
 # what tells a configuration built from another version that the
 # machine set its profile to something else.
 #
 # A configuration declared inside the machine reads the same childless
-# evaluation through its own manifest, so it computes the same identity
+# evaluation through the manifest of that configuration, so it computes the same identity
 # from the same source. Its activation compares the two
 # (`lib.caisson.integrations.driftCheckOf`), and warns when they differ.
 # When the machine activates it, the file already belongs to the

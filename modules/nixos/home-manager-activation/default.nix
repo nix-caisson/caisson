@@ -26,7 +26,7 @@
 # declared inside it, also through a structural configuration, that its
 # `caisson.home-manager.exported` selector selects. It leaves out two
 # kinds. A home-manager configuration declared inside a machine that is
-# itself inside this one belongs to that inner machine. A home-manager
+# itself inside this machine belongs to that inner machine. A home-manager
 # configuration evaluated for a system other than the system of this
 # machine cannot run here.
 #
@@ -133,7 +133,7 @@ let
   # The core module of the class of this evaluation: of the
   # `systemManager` class in a system-manager evaluation, else of the
   # `nixos` class. The registered core modules of the two classes are
-  # one file under two names, so a module imports the one its
+  # one file under two names, so a module imports the name its
   # evaluation already holds.
   coreModule =
     if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
@@ -163,7 +163,7 @@ let
     && entry.manifest.system == evalManifest.system;
 
   # What the units need of each home-manager configuration.
-  homes = builtins.map (entry: {
+  homeManagerConfigurations = builtins.map (entry: {
     # The name the home-manager configuration is published under, for
     # messages.
     name = entry.manifest.name;
@@ -178,7 +178,9 @@ let
 
   # The home-manager configurations whose packages the machine installs
   # (`caisson.useUserPackages`).
-  installedHere = builtins.filter (home: home.packages.setBy == "machine") homes;
+  installedHere = builtins.filter (
+    homeManagerConfiguration: homeManagerConfiguration.packages.setBy == "machine"
+  ) homeManagerConfigurations;
 
   # The accounts of the childless evaluation of the machine. The
   # accounts of this evaluation include the entries this module adds to
@@ -190,38 +192,43 @@ let
   # from `users.users.<user>.packages` (`nixos/modules/config/users-groups.nix`
   # of nixpkgs), here from `home.path` alone.
   userEnvironment =
-    home:
+    homeManagerConfiguration:
     pkgs.buildEnv {
       name = "user-environment";
-      paths = [ home.packages.holds ];
+      paths = [ homeManagerConfiguration.packages.holds ];
       inherit (config.environment) pathsToLink extraOutputsToInstall;
       inherit (config.system.path) ignoreCollisions postBuild;
     };
 
   # True when the machine declares the account of the user of the
   # home-manager configuration in `users.users`.
-  isDeclared = home: config.users.users ? ${home.username};
+  isDeclared = homeManagerConfiguration: config.users.users ? ${homeManagerConfiguration.username};
 
   # The users that have an account on this machine although
   # `users.users` does not declare it.
   elsewhere = config.caisson.home-manager.activation.usersDeclaredElsewhere;
-  isElsewhere = home: builtins.elem home.username elsewhere;
+  isElsewhere = homeManagerConfiguration: builtins.elem homeManagerConfiguration.username elsewhere;
 
   # The home-manager configurations whose user has no account the
   # machine knows of: not in `users.users`, and not listed as declared
   # elsewhere. The module refuses these.
-  withoutAccount = builtins.filter (home: !(isDeclared home) && !(isElsewhere home)) homes;
+  withoutAccount = builtins.filter (
+    homeManagerConfiguration:
+    !(isDeclared homeManagerConfiguration) && !(isElsewhere homeManagerConfiguration)
+  ) homeManagerConfigurations;
 
   # The users that are listed as declared elsewhere and are also in
   # `users.users`. The two statements contradict each other.
   inBoth = builtins.filter (username: config.users.users ? ${username}) elsewhere;
 
-  unitName = home: "home-manager-${utils.escapeSystemdPath home.username}";
+  unitName =
+    homeManagerConfiguration:
+    "home-manager-${utils.escapeSystemdPath homeManagerConfiguration.username}";
 
   # The settings both kinds of unit share. They are the settings of
   # the unit home-manager's NixOS module writes.
-  baseUnit = home: {
-    description = "Home Manager environment for ${home.username}";
+  baseUnit = homeManagerConfiguration: {
+    description = "Home Manager environment for ${homeManagerConfiguration.username}";
     # The unit is not stopped when its definition changes. The new
     # generation of the machine starts it again, which activates the
     # new generation of the home-manager configuration.
@@ -235,20 +242,20 @@ let
       Type = "oneshot";
       RemainAfterExit = true;
       TimeoutStartSec = "5m";
-      SyslogIdentifier = "hm-activate-${home.username}";
+      SyslogIdentifier = "hm-activate-${homeManagerConfiguration.username}";
     };
   };
 
   # The unit for an account the machine declares.
   systemUnit =
-    home:
-    lib.attrsets.recursiveUpdate (baseUnit home) {
+    homeManagerConfiguration:
+    lib.attrsets.recursiveUpdate (baseUnit homeManagerConfiguration) {
       wantedBy = [ "multi-user.target" ];
       wants = [ "nix-daemon.socket" ];
       after = [ "nix-daemon.socket" ];
       before = [ "systemd-user-sessions.service" ];
-      unitConfig.RequiresMountsFor = home.homeDirectory;
-      serviceConfig.User = home.username;
+      unitConfig.RequiresMountsFor = homeManagerConfiguration.homeDirectory;
+      serviceConfig.User = homeManagerConfiguration.username;
       serviceConfig.ExecStart =
         let
           systemctl = "XDG_RUNTIME_DIR=\${XDG_RUNTIME_DIR:-/run/user/$UID} systemctl";
@@ -261,7 +268,7 @@ let
             "XDG_RUNTIME_DIR"
           ];
         in
-        pkgs.writeScript "hm-activate-${home.username}" ''
+        pkgs.writeScript "hm-activate-${homeManagerConfiguration.username}" ''
           #! ${pkgs.runtimeShell} -el
 
           # A login shell runs the activation script, so that the
@@ -273,41 +280,43 @@ let
             | ${sed} -En '/^(${sessionVariables})=/s/^/export /p'
           )"
 
-          exec ${home.activationPackage}/activate
+          exec ${homeManagerConfiguration.activationPackage}/activate
         '';
     };
 
   # The unit for a user listed as declared elsewhere.
   userUnit =
-    home:
-    lib.attrsets.recursiveUpdate (baseUnit home) {
+    homeManagerConfiguration:
+    lib.attrsets.recursiveUpdate (baseUnit homeManagerConfiguration) {
       wantedBy = [ "default.target" ];
       unitConfig = {
-        ConditionUser = home.username;
+        ConditionUser = homeManagerConfiguration.username;
         RequiresMountsFor = "%h";
       };
       # A login shell runs the activation script, so that the script
       # gets the usual environment of the user, with Nix on the
       # search path.
-      serviceConfig.ExecStart = pkgs.writeScript "hm-user-activate-${home.username}" ''
+      serviceConfig.ExecStart = pkgs.writeScript "hm-user-activate-${homeManagerConfiguration.username}" ''
         #! ${pkgs.runtimeShell} -el
-        exec ${home.activationPackage}/activate
+        exec ${homeManagerConfiguration.activationPackage}/activate
       '';
     };
 
   unitsOf =
     mkUnit: selected:
     builtins.listToAttrs (
-      builtins.map (home: {
-        name = unitName home;
-        value = mkUnit home;
+      builtins.map (homeManagerConfiguration: {
+        name = unitName homeManagerConfiguration;
+        value = mkUnit homeManagerConfiguration;
       }) selected
     );
 
   # The users that more than one home-manager configuration names.
   # Several home-manager configurations for the same user would each
   # write the home directory of that user.
-  usernames = builtins.map (home: home.username) homes;
+  usernames = builtins.map (
+    homeManagerConfiguration: homeManagerConfiguration.username
+  ) homeManagerConfigurations;
   repeated = lib.lists.unique (
     builtins.filter (username: lib.lists.count (other: other == username) usernames > 1) usernames
   );
@@ -358,7 +367,8 @@ in
             message = ''
               caisson: this machine has a home-manager configuration whose user has no account in `users.users`.
               ${lib.concatMapStringsSep "\n" (
-                home: "  the home-manager configuration `${home.name}` is for the user `${home.username}`"
+                homeManagerConfiguration:
+                "  the home-manager configuration `${homeManagerConfiguration.name}` is for the user `${homeManagerConfiguration.username}`"
               ) withoutAccount}
               Check `home.username` of the home-manager configuration, and that the home-manager configuration is declared inside the right machine.
               If something other than `users.users` provides the account, as systemd-homed does, add the user to `caisson.home-manager.activation.usersDeclaredElsewhere`.
@@ -376,7 +386,8 @@ in
             message = ''
               caisson: this system-manager machine has a home-manager configuration that sets `caisson.useUserPackages`.
               ${lib.concatMapStringsSep "\n" (
-                home: "  the home-manager configuration `${home.name}` for the user `${home.username}`"
+                homeManagerConfiguration:
+                "  the home-manager configuration `${homeManagerConfiguration.name}` for the user `${homeManagerConfiguration.username}`"
               ) installedHere}
               Only a NixOS machine installs the packages of a home-manager configuration. Remove the setting, so that the activation of the home-manager configuration installs them.
             '';
@@ -389,7 +400,11 @@ in
                 username:
                 "  ${username}: ${
                     lib.concatStringsSep ", " (
-                      builtins.map (home: home.name) (builtins.filter (home: home.username == username) homes)
+                      builtins.map (homeManagerConfiguration: homeManagerConfiguration.name) (
+                        builtins.filter (
+                          homeManagerConfiguration: homeManagerConfiguration.username == username
+                        ) homeManagerConfigurations
+                      )
                     )
                   }"
               ) repeated}
@@ -398,9 +413,12 @@ in
           }
         ];
 
-        systemd.services = unitsOf systemUnit (builtins.filter isDeclared homes);
+        systemd.services = unitsOf systemUnit (builtins.filter isDeclared homeManagerConfigurations);
         systemd.user.services = unitsOf userUnit (
-          builtins.filter (home: !(isDeclared home) && isElsewhere home) homes
+          builtins.filter (
+            homeManagerConfiguration:
+            !(isDeclared homeManagerConfiguration) && isElsewhere homeManagerConfiguration
+          ) homeManagerConfigurations
         );
       }
       // lib.optionalAttrs hasUserPackages {
@@ -408,18 +426,29 @@ in
         # packages. A home-manager configuration whose user has no
         # account gets no entry here, so the assertion above names it.
         users.users = builtins.listToAttrs (
-          builtins.map (home: {
-            name = home.username;
-            value.packages = [ home.packages.holds ];
-          }) (builtins.filter (home: declaredAccounts ? ${home.username}) installedHere)
+          builtins.map
+            (homeManagerConfiguration: {
+              name = homeManagerConfiguration.username;
+              value.packages = [ homeManagerConfiguration.packages.holds ];
+            })
+            (
+              builtins.filter (
+                homeManagerConfiguration: declaredAccounts ? ${homeManagerConfiguration.username}
+              ) installedHere
+            )
         );
         environment.etc = builtins.listToAttrs (
           builtins.map
-            (home: {
-              name = "profiles/per-user/${home.username}";
-              value.source = userEnvironment home;
+            (homeManagerConfiguration: {
+              name = "profiles/per-user/${homeManagerConfiguration.username}";
+              value.source = userEnvironment homeManagerConfiguration;
             })
-            (builtins.filter (home: !(declaredAccounts ? ${home.username}) && isElsewhere home) installedHere)
+            (
+              builtins.filter (
+                homeManagerConfiguration:
+                !(declaredAccounts ? ${homeManagerConfiguration.username}) && isElsewhere homeManagerConfiguration
+              ) installedHere
+            )
         );
         # home-manager puts the file that sets the session variables of
         # the home-manager configuration in `etc/profile.d` of `home.path`.

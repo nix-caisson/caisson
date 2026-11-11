@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The pin readers: a function per pin system that reads its files into
-# `dependencies`, the pinned trees a project is built from, each carrying the
+# `dependencies`, the pinned source trees a project is built from, each carrying the
 # identity its pin files record. Everything caisson does with a dependency
 # is the same under every pin system; a reader is the whole of what a
 # pin system contributes.
@@ -9,7 +9,7 @@
 #   pins.flake inputs            the inputs Nix's flake evaluator resolved
 #                                for the flake being evaluated (the
 #                                `inputs` its `outputs` receives), with
-#                                any `--override-input` in force; returns
+#                                any `--override-input` passed; returns
 #                                { dependencies; root; }, `root` from `self`
 #   pins.flake-compat ./dir      the flake.lock beside a flake.nix in
 #                                `dir`, resolved the way flake-compat
@@ -31,7 +31,7 @@
 #                  writer that moves the source follows from it
 #   pin.files      { refs; revisions; }: the file holding the ref and
 #                  the file holding the revision, relative to `pin.dir`
-#                  when present and to the tree's root otherwise
+#                  when present and to the root of the source tree otherwise
 #   pin.dir        the directory holding the pin files, as a path, for
 #                  a reader given a directory; the root is not known to
 #                  the reader, so relativizing happens where both are
@@ -50,7 +50,7 @@
 # with the fields of a root (below), since `pins.flake` reads the lock
 # from `self`.
 #   pin.overridden `pins.flake` only: the resolved tree differs from
-#                  the lock (an `--override-input` was in force), so
+#                  the lock (an `--override-input` was passed), so
 #                  `pin.url` describes the lock, not the tree
 #
 # A root is { outPath; dirty; rev; shortRev; dirtyRev; dirtyShortRev;

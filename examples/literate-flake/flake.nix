@@ -50,7 +50,7 @@
         manifest) are under `lib.caisson`, beside the integrations. Your
         overlays contribute your extensions (here, `lib.literate-flake`).
 
-        - `dependencies` are the pinned trees the composition is built
+        - `dependencies` are the pinned source trees the composition is built
           from. A module or overlay reads them through `closure-lib`, as
           `closure-lib.caisson.dependencies.<name>`, without threading
           them through every call site.

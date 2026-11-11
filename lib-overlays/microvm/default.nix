@@ -36,11 +36,11 @@
     # What an integration is written from, imported by key so it is
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
-    # The nixos integration, whose composition and publishing this one
-    # builds on.
+    # The nixos integration, whose composition and publishing this
+    # integration builds on.
     ((mkLibOverlay ../nixos) // { key = "nixos"; })
     # The native microvm integration, whose resolution of the
-    # microvm.nix source this one builds on.
+    # microvm.nix source this integration builds on.
     ((mkLibOverlay ../caisson-microvm) // { key = "caisson-microvm"; })
   ];
 
@@ -53,8 +53,8 @@
       # The evaluator's call, on the view being evaluated: eval-config
       # over the composition of the nixos class, with microvm.nix's
       # guest module, for the configuration's system. `ecosystemArgs`,
-      # which only the twin's pattern admits, is merged over the call
-      # last.
+      # which only the pattern of the `WithEcosystemArgs` variant admits,
+      # is merged over the call last.
       evaluate =
         args: view:
         let
@@ -123,7 +123,7 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit (nixos) exportsTo;
-          # A guest is a machine of its own; a configuration with an
+          # A guest is a separate machine. A configuration with an
           # activation declared inside it checks its marker.
           activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate args;
@@ -149,7 +149,7 @@
             # declarations when absent.
             ecosystemSrc ? null,
             # The microvm.nix flake or source tree, as a function of the
-            # tree's dependencies (`microvmSrc = dependencies: dependencies.<name>;`);
+            # dependencies passed to mkLib (`microvmSrc = dependencies: dependencies.<name>;`);
             # resolved from the composition's declarations under the
             # name `microvm` when absent.
             microvmSrc ? null,

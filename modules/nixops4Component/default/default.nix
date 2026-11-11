@@ -5,12 +5,12 @@
 #
 # It selects the module `nixos` of the class, which evaluates the
 # `nixos.module` of a member that imports nixops4-nixos as a caisson
-# NixOS configuration beneath the member.
+# NixOS configuration declared inside the member.
 #
 # NixOps4 runs `bin/apply` from the toplevel of the NixOS
 # configuration it deploys. This module adds caisson's NixOS module
 # `nixops4-apply`, which builds that script, to the modules that the
-# nearest NixOS configurations beneath a component import by default,
+# nearest NixOS configurations declared inside a component import by default,
 # as nixops4-nixos adds its `apply` module to the configuration it
 # evaluates.
 #

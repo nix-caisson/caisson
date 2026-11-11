@@ -29,7 +29,7 @@
 
       core = caisson-core.lib.caisson-core;
 
-      # The pin readers live in this tree and are read by path: no
+      # The pin readers live in this repository and are read by path: no
       # library exists yet at this point.
       pins = import ./lib-overlays/framework/pins;
 

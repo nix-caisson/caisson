@@ -12,7 +12,7 @@
 # A NixOS configuration selects this module by name, as `disko`, or as
 # `caisson/disko` in a flake that lists caisson in `projects`.
 #
-# The disko source is the one the composition declares or pins under
+# The disko source is the source the composition declares or pins under
 # the name `disko`, read from the library of the evaluation.
 { ... }:
 { lib, ... }:

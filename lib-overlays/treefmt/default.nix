@@ -2,12 +2,12 @@
 #
 # The treefmt integration: it owns the `treefmt` class, the class of
 # treefmt-nix's modules. A treefmt configuration is the formatters of a
-# tree: `programs.<name>.enable` and `settings`, as treefmt-nix writes
-# them. It is evaluated per system, once for each system in force where it is declared,
-# on the package set selected for it.
+# source tree: `programs.<name>.enable` and `settings`, as treefmt-nix writes
+# them. It is evaluated per system, once for each system its parent evaluates
+# its children for, on the package set selected for it.
 #
 # treefmt-nix evaluates its modules with `evalModules` on the library of
-# a nixpkgs. caisson evaluates them with its own `evalModules`, on the
+# a nixpkgs. caisson evaluates them with an `evalModules` call of caisson, on the
 # composed library, over the modules treefmt-nix publishes for a
 # configuration embedded in another, `submodule-modules`, with `pkgs`
 # set to the selected package set. Those modules need treefmt-nix's
@@ -18,10 +18,10 @@
 # configuration, which `nix fmt` runs; `configFile`, the `treefmt.toml`;
 # `programs`, the formatters by name; and `check`, the function that
 # takes a source tree and builds a derivation that fails when the tree
-# is not formatted. The configuration declared under the name `default`
+# is not formatted. The configuration declared under the name `formatter`
 # is published as `formatter.<system>`, its wrapper, which `nix fmt`
 # reads, and as `checks.<system>.treefmt`, its check over the root of
-# the tree (`mkLib`'s `root`), which `nix flake check` builds.
+# the flake (`mkLib`'s `root`), which `nix flake check` builds.
 {
   mkLibOverlay,
   ...
@@ -159,9 +159,10 @@
 
       # Only the configuration named `formatter`, for the output it
       # fills, is published: as `formatter.<system>`, its wrapper,
-      # which `nix fmt` reads, and, in a tree that knows its root, as
-      # `checks.<system>.treefmt`, its check over that tree, which
-      # fails `nix flake check` when the tree is not formatted.
+      # which `nix fmt` reads, and, in a flake that knows its root, as
+      # `checks.<system>.treefmt`, its check over the source tree of the
+      # flake, which fails `nix flake check` when that source tree is not
+      # formatted.
       isFormatter = manifest: (manifest.name or null) == "formatter";
       exportsTo = [
         {
@@ -192,7 +193,7 @@
           };
           type = "treefmt";
           # A treefmt configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;

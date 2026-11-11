@@ -4,12 +4,12 @@
 # no ecosystem. Its class, `structural`, is defined by caisson itself,
 # since no ecosystem owns a plain tree of configurations, and it
 # carries nothing but caisson's core module: the manifest, the
-# configurations declared beneath, the registry selectors and
+# configurations declared inside it, the registry selectors and
 # `caisson.exports`. Its evaluator is the module system of the composed
 # library, `evalModules`. A structural configuration is the top of a
 # repository whose point is what it exports, and `default.nix` returns
-# what `mkTopConfiguration` returns from it; it is also a layer at any
-# depth, declared beneath another configuration under
+# what `mkTopConfiguration` returns from it. It can also be a layer
+# declared inside another configuration under
 # `caisson.structural.configurations`.
 {
   mkLibOverlay,
@@ -36,7 +36,7 @@
       # the framework modules of the class, the selection and the
       # configuration's module, with the composition's dependencies
       # as the `inputs` special argument. `ecosystemArgs`, which only
-      # the twin's pattern admits, is merged over the call last.
+      # the pattern of the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -102,7 +102,7 @@
         name = "structural";
         class = "structural";
         # What a tool reads from a top: the registries it exports and the
-        # configurations declared beneath it, each published under the
+        # configurations declared inside it, each published under the
         # output attribute set its integration declares and named from
         # its path (`nixosConfigurations.<name>`), with the manifest
         # beside them for `manifestOf` and `topside --file`, carrying
@@ -137,11 +137,11 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
-            # to each, by package config name, and returns the set to
-            # run on. It holds for every configuration beneath that
-            # selects none.
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package
+            # sets available to each, by package config name, and returns
+            # the set to run on. A configuration declared inside runs on
+            # it unless it or a configuration between them selects another.
             defaultPkgs ? null,
             # The selection over the structural class of the registry.
             # It replaces the default of the class, which is every

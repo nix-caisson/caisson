@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# Re-export: for each integration whose configurations this
-# configuration can hold beneath it (the module of each integration
+# Re-export: for each integration whose configurations can be declared
+# inside this configuration (the module of each integration
 # declares `caisson.<integration>.configurations`),
 # `caisson.<integration>.exported` selects, from those configurations,
 # those this configuration passes up, and what each selected

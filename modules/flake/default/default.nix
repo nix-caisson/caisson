@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# The `default` flake module caisson registers: what every flake
-# configuration beneath caisson gets unless it selects otherwise,
-# which is the nixpkgs integration's module layer.
+# The `default` flake module caisson registers: what a flake
+# configuration composed with caisson gets unless it passes
+# `moduleImports`, which is the nixpkgs integration's module layer.
 { closure-lib, mkModule, ... }:
 { ... }:
 {

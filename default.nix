@@ -8,7 +8,7 @@
 #
 # The pins are those in flake.lock, read without the flake evaluator
 # by caisson-core's flake-compat reader, so this top and the flake top
-# build from the same trees and a pin advance moves both. caisson-core
+# build from the same source trees and a pin advance moves both. caisson-core
 # itself is fetched from its node in the lock first, since the reader
 # is one of its functions. The root is the working tree, named by its
 # revision when clean (an impure read, as a flakeless top's is).

@@ -11,11 +11,11 @@
 # fixes it.
 #
 # The source is the source the composition supplies for the part
-# `nixpkgs-lib`: the nixpkgs.lib mirror, a tree holding nixpkgs' `lib`
+# `nixpkgs-lib`: the nixpkgs.lib mirror, a source tree holding nixpkgs' `lib`
 # directory such as a nixpkgs checkout, or that directory. The library
 # is a part of the nixpkgs stack separate from the package set and from
 # the NixOS module collection, each supplied from a separate key, so a
-# tree that takes the library from its nixpkgs checkout names that
+# flake that takes the library from its nixpkgs checkout names that
 # checkout under `nixpkgs-lib` as well. What a composition supplies for
 # a part is its `defaultEcosystemSrc.<name>`, else the source it pins
 # under that exact name.
@@ -23,8 +23,8 @@
 # The source is read from `prev.caisson-core.ecosystemSrc`, which
 # caisson-core publishes in the first layers of a library from the
 # arguments of the mkLib call. So this entry loads the nixpkgs library
-# of the composition it is composed into: composed in a tree that
-# takes caisson as a project, it reads the source that tree declares,
+# of the composition it is composed into: composed in a flake that
+# takes caisson as a project, it reads the source that flake declares,
 # and the pin of caisson plays no part. It has to be `prev`: the names
 # this entry adds come from the source, so the source cannot be read
 # out of the fixpoint those names are part of.
@@ -40,9 +40,9 @@
 #
 # An overlay that calls nixpkgs' functions through the composed
 # library imports this entry by the key `nixpkgs-lib`, so composing
-# that overlay composes this. A tree outside caisson imports it from
+# that overlay composes this. A flake outside caisson imports it from
 # the caisson source tree, as it imports `integrations`, where `caisson`
-# is the flake input of that tree:
+# is the flake input of that flake:
 #
 #   (mkLibOverlay (caisson.outPath + "/lib-overlays/nixpkgs-lib"))
 #   // { key = "nixpkgs-lib"; }
@@ -67,7 +67,7 @@
           ''
         else
           "${src}";
-      # A tree holding the `lib` directory, or that directory.
+      # A source tree holding the `lib` directory, or that directory.
       libDir = if builtins.pathExists "${root}/lib/default.nix" then "${root}/lib" else root;
     in
     prev // builtins.import libDir;

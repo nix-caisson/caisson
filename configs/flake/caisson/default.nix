@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake top's configuration: the shared configuration of what
-# caisson exports, declared beneath this top under the name it is
+# caisson exports, declared inside this top under the name it is
 # registered by (configs/structural/impl), plus the checks partition
 # only a flake evaluation carries. What the shared configuration
 # exports is passed up into this top's exports, and from there into

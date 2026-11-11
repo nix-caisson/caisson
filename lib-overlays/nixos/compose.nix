@@ -8,8 +8,8 @@
 #
 # It is a function of the view being evaluated: `lib`, the library the
 # evaluation runs on, and `manifest`, the manifest of the evaluation.
-# A NixOS configuration has an evaluation for every system in force
-# where it is declared, so the manifest is that of the evaluation for
+# A NixOS configuration has an evaluation for each system its parent
+# evaluates its children for, so the manifest is that of the evaluation for
 # one system: the name, the system and the package sets come from it.
 {
   context,
@@ -37,8 +37,8 @@ let
   # system of the evaluation, by package config name.
   pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
 
-  # The set the configuration runs on: the selection in force at its
-  # manifest, applied to those.
+  # The set the configuration runs on: the package set selection that
+  # applies to its manifest, applied to those.
   pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
   # eval-config evaluations carry the nixpkgs module, so the set lands

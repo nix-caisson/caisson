@@ -75,7 +75,7 @@ in
       has its packages installed by the machine. The marker of the
       machine also records the digest of the `home.path` it installed,
       and the activation of the home-manager configuration warns when
-      its own `home.path` differs from it.
+      the `home.path` of the home-manager configuration differs from it.
     '';
   };
 

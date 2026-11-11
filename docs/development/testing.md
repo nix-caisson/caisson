@@ -29,13 +29,13 @@ plumbing works.
   declared inside it, a colmena hive, disk layouts with the machines
   installed onto them, a darwin machine evaluated for aarch64-darwin
   with and without a home-manager configuration and a hjem
-  configuration inside it, hjem configurations on
-  their own and inside a NixOS machine, a terranix and a system-manager
+  configuration inside it, hjem configurations declared
+  at the top of the flake and inside a NixOS machine, a terranix and a system-manager
   configuration, and the composition guarantees of the real exported
   overlays. The `hjem-system` check builds the manifest file of the hjem
   configuration inside the machine, which checks it against hjem's
   schema, and the units that activate it, which runs shellcheck on
-  their scripts. The two darwin machines of the suite are also the one
+  their scripts. The two darwin machines of the suite are also the
   check for aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in
@@ -61,7 +61,7 @@ plumbing works.
 ## Argument Errors (Trace Shape)
 
 - **Scope:** The argument error of every entry point (`mkConfiguration`,
-  its `WithEcosystemArgs` twin, `nixos.mkConfigurationFull`, the colmena
+  its `WithEcosystemArgs` variant, `nixos.mkConfigurationFull`, the colmena
   node constructors) is Nix's function-argument error, raised at the
   call site: between `error:` and the message stands the call site and
   no frame of caisson.
@@ -85,7 +85,7 @@ plumbing works.
 - **Location:** `tests/deferred-errors/check.sh` and its cases in
   `tests/deferred-errors/cases.nix`.
 - **Mechanism:** the script runs `nix eval` on each case and looks for
-  the line of the message the case names. The `deferred-errors` check
+  the line of text in the message that the case names. The `deferred-errors` check
   runs it in the sandbox over the library of the `argument-errors`
   check and the NixOps4 source.
 - **Execution against the flake's library, from a checkout:**

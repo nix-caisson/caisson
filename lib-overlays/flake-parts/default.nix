@@ -4,10 +4,10 @@
 # flake outputs. It owns the `flake` class and evaluates it with
 # flake-parts' `evalFlakeModule`, as `mkFlake` does. Beside the entry
 # points it carries the export machinery (the core flake-parts
-# module reads the manifest of the evaluation, projects the
-# `libOverlays` and `modules` flake outputs from it, and defaults
-# flake-parts' `systems` from the `systems` the composition declared),
-# and the `flake-parts` library mirror.
+# module reads the manifest of the evaluation, writes the `lib` and
+# `modules` flake outputs from it, and defaults flake-parts' `systems`
+# from the `systems` the composition declared), and the `flake-parts`
+# library, copied into the composed library.
 #
 # flake-parts itself comes from the composition, resolved like every
 # ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
@@ -73,8 +73,8 @@
       # the flake's `inputs` from the manifest's dependencies, the special
       # arguments and the module location when the configuration is
       # named, beside the flake-parts it runs on and the module it
-      # evaluates. `ecosystemArgs`, which only the twin's pattern
-      # admits, is merged over the call last.
+      # evaluates. `ecosystemArgs`, which only the pattern of the
+      # `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -145,8 +145,8 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
 
-          # The package set `perSystem` runs on, its `pkgs`: the
-          # selection in force at the flake, applied to the package
+          # The package set `perSystem` runs on, its `pkgs`: the package
+          # set selection that applies to the flake, applied to the package
           # sets available for each system. A package config that builds
           # no set for a system is not among the sets there, and a
           # flake with no package sets for a system keeps the `pkgs`
@@ -205,14 +205,14 @@
           # `self` is the evaluation's outputs with the root's source
           # info (out path, revision, last-modified) beside them, and
           # `self.inputs` the dependencies. A composition with no root
-          # names no tree, so its `self` has no out path. An `inputs`
-          # handed in through the WithEcosystemArgs twin that carries a
+          # names no source tree, so its `self` has no out path. An `inputs`
+          # handed in through the `WithEcosystemArgs` variant that carries a
           # `self` is taken as it is.
           given = callArgs.inputs or { };
           root = manifest.root or null;
           # The root's source-info fields that name something: a flake's
-          # `self` carries only the fields its tree has, so a reader of
-          # `self.rev or …` sees a dirty tree as Nix hands it over.
+          # `self` carries only the fields its source tree has, so a reader of
+          # `self.rev or …` sees a dirty source tree as Nix hands it over.
           sourceInfo = if root == null then { } else lib.filterAttrs (_: value: value != null) root;
           inputs = if given ? self then given else given // { inherit self; };
           self =
@@ -249,7 +249,7 @@
                 manifest = lib.caisson-core.libManifest or { };
               };
           # What `evalFlakeModule` received, element by element of the
-          # module it was handed: flake-parts' own modules, its module
+          # module it was handed: the modules of flake-parts, its module
           # list and the two core modules imported here, as the single
           # event of the flake-parts ecosystem, then each of the modules
           # of the composition.
@@ -310,9 +310,9 @@
             # The package set perSystem runs on, its `pkgs`: a function
             # that receives the package sets available for each system,
             # as an attribute set by package config name, and returns
-            # the set to run on. The
-            # selection holds for every configuration beneath the
-            # flake that selects none. When absent, the selection of
+            # the set to run on. A configuration declared inside the
+            # flake runs on it unless it or a configuration between them
+            # selects another. When absent, the selection of
             # the nearest configuration above, and the set named
             # `default` where none above selects.
             defaultPkgs ? null,
@@ -354,7 +354,7 @@
         flake-parts = integration.namespace;
       };
 
-      # The flake-parts library mirrored into the composed library,
+      # The flake-parts library copied into the composed library,
       # from the composition's declared flake-parts; forced only when
       # read.
       flake-parts = (prev.flake-parts or { }) // flakePartsDefault.lib;

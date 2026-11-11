@@ -4,15 +4,15 @@
 # modules, `flake.modules` holds those that
 # `caisson.flakeOutputs.modules` selects. The exported lib overlays
 # and package overlays are in the manifest, which is in the `lib`
-# output. They are entries in the shape caisson registers, so they
-# have no flake output. These
+# output, as entries in the shape caisson registers. These
 # flake-parts conventions are on top: the `flake` class always exports a
 # `default` entry (an empty module unless the selection provides it),
 # so `flakeModules.default` exists for consumers that import it by
-# convention, and `flake.flakeModules` mirrors `flake.modules.flake`.
+# convention, and `flake.flakeModules` is the same as `flake.modules.flake`.
 #
-# The configurations declared beneath the flake, at any depth, are
-# published as well, each under the output attribute set its
+# The configurations declared inside the flake and passed up to it,
+# nested configurations included, are published as well, each under the
+# output attribute set its
 # integration declares (`flake.nixosConfigurations`), named from its
 # path: a name that is alone stays bare, and names that collide gain
 # the segments that tell them apart.
@@ -44,7 +44,7 @@ in
       of `projects`. `mkLib` reads every exported module, whatever
       this function returns.
 
-      The `modules` output serves an import by hand, as
+      The `modules` output is for an import by hand, as
       `inputs.<input>.modules.<class>.<name>`.
       Leave a module out of the output when it only works inside an
       evaluation that caisson makes, because it reads the options under

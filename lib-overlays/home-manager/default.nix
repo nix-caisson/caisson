@@ -4,12 +4,12 @@
 # contributes the declared home-manager's library to the composition
 # as `lib.hm`, and evaluates the class over the composed library with
 # home-manager's module list. A home-manager configuration is
-# evaluated per system, once for each system in force where it is
-# declared, on the package set in force there, and a top publishes it
+# evaluated per system, once for each system its parent evaluates its
+# children for, on the package set selected there, and a top publishes it
 # under `homeConfigurations`.
 #
 # A home-manager configuration can be declared inside a NixOS
-# configuration. The modules that serve such a home-manager
+# configuration. The modules for such a home-manager
 # configuration are registered modules of caisson: the NixOS
 # modules `home-manager-activation` and `home-manager-source-marker`,
 # and the home-manager modules `nixos-parent` and
@@ -61,7 +61,7 @@
       # `defaultEcosystemSrc.home-manager` of the mkLib call, else the
       # pinned source of that name; null when it declares none. The layered
       # lookup of the integrations entry, read without its miss
-      # message: a composition may leave the tree to the
+      # message: a composition may leave the home-manager source to the
       # `ecosystemSrc` of each evaluation.
       declaredSrc =
         let
@@ -76,7 +76,7 @@
         );
 
       # home-manager's library over a library: `modules/lib/default.nix`
-      # of the tree at `src` applied to `lib`. Its functions call each
+      # of the source tree at `src` applied to `lib`. Its functions call each
       # other through `lib.hm`, so the library they are applied to
       # carries the result as `hm`, and every nixpkgs name they read
       # is a name that library has.
@@ -85,7 +85,7 @@
       # The declared home-manager's library over the composed library,
       # the `hm` entry this integration contributes; forced only when
       # read. Reading it in a composition that declares no
-      # home-manager names the places a tree comes from.
+      # home-manager names the places a home-manager source comes from.
       hmLibDeclared =
         if declaredSrc != null then
           mkHmLib declaredSrc final
@@ -95,14 +95,14 @@
             `defaultEcosystemSrc.home-manager` in the mkLib call, or pin a
             source named `home-manager` in the `dependencies` passed to mkLib; an evaluation
             that names its home-manager through `ecosystemSrc` runs on the
-            composed library carrying `hm` from that tree.
+            composed library carrying `hm` from that source.
           '';
 
       # The library an evaluation runs on: the composed library with
       # the module system tied over it. The module system hands `lib`
       # to every module it evaluates, those of the main evaluation
       # through `specialArgs` and the rest, submodules and the
-      # evaluations home-manager's tree runs beside the main evaluation
+      # evaluations the home-manager source runs beside the main evaluation
       # (the manual's option documentation), from the library the module
       # system's files closed over. The module system of the composed
       # library is what nixpkgs built, closed over the nixpkgs
@@ -119,7 +119,7 @@
       # `base` is the library of the view being evaluated, the
       # composed library carrying the manifest of the evaluation.
       #
-      # `hmSrc` names the tree `hm` comes from when the composition
+      # `hmSrc` names the source `hm` comes from when the composition
       # declares none: `hm` and the home-manager maintainers merged
       # into the nixpkgs list are then built over this library, the
       # way the entries below build them over the composed library, so
@@ -140,11 +140,11 @@
         );
 
       # A home-manager evaluation runs on one library, so its modules
-      # and its `lib.hm` come from one tree. With a declared
-      # home-manager, the composed library carries `hm` from that tree
+      # and its `lib.hm` come from the same home-manager source. With a declared
+      # home-manager, the composed library carries `hm` from that source
       # as an entry, and an evaluation whose `ecosystemSrc` names a
-      # different tree is refused, the message naming the declaration
-      # that composes an `hm` for it. With none declared, the tree the
+      # different source is refused, the message naming the declaration
+      # that composes an `hm` for it. With none declared, the source the
       # evaluation names supplies both.
       libFor =
         base: explicit:
@@ -159,11 +159,11 @@
           throw ''
             caisson.home-manager: this evaluation names
               ${named}
-            as its home-manager, and the composed library carries `lib.hm`
+            as its home-manager, and the composed library holds `lib.hm`
             from the home-manager this composition declares,
               ${declaredSrc}.
             A home-manager evaluation runs on one library, so the two must be
-            the same tree. Declare the other tree as
+            the same source. Declare the other source as
             `defaultEcosystemSrc.home-manager` in a mkLib call and evaluate
             under the library that composes, or drop the `ecosystemSrc`
             argument.
@@ -181,7 +181,7 @@
       # It is a function of the view being evaluated: `lib`, the
       # library of that view, and `manifest`, the manifest of the
       # evaluation. A home-manager configuration has an evaluation for
-      # every system in force where it is declared, so the manifest is
+      # each system its parent evaluates its children for, so the manifest is
       # that of the evaluation for one system: the name, the system and
       # the package sets come from it.
       mkCommonArgs =
@@ -211,8 +211,8 @@
           # package config name.
           pkgSets = integrations.pkgSetsForSystem { inherit context what; } manifest system;
 
-          # The set the home-manager configuration runs on: the
-          # selection in force at its manifest, applied to those.
+          # The set the home-manager configuration runs on: the package
+          # set selection that applies to its manifest, applied to those.
           pkgs = integrations.pkgSetOf { inherit context what; } manifest pkgSets;
 
           classRegistry = lib.caisson.modules.homeManager or { };
@@ -338,7 +338,7 @@
       # The evaluator's call, from the composition above: everything
       # the evaluation takes (configuration, pkgs, lib, modulesPath,
       # minimal, check, extraSpecialArgs) can be set or replaced
-      # through the twin's `ecosystemArgs`. An integration that
+      # through the `ecosystemArgs` of the `WithEcosystemArgs` variant. An integration that
       # evaluates the class the other way reads this through
       # `lib.caisson.home-manager.compose`.
       compose =
@@ -378,7 +378,7 @@
       # standing where it built a library.
       #
       # The module list, the module files, the class name and
-      # `modulesPath` all come from the tree `modulesPath` names, so
+      # `modulesPath` all come from the directory `modulesPath` names, so
       # home-manager decides what is evaluated. Beside the library
       # the evaluation runs on, it differs from the upstream entry
       # point in the package set: `useNixpkgsModule` is false, so
@@ -482,7 +482,7 @@
 
       # The evaluator step of a home-manager configuration, on the view
       # being evaluated: the evaluation over the composition, with the
-      # twin's `ecosystemArgs` merged over the composed call last.
+      # `ecosystemArgs` of the `WithEcosystemArgs` variant merged over the composed call last.
       # `variant` is what `compose` takes, the entry point and its
       # module list. An integration that evaluates the class the other
       # way builds
@@ -506,7 +506,7 @@
           # What evalModules received: each module the configuration
           # module imports, then home-manager's module list. A
           # configuration module given through `ecosystemArgs` is
-          # recorded as the one module it is.
+          # recorded as a single module.
           modules =
             (
               if (args.ecosystemArgs or null) != null && args.ecosystemArgs ? configuration then
@@ -538,8 +538,8 @@
       # A home-manager configuration is published as
       # `homeConfigurations.<name>`, the evaluated home-manager
       # configuration, which is what the home-manager CLI reads. A
-      # home-manager configuration beneath a NixOS or darwin
-      # configuration is named `<user>@<host>`, the name it is passed up
+      # home-manager configuration declared inside a NixOS or darwin
+      # configuration is named `<user>@<machine>`, the name it is passed up
       # under and the name that machine is declared under, which is
       # where the CLI looks (`$USER@$(hostname)`); a home-manager
       # configuration with no machine above it keeps its name.
@@ -550,14 +550,14 @@
           { name, manifest }:
           let
             machine = final.caisson.integrations.nearestOf machineTypes manifest;
-            host = if machine == null then null else machine.name or null;
+            machineName = if machine == null then null else machine.name or null;
           in
-          if host == null then
+          if machineName == null then
             { value = name; }
           else
             {
-              value = "${name}@${host}";
-              description = "named ${name}@${host} from its name and the name of the ${
+              value = "${name}@${machineName}";
+              description = "named ${name}@${machineName} from its name and the name of the ${
                 { nixos = "NixOS"; }.${machine.type} or machine.type
               } configuration it is under";
             };
@@ -632,8 +632,8 @@
           };
           type = "home-manager";
           # A home-manager configuration is evaluated per system: it
-          # has an evaluation for every system in force where it is
-          # declared.
+          # has an evaluation for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -660,7 +660,7 @@
         # A home-manager configuration that is a top, as the
         # home-manager CLI reads it: the evaluated home-manager
         # configuration, with its `activationPackage`. Where the
-        # composition has several systems in force, it is the evaluated
+        # composition declares several systems, it is the evaluated
         # home-manager configurations by system, and where it has none,
         # the empty set (`integrations.topValue`).
         top = selection.topValue;
@@ -670,7 +670,7 @@
         # and `mkTopConfiguration` finalizes it at a top.
         # `lib.caisson.home-manager-minimal` takes the same arguments.
         # The home-manager configuration is evaluated per system, once
-        # for each system in force where it is declared, and its
+        # for each system its parent evaluates its children for, and its
         # package sets come from the composition, through the manifest;
         # `defaultPkgs` selects the set it runs on.
         mkConfiguration =
@@ -694,7 +694,7 @@
             # config name, each for the system of the evaluation, and
             # returns the set to run on. When absent, the selection of
             # the nearest
-            # configuration above, which beneath a NixOS configuration
+            # configuration above, which inside a NixOS configuration
             # is the set of that configuration, and the set named
             # `default` where none above selects.
             defaultPkgs ? null,

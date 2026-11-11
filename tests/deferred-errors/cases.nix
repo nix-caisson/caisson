@@ -254,7 +254,7 @@ in
           }
         )
       )).argsNeeded;
-    message = "the resource at selfish reads its own outputs in its";
+    message = "the resource at selfish reads its outputs in its";
   };
 
   # A member is a composite or a resource.

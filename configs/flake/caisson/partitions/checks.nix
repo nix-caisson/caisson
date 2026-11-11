@@ -13,7 +13,7 @@
       { inputs, self, ... }:
       let
         # The inputs of the system-manager tests: the dependency pool
-        # with `caisson` set to this tree.
+        # with `caisson` set to this flake.
         testInputs = inputs // {
           caisson = self;
         };
@@ -119,8 +119,8 @@
 
             pkgs = inputs.nixpkgs.legacyPackages.${system};
 
-            # Imported directly (not via lib) because a partition's
-            # inputs.self is the extra-inputs flake, not caisson itself.
+            # The `inputs.self` of a partition is the extra-inputs flake,
+            # so the overlay is imported from the source tree of caisson.
             evalWeight = import (self.outPath + "/lib-overlays/tooling/eval-weight") {
               lib = pkgs.lib;
             };
@@ -176,7 +176,7 @@
                   assert !(self ? debug);
                   pkgs.runCommand "debug-disabled" { } "touch $out";
                 # The pinned-world suite, forced at evaluation time: the
-                # tree itself composed with the upstream pins of
+                # caisson itself composed with the upstream pins of
                 # tests/dependencies, so the check evaluates caisson
                 # against the committed world. The drift workflow builds
                 # this check alone over advanced pins.
@@ -191,7 +191,7 @@
                   builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
                 # The manifest file of a hjem configuration inside a NixOS
                 # machine and the units that activate it, built. Building
-                # the manifest file checks it against hjem's own schema
+                # the manifest file checks it against the schema of hjem
                 # with `cue vet`, so the file the machine activates is one
                 # hjem's CLI accepts. Building the units runs shellcheck
                 # on their scripts.
@@ -326,7 +326,7 @@
                     # composed lib, since the raw scenario's flake-parts is
                     # built over the plain nixpkgs lib and is not shared,
                     # and the evaluation of the structural configuration
-                    # caisson's flake top holds beneath it, which reading
+                    # declared inside caisson's flake top, which reading
                     # caisson's outputs pays.
                     {
                       name = "caisson-overhead";
@@ -415,7 +415,7 @@
         # A macOS machine declared through the darwin integration, built:
         # the system `darwin-rebuild` would build for it. It is the only
         # check for aarch64-darwin. The pinned-world suite evaluates the
-        # same machine on any host; building it needs a darwin builder,
+        # same machine on a Linux or macOS machine; building it needs a darwin builder,
         # so the darwin job of the workflow builds it on a macOS runner.
         flake.checks.aarch64-darwin.darwin-system =
           let

@@ -2,11 +2,11 @@
 #
 # The nvf integration: it owns the `nvf` class, the class of nvf's
 # modules. An nvf configuration is a Neovim, written as nvf modules
-# (`vim.*`), evaluated per system, once for each system in force where it is declared,
+# (`vim.*`), evaluated per system, once for each system its parent evaluates its children for,
 # on the package set selected for it.
 #
 # nvf evaluates its modules with `neovimConfiguration`, on nixpkgs'
-# library extended with nvf's own, `lib.nvim`. caisson evaluates the
+# library extended with the library of nvf, `lib.nvim`. caisson evaluates the
 # same modules, nvf's `modules/modules.nix`, with the special arguments
 # `neovimConfiguration` passes (`self` and `inputs`, the nvf flake, and
 # `modulesPath`), on the composed library extended with `lib.nvim`
@@ -18,7 +18,7 @@
 # `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration`
 # returns: `neovim`, `config` and `options`.
 #
-# An nvf configuration is kept in a Nix profile of its own, the way a
+# An nvf configuration is kept in a separate Nix profile, the way a
 # home-manager configuration keeps its generations
 # (`lib.caisson.integrations.profileOf`): its output
 # `activationPackage` holds `activate`, which points the profile at the
@@ -218,7 +218,7 @@
           };
           type = "nvf";
           # An nvf configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;

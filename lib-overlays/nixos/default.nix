@@ -70,8 +70,8 @@
       # The evaluator's call, on the view being evaluated: eval-config
       # over the composition, for the configuration's system.
       # `baseModules` is passed where the entry point names NixOS'
-      # module list itself. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last.
+      # module list itself. `ecosystemArgs`, which only the pattern of
+      # the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         { explicitBaseModules }:
         args: view:
@@ -82,7 +82,7 @@
             specialArgs = common.specialArgs;
             # `nixos/lib/eval-config.nix` of the nixpkgs source
             # defaults `lib` to `import ../../lib`, the library of the
-            # tree it lives in. Naming it makes the composed library
+            # source tree it lives in. Naming it makes the composed library
             # what the evaluation runs on: its `evalModules`, its
             # merging and its type checking, and the library the
             # result publishes as `.lib`.
@@ -139,7 +139,7 @@
           };
           type = "nixos";
           # A NixOS configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation for each system its parent evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -155,8 +155,8 @@
         # A NixOS configuration that is a top, as a tool reads it: the
         # evaluated configuration, which is what `nixos-rebuild --file`
         # reads and what a test or the REPL evaluates with no
-        # configuration above it. Where the composition has several
-        # systems in force, it is the evaluated configurations by
+        # configuration above it. Where the composition declares several
+        # systems, it is the evaluated configurations by
         # system, and where it has none, the empty set: the evaluations
         # are named as anything published is (`integrations.topValue`).
         # Its name is the name the composition declares on mkLib.
@@ -168,8 +168,8 @@
         # `mkTopConfiguration` finalizes it at a top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # configuration is evaluated per system, once for each system in force where it
-        # is declared, and its package sets come from the composition,
+        # configuration is evaluated per system, once for each system its
+        # parent evaluates its children for, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.
         mkConfiguration =
@@ -192,8 +192,9 @@
             # each for the system of the evaluation, and returns the
             # set to run on. `defaultPkgs = pkgSets: pkgSets.stable;`
             # selects the set of the package config named `stable`.
-            # The selection holds for every configuration beneath this
-            # one that selects none. When absent, the selection of the
+            # A configuration declared inside this configuration runs on
+            # it unless it or a configuration between them selects
+            # another. When absent, the selection of the
             # nearest configuration above, and the set named `default`
             # where none above selects.
             defaultPkgs ? null,

@@ -8,15 +8,15 @@
 # machines colmena deploys the way any configuration declares NixOS
 # configurations, under `caisson.nixos.configurations.<name>`.
 #
-# The nodes are the NixOS configurations passed up from beneath the
-# colmena configuration, each under the name it is published under.
+# The nodes are the NixOS configurations declared inside the colmena
+# configuration and passed up to it, each under the name it is published under.
 # The default module of the class adds caisson's `colmena-deployment`
 # NixOS module to those configurations, which declares colmena's
 # `deployment` options; the integration reads `deployment` back from
 # each node and builds the hive: the small versioned attribute set
-# (the hive schema) that colmena's command reads. The integration is
-# not compatible with colmena's hive modules (`makeHive`, `defaults`,
-# `meta.nixpkgs`): every node is an evaluated NixOS configuration.
+# (the hive schema) that colmena's command reads. Every node is an
+# evaluated NixOS configuration, so settings written for colmena's
+# `makeHive`, such as `defaults` and `meta.nixpkgs`, do not apply here.
 #
 # A colmena configuration is published as `colmenaHive`, an output that
 # holds a single value, so the configuration declared under the name of
@@ -108,8 +108,8 @@
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
 
       # A machine colmena deploys is one evaluation. A NixOS
-      # configuration with several systems in force is evaluated per
-      # system, and publishing would make each evaluation a node. The
+      # configuration whose parent evaluates its children for several
+      # systems is evaluated per system, and publishing would make each evaluation a node. The
       # machines evaluated more than once, each with its name and its
       # systems: the NixOS entries grouped by their path without the
       # system segments, where a group has more than one entry.
@@ -135,9 +135,9 @@
       # configurations among the entries the colmena configuration
       # passes up that belong to it (`integrations.belongsHere`), those
       # with no NixOS configuration between them and the colmena
-      # configuration. A machine beneath a disk layout or a structural
+      # configuration. A machine declared inside a disk layout or a structural
       # group is a node. A NixOS configuration declared inside a node,
-      # such as an image, belongs to the node and is not one. A node is
+      # such as an image, belongs to the node and is not a node. A node is
       # refused when it has more than one evaluation, when colmena could
       # not select it, and when it does not declare the `deployment`
       # options colmena reads.
@@ -160,7 +160,7 @@
                 lib.caisson.caisson-colmena: the node `${name}` declares no `deployment` options,
                 which colmena reads. A NixOS configuration declared inside a colmena
                 configuration gets them from caisson's `colmena-deployment` module by
-                default; one that passes `moduleImports` lists that module itself.
+                default; a configuration that passes `moduleImports` lists that module itself.
               '';
         in
         if repeated != [ ] then
@@ -172,7 +172,7 @@
                 machine: "  `${machine.name}`, for ${builtins.concatStringsSep ", " machine.systems}"
               ) repeated
             )}
-            Declare each machine where a single system is in force.
+            Declare each machine inside a configuration that evaluates its children for a single system.
           ''
         else if bad == [ ] then
           builtins.mapAttrs checked published
@@ -233,8 +233,8 @@
       # the options of the class, the framework modules of the class, the
       # selection and the configuration's module, with the composition's
       # dependencies as the `inputs` special argument. `ecosystemArgs`,
-      # which only the twin's pattern admits, is merged over the call
-      # last.
+      # which only the pattern of the `WithEcosystemArgs` variant admits,
+      # is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -344,8 +344,8 @@
             # special argument; `colmena eval` needs `pkgSets.pkgs`
             # and reports the miss.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,
