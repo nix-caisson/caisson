@@ -252,6 +252,15 @@
                     caisson = self;
                   };
                 };
+                # A machine booted in a VM that installs the packages of
+                # the home-manager configurations that set
+                # `caisson.useUserPackages`, through switches and a boot
+                # (tests/user-packages-vm).
+                user-packages-vm = import (self.outPath + "/tests/user-packages-vm") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the

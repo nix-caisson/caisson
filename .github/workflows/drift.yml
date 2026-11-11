@@ -38,6 +38,7 @@ jobs:
       - run: nix build -L '.#checks.x86_64-linux.hjem-system'
       - run: nix build -L '.#checks.x86_64-linux.drift-message'
       - run: nix build -L '.#checks.x86_64-linux.activation-vm'
+      - run: nix build -L '.#checks.x86_64-linux.user-packages-vm'
       - run: nix build -L '.#checks.x86_64-linux.system-manager-vm-ubuntu-22_04'
       - run: nix build -L '.#checks.x86_64-linux.system-manager-vm-debian-12'
   system-manager-container:
