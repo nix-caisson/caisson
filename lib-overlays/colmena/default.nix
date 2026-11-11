@@ -170,8 +170,8 @@
         let
           # The nodes as the `nodes` special argument: the NixOS
           # configurations declared inside this colmena configuration,
-          # each evaluated, from the full evaluation of this
-          # configuration. A node reads that evaluation through
+          # each evaluated, from the result of the full evaluation of
+          # this configuration. A node reads that evaluation result through
           # `unsafeCrossChildReferences`, set below, which records the
           # read on each node; it is the configuration this module runs
           # in, so its manifest here holds the same children.
@@ -196,7 +196,7 @@
           ) hive.nodes;
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the `meta` options, the framework modules of the class, the
       # selection and the module made from the hive, with the
       # composition's dependencies as the `inputs` special argument.

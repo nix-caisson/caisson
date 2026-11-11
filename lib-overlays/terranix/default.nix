@@ -54,7 +54,7 @@
         else
           throw "${context} requires `ecosystemSrc.lib.terranixConfiguration`.";
 
-      # The evaluator's call, on the view being evaluated:
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with:
       # `terranixConfiguration` over the framework modules, the
       # selection and the configuration's module, on the package set
       # selected for the configuration. `ecosystemArgs`, which only the
@@ -148,8 +148,8 @@
           ++ moduleList;
           # What Terraform reads: the `config.tf.json` file.
           outputs.json = value;
-          # caisson's options, from `_meta`. terranix keeps the options
-          # of the evaluation to itself, so no configurations can be
+          # caisson's options, from `_meta`. terranix keeps the evaluated
+          # options to itself, so no configurations can be
           # declared inside a terranix configuration.
           config.caisson = value._meta.caisson;
           options = { };
@@ -171,7 +171,8 @@
           };
           type = "terranix";
           # A terranix configuration is evaluated per system: it has an
-          # evaluation for each system its parent evaluates its children for.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -202,8 +203,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

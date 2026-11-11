@@ -19,8 +19,8 @@
     description = ''
       Whether `activate` of this configuration prints a warning when the
       configuration was built for a version of the configuration it is
-      declared inside, such as a home-manager configuration or a
-      machine, that differs from the version that is applied.
+      declared inside, such as a home-manager configuration or a NixOS
+      configuration, that differs from the version that is applied.
     '';
   };
 }

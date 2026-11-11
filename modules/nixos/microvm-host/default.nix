@@ -29,9 +29,9 @@
 # into the units `microvm@<guest>.service` and the working directories
 # of the guests under `microvm.stateDir`.
 #
-# The guests are read in the evaluation of the host that holds them.
-# In the evaluation without the configurations declared inside it,
-# which the guests read, the host has no guests.
+# The module reads the guests in the full evaluation of the host. The
+# guests read the result of the childless evaluation of the host, and
+# there the host has no guests.
 { ... }:
 {
   config,
@@ -138,7 +138,7 @@ in
       assertion = config.microvm.vms.${name}.config == null && config.microvm.vms.${name}.flake == null;
       message = ''
         The guest `${name}` of this host is a configuration declared inside it, and
-        caisson's `microvm-host` NixOS module gives microvm.nix its evaluation as
+        caisson's `microvm-host` NixOS module gives microvm.nix its evaluation result as
         `microvm.vms.${name}.evaluatedConfig`. Leave `microvm.vms.${name}.config`
         and `microvm.vms.${name}.flake` unset.
       '';

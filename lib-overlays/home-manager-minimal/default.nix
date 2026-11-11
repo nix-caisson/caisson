@@ -7,7 +7,7 @@
 # registration form and its composition belong to
 # `lib.caisson.home-manager`. A configuration evaluated here imports
 # the modules it uses itself, from the `modulesPath` special argument
-# the evaluation supplies.
+# the integration supplies.
 { mkLibOverlay, ... }:
 {
 
@@ -28,8 +28,8 @@
         final.caisson.home-manager
           or (throw "lib.caisson.home-manager-minimal evaluates the homeManager class and needs the home-manager integration composed beside it.");
 
-      # Among the nested configurations, an evaluation of an alt is a configuration of the
-      # integration that owns the class: it is declared under
+      # A configuration this alt integration makes is a configuration
+      # of the integration that owns the class: it is declared under
       # `caisson.home-manager.configurations` and published where
       # home-manager configurations are.
       configuration = over.configuration {

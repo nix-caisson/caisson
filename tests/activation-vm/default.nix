@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS test of what a machine activates, run in a VM, through
-# sequences of changes at each level that activates something: the
-# home-manager configurations, the hjem configurations and the profiles
-# declared inside the machine, and a standalone hjem configuration.
+# A NixOS test of what a NixOS configuration activates, run in a VM,
+# through sequences of changes at each level that activates something:
+# the home-manager configurations, the hjem configurations and the
+# profiles declared inside the NixOS configuration, and a standalone
+# hjem configuration.
 # `inputs` is the dependency pool of the checks partition with `caisson`
 # set to the source of this repository.
 #
@@ -11,14 +12,14 @@
 # has `vim` beside `nvim` and `vi`, and a file of each home-manager
 # configuration and each hjem configuration names the version.
 #
-# The machine declares, in v1 (`declarationsOf` below), the profiles of
+# The NixOS configuration declares, in v1 (`declarationsOf` below), the profiles of
 # the system `editor` and `retired`, a hjem configuration for `alice`
 # with a profile inside it, and the home-manager configurations of
 # `carol` and `dave`, each with a profile inside it. The specialisation
 # `v2` declares v2, which drops `retired` and adds the home-manager
-# configuration of `erin`. The test boots the machine, switches to v2
-# and back, and checks after each step that the profiles, the files and
-# the units are those of the version the machine runs, and that the
+# configuration of `erin`. The test boots the VM, switches to v2 and
+# back, and checks after each step that the profiles, the files and the
+# units are those of the version the VM runs, and that the
 # profile of a removed configuration stays where it was. It checks that a
 # switch puts the profile of `alice` back after it is changed by hand,
 # and that a boot puts the profiles of the system and of `carol` back.
@@ -33,7 +34,7 @@
 #
 # The user `bob` has a hjem configuration that is a top, with the nvf
 # configuration `standalone-editor` inside it, applied with
-# `hjem standalone switch`, as on a machine that caisson does not
+# `hjem standalone switch`, as on a computer that caisson does not
 # manage. The test applies v1, which activates nothing until the
 # systemd of `bob` reads the units in the files of `bob`, starts that systemd
 # again as a login does, and then switches to v2, rolls back with
@@ -44,9 +45,10 @@
 #
 # The NixOS test framework evaluates its nodes itself, with the
 # `eval-config.nix` of nixpkgs, and a node is a NixOS module. The node
-# here is evaluated on the library of a caisson evaluation of the same
-# machine, passed through `node.specialArgs`, so the modules of caisson
-# find `lib.caisson` and the manifest of the machine. The node imports
+# here is evaluated on the library that caisson evaluates the same
+# NixOS configuration with, passed through `node.specialArgs`, so the
+# modules of caisson find `lib.caisson` and the manifest of the NixOS
+# configuration. The node imports
 # what caisson's NixOS evaluator imports from the registry: the
 # framework modules of the class and caisson's `default` module.
 { inputs }:
@@ -126,7 +128,7 @@ let
   # A Nix file that evaluates to the manifest of `bob` in a version. The
   # JSON is written into the file as a Nix string, so the file refers to
   # the store paths of the manifest, which keeps them in the closure of
-  # the machine, and evaluating it inside the machine needs nothing else.
+  # the system, and evaluating it inside the VM needs nothing else.
   bobNix =
     version:
     pkgs.writeText "manifest-bob-${version}.nix" ''
@@ -193,7 +195,7 @@ let
         };
     }).activationPackage;
 
-  # What the machine declares in a version. The specialisation `v2`
+  # What the NixOS configuration declares in a version. The specialisation `v2`
   # replaces each set of configurations whole, which also removes what
   # v1 has and v2 has not:
   #
@@ -202,7 +204,7 @@ let
   # - the hjem configuration of `alice` with the nvf configuration
   #   `hjem-editor` inside it;
   # - the home-manager configurations of `carol`, whose account the
-  #   machine declares, and of `dave`, whose account is declared
+  #   NixOS configuration declares, and of `dave`, whose account is declared
   #   elsewhere, and in v2 alone the home-manager configuration of
   #   `erin`.
   declarationsOf =
@@ -233,13 +235,14 @@ let
       );
     };
 
-  # The machine: v1 of the declarations, the accounts of `alice`, `bob`,
-  # `carol` and `erin`, the hjem CLI, and the manifests of `bob`. `bob`
-  # lingers, so the systemd of `bob` runs without a login. The account
-  # of `dave` is declared elsewhere: the test creates it, as
-  # systemd-homed or a directory service would provide it. `editor` is
-  # the profile `nvim` runs where several share its variable.
-  machine =
+  # The module of the NixOS configuration: v1 of the declarations, the
+  # accounts of `alice`, `bob`, `carol` and `erin`, the hjem CLI, and the
+  # manifests of `bob`. `bob` lingers, so the systemd of `bob` runs
+  # without a login. The account of `dave` is declared elsewhere: the
+  # test creates it, as systemd-homed or a directory service would
+  # provide it. `editor` is the profile `nvim` runs where several share
+  # its variable.
+  nixosModule =
     { lib, ... }:
     {
       config = lib.mkMerge [
@@ -287,15 +290,15 @@ let
       ];
     };
 
-  # The library of the caisson evaluation of the machine, which holds
-  # the manifest of that evaluation. A module of the evaluation hands
-  # the library out through an option.
-  machineLib =
+  # The library caisson evaluates the NixOS configuration with, which
+  # holds its manifest. A module of the NixOS configuration hands the
+  # library out through an option.
+  nixosLib =
     (lib.caisson.nixos.mkTopConfiguration {
       configModule =
         { lib, ... }:
         {
-          imports = [ machine ];
+          imports = [ nixosModule ];
           options.profileVmLib = lib.mkOption { type = lib.types.raw; };
           config = {
             profileVmLib = lib;
@@ -309,7 +312,7 @@ let
         };
     }).config.profileVmLib;
 
-  registry = machineLib.caisson.modules.nixos;
+  registry = nixosLib.caisson.modules.nixos;
 
   profile = "/nix/var/nix/profiles/caisson/nvf/editor";
   aliceProfile = "/home/alice/.local/state/caisson/profiles/nvf/hjem-editor";
@@ -318,20 +321,20 @@ in
 pkgs.testers.runNixOSTest {
   name = "caisson-activation-vm";
 
-  node.specialArgs.lib = machineLib;
+  node.specialArgs.lib = nixosLib;
 
   nodes.machine = {
-    imports = machineLib.caisson.integrations.frameworkModules "nixos" registry ++ [
+    imports = nixosLib.caisson.integrations.frameworkModules "nixos" registry ++ [
       registry."caisson/default"
-      machine
+      nixosModule
     ];
     system.stateVersion = "25.05";
-    # The test switches the machine, which the test framework leaves
-    # out of a node by default.
+    # The test switches the VM to another generation, which the test
+    # framework leaves out of a node by default.
     system.switch.enable = true;
-    # The test boots the machine again, and what the first boot added to
+    # The test boots the VM again, and what the first boot added to
     # the store, such as the environments of the home-manager
-    # configurations, must still be there, as on a machine whose store
+    # configurations, must still be there, as on a computer whose store
     # is on its disk.
     virtualisation.writableStoreUseTmpfs = false;
     specialisation.v2.configuration = { lib, ... }: declarationsOf "v2" lib;
@@ -381,7 +384,7 @@ pkgs.testers.runNixOSTest {
       def switch_to(toplevel):
           machine.succeed(f"{toplevel}/bin/switch-to-configuration test")
 
-      # Everything the machine activates is in `version`: the profile of
+      # Everything the NixOS configuration activates is in `version`: the profile of
       # the system, the hjem configuration of `alice`, the home-manager
       # configurations of `carol` and `dave`, and the profiles inside
       # them.
@@ -391,8 +394,8 @@ pkgs.testers.runNixOSTest {
               holds(profile_of(user, name), version)
               has_file(user, version)
 
-      # The machine boots in v1. The account of `dave`, which the machine
-      # does not declare, is created, and lingers, so the service manager
+      # The VM boots in v1. The account of `dave`, which the NixOS
+      # configuration does not declare, is created, and lingers, so the service manager
       # of `dave` starts and activates the home-manager configuration
       # with its user unit.
       #
@@ -423,7 +426,7 @@ pkgs.testers.runNixOSTest {
       restored = target_of(profile_of("alice", "hjem-editor"))
       assert restored == alice_declared, f"the profile of alice is {restored}, not {alice_declared}"
 
-      # The machine switches to v2: everything follows, the unit of the
+      # The VM switches to v2: everything follows, the unit of the
       # removed profile `retired` is gone, and the added home-manager
       # configuration of `erin` is activated. The profile `retired`
       # itself stays, with the Neovim of v1, until someone deletes it.
@@ -514,7 +517,7 @@ pkgs.testers.runNixOSTest {
       assert restored == frank_declared, f"the profile of frank is {restored}, not {frank_declared}"
 
       # The profiles of the system and of `carol` are put back when the
-      # machine boots.
+      # VM boots.
       change_by_hand("${profile}", "root")
       change_by_hand(profile_of("carol", "home-editor"), "carol")
       machine.shutdown()

@@ -7,8 +7,8 @@
 # nor a configuration between selects another; and the systems that
 # configurations evaluated per system are evaluated for. This
 # configuration is not among those they are given to. They are read
-# from the childless view, which the configurations declared inside it
-# are built against.
+# from the result of the childless evaluation, which the configurations
+# declared inside it are built against.
 { lib, ... }:
 {
   options.caisson.forChildren = {
@@ -71,8 +71,8 @@
         The systems the configurations declared inside this
         configuration are evaluated for. It applies to configurations that are
         evaluated per system, such as a NixOS configuration or a
-        home-manager configuration: each gets one evaluation per
-        system listed.
+        home-manager configuration: each gets an evaluation result for
+        each system listed.
 
         When null, a configuration that is itself evaluated per
         system has its children evaluated for its system only, so a
@@ -97,12 +97,13 @@
       description = ''
         By class, whether the configurations of that class declared
         inside this configuration, however many configurations lie
-        between, read the full evaluation of this configuration, with
-        its children, in place of the childless view of their parent
+        between, read the result of the full evaluation of this
+        configuration, with its children, in place of the result of the
+        childless evaluation of their parent
         (`lib.caisson-core.evalManifest.crossChildLevel`). They can
         then read any configuration declared inside this configuration,
         and a loop between them is a Nix infinite recursion, which the
-        childless view otherwise rules out.
+        childless evaluation otherwise rules out.
 
         A setting through `caisson.forDirectChildren` beats a setting
         through `caisson.forNearestChildren`, which beats a setting

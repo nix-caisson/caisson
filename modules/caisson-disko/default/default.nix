@@ -7,7 +7,7 @@
 # `caisson-disko-layout`, which gives a NixOS configuration the
 # `fileSystems`, `boot` and `swapDevices` of the layout, to the modules
 # that such a NixOS configuration imports by default. A NixOS
-# configuration declared inside one of those machines, such as an
+# configuration declared inside one of those NixOS configurations, such as an
 # image, is not installed onto the layout and does not get it. A NixOS
 # configuration that passes `moduleImports` selects its modules
 # itself, and then it lists `caisson-disko-layout` itself, as

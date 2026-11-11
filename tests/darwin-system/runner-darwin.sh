@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 #
-# Activates the macOS machine `runnerMachineOf` of tests/darwin-system
-# on a macOS machine, through a sequence of changes, and checks after
-# each step the profile of the system, the files of the machine, of the
-# home-manager configuration of `runner` and of the hjem configuration
+# Activates the nix-darwin configuration `runnerDarwinOf` of
+# tests/darwin-system on a macOS machine, through a sequence of changes,
+# and checks after each step the profile of the system, the files of the
+# nix-darwin configuration, of the home-manager configuration of
+# `runner` and of the hjem configuration
 # of `runner`, and the profile inside the hjem configuration. The
 # Neovims of v2 have `vim`, those of v1 have not, and each file names
 # the version.
@@ -15,12 +16,13 @@
 # - the profile of `runner` and the profile of the system are changed by
 #   hand, and activating v1 again puts the profiles back;
 # - the activation of the home-manager configuration in v2 is run by
-#   hand while the machine runs v1, which warns of the drift and applies
+#   hand while the runner runs v1 of the nix-darwin configuration, which
+#   warns of the drift and applies
 #   the home-manager configuration, and the activation of the
 #   home-manager configuration in v1 is run by hand, which is quiet.
 #
 # The argument is the output of the check `darwin-system`, which holds
-# the systems of the machine under `runner-machine`. The workflow runs
+# the systems of the nix-darwin configuration under `runner-darwin`. The workflow runs
 # this script on its macOS runner, as the logged-in user `runner`, who
 # may use `sudo`. Activating changes the runner: it is a machine the
 # workflow discards.
@@ -39,7 +41,7 @@ fail() {
 
 # Waits up to a minute for the profile at `$1` to hold the Neovim of the
 # version `$2`. hjem's agent and the activation of the profiles of
-# `runner` run after the activation of the machine returns.
+# `runner` run after the activation of the nix-darwin configuration returns.
 holds() {
   local path="$1" version="$2"
   for _ in $(seq 60); do
@@ -76,17 +78,17 @@ is_at() {
 }
 
 activate() {
-  sudo "$out/runner-machine/$1/activate"
+  sudo "$out/runner-darwin/$1/activate"
 }
 
 # nix-darwin replaces only the files in /etc it wrote itself; the files
 # of macOS it would replace are renamed first, as its message asks.
 while IFS= read -r -d '' link; do
-  sub="${link#"$out/runner-machine/v1/etc/"}"
+  sub="${link#"$out/runner-darwin/v1/etc/"}"
   if [ -e "/etc/$sub" ] && [ "$(readlink "/etc/$sub")" != "/etc/static/$sub" ]; then
     sudo mv "/etc/$sub" "/etc/$sub.before-nix-darwin"
   fi
-done < <(find -H "$out/runner-machine/v1/etc" -type l -print0)
+done < <(find -H "$out/runner-darwin/v1/etc" -type l -print0)
 
 activate v1
 is_at v1
@@ -99,8 +101,9 @@ is_at v2
 activate v1
 is_at v1
 
-# Profiles changed by hand are put back when the machine is activated.
-other="$out/runner-machine/v1"
+# Profiles changed by hand are put back when the nix-darwin
+# configuration is activated.
+other="$out/runner-darwin/v1"
 nix-env --profile "$user_profile" --set "$other"
 sudo nix-env --profile "$system_profile" --set "$other"
 [ ! -e "$user_profile/bin/nvim" ] || fail "changing the profile of runner by hand left nvim in it"
@@ -111,22 +114,23 @@ is_at v1
 [ "$(readlink -f "$user_profile")" = "$user_declared" ] || fail "the profile of runner was not put back"
 
 # The activation of the home-manager configuration in v2, run by hand
-# while the machine runs v1, warns that the home-manager configuration
-# was built for another version of the machine, and applies the
+# while the runner runs v1 of the nix-darwin configuration, warns that
+# the home-manager configuration was built for another version of the
+# nix-darwin configuration, and applies the
 # home-manager configuration. The activation of the home-manager
 # configuration in v1 is quiet.
-printed="$("$out/runner-machine/home-v2/activate" 2>&1)" \
+printed="$("$out/runner-darwin/home-v2/activate" 2>&1)" \
   || fail "the activation of the home-manager configuration in v2 failed: $printed"
 case "$printed" in
   *"was built for a version of the darwin configuration"*) ;;
   *) fail "the activation of the home-manager configuration in v2 printed no warning: $printed" ;;
 esac
 names "$home_file" v2
-printed="$("$out/runner-machine/home-v1/activate" 2>&1)" \
+printed="$("$out/runner-darwin/home-v1/activate" 2>&1)" \
   || fail "the activation of the home-manager configuration in v1 failed: $printed"
 case "$printed" in
   *WARNING*) fail "the activation of the home-manager configuration in v1 warned: $printed" ;;
 esac
 names "$home_file" v1
 
-echo "the machine activates its profiles, its home-manager configuration and the hjem configuration of runner through each activation"
+echo "the nix-darwin configuration activates its profiles, its home-manager configuration and the hjem configuration of runner through each activation"

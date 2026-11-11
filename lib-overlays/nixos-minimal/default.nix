@@ -29,17 +29,18 @@
         final.caisson.nixos
           or (throw "lib.caisson.nixos-minimal evaluates the nixos class and needs the nixos integration composed beside it.");
 
-      # The evaluator's call, on the view being evaluated: `evalModules`
-      # from nixos/lib over the composition of the nixos class.
-      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
-      # variant admits, is merged over the call last.
+      # The evaluator's call, on the lib and manifest the configuration
+      # is evaluated with: `evalModules` from nixos/lib over the
+      # composition of the nixos class. `ecosystemArgs`, which only the
+      # pattern of the `WithEcosystemArgs` variant admits, is merged over
+      # the call last.
       evaluate =
-        args: view:
+        args: given:
         let
           common = over.compose {
             context = "lib.caisson.nixos-minimal.mkConfiguration";
             nixpkgsModule = false;
-          } view args;
+          } given args;
           callArgs = {
             prefix = if (args.prefix or null) == null then [ ] else args.prefix;
             modules = common.modules;
@@ -75,8 +76,8 @@
             class = "nixos";
             inherit args;
           };
-          # Among the nested configurations, an evaluation of an alt is
-          # a configuration of the integration that owns the class: it
+          # A configuration this alt integration makes is a
+          # configuration of the integration that owns the class: it
           # is declared under `caisson.nixos.configurations`, published
           # where NixOS configurations are, and `nearest.nixos` for the
           # configurations declared inside it.

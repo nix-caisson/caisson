@@ -7,7 +7,7 @@
 # `caisson-facter-hardware`, which hands the facter report to nixpkgs'
 # `hardware.facter` module, to the modules that such a NixOS
 # configuration imports by default. A NixOS configuration declared
-# inside one of those machines, such as an image or a guest, does not
+# inside one of those NixOS configurations, such as an image or a guest, does not
 # run on that hardware and does not get it. A NixOS configuration that
 # passes `moduleImports` selects its modules itself, and then it lists
 # `caisson-facter-hardware` itself, as

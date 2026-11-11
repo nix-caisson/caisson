@@ -3,7 +3,7 @@
 # A home-manager module with which a home-manager configuration records
 # what it applied, so that the configurations declared inside it can
 # detect drift. It is the counterpart, for a home-manager
-# configuration, of the machine module `activation-marker`: see there
+# configuration, of the NixOS module `activation-marker`: see there
 # for why.
 #
 # A step of the activation of the home-manager configuration writes the

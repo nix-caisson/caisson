@@ -14,7 +14,7 @@
 { ... }:
 { lib, ... }:
 let
-  machines =
+  microvmConfiguration =
     lib.caisson-core.evalManifest.nearest.caisson-microvm or (throw ''
       caisson's `microvm-guest` NixOS module imports microvm.nix's guest module from
       the source of the caisson-microvm configuration it is declared inside, and
@@ -25,5 +25,5 @@ in
 {
   _file = "caisson:microvm-guest";
 
-  imports = [ "${machines.outputs.ecosystemSrc}/nixos-modules/microvm" ];
+  imports = [ "${microvmConfiguration.outputs.ecosystemSrc}/nixos-modules/microvm" ];
 }

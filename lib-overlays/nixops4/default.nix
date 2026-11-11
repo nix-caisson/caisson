@@ -126,8 +126,9 @@
       # configurations declared inside it. The members are computed
       # from the definitions of `members`, since its value is the
       # members' configs: in the full evaluation those of the members
-      # the composite finalized (`finalized`), and in the childless view
-      # those of the full evaluation, which the composite reads through
+      # the composite finalized (`finalized`), and in the childless
+      # evaluation those in the result of the full evaluation, which the
+      # composite reads through
       # `unsafeCrossChildReferences`.
       membersModule =
         ctx:

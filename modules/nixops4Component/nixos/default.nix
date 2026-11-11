@@ -30,7 +30,7 @@
 let
   manifest = lib.caisson-core.evalManifest;
   usesNixos = options ? nixos && options.nixos ? module;
-  machine = lib.caisson.caisson-nixops4-resource.machineOf {
+  nixos = lib.caisson.caisson-nixops4-resource.machineOf {
     context = "caisson's `nixos` module of the nixops4Component class";
     resource = manifest.name;
     declared = config.caisson.nixos.configurations;
@@ -47,7 +47,7 @@ in
     };
     # nixops4-nixos builds `nixos.configuration` with this call.
     nixpkgs = lib.mkForce {
-      lib.nixosSystem = _: machine.value;
+      lib.nixosSystem = _: nixos.value;
     };
     inputs.executable = lib.mkForce bash;
   };

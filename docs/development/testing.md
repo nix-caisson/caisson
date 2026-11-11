@@ -25,17 +25,18 @@ plumbing works.
 - **Scope:** caisson composed with concrete pinned versions of the upstream
   world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem,
   terranix, system-manager) and exercised end to end: a home-manager
-  configuration, a NixOS system with home-manager configurations
-  declared inside it, a colmena hive, disk layouts with the machines
-  installed onto them, a darwin machine evaluated for aarch64-darwin
-  with and without a home-manager configuration and a hjem
-  configuration inside it, hjem configurations declared
-  at the top of the flake and inside a NixOS machine, a terranix and a system-manager
-  configuration, and the composition guarantees of the real exported
-  overlays. The `hjem-system` check builds the manifest file of the hjem
-  configuration inside the machine, which checks it against hjem's
-  schema, and the units that activate it, which runs shellcheck on
-  their scripts. The two darwin machines of the suite are also the
+  configuration, a NixOS configuration with home-manager configurations
+  declared inside it, a colmena hive, disk layouts with the NixOS
+  configurations installed onto them, a nix-darwin configuration
+  evaluated for aarch64-darwin with and without a home-manager
+  configuration and a hjem configuration inside it, hjem configurations
+  declared at the top of the flake and inside a NixOS configuration, a
+  terranix and a system-manager configuration, and the composition
+  guarantees of the real exported overlays. The `hjem-system` check
+  builds the manifest file of the hjem configuration inside the NixOS
+  configuration, which checks it against hjem's schema, and the units
+  that activate it, which runs shellcheck on their scripts. The
+  nix-darwin configurations of the suite are also the
   check for aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in
@@ -81,7 +82,7 @@ plumbing works.
 - **Scope:** The text of the errors of deferred configurations and the
   NixOps4 integrations. A tool tells an arg it lacks from a failure by
   `caisson-deferred: needs <path>`, and `builtins.tryEval` in the
-  pinned-world suite sees only that an evaluation failed.
+  pinned-world suite sees only that the evaluation failed.
 - **Location:** `tests/deferred-errors/check.sh` and its cases in
   `tests/deferred-errors/cases.nix`.
 - **Mechanism:** the script runs `nix eval` on each case and looks for

@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MIT
 #
-# A darwin module with which a macOS machine activates the
+# A darwin module with which a nix-darwin configuration activates the
 # home-manager configurations declared inside it.
 #
 # Activating a home-manager configuration means running the `activate`
 # script of its activation package as the user of the home-manager
 # configuration. home-manager has a nix-darwin module that does this
 # for the home-manager configurations it embeds: a step of the
-# machine's `postActivation` script runs `activate` for each
+# `postActivation` script of the nix-darwin configuration runs `activate` for each
 # home-manager configuration, as its user, through `launchctl asuser`
 # and `sudo`. caisson does not use that nix-darwin module. A
 # home-manager configuration declared inside a darwin configuration is
@@ -20,9 +20,10 @@
 # if it lists this module.
 #
 # The module activates the home-manager configurations that this
-# darwin configuration passes up, leaving out those declared inside a
-# machine that is itself inside this machine, and those evaluated for
-# another system. It expects the machine to declare the account of the
+# nix-darwin configuration passes up, leaving out those declared inside
+# a NixOS, nix-darwin or system-manager configuration that is itself
+# declared inside this nix-darwin configuration, and those evaluated for
+# another system. It expects the nix-darwin configuration to declare the account of the
 # user of each home-manager configuration in `users.users`, as
 # home-manager's nix-darwin module does. It refuses a home-manager
 # configuration whose user has no account, and a home-manager
@@ -34,9 +35,9 @@
 # profile. home-manager's nix-darwin module passes `--driver-version 1`,
 # which leaves the profile alone.
 #
-# The module reads the home-manager configurations from the full
-# evaluation of the darwin configuration, so in the childless
-# evaluation it defines nothing.
+# The module reads the home-manager configurations from the result of
+# the full evaluation of the nix-darwin configuration, so in the
+# childless evaluation it defines nothing.
 { closure-lib, ... }:
 {
   config,
@@ -47,7 +48,7 @@
 let
   inherit (lib.caisson) evalManifest;
 
-  # True for an entry this machine activates. `entry.path` is the path
+  # True for an entry this nix-darwin configuration activates. `entry.path` is the path
   # from this darwin configuration to the configuration of the entry, a
   # list of `{ type, name }` segments.
   isActivatedHere =
@@ -79,7 +80,7 @@ let
   ) homeManagerConfigurations;
 
   # nix-darwin leaves the home directory of an account at `null` until
-  # the machine sets it, and a home-manager configuration needs a home directory.
+  # the nix-darwin configuration sets it, and a home-manager configuration needs a home directory.
   withoutHomeDirectory = builtins.filter (
     homeManagerConfiguration:
     config.users.users ? ${homeManagerConfiguration.username}
@@ -95,7 +96,7 @@ let
 
   # The step for a home-manager configuration: the step that the
   # nix-darwin module of home-manager writes, with `DRY_RUN` passed on
-  # when the machine is activated dry.
+  # when the nix-darwin configuration is activated dry.
   stepOf = homeManagerConfiguration: ''
     echo Activating home-manager configuration for ${homeManagerConfiguration.username} >&2
     hmDryRunArgs=()

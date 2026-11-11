@@ -4,9 +4,9 @@
 # owns the `caisson-colmena` class, prefixed because caisson defines
 # it, colmena's hive format being no module class. A colmena
 # configuration is a module of that class with
-# `meta`, the metadata colmena's command reads. It declares the
-# machines colmena deploys the way any configuration declares NixOS
-# configurations, under `caisson.nixos.configurations.<name>`.
+# `meta`, the metadata colmena's command reads. It declares the NixOS
+# configurations colmena deploys the way any configuration declares
+# NixOS configurations, under `caisson.nixos.configurations.<name>`.
 #
 # The nodes are the NixOS configurations declared inside the colmena
 # configuration and passed up to it, each under the name it is published under.
@@ -22,7 +22,7 @@
 # holds a single value, so the configuration declared under the name of
 # that output, `colmenaHive`, fills it. The nodes are published as well, as the NixOS
 # configurations they are, so `nixos-rebuild` and `colmena apply` build
-# the same machine.
+# the same system.
 {
   mkLibOverlay,
   ...
@@ -107,16 +107,17 @@
       # could never be addressed, so the hive refuses it.
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
 
-      # A machine colmena deploys is one evaluation. A NixOS
-      # configuration whose parent evaluates its children for several
-      # systems is evaluated per system, and publishing would make each evaluation a node. The
-      # machines evaluated more than once, each with its name and its
-      # systems: the NixOS entries grouped by their path without the
+      # A node colmena deploys is a single evaluation result of a NixOS
+      # configuration. A NixOS configuration whose parent evaluates its
+      # children for several systems is evaluated per system, and
+      # publishing would make each evaluation result a node. The NixOS
+      # configurations evaluated more than once, each with its name and
+      # its systems: the NixOS entries grouped by their path without the
       # system segments, where a group has more than one entry.
       evaluatedMoreThanOnce =
         entries:
         let
-          machines = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
+          nixosEntries = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
           nameOf =
             entry:
             final.caisson.integrations.displayName (
@@ -124,7 +125,7 @@
                 builtins.filter (segment: segment.type != "system") entry.path
               )
             );
-          grouped = builtins.groupBy nameOf machines;
+          grouped = builtins.groupBy nameOf nixosEntries;
         in
         final.mapAttrsToList (name: group: {
           inherit name;
@@ -135,10 +136,10 @@
       # configurations among the entries the colmena configuration
       # passes up that belong to it (`integrations.belongsHere`), those
       # with no NixOS configuration between them and the colmena
-      # configuration. A machine declared inside a disk layout or a structural
+      # configuration. A NixOS configuration declared inside a disk layout or a structural
       # group is a node. A NixOS configuration declared inside a node,
       # such as an image, belongs to the node and is not a node. A node is
-      # refused when it has more than one evaluation, when colmena could
+      # refused when it has more than one evaluation result, when colmena could
       # not select it, and when it does not declare the `deployment`
       # options colmena reads.
       nodesOf =
@@ -165,14 +166,14 @@
         in
         if repeated != [ ] then
           throw ''
-            lib.caisson.caisson-colmena: a node is one evaluation of a NixOS configuration,
+            lib.caisson.caisson-colmena: a node is a single evaluation result of a NixOS configuration,
             and these NixOS configurations are evaluated per system, for more than one system:
             ${builtins.concatStringsSep "\n" (
               builtins.map (
-                machine: "  `${machine.name}`, for ${builtins.concatStringsSep ", " machine.systems}"
+                nixos: "  `${nixos.name}`, for ${builtins.concatStringsSep ", " nixos.systems}"
               ) repeated
             )}
-            Declare each machine inside a configuration that evaluates its children for a single system.
+            Declare each NixOS configuration inside a configuration that evaluates its children for a single system.
           ''
         else if bad == [ ] then
           builtins.mapAttrs checked published
@@ -229,7 +230,7 @@
               };
           };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the options of the class, the framework modules of the class, the
       # selection and the configuration's module, with the composition's
       # dependencies as the `inputs` special argument. `ecosystemArgs`,
@@ -333,7 +334,7 @@
         mkConfiguration =
           {
             # The colmena configuration's module: `meta`, and the
-            # machines under `caisson.nixos.configurations`. When
+            # NixOS configurations under `caisson.nixos.configurations`. When
             # absent, the configuration registered under the
             # configuration's name
             # (`lib.caisson.configs.caisson-colmena.<name>`), if any.

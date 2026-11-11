@@ -169,7 +169,7 @@
           hash = builtins.hashString "sha256" (builtins.toJSON serializableConfig);
         };
 
-      # The evaluator's call, on the lib of the view being evaluated.
+      # The evaluator's call, on the lib the configuration is evaluated with.
       # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
       # variant admits, is merged over the call last.
       evaluate =

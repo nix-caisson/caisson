@@ -110,7 +110,7 @@
           };
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the start options, the framework modules of the class, the
       # selection and the configuration's module, with the composition's
       # dependencies as the `inputs` special argument. `ecosystemArgs`,

@@ -7,8 +7,8 @@
 # group or a disk layout, and is given to the first configurations of
 # its class on each path down. The configurations declared inside those
 # do not get it. This configuration is not among those it is given to.
-# The additions are read from the childless view, which the
-# configurations declared inside it are built against.
+# The additions are read from the result of the childless evaluation,
+# which the configurations declared inside it are built against.
 { lib, ... }:
 {
   options.caisson.forNearestChildren = {
@@ -41,7 +41,7 @@
 
         Use this option for what the nearest configurations of a class
         live on, such as the deployment of a node or the disk layout of
-        a machine, and `caisson.forChildren.extraDefaultModuleImports`
+        a NixOS configuration, and `caisson.forChildren.extraDefaultModuleImports`
         for what applies to the configurations of the class at every
         level inside this configuration.
 
@@ -58,16 +58,17 @@
       };
       description = ''
         By class, whether the nearest configurations of that class
-        declared inside this configuration read the full evaluation of this
-        configuration, with its children, in place of the childless
-        view of their parent (`lib.caisson-core.evalManifest.crossChildLevel`).
-        It passes through configurations of other classes, as the
-        additions above do, so it applies to a machine inside a
-        structural group or a disk layout declared inside this
-        configuration. A configuration it applies to can read any
-        configuration declared inside this configuration, and a loop
-        between them is a Nix infinite recursion, which the childless
-        view otherwise rules out.
+        declared inside this configuration read the result of the full
+        evaluation of this configuration, with its children, in place of
+        the result of the childless evaluation of their parent
+        (`lib.caisson-core.evalManifest.crossChildLevel`). It passes
+        through configurations of other classes, as the additions above
+        do, so it applies to a NixOS configuration inside a structural
+        group or a disk layout declared inside this configuration. A
+        configuration it applies to can read any configuration declared
+        inside this configuration, and a loop between them is a Nix
+        infinite recursion, which the childless evaluation otherwise
+        rules out.
 
         A setting through `caisson.forDirectChildren` beats a setting
         here, which beats a setting through `caisson.forChildren`, and within one

@@ -12,7 +12,7 @@
 # - `activation-drift`, with which the activation of the home-manager
 #   configuration warns when the home-manager configuration was built
 #   for a different version of the configuration it is declared inside,
-#   such as its machine;
+#   such as a NixOS configuration;
 # - `activation-marker`, with which the activation of the home-manager
 #   configuration records what it applied, for the configurations
 #   declared inside the home-manager configuration to check in turn.

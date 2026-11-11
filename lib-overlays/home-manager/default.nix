@@ -62,7 +62,7 @@
       # pinned source of that name; null when it declares none. The layered
       # lookup of the integrations entry, read without its miss
       # message: a composition may leave the home-manager source to the
-      # `ecosystemSrc` of each evaluation.
+      # `ecosystemSrc` of each home-manager configuration.
       declaredSrc =
         let
           manifest = final.caisson-core.libManifest or { };
@@ -93,12 +93,12 @@
           throw ''
             lib.hm: this composition declares no home-manager. Declare it as
             `defaultEcosystemSrc.home-manager` in the mkLib call, or pin a
-            source named `home-manager` in the `dependencies` passed to mkLib; an evaluation
+            source named `home-manager` in the `dependencies` passed to mkLib; a configuration
             that names its home-manager through `ecosystemSrc` runs on the
             composed library carrying `hm` from that source.
           '';
 
-      # The library an evaluation runs on: the composed library with
+      # The library a home-manager configuration runs on: the composed library with
       # the module system tied over it. The module system hands `lib`
       # to every module it evaluates, those of the main evaluation
       # through `specialArgs` and the rest, submodules and the
@@ -116,8 +116,8 @@
       # (which the `docs/default.nix` of home-manager applies) keeps all
       # of it.
       #
-      # `base` is the library of the view being evaluated, the
-      # composed library carrying the manifest of the evaluation.
+      # `base` is the library the configuration is evaluated with, the
+      # composed library carrying the manifest of the configuration.
       #
       # `hmSrc` names the source `hm` comes from when the composition
       # declares none: `hm` and the home-manager maintainers merged
@@ -142,10 +142,10 @@
       # A home-manager evaluation runs on one library, so its modules
       # and its `lib.hm` come from the same home-manager source. With a declared
       # home-manager, the composed library carries `hm` from that source
-      # as an entry, and an evaluation whose `ecosystemSrc` names a
+      # as an entry, and a configuration whose `ecosystemSrc` names a
       # different source is refused, the message naming the declaration
       # that composes an `hm` for it. With none declared, the source the
-      # evaluation names supplies both.
+      # configuration names supplies both.
       libFor =
         base: explicit:
         let
@@ -157,7 +157,7 @@
           mkEvaluationLib base null
         else
           throw ''
-            caisson.home-manager: this evaluation names
+            caisson.home-manager: this home-manager configuration names
               ${named}
             as its home-manager, and the composed library holds `lib.hm`
             from the home-manager this composition declares,
@@ -178,12 +178,12 @@
       # `lib.caisson.home-manager`, the necessary modules alone are
       # `lib.caisson.home-manager-minimal`.
       #
-      # It is a function of the view being evaluated: `lib`, the
-      # library of that view, and `manifest`, the manifest of the
-      # evaluation. A home-manager configuration has an evaluation for
-      # each system its parent evaluates its children for, so the manifest is
-      # that of the evaluation for one system: the name, the system and
-      # the package sets come from it.
+      # It is a function of what the configuration is evaluated with:
+      # `lib`, the library, and `manifest`, the manifest of the
+      # configuration. A home-manager configuration has an evaluation
+      # result for each system its parent evaluates its children for,
+      # so the manifest is that of the evaluation for one system: the
+      # name, the system and the package sets come from it.
       mkCommonArgs =
         {
           context,
@@ -194,10 +194,10 @@
         let
           integrations = lib.caisson.integrations;
 
-          # The name of the configuration this is an evaluation of.
+          # The name of the configuration being evaluated.
           name = manifest.name or null;
 
-          # The system of this evaluation.
+          # The system the configuration is evaluated for.
           inherit (manifest) system;
 
           what =
@@ -207,7 +207,7 @@
               "this home-manager configuration for ${system}";
 
           # The package sets available to the home-manager
-          # configuration, each for the system of the evaluation, by
+          # configuration, each for the system it is evaluated for, by
           # package config name.
           pkgSets = integrations.pkgSetsForSystem { inherit context what; } manifest system;
 
@@ -254,27 +254,28 @@
             };
           };
 
-          # The machine the home-manager configuration is declared
-          # inside, when there is one: the nearest NixOS, darwin or
-          # system-manager configuration above the home-manager
-          # configuration, so a structural configuration between the
-          # two changes nothing. The manifest holds the childless
-          # evaluation of that machine, which is the evaluation that
-          # leaves out the configurations declared inside it. The
-          # home-manager configuration is one of those, so the full
-          # evaluation would depend on the home-manager configuration.
-          machine = selection.nearestOf machineTypes manifest;
+          # The system configuration the home-manager configuration is
+          # declared inside, when there is one: the nearest NixOS,
+          # nix-darwin or system-manager configuration above the
+          # home-manager configuration, so a structural configuration
+          # between the two changes nothing. The manifest holds the
+          # result of the childless evaluation of that configuration,
+          # which leaves out the configurations declared inside it. The
+          # home-manager configuration is one of those, so the result of
+          # the full evaluation would depend on the home-manager
+          # configuration.
+          systemConfiguration = selection.nearestOf systemConfigurationTypes manifest;
 
           # home-manager hands a home-manager configuration the
-          # configuration of its machine as the module argument
-          # `osConfig`, and null when the home-manager configuration
-          # has no machine. An `osConfig` passed to the constructor
-          # takes the place of the configuration of the machine.
+          # evaluated options of that system configuration as the
+          # module argument `osConfig`, and null when the home-manager
+          # configuration is declared inside none. An `osConfig` passed
+          # to the constructor takes the place of those options.
           osConfig =
             if (args.osConfig or null) != null then
               args.osConfig
-            else if machine != null then
-              machine.value.config
+            else if systemConfiguration != null then
+              systemConfiguration.value.config
             else
               null;
 
@@ -300,8 +301,8 @@
           configuration = {
             imports = configurationModules;
           };
-          # The library of the view, with the module system tied over
-          # it, is what the evaluation runs on, and it carries
+          # The library the configuration is evaluated with, with the
+          # module system tied over it, is what its modules run on, and it carries
           # `lib.hm`, so the modules see one library with the
           # home-manager namespace under the name home-manager reads.
           lib = libFor lib (args.ecosystemSrc or null);
@@ -314,20 +315,27 @@
             inherit pkgSets osConfig;
           }
           # home-manager also hands a home-manager configuration inside
-          # a machine the class of the machine, as `osClass`. A
-          # home-manager configuration with no machine gets no such
-          # argument from home-manager, so none is added here.
-          # home-manager's nix-darwin module also hands a home-manager
-          # configuration the machine as `darwinConfig`.
+          # a system configuration the class of that configuration, as
+          # `osClass`. A home-manager configuration declared inside none
+          # gets no such argument from home-manager, so none is added
+          # here. home-manager's nix-darwin module also hands a
+          # home-manager configuration the evaluated options of the
+          # nix-darwin configuration as `darwinConfig`.
           #
           # home-manager's legacy argument `nixosConfig` is left at
           # null, the value home-manager gives it in a home-manager
-          # configuration with no machine. home-manager's fontconfig
-          # module reads `nixosConfig.home-manager`, an option that
-          # only home-manager's NixOS module declares, and caisson does
-          # not use that module.
-          // (if machine != null then { osClass = machine.type; } else { })
-          // (if machine != null && machine.type == "darwin" then { darwinConfig = osConfig; } else { })
+          # configuration declared inside no system configuration.
+          # home-manager's fontconfig module reads
+          # `nixosConfig.home-manager`, an option that only
+          # home-manager's NixOS module declares, and caisson does not
+          # use that module.
+          // (if systemConfiguration != null then { osClass = systemConfiguration.type; } else { })
+          // (
+            if systemConfiguration != null && systemConfiguration.type == "darwin" then
+              { darwinConfig = osConfig; }
+            else
+              { }
+          )
           // (if (args.specialArgs or null) != null then args.specialArgs else { });
           # The module tree the evaluation reads: home-manager's
           # module list, its module files and the `modulesPath` special
@@ -348,9 +356,9 @@
           # modules alone instead of its whole module tree.
           minimal ? false,
         }:
-        view: args:
+        given: args:
         let
-          common = mkCommonArgs { inherit context minimal; } view args;
+          common = mkCommonArgs { inherit context minimal; } given args;
         in
         common
         // {
@@ -480,17 +488,17 @@
         in
         withExtraAttrs rawModule;
 
-      # The evaluator step of a home-manager configuration, on the view
-      # being evaluated: the evaluation over the composition, with the
+      # The evaluator step of a home-manager configuration, on the lib
+      # and manifest it is evaluated with: the evaluation over the composition, with the
       # `ecosystemArgs` of the `WithEcosystemArgs` variant merged over the composed call last.
       # `variant` is what `compose` takes, the entry point and its
       # module list. An integration that evaluates the class the other
       # way builds
       # its configurations from this.
       evaluation =
-        variant: args: view:
+        variant: args: given:
         let
-          composed = compose variant view args;
+          composed = compose variant given args;
           ecosystemArgs =
             composed.ecosystemArgs
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
@@ -527,9 +535,10 @@
           };
         };
 
-      # The integrations whose configurations are machines a
-      # home-manager configuration can be declared inside.
-      machineTypes = [
+      # The integrations whose configurations are the NixOS, nix-darwin
+      # and system-manager configurations a home-manager configuration
+      # can be declared inside.
+      systemConfigurationTypes = [
         "nixos"
         "darwin"
         "system-manager"
@@ -538,27 +547,29 @@
       # A home-manager configuration is published as
       # `homeConfigurations.<name>`, the evaluated home-manager
       # configuration, which is what the home-manager CLI reads. A
-      # home-manager configuration declared inside a NixOS or darwin
-      # configuration is named `<user>@<machine>`, the name it is passed up
-      # under and the name that machine is declared under, which is
-      # where the CLI looks (`$USER@$(hostname)`); a home-manager
-      # configuration with no machine above it keeps its name.
+      # home-manager configuration declared inside a NixOS or nix-darwin
+      # configuration is named `<user>@<configuration>`, the name it is
+      # passed up under and the name that NixOS or nix-darwin
+      # configuration is declared under, which is where the CLI looks
+      # (`$USER@$(hostname)`); a home-manager configuration with no such
+      # configuration above it keeps its name.
       exportsTo = {
         attrset = "homeConfigurations";
         value = manifest: manifest.value;
         name =
           { name, manifest }:
           let
-            machine = final.caisson.integrations.nearestOf machineTypes manifest;
-            machineName = if machine == null then null else machine.name or null;
+            systemConfiguration = final.caisson.integrations.nearestOf systemConfigurationTypes manifest;
+            systemConfigurationName =
+              if systemConfiguration == null then null else systemConfiguration.name or null;
           in
-          if machineName == null then
+          if systemConfigurationName == null then
             { value = name; }
           else
             {
-              value = "${name}@${machineName}";
-              description = "named ${name}@${machineName} from its name and the name of the ${
-                { nixos = "NixOS"; }.${machine.type} or machine.type
+              value = "${name}@${systemConfigurationName}";
+              description = "named ${name}@${systemConfigurationName} from its name and the name of the ${
+                { nixos = "NixOS"; }.${systemConfiguration.type} or systemConfiguration.type
               } configuration it is under";
             };
       };
@@ -567,7 +578,7 @@
       # Nix profiles of the home-manager configuration are, what each
       # holds, and what sets each, as data read from the evaluated
       # home-manager configuration of `manifest`. The activation
-      # module of a machine reads it to install the packages it sets,
+      # module of a NixOS or nix-darwin configuration reads it to install the packages it sets,
       # and topside reads it to show the profiles.
       #
       # `activate` is the program that activates the home-manager
@@ -576,8 +587,8 @@
       # `holds`, the store path it holds once the home-manager
       # configuration is applied, and `setBy`, what sets it:
       # `activation`, the `activate` script run as the user, or
-      # `machine`, a switch of the machine the home-manager
-      # configuration is declared inside, which builds the profile as
+      # `machine`, a switch of the NixOS or nix-darwin configuration the
+      # home-manager configuration is declared inside, which builds the profile as
       # part of the system.
       #
       # `generations` is the home-manager profile, whose generations
@@ -587,7 +598,7 @@
       # in `/nix/var/nix/profiles/per-user/$USER` otherwise
       # (`modules/lib-bash/activation-init.sh` of home-manager).
       # `activate` sets it when it is run with no driver version, as
-      # the units of a machine run it, and `home-manager switch` sets
+      # the units of a NixOS configuration run it, and `home-manager switch` sets
       # it before it runs `activate`.
       #
       # `packages` is the profile that holds `home.path`, the packages
@@ -596,7 +607,8 @@
       # or `nix profile`. Where home-manager's option
       # `submoduleSupport.externalPackageInstall` is true, which
       # `caisson.useUserPackages` sets, the path is
-      # `/etc/profiles/per-user/<user>` and the machine sets it.
+      # `/etc/profiles/per-user/<user>` and the NixOS or nix-darwin
+      # configuration sets it.
       profileAdapter =
         manifest:
         let
@@ -632,15 +644,15 @@
           };
           type = "home-manager";
           # A home-manager configuration is evaluated per system: it
-          # has an evaluation for each system its parent evaluates its
-          # children for.
+          # has an evaluation result for each system its parent
+          # evaluates its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
           # A home-manager configuration is activated for its user. Its
           # identity is its activation package; its marker is a file
           # under `$HOME/.local/state`, named by `$HOME` and not by
-          # `$XDG_STATE_HOME`, which a unit of the machine and a shell
+          # `$XDG_STATE_HOME`, which a unit of a NixOS configuration and a shell
           # may see differently. The home-manager module
           # `activation-marker` writes. The configurations with an
           # activation declared inside the home-manager configuration
@@ -691,7 +703,7 @@
             # The package set the home-manager configuration runs on:
             # a function that receives the package sets available
             # where it is declared, as an attribute set by package
-            # config name, each for the system of the evaluation, and
+            # config name, each for the system it is evaluated for, and
             # returns the set to run on. When absent, the selection of
             # the nearest
             # configuration above, which inside a NixOS configuration

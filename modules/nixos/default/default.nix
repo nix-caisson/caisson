@@ -9,35 +9,35 @@
 # the name it is declared under, at `mkDefault` priority.
 #
 # The registered module `hjem-activation` activates the hjem
-# configurations declared inside the machine, and
+# configurations declared inside the NixOS configuration, and
 # `./caisson/forChildren.nix` gives each of them the hjem module
-# `nixos-parent`, which sets the user's home directory from the
-# machine's account.
+# `nixos-parent`, which sets the user's home directory from the account
+# the NixOS configuration declares.
 #
 # It also holds what a NixOS configuration does for the home-manager
-# configurations declared inside it, in two parts:
+# configurations declared inside it, in these parts:
 #
 # - `./caisson/forChildren.nix` gives each of those home-manager
 #   configurations the home-manager module `nixos-parent`, which sets
 #   the options of the home-manager configuration that come from the
-#   machine.
+#   NixOS configuration.
 # - The registered module `home-manager-activation` writes the
-#   systemd units that activate those home-manager configurations on
-#   the machine.
+#   systemd units that activate those home-manager configurations.
 #
 # The registered module `profile-activation` activates the profile of
-# each nvf or nixvim configuration declared inside the machine, and
-# installs the programs with which a shell chooses among them.
+# each nvf or nixvim configuration declared inside the NixOS
+# configuration, and installs the programs with which a shell chooses
+# among them.
 #
-# The registered module `activation-marker` writes a file on the
-# machine that names what the machine applied. Every configuration with
-# an activation declared inside the machine, a home-manager
-# configuration among them, compares against that file when it is
-# activated by hand, and warns when it was built for a different
-# machine.
+# The registered module `activation-marker` writes a file under `/etc`
+# that names what the NixOS configuration applied. Every configuration
+# with an activation declared inside the NixOS configuration, a
+# home-manager configuration among them, compares against that file
+# when it is activated by hand, and warns when it was built for a
+# different version of the NixOS configuration.
 #
 # The parts read options of caisson's core module. The core module
-# leaves its options out when the library of the evaluation is not a
+# leaves its options out when the library of the configuration is not a
 # caisson composition, so the parts are left out in the same case.
 { closure-lib, mkModule, ... }:
 { lib, ... }:

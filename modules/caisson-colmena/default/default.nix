@@ -6,8 +6,8 @@
 # configuration are its nodes, and colmena reads the `deployment`
 # options back from each of them. This module adds caisson's NixOS
 # module `colmena-deployment`, which declares those options, to the
-# modules that such a NixOS configuration imports by default. The
-# machines inside a structural group or a disk layout declared inside
+# modules that such a NixOS configuration imports by default. The NixOS
+# configurations inside a structural group or a disk layout declared inside
 # the colmena configuration get it too. A NixOS configuration declared inside a node
 # is not a node and does not get it.
 #

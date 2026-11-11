@@ -289,39 +289,39 @@ let
   luksLvmLayout = import "${inputs.disko}/example/luks-lvm.nix";
   complexLayout = import "${inputs.disko}/example/complex.nix";
 
-  # What a machine installed onto a layout needs beside the layout,
-  # which gives it its file systems.
-  diskoMachineBase = {
+  # What a NixOS configuration installed onto a layout needs beside the
+  # layout, which gives it its file systems.
+  diskoNixosBase = {
     boot.loader.grub.enable = false;
     system.stateVersion = "25.05";
   };
 
-  # The machine NixOS builds from the NixOS module of disko, the layout
-  # and `diskoMachineBase`, with no caisson involved. It is named
-  # `nas-1`, the host name caisson gives the machine declared as
-  # `nas-1`.
-  upstreamDiskoMachine =
+  # The NixOS configuration that NixOS evaluates from the NixOS module
+  # of disko, the layout and `diskoNixosBase`, with no caisson
+  # involved. Its host name is `nas-1`, the host name caisson gives the
+  # NixOS configuration declared as `nas-1`.
+  upstreamDiskoNixosConfiguration =
     layout:
     import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
       system = "x86_64-linux";
       modules = [
         "${inputs.disko}/module.nix"
         layout
-        diskoMachineBase
+        diskoNixosBase
         { networking.hostName = "nas-1"; }
       ];
     };
 
   # A top holding a disko configuration of `integration` named
-  # `nas-1`, over `layout`. With `machine`, a NixOS module, the layout
-  # declares a NixOS configuration named `nas-1` from it, installed onto
+  # `nas-1`, over `layout`. With `nixosModule`, the layout declares a
+  # NixOS configuration named `nas-1` from that module, installed onto
   # the layout. `args` are further arguments passed to `mkConfiguration`
   # for the layout.
   layoutTop =
     {
       integration,
       layout,
-      machine ? null,
+      nixosModule ? null,
       args ? { },
     }:
     hiveLib.caisson.structural.mkTopConfiguration {
@@ -338,12 +338,12 @@ let
                   imports = [ layout ];
                 }
                 // (
-                  if machine == null then
+                  if nixosModule == null then
                     { }
                   else
                     {
                       caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
-                        configModule = machine;
+                        configModule = nixosModule;
                       };
                     }
                 );
@@ -356,11 +356,12 @@ let
   layoutManifest = integration: top: top.caisson.manifest.children.${integration}.nas-1;
 
   # A top holding a colmena configuration named `colmenaHive`, with a NixOS
-  # configuration declared inside it for each machine given, by name.
-  # `machineArgs` are further arguments of each machine's constructor.
-  # The colmena configuration disallows a bare `colmena apply`.
+  # configuration declared inside it for each NixOS module given, by
+  # name. `nixosArgs` are further arguments of the constructor of each
+  # NixOS configuration. The colmena configuration disallows a bare
+  # `colmena apply`.
   colmenaTopWith =
-    machineArgs: machines:
+    nixosArgs: nixosModules:
     hiveLib.caisson.structural.mkTopConfiguration {
       moduleImports = _modules: [ ];
       configModule =
@@ -373,8 +374,8 @@ let
               {
                 meta.allowApplyAll = false;
                 caisson.nixos.configurations = builtins.mapAttrs (
-                  _: configModule: lib.caisson.nixos.mkConfiguration ({ inherit configModule; } // machineArgs)
-                ) machines;
+                  _: configModule: lib.caisson.nixos.mkConfiguration ({ inherit configModule; } // nixosArgs)
+                ) nixosModules;
               };
           };
         };
@@ -382,23 +383,24 @@ let
   colmenaTop = colmenaTopWith { };
 
   # A top holding the root composite of a NixOps4 deployment, declared
-  # under the name `nixops4`, which declares a resource for each machine
-  # given, by name, holding a NixOS configuration of that name. `root`
+  # under the name `nixops4`, which declares a resource for each NixOS
+  # module given, by name, holding a NixOS configuration of that name. `root`
   # is a further module of the root composite, `resources` a further
   # module of each resource, by name, and `wiring` a function of the
   # `members` argument of the root composite returning more such
   # modules, by name, as a composite wires one member to another.
   # `defaultPkgs` is the selection of the root composite and
-  # `machineArgs` further arguments of each machine's constructor.
+  # `nixosArgs` further arguments of the constructor of each NixOS
+  # configuration.
   nixops4TopWith =
     {
       root ? { },
       resources ? { },
       wiring ? _: { },
       defaultPkgs ? null,
-      machineArgs ? { },
+      nixosArgs ? { },
     }:
-    machines:
+    nixosModules:
     hiveLib.caisson.structural.mkTopConfiguration {
       moduleImports = _modules: [ ];
       configModule =
@@ -423,11 +425,11 @@ let
                               ((wiring members).${name} or { })
                             ];
                             caisson.nixos.configurations.${name} = lib.caisson.nixos.mkConfiguration (
-                              { configModule = nixosModule; } // machineArgs
+                              { configModule = nixosModule; } // nixosArgs
                             );
                           };
                       }
-                    ) machines;
+                    ) nixosModules;
                   };
               };
         };
@@ -498,7 +500,8 @@ let
     };
 
   # Root modules as a NixOps4 user writes them: a resource whose output
-  # another member reads, a NixOS machine through nixops4-nixos, and a
+  # another member reads, a member that deploys NixOS through
+  # nixops4-nixos, and a
   # nested composite holding a resource.
   nixops4UpstreamRoot =
     { providers, members, ... }:
@@ -804,11 +807,11 @@ let
 
   # A NixOS configuration with two home-manager configurations
   # declared inside it, evaluated with the real home-manager over the
-  # real NixOS. The machine declares the account of the first
-  # home-manager configuration. It does not declare the account of the
+  # real NixOS. The NixOS configuration declares the account of the
+  # first home-manager configuration. It does not declare the account of the
   # second, and lists that user as declared elsewhere, as for an
   # account that systemd-homed manages.
-  machineWithHomeManagerConfigurations = hiveLib.caisson.structural.mkTopConfiguration {
+  nixosConfigurationWithHomeManagerConfigurations = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
       { lib, ... }:
@@ -846,11 +849,12 @@ let
       };
   };
 
-  # The same machine, with home-manager configurations that set
-  # `caisson.useUserPackages`, one for the account the machine declares
-  # and one for the user declared elsewhere, and a third home-manager
-  # configuration, for another declared account, that leaves it unset.
-  machineWithUserPackages = hiveLib.caisson.structural.mkTopConfiguration {
+  # The same NixOS configuration, with home-manager configurations that
+  # set `caisson.useUserPackages`: a home-manager configuration for the
+  # account the NixOS configuration declares, another for the user
+  # declared elsewhere, and a third, for another declared account, that
+  # leaves it unset.
+  nixosConfigurationWithUserPackages = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
     configModule =
       { lib, ... }:
@@ -899,12 +903,13 @@ let
       };
   };
 
-  # The library of a NixOS evaluation that caisson runs. It has
-  # `lib.caisson`, and it holds the manifest of that evaluation.
+  # The library caisson evaluates a NixOS configuration on. It has
+  # `lib.caisson`, and it holds the manifest of that evaluation result.
   #
   # The check `aNixosModuleImportsWhatDeclaresItsCaissonOptions` below
-  # needs such a library without the evaluation it came from. A module
-  # of the evaluation hands the library out through an option.
+  # needs such a library without the evaluation result it came from. A
+  # module of the NixOS configuration hands the library out through an
+  # option.
   nixosEvaluationLib =
     (hiveLib.caisson.nixos.mkTopConfiguration {
       ecosystemSrc = dependencies: dependencies.nixpkgs;
@@ -962,16 +967,16 @@ let
       ];
 
     # A user who is not on caisson imports a module from the `modules`
-    # output of a caisson flake into a machine that `nixosSystem` of
-    # nixpkgs evaluates. The library of that evaluation is the library
-    # of nixpkgs.
+    # output of a caisson flake into a NixOS configuration that
+    # `nixosSystem` of nixpkgs evaluates. That NixOS configuration is
+    # evaluated on the library of nixpkgs.
     #
     # The flake `publisher` registers the module from
     # tests/pinned-world/modules and publishes it as
-    # `modules.nixos.published`. The machine builds, and the file that
-    # the module writes shows two things. The module read the
-    # library of `publisher` through `closure-lib`. The `lib` that the
-    # machine gave the module has no `caisson`.
+    # `modules.nixos.published`. The NixOS configuration builds, and the
+    # file that the module writes shows two things. The module read the
+    # library of `publisher` through `closure-lib`. The `lib` that
+    # `nixosSystem` gave the module has no `caisson`.
     aPublishedModuleEvaluatesUnderPlainNixosSystem =
       let
         publisher =
@@ -983,14 +988,14 @@ let
             }
           )).caisson.flake-parts.mkTopConfiguration
             { };
-        machine = inputs.nixpkgs.lib.nixosSystem {
+        evaluated = inputs.nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
             minimalNixosBase
             publisher.modules.nixos.published
           ];
         };
-        written = builtins.fromJSON machine.config.environment.etc."pinned-world/published.json".text;
+        written = builtins.fromJSON evaluated.config.environment.etc."pinned-world/published.json".text;
       in
       !(inputs.nixpkgs.lib ? caisson)
       && builtins.attrNames publisher.modules.nixos == [ "published" ]
@@ -999,7 +1004,7 @@ let
           definedIn = "publisher";
           evaluatorLibHasCaisson = false;
         }
-      && builtins.isString machine.config.system.build.toplevel.drvPath;
+      && builtins.isString evaluated.config.system.build.toplevel.drvPath;
 
     composesTheCaissonLibrary =
       builtins.attrNames composed.lib.caisson == expectedCaissonNames
@@ -1223,22 +1228,22 @@ let
 
     # Two home-manager configurations declared inside a NixOS
     # configuration, evaluated with the real home-manager over the real
-    # NixOS. The machine declares the account of the first home-manager
-    # configuration and not the account of the second, as with an
-    # account that systemd-homed manages.
+    # NixOS. The NixOS configuration declares the account of the first
+    # home-manager configuration and not the account of the second, as
+    # with an account that systemd-homed manages.
     #
-    # Each home-manager configuration is given the Nix of the machine,
-    # and each builds an activation package, which forces
-    # home-manager's whole module tree with the configuration of the
-    # machine handed in as `osConfig`. The first home-manager
+    # Each home-manager configuration is given the Nix of the NixOS
+    # configuration, and each builds an activation package, which forces
+    # home-manager's whole module tree with the `config` of the NixOS
+    # configuration handed in as `osConfig`. The first home-manager
     # configuration takes its home directory and its user ID from the
     # account. The second home-manager configuration sets its home
     # directory itself.
-    homeManagerConfigurationsInsideAMachineAreGivenTheMachine =
+    homeManagerConfigurationsInsideANixosConfigurationAreGivenIt =
       let
-        machine = machineWithHomeManagerConfigurations.nixosConfigurations.probe.config;
-        declared = machineWithHomeManagerConfigurations.homeConfigurations."declared@probe";
-        undeclared = machineWithHomeManagerConfigurations.homeConfigurations."undeclared@probe";
+        nixosConfig = nixosConfigurationWithHomeManagerConfigurations.nixosConfigurations.probe.config;
+        declared = nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."declared@probe";
+        undeclared = nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."undeclared@probe";
         hasTheProgram =
           homeManagerConfiguration:
           builtins.elem homeManagerConfiguration.config.programs.home-manager.package homeManagerConfiguration.config.home.packages;
@@ -1249,8 +1254,8 @@ let
       && declared.config.home.uid == 1001
       && undeclared.config.home.homeDirectory == "/home/undeclared"
       && undeclared.config.home.uid == null
-      && declared.config.nix.package == machine.nix.package
-      && undeclared.config.nix.package == machine.nix.package
+      && declared.config.nix.package == nixosConfig.nix.package
+      && undeclared.config.nix.package == nixosConfig.nix.package
       && declared.config.submoduleSupport.enable
       && undeclared.config.submoduleSupport.enable
       && hasTheProgram declared
@@ -1266,11 +1271,11 @@ let
     # the file of the integration where it gives its `exportsTo`.
     exportRecordLeadsToWhatIsPublished =
       let
-        top = machineWithHomeManagerConfigurations.caisson.manifest;
+        top = nixosConfigurationWithHomeManagerConfigurations.caisson.manifest;
         record = top.exportRecord;
         follow = builtins.foldl' (manifest: segment: manifest.children.${segment.type}.${segment.name}) top;
         declared = record.homeConfigurations."declared@probe";
-        machine = record.nixosConfigurations.probe;
+        probe = record.nixosConfigurations.probe;
         inIntegration =
           integration: position:
           pkgs.lib.hasSuffix "/lib-overlays/${integration}/default.nix" position.file
@@ -1287,18 +1292,18 @@ let
         ]
       &&
         (follow declared.from.namePath).value.activationPackage.drvPath
-        == machineWithHomeManagerConfigurations.homeConfigurations."declared@probe".activationPackage.drvPath
+        == nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."declared@probe".activationPackage.drvPath
       &&
-        (follow machine.from.namePath).value.config.system.build.toplevel.drvPath
-        == machineWithHomeManagerConfigurations.nixosConfigurations.probe.config.system.build.toplevel.drvPath
+        (follow probe.from.namePath).value.config.system.build.toplevel.drvPath
+        == nixosConfigurationWithHomeManagerConfigurations.nixosConfigurations.probe.config.system.build.toplevel.drvPath
       &&
         declared.notes
         == [ "named declared@probe from its name and the name of the NixOS configuration it is under" ]
-      && machine.notes == [ ]
+      && probe.notes == [ ]
       && builtins.length declared.code == 1
       && inIntegration "home-manager" (builtins.head declared.code)
-      && builtins.length machine.code == 1
-      && inIntegration "nixos" (builtins.head machine.code);
+      && builtins.length probe.code == 1
+      && inIntegration "nixos" (builtins.head probe.code);
 
     # The history of a NixOS configuration records what eval-config
     # received, as `declaration` events of its manifest: NixOS' module
@@ -1306,12 +1311,12 @@ let
     # modules selected from the registry by their registry keys, the
     # module of the configuration, and the module that hands it the
     # package set. The history of a home-manager configuration inside
-    # it begins with the history of the childless manifest of the
-    # machine.
-    aMachineRecordsWhatItsEvaluatorReceived =
+    # it begins with the history of the manifest of the result of the
+    # childless evaluation of the NixOS configuration.
+    aNixosConfigurationRecordsWhatItsEvaluatorReceived =
       let
-        machine =
-          machineWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe;
+        probe =
+          nixosConfigurationWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe;
         path = [
           {
             type = "system";
@@ -1322,9 +1327,9 @@ let
             name = "probe";
           }
         ];
-        ofMachine = builtins.filter (event: event.manifest == path) machine.history;
-        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
-        prefix = builtins.length machine.childlessManifest.history;
+        ofProbe = builtins.filter (event: event.manifest == path) probe.history;
+        declared = probe.children.system.x86_64-linux.children.home-manager.declared;
+        prefix = builtins.length probe.childlessManifest.history;
         identity = event: {
           inherit (event)
             manifest
@@ -1334,7 +1339,7 @@ let
             ;
         };
       in
-      builtins.map (event: event.key) ofMachine == [
+      builtins.map (event: event.key) ofProbe == [
         "nixos"
         "caisson.nixos"
         "modules.nixos.caisson/core"
@@ -1342,25 +1347,25 @@ let
         "inline/4"
         "caisson.nixos.pkgSet"
       ]
-      && builtins.all (event: event.operation == "declaration" && event.type == "nixos") ofMachine
-      && builtins.map (event: event.index) ofMachine == pkgs.lib.range 0 5
+      && builtins.all (event: event.operation == "declaration" && event.type == "nixos") ofProbe
+      && builtins.map (event: event.index) ofProbe == pkgs.lib.range 0 5
       &&
-        (builtins.head ofMachine).origin == {
+        (builtins.head ofProbe).origin == {
           project = "nixpkgs";
           file = "nixos/modules/module-list.nix";
         }
       &&
-        (builtins.elemAt ofMachine 1).origin == {
+        (builtins.elemAt ofProbe 1).origin == {
           project = "caisson";
           file = "modules/nixos/core";
         }
       &&
         builtins.map identity (pkgs.lib.take prefix declared.history)
-        == builtins.map identity machine.childlessManifest.history
+        == builtins.map identity probe.childlessManifest.history
       && builtins.length declared.history > prefix;
 
-    # Every module caisson adds to an evaluation is keyed, so the
-    # history of the evaluation names it. The suite walks every
+    # Every module caisson adds to a configuration is keyed, so the
+    # history of the evaluation result names it. The suite walks every
     # manifest of the tops of the pinned world below, from the top
     # down through `children`, which holds a configuration of every
     # integration. An `inline/<index>` event is a module a
@@ -1404,7 +1409,7 @@ let
           );
         expected = builtins.mapAttrs (_: builtins.sort builtins.lessThan) {
           registered = [ ];
-          machineWithHomeManagerConfigurations = [
+          nixosConfigurationWithHomeManagerConfigurations = [
             "top: inline/2"
             "system x86_64-linux / nixos probe: inline/4"
             "system x86_64-linux / nixos probe / system x86_64-linux / home-manager declared: inline/4"
@@ -1434,8 +1439,8 @@ let
           ];
           hjem = [
             "top: inline/2"
-            "system x86_64-linux / nixos probe-machine: inline/4"
-            "system x86_64-linux / nixos probe-machine / system x86_64-linux / hjem probe: inline/7"
+            "system x86_64-linux / nixos probe-nixos: inline/4"
+            "system x86_64-linux / nixos probe-nixos / system x86_64-linux / hjem probe: inline/7"
           ];
           microvm = [
             "top: inline/2"
@@ -1449,7 +1454,7 @@ let
         };
         recorded = {
           registered = inlineOf registeredWorld;
-          machineWithHomeManagerConfigurations = inlineOf machineWithHomeManagerConfigurations;
+          nixosConfigurationWithHomeManagerConfigurations = inlineOf nixosConfigurationWithHomeManagerConfigurations;
           upstreamHive = inlineOf upstreamHiveTop;
           colmena = inlineOf (colmenaTop {
             probe-node = minimalNixosBase;
@@ -1457,7 +1462,7 @@ let
           caissonDisko = inlineOf (layoutTop {
             integration = "caisson-disko";
             layout = luksLvmLayout;
-            machine = diskoMachineBase;
+            nixosModule = diskoNixosBase;
           });
           disko = inlineOf (layoutTop {
             integration = "disko";
@@ -1525,19 +1530,20 @@ let
         ) == [ "configs.nixos.minimal" ];
 
     # Each configuration records how it selected its modules. The top
-    # of the machine gives `moduleImports`, which replaces the default,
-    # and the record holds where it gave it. The machine takes the
-    # default of its class, the entries named `default`. The
-    # home-manager configuration inside it takes the default of its
-    # class too, which holds what the machine adds for the
-    # home-manager configurations declared inside it, with the name path of the
-    # machine and the file of caisson that adds it.
+    # above the NixOS configuration gives `moduleImports`, which
+    # replaces the default, and the record holds where it gave it. The
+    # NixOS configuration takes the default of its class, the entries
+    # named `default`. The home-manager configuration inside it takes
+    # the default of its class too, which holds what the NixOS
+    # configuration adds for the home-manager configurations declared
+    # inside it, with the name path of the NixOS configuration and the
+    # file of caisson that adds it.
     selectionsRecordHowModulesWereChosen =
       let
-        top = machineWithHomeManagerConfigurations.caisson.manifest;
-        machine = top.children.system.x86_64-linux.children.nixos.probe;
-        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
-        machinePath = [
+        top = nixosConfigurationWithHomeManagerConfigurations.caisson.manifest;
+        probe = top.children.system.x86_64-linux.children.nixos.probe;
+        declared = probe.children.system.x86_64-linux.children.home-manager.declared;
+        probePath = [
           {
             type = "system";
             name = "x86_64-linux";
@@ -1553,7 +1559,7 @@ let
       && top.moduleImports.position.file == "tests/pinned-world/default.nix"
       && builtins.isInt top.moduleImports.position.line
       &&
-        machine.moduleImports == {
+        probe.moduleImports == {
           act = "default";
           position = null;
           default = [
@@ -1574,21 +1580,22 @@ let
       &&
         builtins.elemAt declared.moduleImports.default 1 == {
           key = "modules.homeManager.nixos-parent";
-          level = machinePath;
+          level = probePath;
           file = "modules/nixos/default/caisson";
         };
 
     # Each configuration records where each part of the stack it used
-    # came from. The library of every evaluation is the nixpkgs pin,
-    # through the `defaultEcosystemSrc` of the composition. The machine
-    # selects its module collection with its `ecosystemSrc`, and the
-    # home-manager configuration inside it selects home-manager the
-    # same way. The top resolves no ecosystem beside the library.
+    # came from. Every configuration here is evaluated on the library
+    # of the nixpkgs pin, through the `defaultEcosystemSrc` of the
+    # composition. The NixOS configuration selects its module
+    # collection with its `ecosystemSrc`, and the home-manager
+    # configuration inside it selects home-manager the same way. The
+    # top resolves no ecosystem beside the library.
     ecosystemsRecordWhereEachPartCameFrom =
       let
-        top = machineWithHomeManagerConfigurations.caisson.manifest;
-        machine = top.children.system.x86_64-linux.children.nixos.probe;
-        declared = machine.children.system.x86_64-linux.children.home-manager.declared;
+        top = nixosConfigurationWithHomeManagerConfigurations.caisson.manifest;
+        probe = top.children.system.x86_64-linux.children.nixos.probe;
+        declared = probe.children.system.x86_64-linux.children.home-manager.declared;
         library = {
           from = "defaultEcosystemSrc";
           source = "nixpkgs";
@@ -1598,7 +1605,7 @@ let
         nixpkgs-lib = library;
       }
       &&
-        machine.ecosystems == {
+        probe.ecosystems == {
           nixpkgs-lib = library;
           nixos = {
             from = "ecosystemSrc";
@@ -1618,8 +1625,8 @@ let
     # ecosystem they resolved came from. `hiveLib` pins colmena and
     # disko under those names and selects nothing for them, so a colmena
     # configuration and a disko configuration of either integration
-    # take the pinned source of that name. A machine inside them takes
-    # its module collection from the `nixos` of the `defaultEcosystemSrc`
+    # take the pinned source of that name. A NixOS configuration inside
+    # them takes its module collection from the `nixos` of the `defaultEcosystemSrc`
     # of the composition. The darwin composition pins nix-darwin,
     # nixpkgs, home-manager and hjem under those names. The hjem
     # composition pins hjem
@@ -1674,7 +1681,7 @@ let
       && familyChildren.hjem.probe.ecosystems.hjem == pinned "hjem"
       && hjem.standalone.caisson.manifest.ecosystems.hjem == pinned "hjem"
       && hjem.inner.ecosystems.hjem == pinned "hjem"
-      && hjem.machineManifest.ecosystems.nixos == library;
+      && hjem.nixosManifest.ecosystems.nixos == library;
 
     # A selector that renames and drops configurations, with a note
     # saying so: the export record holds the published names alone,
@@ -1684,7 +1691,7 @@ let
     # integration.
     exportRecordFollowsTheSelector =
       let
-        machine =
+        nixosConfiguration =
           lib:
           lib.caisson.nixos.mkConfiguration {
             ecosystemSrc = dependencies: dependencies.nixpkgs;
@@ -1696,15 +1703,15 @@ let
             { lib, ... }:
             {
               caisson.nixos.configurations = {
-                nas-1 = machine lib;
-                lab-3 = machine lib;
+                nas-1 = nixosConfiguration lib;
+                lab-3 = nixosConfiguration lib;
               };
               caisson.nixos.exported =
                 configurations:
                 lib.mapAttrs' (name: lib.nameValuePair "office-${name}") (
                   lib.filterAttrs (name: _: !lib.hasPrefix "lab-" name) configurations
                 );
-              caisson.nixos.exportNote = "office machines take the site prefix; lab machines stay unpublished";
+              caisson.nixos.exportNote = "office NixOS configurations take the site prefix; lab NixOS configurations stay unpublished";
             };
         };
         entry = top.caisson.manifest.exportRecord.nixosConfigurations.office-nas-1;
@@ -1722,26 +1729,29 @@ let
             name = "nas-1";
           }
         ]
-      && entry.notes == [ "office machines take the site prefix; lab machines stay unpublished" ]
+      &&
+        entry.notes
+        == [ "office NixOS configurations take the site prefix; lab NixOS configurations stay unpublished" ]
       && builtins.length entry.code == 2
       && (builtins.elemAt entry.code 0).line == null
       && pkgs.lib.hasSuffix "/lib-overlays/nixos/default.nix" (builtins.elemAt entry.code 1).file;
 
-    # The same machine activates the home-manager configurations
-    # inside it. It writes a system unit for the home-manager
-    # configuration whose account it declares, which runs as that
-    # user, and a user unit for the other home-manager configuration,
-    # which runs only for that user. The script of each unit runs the
-    # `activate` program of the activation package of its home-manager
-    # configuration. The system of the machine evaluates with the
-    # units in it, which also checks the assertions of the machine.
-    aMachineActivatesTheHomeManagerConfigurationsInsideIt =
+    # The same NixOS configuration activates the home-manager
+    # configurations inside it. It writes a system unit for the
+    # home-manager configuration whose account it declares, which runs
+    # as that user, and a user unit for the other home-manager
+    # configuration, which runs only for that user. The script of each
+    # unit runs the `activate` program of the activation package of its
+    # home-manager configuration. The system of the NixOS configuration
+    # evaluates with the units in it, which also checks the assertions
+    # of the NixOS configuration.
+    aNixosConfigurationActivatesTheHomeManagerConfigurationsInsideIt =
       let
-        machine = machineWithHomeManagerConfigurations.nixosConfigurations.probe.config;
-        declared = machineWithHomeManagerConfigurations.homeConfigurations."declared@probe";
-        undeclared = machineWithHomeManagerConfigurations.homeConfigurations."undeclared@probe";
-        systemUnit = machine.systemd.services.home-manager-declared;
-        userUnit = machine.systemd.user.services.home-manager-undeclared;
+        nixosConfig = nixosConfigurationWithHomeManagerConfigurations.nixosConfigurations.probe.config;
+        declared = nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."declared@probe";
+        undeclared = nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."undeclared@probe";
+        systemUnit = nixosConfig.systemd.services.home-manager-declared;
+        userUnit = nixosConfig.systemd.user.services.home-manager-undeclared;
         # The script of the unit runs `activate` of the activation
         # package of the home-manager configuration: the string
         # context of the script records that it refers to the
@@ -1763,23 +1773,23 @@ let
       && userUnit.unitConfig.ConditionUser == "undeclared"
       && runs userUnit undeclared
       && !(runs userUnit declared)
-      && !(machine.systemd.services ? home-manager-undeclared)
-      && !(machine.systemd.user.services ? home-manager-declared)
-      && builtins.isString machine.system.build.toplevel.drvPath;
+      && !(nixosConfig.systemd.services ? home-manager-undeclared)
+      && !(nixosConfig.systemd.user.services ? home-manager-declared)
+      && builtins.isString nixosConfig.system.build.toplevel.drvPath;
 
     # A home-manager configuration that leaves `caisson.useUserPackages`
     # unset installs its packages itself: home-manager's option
     # `submoduleSupport.externalPackageInstall` is false, the profile of
     # the packages is `~/.nix-profile`, the `activate` script installs
     # `home.path` into it, and the profile adapter says that the
-    # activation sets both profiles. The machine adds no packages to the
-    # account, builds no `/etc/profiles/per-user/<user>`, and links no
-    # `/etc/profile.d`.
+    # activation sets both profiles. The NixOS configuration adds no
+    # packages to the account, builds no `/etc/profiles/per-user/<user>`,
+    # and links no `/etc/profile.d`.
     aHomeManagerConfigurationInstallsItsPackagesByDefault =
       let
-        machine = machineWithHomeManagerConfigurations.nixosConfigurations.probe.config;
+        nixosConfig = nixosConfigurationWithHomeManagerConfigurations.nixosConfigurations.probe.config;
         homeManagerConfigurations =
-          machineWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+          nixosConfigurationWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
         installsItsPackages =
           name: directory:
           let
@@ -1803,33 +1813,34 @@ let
       in
       installsItsPackages "declared" "/home/declared"
       && installsItsPackages "undeclared" "/home/undeclared"
-      && machine.users.users.declared.packages == [ ]
-      && !(machine.environment.etc ? "profiles/per-user/declared")
-      && !(machine.environment.etc ? "profiles/per-user/undeclared")
-      && !(builtins.elem "/etc/profile.d" machine.environment.pathsToLink);
+      && nixosConfig.users.users.declared.packages == [ ]
+      && !(nixosConfig.environment.etc ? "profiles/per-user/declared")
+      && !(nixosConfig.environment.etc ? "profiles/per-user/undeclared")
+      && !(builtins.elem "/etc/profile.d" nixosConfig.environment.pathsToLink);
 
     # A home-manager configuration that sets `caisson.useUserPackages`
-    # leaves its packages to the machine. home-manager's option
-    # `submoduleSupport.externalPackageInstall` is true, so the profile of
-    # the packages is `/etc/profiles/per-user/<user>`, and the `activate`
-    # script removes `home-manager-path` from the profile in the home
-    # directory instead of installing it. The machine adds `home.path` to
-    # the packages of the account it declares, builds
+    # leaves its packages to the NixOS configuration. home-manager's
+    # option `submoduleSupport.externalPackageInstall` is true, so the
+    # profile of the packages is `/etc/profiles/per-user/<user>`, and the
+    # `activate` script removes `home-manager-path` from the profile in
+    # the home directory instead of installing it. The NixOS
+    # configuration adds `home.path` to the packages of the account it
+    # declares, builds
     # `/etc/profiles/per-user/<user>` from `home.path` for the user
     # declared elsewhere, and links `/etc/profile.d`. The home-manager
     # configuration beside them that leaves the option unset installs
     # its packages itself, and the units of all three are as without the
     # option.
-    aMachineInstallsThePackagesOfAHomeManagerConfigurationThatSetsUseUserPackages =
+    aNixosConfigurationInstallsThePackagesOfAHomeManagerConfigurationThatSetsUseUserPackages =
       let
-        machine = machineWithUserPackages.nixosConfigurations.probe.config;
+        nixosConfig = nixosConfigurationWithUserPackages.nixosConfigurations.probe.config;
         homeManagerConfigurations =
-          machineWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+          nixosConfigurationWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
         configOf = name: homeManagerConfigurations.${name}.value.config;
         adapterOf =
           name: homeManagerConfigurations.${name}.activation.profileAdapter homeManagerConfigurations.${name};
         drvPaths = builtins.map (package: package.drvPath);
-        installedByMachine =
+        installedByTheNixosConfiguration =
           name:
           let
             config = configOf name;
@@ -1845,30 +1856,31 @@ let
           && adapter.profiles.packages.setBy == "machine"
           && adapter.profiles.generations.setBy == "activation";
       in
-      installedByMachine "declared"
-      && installedByMachine "undeclared"
+      installedByTheNixosConfiguration "declared"
+      && installedByTheNixosConfiguration "undeclared"
       && (adapterOf "plain").profiles.packages.setBy == "activation"
       && (configOf "plain").home.profileDirectory == "/home/plain/.nix-profile"
-      && drvPaths machine.users.users.declared.packages == [ (configOf "declared").home.path.drvPath ]
-      && machine.users.users.plain.packages == [ ]
-      && !(machine.users.users ? undeclared)
-      && machine.environment.etc ? "profiles/per-user/declared"
+      && drvPaths nixosConfig.users.users.declared.packages == [ (configOf "declared").home.path.drvPath ]
+      && nixosConfig.users.users.plain.packages == [ ]
+      && !(nixosConfig.users.users ? undeclared)
+      && nixosConfig.environment.etc ? "profiles/per-user/declared"
       &&
-        drvPaths machine.environment.etc."profiles/per-user/undeclared".source.paths == [
+        drvPaths nixosConfig.environment.etc."profiles/per-user/undeclared".source.paths == [
           (configOf "undeclared").home.path.drvPath
         ]
-      && !(machine.environment.etc ? "profiles/per-user/plain")
-      && builtins.elem "/etc/profile.d" machine.environment.pathsToLink
-      && machine.systemd.services ? home-manager-declared
-      && machine.systemd.services ? home-manager-plain
-      && machine.systemd.user.services ? home-manager-undeclared;
+      && !(nixosConfig.environment.etc ? "profiles/per-user/plain")
+      && builtins.elem "/etc/profile.d" nixosConfig.environment.pathsToLink
+      && nixosConfig.systemd.services ? home-manager-declared
+      && nixosConfig.systemd.services ? home-manager-plain
+      && nixosConfig.systemd.user.services ? home-manager-undeclared;
 
     # The home-manager configuration published as
     # `homeConfigurations."<user>@<host>"`, which a standalone
     # `home-manager switch` builds, is the home-manager configuration
-    # the machine activates: its activation package is the package the
-    # unit of the machine runs, with the option set as without it. The
-    # marker of the machine records the digest of the `home.path` it
+    # the NixOS configuration activates: its activation package is the
+    # package the unit of the NixOS configuration runs, with the option
+    # set as without it. The marker of the NixOS configuration records
+    # the digest of the `home.path` it
     # installed for each home-manager configuration that sets
     # `caisson.useUserPackages`, by the name of the marker file of that
     # home-manager configuration, and the drift step of that
@@ -1877,24 +1889,24 @@ let
     # that leaves the option unset has no entry and no such comparison.
     aHomeManagerConfigurationThatSetsUseUserPackagesIsTheSameStandalone =
       let
-        machine = machineWithUserPackages.nixosConfigurations.probe.config;
+        nixosConfig = nixosConfigurationWithUserPackages.nixosConfigurations.probe.config;
         homeManagerConfigurations =
-          machineWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
-        published = name: machineWithUserPackages.homeConfigurations."${name}@probe";
+          nixosConfigurationWithUserPackages.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.children.system.x86_64-linux.children.home-manager;
+        published = name: nixosConfigurationWithUserPackages.homeConfigurations."${name}@probe";
         unitRuns =
           unit: name:
           builtins.elem (published name).activationPackage.drvPath (
             builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart.text)
           );
-        record = builtins.fromJSON machine.environment.etc."caisson/marker.json".text;
+        record = builtins.fromJSON nixosConfig.environment.etc."caisson/marker.json".text;
         digestOf = name: builtins.hashString "sha256" (toString (published name).config.home.path);
         step = name: (published name).config.home.activation.caissonDrift.data;
       in
       (published "declared").activationPackage.drvPath
       == homeManagerConfigurations.declared.outputs.activationPackage.drvPath
-      && unitRuns machine.systemd.services.home-manager-declared "declared"
-      && unitRuns machine.systemd.user.services.home-manager-undeclared "undeclared"
-      && unitRuns machine.systemd.services.home-manager-plain "plain"
+      && unitRuns nixosConfig.systemd.services.home-manager-declared "declared"
+      && unitRuns nixosConfig.systemd.user.services.home-manager-undeclared "undeclared"
+      && unitRuns nixosConfig.systemd.services.home-manager-plain "plain"
       &&
         builtins.attrNames record == [
           "identity"
@@ -1909,30 +1921,31 @@ let
       && pkgs.lib.hasInfix (digestOf "declared") (step "declared")
       && !(pkgs.lib.hasInfix ".profiles[$key][$name]" (step "plain"));
 
-    # The same machine writes the file `/etc/caisson/marker.json`. The
-    # file holds the digest of the system of the machine with the
-    # configurations declared inside it left out.
+    # The same NixOS configuration writes the file
+    # `/etc/caisson/marker.json`. The file holds the digest of the
+    # system that the result of the childless evaluation of the NixOS
+    # configuration builds.
     #
-    # The system that the machine builds has the units of the
-    # home-manager configurations in it. So the digest in the file is
-    # the digest of the childless system, and not of the system that
-    # the machine builds.
+    # The system that the NixOS configuration builds has the units of
+    # the home-manager configurations in it. So the digest in the file
+    # is the digest of the system of the childless evaluation, and not
+    # of the system that the NixOS configuration builds.
     #
     # Each home-manager configuration computes the same digest. The
     # activation of each home-manager configuration has a step that
     # compares that digest with the file. The script of the step must
     # therefore contain the digest and the path of the file.
-    aMachineRecordsWhatItsHomeManagerConfigurationsCompareAgainst =
+    aNixosConfigurationRecordsWhatItsHomeManagerConfigurationsCompareAgainst =
       let
-        machine = machineWithHomeManagerConfigurations.nixosConfigurations.probe.config;
+        nixosConfig = nixosConfigurationWithHomeManagerConfigurations.nixosConfigurations.probe.config;
         homeManagerConfigurations = [
-          machineWithHomeManagerConfigurations.homeConfigurations."declared@probe"
-          machineWithHomeManagerConfigurations.homeConfigurations."undeclared@probe"
+          nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."declared@probe"
+          nixosConfigurationWithHomeManagerConfigurations.homeConfigurations."undeclared@probe"
         ];
-        record = builtins.fromJSON machine.environment.etc."caisson/marker.json".text;
+        record = builtins.fromJSON nixosConfig.environment.etc."caisson/marker.json".text;
         digest = record.identity;
         childless =
-          machineWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.childlessManifest.outputs.toplevel;
+          nixosConfigurationWithHomeManagerConfigurations.caisson.manifest.children.system.x86_64-linux.children.nixos.probe.childlessManifest.outputs.toplevel;
         comparesAgainstIt =
           homeManagerConfiguration:
           let
@@ -1942,41 +1955,42 @@ let
       in
       builtins.attrNames record == [ "identity" ]
       && digest == builtins.hashString "sha256" childless.outPath
-      && digest != builtins.hashString "sha256" machine.system.build.toplevel.outPath
+      && digest != builtins.hashString "sha256" nixosConfig.system.build.toplevel.outPath
       && builtins.all comparesAgainstIt homeManagerConfigurations;
 
     # A NixOS configuration can be evaluated alone, with
     # `mkTopConfiguration`, or declared inside another configuration,
     # under `caisson.nixos.configurations`. The parent here gives its
-    # children nothing. The machine must then be the same machine in
-    # each position: its system is the same derivation.
+    # children nothing. The NixOS configuration must then have the same
+    # evaluation result in each position: its system is the same
+    # derivation.
     #
-    # The machine is declared inside a structural configuration and
-    # inside a flake-parts configuration. Each parent publishes it as
-    # `nixosConfigurations.probe`.
-    aMachineInsideAParentIsTheSameMachine =
+    # The NixOS configuration is declared inside a structural
+    # configuration and inside a flake-parts configuration. Each parent
+    # publishes it as `nixosConfigurations.probe`.
+    aNixosConfigurationInsideAParentHasTheSameEvaluationResult =
       let
-        machine = {
+        probeArgs = {
           ecosystemSrc = dependencies: dependencies.nixpkgs;
           configModule = {
             imports = [ minimalNixosBase ];
             networking.hostName = "probe";
           };
         };
-        declaresTheMachine =
+        declaresTheProbe =
           { lib, ... }:
           {
-            caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration machine;
+            caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration probeArgs;
           };
-        alone = hiveLib.caisson.nixos.mkTopConfiguration machine;
+        alone = hiveLib.caisson.nixos.mkTopConfiguration probeArgs;
         insideStructural =
           (hiveLib.caisson.structural.mkTopConfiguration {
             moduleImports = _modules: [ ];
-            configModule = declaresTheMachine;
+            configModule = declaresTheProbe;
           }).nixosConfigurations.probe;
         insideFlake =
           (hiveLib.caisson.flake-parts.mkTopConfiguration {
-            configModule = declaresTheMachine;
+            configModule = declaresTheProbe;
           }).nixosConfigurations.probe;
         systemOf = configuration: configuration.config.system.build.toplevel.drvPath;
       in
@@ -1984,9 +1998,9 @@ let
 
     # A flake publishes its manifest as the output `caisson.manifest`,
     # as a structural top does, with the export record of what it
-    # publishes. The name path of the record's entry for the machine,
-    # followed from that manifest through `children`, leads to the
-    # machine the flake publishes.
+    # publishes. The name path of the record's entry for the NixOS
+    # configuration, followed from that manifest through `children`,
+    # leads to the NixOS configuration the flake publishes.
     aFlakePublishesItsManifestWithTheExportRecord =
       let
         flake = hiveLib.caisson.flake-parts.mkTopConfiguration {
@@ -2015,7 +2029,7 @@ let
     # and the images. Each is a reference into `config.system.build`
     # of the real NixOS. The system and both VMs are derivations, and
     # NixOS offers at least one image.
-    aMachineRecordsItsSystemItsVmsAndItsImages =
+    aNixosConfigurationRecordsItsSystemItsVmsAndItsImages =
       let
         outputs = nixosEvaluationLib.caisson.evalManifest.childlessManifest.outputs;
       in
@@ -2030,13 +2044,14 @@ let
     # configuration declared inside a structural configuration build
     # the same activation package.
     #
-    # A home-manager configuration declared inside a machine is given
-    # the home directory, the user ID and the Nix package of the
-    # machine, by modules that the machine passes to its home-manager
-    # configurations by default. A home-manager configuration that
-    # passes `moduleImports` selects its modules itself and gets none
-    # of them. Such a home-manager configuration, inside a machine,
-    # must also build the same activation package as the home-manager
+    # A home-manager configuration declared inside a NixOS
+    # configuration is given the home directory, the user ID and the
+    # Nix package of the NixOS configuration, by modules that the NixOS
+    # configuration passes to its home-manager configurations by
+    # default. A home-manager configuration that passes `moduleImports`
+    # selects its modules itself and gets none of them. Such a
+    # home-manager configuration, inside a NixOS configuration, must
+    # also build the same activation package as the home-manager
     # configuration evaluated alone.
     aHomeManagerConfigurationInsideAParentIsTheSameHomeManagerConfiguration =
       let
@@ -2058,13 +2073,13 @@ let
                 caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration homeManagerConfiguration;
               };
           }).homeConfigurations.probe;
-        insideMachine =
+        insideNixos =
           (hiveLib.caisson.structural.mkTopConfiguration {
             moduleImports = _modules: [ ];
             configModule =
               { lib, ... }:
               {
-                caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                caisson.nixos.configurations.parent = lib.caisson.nixos.mkConfiguration {
                   ecosystemSrc = dependencies: dependencies.nixpkgs;
                   configModule =
                     { lib, ... }:
@@ -2080,11 +2095,11 @@ let
                     };
                 };
               };
-          }).homeConfigurations."probe@machine";
+          }).homeConfigurations."probe@parent";
         activationOf = configuration: configuration.activationPackage.drvPath;
       in
       activationOf insideStructural == activationOf alone
-      && activationOf insideMachine == activationOf alone;
+      && activationOf insideNixos == activationOf alone;
 
     # The same for a structural configuration, which builds nothing.
     # A structural configuration evaluated alone and the same
@@ -2118,15 +2133,16 @@ let
     # The same for a flake. A flake-parts configuration can be the top
     # of a flake, or it can be declared inside another configuration,
     # under `caisson.flake-parts.configurations`. A flake declared
-    # inside another publishes its machines through its parent.
+    # inside another publishes its NixOS configurations through its
+    # parent.
     #
-    # The flake here declares a machine. It is evaluated alone, inside
-    # a flake-parts configuration, and inside a structural
-    # configuration. The parents give their children nothing. Each of
-    # the three publishes the machine as `nixosConfigurations.probe`,
-    # and the system of the machine is the same derivation in all
-    # three.
-    aFlakeInsideAParentPublishesTheSameMachine =
+    # The flake here declares a NixOS configuration. The flake is
+    # evaluated alone, inside a flake-parts configuration, and inside a
+    # structural configuration. The parents give their children
+    # nothing. Each of these tops publishes the NixOS configuration as
+    # `nixosConfigurations.probe`, and its system is the same
+    # derivation in each.
+    aFlakeInsideAParentPublishesTheSameNixosConfiguration =
       let
         flake = {
           configModule =
@@ -2180,8 +2196,8 @@ let
     # A colmena configuration declared under the name `colmenaHive` inside
     # a top fills the top's `colmenaHive`. Its nodes are the NixOS
     # configurations declared inside it, which the top also publishes
-    # as `nixosConfigurations`, so the hive and the published machine
-    # are the same evaluation.
+    # as `nixosConfigurations`, so the node of the hive and the
+    # published NixOS configuration are the same evaluation result.
     colmenaHiveEvaluatesEndToEnd =
       let
         top = colmenaTop {
@@ -2206,15 +2222,15 @@ let
     # `targetHost` the node leaves unset is the node's name in the hive.
     colmenaNodesAreNixosConfigurations =
       let
-        machineModule = {
+        nixosModule = {
           imports = [ minimalNixosBase ];
           networking.hostName = "probe";
         };
-        top = colmenaTop { probe = machineModule; };
+        top = colmenaTop { probe = nixosModule; };
         node = top.colmenaHive.nodes.probe;
         system = hiveLib.caisson.nixos.mkTopConfiguration {
           ecosystemSrc = dependencies: dependencies.nixpkgs;
-          configModule = machineModule;
+          configModule = nixosModule;
         };
       in
       node.config.system.build.toplevel.drvPath == system.config.system.build.toplevel.drvPath
@@ -2273,13 +2289,14 @@ let
       in
       refused "a,b" && refused "@tagged" && refused "";
 
-    # A node is one evaluation. A NixOS configuration inside a colmena
-    # configuration that evaluates its children for two systems is
-    # evaluated per system, once for each, and the hive refuses it. The
-    # top still publishes both evaluations as NixOS configurations, and
-    # each evaluates, so it is the hive that refuses them. When the
-    # colmena configuration evaluates its children for a single system,
-    # the same top has one node.
+    # A node is a single evaluation result. A NixOS configuration
+    # declared inside a colmena configuration whose children are
+    # evaluated for two systems has an evaluation result for each
+    # system, and the hive refuses it. The top still publishes each
+    # evaluation result as a NixOS configuration, and each evaluates,
+    # so it is the hive that refuses them. When the children of the
+    # colmena configuration are evaluated for a single system, the same
+    # top has a single node.
     colmenaRefusesNodesEvaluatedMoreThanOnce =
       let
         systems = [
@@ -2429,12 +2446,13 @@ let
       && !(builtins.tryEval (withoutPkgs.introspect readPkgs)).success;
 
     # A structural configuration groups NixOS configurations so the
-    # group can be declared wherever machines are, as a unit. The same
-    # group of two machines is declared under a structural top and
-    # inside a colmena configuration: each machine is the same
-    # evaluation in both places, the top publishes the machines under
-    # their names, and the colmena configuration finds its nodes
-    # through the group, under the same names.
+    # group can be declared wherever NixOS configurations are, as a
+    # unit. The same group of NixOS configurations is declared under a
+    # structural top and inside a colmena configuration: each NixOS
+    # configuration has the same evaluation result in both places, the
+    # top publishes the NixOS configurations under their names, and the
+    # colmena configuration finds its nodes through the group, under
+    # the same names.
     structuralGroupsNixosConfigurationsForReuse =
       let
         group =
@@ -2460,7 +2478,7 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.structural.configurations.machines = group lib;
+              caisson.structural.configurations.hosts = group lib;
             };
         };
         deployed = hiveLib.caisson.structural.mkTopConfiguration {
@@ -2472,12 +2490,12 @@ let
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.structural.configurations.machines = group lib;
+                    caisson.structural.configurations.hosts = group lib;
                   };
               };
             };
         };
-        drvOf = machine: machine.config.system.build.toplevel.drvPath;
+        drvOf = evaluated: evaluated.config.system.build.toplevel.drvPath;
         hive = deployed.colmenaHive;
       in
       builtins.attrNames plain.nixosConfigurations == [
@@ -2495,15 +2513,17 @@ let
       && drvOf deployed.nixosConfigurations.host-2 == drvOf hive.nodes.host-2;
 
     # Structural configurations inside a colmena configuration group its
-    # machines, and each group gives its machines modules, which is what
-    # colmena's `defaults` and per-node modules are for. Two groups add
-    # different modules to the default of the NixOS configurations
-    # declared inside them: machines a, b and c get the first, d and
-    # e the second. Each module also tags its machines with the name of
-    # the group, so `colmena apply --on @first` selects the first group.
-    # Every node gets the module and the tag of its own group and not
-    # the other, and every machine is a node of the hive.
-    structuralGroupsInsideColmenaGiveTheirMachinesModules =
+    # NixOS configurations, and each group gives its NixOS
+    # configurations modules, which is what colmena's `defaults` and
+    # per-node modules are for. Two groups add different modules to the
+    # default of the NixOS configurations declared inside them: the
+    # NixOS configurations a, b and c get the first, d and e the
+    # second. Each module also tags its NixOS configurations with the
+    # name of the group, so `colmena apply --on @first` selects the
+    # first group. Every node gets the module and the tag of its group
+    # and not the other, and every NixOS configuration is a node of the
+    # hive.
+    structuralGroupsInsideColmenaGiveTheirNixosConfigurationsModules =
       let
         groupModule = groupName: {
           environment.etc.group-name.text = groupName;
@@ -2553,20 +2573,20 @@ let
                 };
               };
           }).colmenaHive;
-        machines = [
+        nodeNames = [
           "a"
           "b"
           "c"
           "d"
           "e"
         ];
-        groupOf = machine: hive.nodes.${machine}.config.environment.etc.group-name.text;
+        groupOf = nodeName: hive.nodes.${nodeName}.config.environment.etc.group-name.text;
         tagged =
-          tag: builtins.filter (machine: builtins.elem tag hive.deploymentConfig.${machine}.tags) machines;
+          tag: builtins.filter (nodeName: builtins.elem tag hive.deploymentConfig.${nodeName}.tags) nodeNames;
       in
-      builtins.attrNames hive.nodes == machines
+      builtins.attrNames hive.nodes == nodeNames
       &&
-        builtins.map groupOf machines == [
+        builtins.map groupOf nodeNames == [
           "first"
           "first"
           "first"
@@ -2613,8 +2633,9 @@ let
       && top.nixosConfigurations.beta.config.networking.hostName == "beta";
 
     # `nodes` is the nodes themselves: the NixOS configurations declared
-    # inside the colmena configuration, read from its full evaluation
-    # through `unsafeCrossChildReferences`. Each node records the colmena configuration as the
+    # inside the colmena configuration, read from the evaluation result
+    # of the colmena configuration with its children, through
+    # `unsafeCrossChildReferences`. Each node records the colmena configuration as the
     # level whose children it reads.
     colmenaUpstreamNodesAreTheNodes =
       let
@@ -2648,7 +2669,7 @@ let
         export = nixops4Export top.nixops4;
         resource = export.members.probe.resource;
         args = resource.inputs.args;
-        machine =
+        evaluated =
           (nixops4RootManifest top).children.caisson-nixops4-resource.probe.value.config.nixos.configuration;
       in
       top.nixops4._type == "nixops4Component"
@@ -2656,9 +2677,9 @@ let
       && resource.type == "exec"
       && resource.inputs.executable == pkgs.lib.getExe pkgs.bash
       && builtins.elemAt args 2 == "root@probe"
-      && builtins.elemAt args 3 == "${machine.config.system.build.toplevel}"
+      && builtins.elemAt args 3 == "${evaluated.config.system.build.toplevel}"
       && pkgs.lib.hasInfix "$1/bin/apply switch" (builtins.elemAt args 1)
-      && pkgs.lib.hasInfix "$out/bin/apply" machine.config.system.activatableSystemBuilderCommands
+      && pkgs.lib.hasInfix "$out/bin/apply" evaluated.config.system.activatableSystemBuilderCommands
       && pkgs.lib.hasInfix nixops4HostKey (
         builtins.readFile (
           builtins.head (builtins.match ".*UserKnownHostsFile=([^ ]*) .*" (builtins.elemAt args 1))
@@ -2989,7 +3010,7 @@ let
         top = nixops4UpstreamTopWith { } [ nixops4UpstreamRoot ];
         probe = (nixops4Export top.nixops4).members.probe.resource;
         member = (nixops4RootManifest top).children.caisson-nixops4-resource.probe;
-        machine = member.children.system.x86_64-linux.children.nixos.probe;
+        nixosManifest = member.children.system.x86_64-linux.children.nixos.probe;
         upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
           system = null;
           modules = [
@@ -3002,12 +3023,13 @@ let
           ];
         };
       in
-      machine.type == "nixos"
+      nixosManifest.type == "nixos"
       && probe.inputs.executable == pkgs.lib.getExe pkgs.bash
-      && builtins.elemAt probe.inputs.args 3 == "${machine.value.config.system.build.toplevel}"
-      && pkgs.lib.hasInfix "$out/bin/apply" machine.value.config.system.activatableSystemBuilderCommands
+      && builtins.elemAt probe.inputs.args 3 == "${nixosManifest.value.config.system.build.toplevel}"
+      && pkgs.lib.hasInfix "$out/bin/apply" nixosManifest.value.config.system.activatableSystemBuilderCommands
       &&
-        machine.value.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath;
+        nixosManifest.value.config.system.build.toplevel.drvPath
+        == upstream.config.system.build.toplevel.drvPath;
 
     # The shell of a nixops4-nixos member comes from the package set
     # caisson selects for the nixops4 configuration, not from the
@@ -3029,9 +3051,9 @@ let
       in
       (nixops4Export top.nixops4).members.probe.resource.inputs.executable == pkgs.lib.getExe pkgs.dash;
 
-    # Every upstream composite reads its members' configs through its
-    # full evaluation: each member records the composite as the level
-    # whose children it reads.
+    # Every upstream composite reads the configs of its members through
+    # its evaluation result with its children: each member records the
+    # composite as the level whose children it reads.
     nixops4UpstreamMembersReadTheFullComposite =
       let
         root = nixops4RootManifest (nixops4UpstreamTopWith { } [ nixops4UpstreamRoot ]);
@@ -3246,7 +3268,7 @@ let
     # A NixOS configuration declared inside a resource inside a nested
     # composite is deployed by that resource, as a NixOS configuration
     # declared inside a resource of the root is.
-    nixops4MachineInsideANestedComposite =
+    nixops4NixosConfigurationInsideANestedComposite =
       let
         top = nixops4RootTopWith (
           { lib, ... }:
@@ -3274,14 +3296,14 @@ let
         web =
           (nixops4RootManifest top)
           .children.caisson-nixops4-composite.site.children.caisson-nixops4-resource.web;
-        machine = web.children.system.x86_64-linux.children.nixos.web;
+        nixosManifest = web.children.system.x86_64-linux.children.nixos.web;
       in
       web.value.config.absoluteMemberPath == [
         "site"
         "web"
       ]
       && builtins.elemAt args 2 == "root@web"
-      && builtins.elemAt args 3 == "${machine.value.config.system.build.toplevel}";
+      && builtins.elemAt args 3 == "${nixosManifest.value.config.system.build.toplevel}";
 
     # Which members a composite has, and whether each is a composite or
     # a resource, may not depend on its members or on their outputs:
@@ -3439,14 +3461,14 @@ let
     # per system, is published as `nixops4` when the NixOS configuration
     # is evaluated for a single system. Its entry is in the manifest for
     # that system.
-    nixops4RootInsideAMachine =
+    nixops4RootInsideANixosConfiguration =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
           moduleImports = _modules: [ ];
           configModule =
             { lib, ... }:
             {
-              caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+              caisson.nixos.configurations.deployer = lib.caisson.nixos.mkConfiguration {
                 configModule = {
                   imports = [ minimalNixosBase ];
                   caisson.caisson-nixops4-composite.configurations.nixops4 = nixops4Composite lib nixops4AddressRoot;
@@ -3455,7 +3477,7 @@ let
             };
         };
         entry =
-          top.caisson.manifest.children.system.x86_64-linux.children.nixos.machine.children.caisson-nixops4-composite.nixops4;
+          top.caisson.manifest.children.system.x86_64-linux.children.nixos.deployer.children.caisson-nixops4-composite.nixops4;
       in
       core.isDeferred entry
       && entry.parent.type == "nixos"
@@ -3644,28 +3666,29 @@ let
         }).colmenaHive
       ).success;
 
-    # A machine installed onto a caisson-disko layout gets the file
-    # systems, boot settings and swap the layout produces, and nothing
-    # of disko: it has no `disko` option and no disko scripts. It is
-    # the system NixOS builds from the NixOS module of disko and the same
-    # layout. The machine `nas-1` inside the layout `nas-1` is published
-    # as `nixosConfigurations.nas-1`, beside `diskoConfigurations.nas-1`.
-    caissonDiskoMachinesGetTheLayoutsSettings =
+    # A NixOS configuration installed onto a caisson-disko layout gets
+    # the file systems, boot settings and swap the layout produces, and
+    # nothing of disko: it has no `disko` option and no disko scripts.
+    # It builds the system NixOS builds from the NixOS module of disko
+    # and the same layout. The NixOS configuration `nas-1` inside the
+    # layout `nas-1` is published as `nixosConfigurations.nas-1`, beside
+    # `diskoConfigurations.nas-1`.
+    caissonDiskoNixosConfigurationsGetTheLayoutsSettings =
       let
         top = layoutTop {
           integration = "caisson-disko";
           layout = luksLvmLayout;
-          machine = diskoMachineBase;
+          nixosModule = diskoNixosBase;
         };
-        machine = top.nixosConfigurations.nas-1;
-        upstream = upstreamDiskoMachine luksLvmLayout;
+        installed = top.nixosConfigurations.nas-1;
+        upstream = upstreamDiskoNixosConfiguration luksLvmLayout;
       in
       builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
       && builtins.attrNames top.diskoConfigurations == [ "nas-1" ]
-      && !(machine.options ? disko)
-      && !(machine.config.system.build ? formatScript)
-      && machine.config.fileSystems."/".device == upstream.config.fileSystems."/".device
-      && machine.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath;
+      && !(installed.options ? disko)
+      && !(installed.config.system.build ? formatScript)
+      && installed.config.fileSystems."/".device == upstream.config.fileSystems."/".device
+      && installed.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath;
 
     # A caisson-disko layout is published in the form disko's command
     # reads. The evaluator of disko, given the published layout, makes
@@ -3686,9 +3709,9 @@ let
       && outputs.nixosConfig ? fileSystems
       && builtins.isString outputs.layoutHash;
 
-    # A layout with no machine installed onto it is published as a
-    # layout and nothing else.
-    caissonDiskoLayoutsNeedNoMachine =
+    # A layout with no NixOS configuration installed onto it is
+    # published as a layout and nothing else.
+    caissonDiskoLayoutsNeedNoNixosConfiguration =
       let
         top = layoutTop {
           integration = "caisson-disko";
@@ -3712,15 +3735,16 @@ let
               }
             ];
           };
-          machine = diskoMachineBase;
+          nixosModule = diskoNixosBase;
         };
         fails = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
       in
       fails top.diskoConfigurations.nas-1 && fails top.nixosConfigurations.nas-1.config.fileSystems;
 
-    # A disko configuration is a layout with no machine, as the
-    # standalone form of disko has it. It is published as
-    # `diskoConfigurations.nas-1`, with no machine beside it, and both
+    # A disko configuration is a layout with no NixOS configuration, as
+    # the standalone form of disko has it. It is published as
+    # `diskoConfigurations.nas-1`, with no NixOS configuration beside
+    # it, and both
     # the evaluator of disko given the published layout and the
     # `scripts` output of the layout make the format script disko makes from the
     # layout as written.
@@ -3758,15 +3782,15 @@ let
                 configModule = {
                   imports = [
                     luksLvmLayout
-                    diskoMachineBase
+                    diskoNixosBase
                   ];
                 };
               };
             };
         };
-        machine = top.nixosConfigurations.nas-1;
-        upstream = upstreamDiskoMachine luksLvmLayout;
-        installed = machine.extendModules {
+        nas-1 = top.nixosConfigurations.nas-1;
+        upstream = upstreamDiskoNixosConfiguration luksLvmLayout;
+        installed = nas-1.extendModules {
           modules = [
             (
               { lib, ... }:
@@ -3782,22 +3806,21 @@ let
       in
       builtins.attrNames top.nixosConfigurations == [ "nas-1" ]
       && !(top ? diskoConfigurations)
-      && machine.config.disko.devices.disk ? main
-      && machine.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath
+      && nas-1.config.disko.devices.disk ? main
+      && nas-1.config.system.build.toplevel.drvPath == upstream.config.system.build.toplevel.drvPath
       &&
-        machine.config.system.build.formatScript.drvPath
-        == upstream.config.system.build.formatScript.drvPath
+        nas-1.config.system.build.formatScript.drvPath == upstream.config.system.build.formatScript.drvPath
       && installed.config.disko.devices.disk.main.device == "/dev/vdz";
 
     # disko's install test extends a NixOS configuration that imports
     # the NixOS module of disko. A NixOS configuration that selects
-    # caisson's `disko` NixOS module builds the install test that the
-    # machine NixOS builds from disko's module and the same layout
-    # builds.
+    # caisson's `disko` NixOS module builds the install test that a
+    # NixOS configuration evaluated from disko's module and the same
+    # layout builds.
     #
     # disko's image builder, `diskoImages` and `diskoImagesScript`, fails
-    # to evaluate at the pinned disko and nixpkgs on a machine with no
-    # caisson: disko passes `vmTools` a tree of kernel modules as its
+    # to evaluate at the pinned disko and nixpkgs for a NixOS
+    # configuration with no caisson: disko passes `vmTools` a tree of kernel modules as its
     # `kernel`, which `vmTools` refuses. The test covers the install
     # test alone.
     diskosNixosFormBuildsDiskosInstallTest =
@@ -3812,14 +3835,14 @@ let
                 configModule = {
                   imports = [
                     luksLvmLayout
-                    diskoMachineBase
+                    diskoNixosBase
                   ];
                 };
               };
             };
         };
         build = top.nixosConfigurations.nas-1.config.system.build;
-        upstream = (upstreamDiskoMachine luksLvmLayout).config.system.build;
+        upstream = (upstreamDiskoNixosConfiguration luksLvmLayout).config.system.build;
       in
       build.installTest.drvPath == upstream.installTest.drvPath;
 
@@ -3859,11 +3882,11 @@ let
       in
       mountOf "/target" != mountOf "/mnt" && mountsUnder "caisson-disko" && mountsUnder "disko";
 
-    # A caisson-disko layout can have several machines installed onto
-    # it, such as a machine and its rescue system. Each is published
-    # under the name it is declared with, and each gets the file
-    # systems of the layout.
-    caissonDiskoLayoutsHoldSeveralMachines =
+    # A caisson-disko layout can have several NixOS configurations
+    # installed onto it, such as a server and its rescue system. Each
+    # is published under the name it is declared with, and each gets
+    # the file systems of the layout.
+    caissonDiskoLayoutsHoldSeveralNixosConfigurations =
       let
         top = hiveLib.caisson.structural.mkTopConfiguration {
           moduleImports = _modules: [ ];
@@ -3876,14 +3899,14 @@ let
                   {
                     imports = [ luksLvmLayout ];
                     caisson.nixos.configurations = lib.genAttrs [ "nas-1" "nas-1-rescue" ] (
-                      _hostName: lib.caisson.nixos.mkConfiguration { configModule = diskoMachineBase; }
+                      _hostName: lib.caisson.nixos.mkConfiguration { configModule = diskoNixosBase; }
                     );
                   };
               };
             };
         };
-        upstream = upstreamDiskoMachine luksLvmLayout;
-        rootOf = machine: machine.config.fileSystems."/".device;
+        upstream = upstreamDiskoNixosConfiguration luksLvmLayout;
+        rootOf = evaluated: evaluated.config.fileSystems."/".device;
       in
       builtins.attrNames top.nixosConfigurations == [
         "nas-1"
@@ -3895,7 +3918,8 @@ let
       && top.nixosConfigurations.nas-1-rescue.config.networking.hostName == "nas-1-rescue";
 
     # A layout declared inside a colmena configuration passes up the
-    # machine installed onto it, so the machine `nas-1` is the node
+    # NixOS configuration installed onto it, so the NixOS configuration
+    # `nas-1` is the node
     # `nas-1` of the hive, and the top publishes it as
     # `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
     diskoLayoutsInsideColmenaAreNodes =
@@ -3915,7 +3939,7 @@ let
                         {
                           imports = [ luksLvmLayout ];
                           caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
-                            configModule = diskoMachineBase // {
+                            configModule = diskoNixosBase // {
                               networking.hostName = "nas-1";
                             };
                           };
@@ -3975,7 +3999,7 @@ let
                                 caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
                                   configModule =
                                     { lib, ... }:
-                                    diskoMachineBase
+                                    diskoNixosBase
                                     // {
                                       networking.hostName = "nas-1";
                                       caisson.nixos.configurations.image = nested lib "image";
@@ -4037,7 +4061,7 @@ let
         marker = name: {
           environment.etc.${name}.text = name;
         };
-        machine =
+        nixosConfiguration =
           lib: hostName: base: inner:
           lib.caisson.nixos.mkConfiguration {
             configModule =
@@ -4051,7 +4075,7 @@ let
                   { }
                 else
                   {
-                    caisson.nixos.configurations.${inner} = machine lib inner minimalNixosBase null;
+                    caisson.nixos.configurations.${inner} = nixosConfiguration lib inner minimalNixosBase null;
                   }
               );
           };
@@ -4067,7 +4091,7 @@ let
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations.a = machine lib "a" minimalNixosBase "a-inner";
+                    caisson.nixos.configurations.a = nixosConfiguration lib "a" minimalNixosBase "a-inner";
                   };
               };
               caisson.caisson-disko.configurations.layout = lib.caisson.caisson-disko.mkConfiguration {
@@ -4075,14 +4099,14 @@ let
                   { lib, ... }:
                   {
                     imports = [ luksLvmLayout ];
-                    caisson.nixos.configurations.b = machine lib "b" diskoMachineBase "b-inner";
+                    caisson.nixos.configurations.b = nixosConfiguration lib "b" diskoNixosBase "b-inner";
                   };
               };
             };
         };
         published = top.nixosConfigurations;
-        has = name: machine: published.${machine}.config.environment.etc ? ${name};
-        machines = [
+        has = name: publishedName: published.${publishedName}.config.environment.etc ? ${name};
+        names = [
           "a"
           "a-inner"
           "b"
@@ -4105,15 +4129,15 @@ let
           }
         ];
       in
-      builtins.attrNames published == machines
+      builtins.attrNames published == names
       &&
-        builtins.map (has "nearest") machines == [
+        builtins.map (has "nearest") names == [
           true
           false
           true
           false
         ]
-      && builtins.all (has "every") machines
+      && builtins.all (has "every") names
       # The default entry of caisson, the addition the top gives through
       # `caisson.forChildren`, the addition the top gives the nearest
       # NixOS configurations, and the layout entry of caisson-disko,
@@ -4191,7 +4215,7 @@ let
       && builtins.all (name: vms.${name}.autostart && !vms.${name}.restartIfChanged) native;
 
     # microvm.nix reads the `microvm.*` options of a guest of a
-    # caisson-microvm configuration from the evaluation of the guest,
+    # caisson-microvm configuration from the evaluation result of the guest,
     # and the guest sets them in its modules. The guest `a` sets
     # its hypervisor, CPUs, memory, vsock CID and shares, and its
     # `evaluatedConfig` on the host has exactly those. The guest `b`
@@ -4224,8 +4248,9 @@ let
       && b.config.microvm.shares == [ ];
 
     # A microvm configuration declared inside a host is the guest
-    # itself: the host's `microvm.vms.upstream` has the evaluation of
-    # the microvm configuration as its `evaluatedConfig`, with the
+    # itself: the host's `microvm.vms.upstream` has the evaluation
+    # result of the microvm configuration as its `evaluatedConfig`, with
+    # the
     # microvm options the module of the guest sets. The host starts it at
     # boot, as microvm.nix does by default, and restarts it when it
     # changes. The microvm configuration records microvm.nix's guest
@@ -4353,7 +4378,7 @@ let
                             configModule =
                               { lib, ... }:
                               {
-                                imports = [ diskoMachineBase ];
+                                imports = [ diskoNixosBase ];
                                 caisson.caisson-microvm.configurations.pool = lib.caisson.caisson-microvm.mkConfiguration {
                                   configModule =
                                     { lib, ... }:
@@ -4388,15 +4413,16 @@ let
         name: !(published.${name}.options ? deployment) && !(published.${name}.config.fileSystems ? "/boot")
       ) guests;
 
-    # The convention for a machine inside a layout: the layout declares
-    # it under the name of the layout, read from
+    # The convention for a NixOS configuration inside a layout: the
+    # layout declares it under the name of the layout, read from
     # `lib.caisson-core.evalManifest.name`, and caisson's default NixOS
-    # module sets the host name to the name the machine is declared
-    # under. A machine that sets a host name itself keeps it.
-    diskoMachinesNamedAfterTheirLayout =
+    # module sets the host name to the name the NixOS configuration is
+    # declared under. A NixOS configuration that sets a host name itself
+    # keeps it.
+    diskoNixosConfigurationsNamedAfterTheirLayout =
       let
         layoutWith =
-          machine:
+          nixosModule:
           hiveLib.caisson.structural.mkTopConfiguration {
             moduleImports = _modules: [ ];
             configModule =
@@ -4409,13 +4435,13 @@ let
                       imports = [ luksLvmLayout ];
                       caisson.nixos.configurations.${lib.caisson-core.evalManifest.name} =
                         lib.caisson.nixos.mkConfiguration
-                          { configModule = machine; };
+                          { configModule = nixosModule; };
                     };
                 };
               };
           };
-        named = layoutWith diskoMachineBase;
-        renamed = layoutWith (diskoMachineBase // { networking.hostName = "storage"; });
+        named = layoutWith diskoNixosBase;
+        renamed = layoutWith (diskoNixosBase // { networking.hostName = "storage"; });
       in
       builtins.attrNames named.nixosConfigurations == [ "nas-1" ]
       && named.nixosConfigurations.nas-1.config.networking.hostName == "nas-1"
@@ -4436,7 +4462,7 @@ let
           inherit (probe) pkgs;
           modules = [
             { nixpkgs.hostPlatform = probe.system; }
-            probe.machine
+            probe.baseModule
           ];
         };
       in
@@ -4449,8 +4475,9 @@ let
       && probe.configuration.pkgs.hello.drvPath == probe.pkgs.hello.drvPath;
 
     # A home-manager configuration and a hjem configuration inside a
-    # darwin machine take the home directory and the user ID from the
-    # account the machine declares, and the machine activates each. Its
+    # nix-darwin configuration take the home directory and the user ID
+    # from the account the nix-darwin configuration declares, and the
+    # nix-darwin configuration activates each. Its
     # `postActivation` step runs the activation of the home-manager
     # configuration as the user, as home-manager's nix-darwin module
     # does, and it installs hjem's launchd agent in
@@ -4469,7 +4496,7 @@ let
           modules = [
             { nixpkgs.hostPlatform = probe.system; }
             inputs.hjem.darwinModules.default
-            probe.machine
+            probe.baseModule
             { hjem.users.probe = probe.hjemUser; }
           ];
         };
@@ -4497,13 +4524,14 @@ let
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
     # nix-darwin leaves `users.users.<name>.home` at `null` until the
-    # machine sets it. A darwin machine whose account for `probe` sets
-    # no home directory refuses the home-manager configuration and the
-    # hjem configuration of `probe` declared inside it, where the same
-    # machine with the home directory set evaluates. A home-manager
-    # configuration or a hjem configuration that sets its home directory
-    # itself is refused by an assertion of the machine or of the hjem
-    # configuration, which names the user. An account without `uid` is
+    # nix-darwin configuration sets it. A nix-darwin configuration whose
+    # account for `probe` sets no home directory refuses the
+    # home-manager configuration and the hjem configuration of `probe`
+    # declared inside it, where the same nix-darwin configuration with
+    # the home directory set evaluates. A home-manager configuration or
+    # a hjem configuration that sets its home directory itself is
+    # refused by an assertion of the nix-darwin configuration or of the
+    # hjem configuration, which names the user. An account without `uid` is
     # accepted, as home-manager's nix-darwin module accepts it, and the
     # `home.uid` of the home-manager configuration stays unset.
     darwinRefusesAccountsWithoutAHomeDirectory =
@@ -4527,7 +4555,7 @@ let
                     configModule =
                       { lib, ... }:
                       {
-                        imports = [ (probe.machine // { users.users.probe = account; }) ];
+                        imports = [ (probe.baseModule // { users.users.probe = account; }) ];
                         caisson.home-manager.configurations.probe = lib.caisson.home-manager.mkConfiguration {
                           configModule = homeManagerModule;
                         };
@@ -4542,7 +4570,7 @@ let
               top.caisson.manifest.children.system.${probe.system}.children.darwin.family.children.system.${probe.system}.children;
           in
           {
-            machine = top.darwinConfigurations.family.config;
+            darwinConfig = top.darwinConfigurations.family.config;
             system = top.darwinConfigurations.family.system;
             homeManagerConfig = inside.home-manager.probe.value.config;
             hjem = inside.hjem.probe.value.config;
@@ -4575,15 +4603,16 @@ let
       && !(fails complete.hjemManifest)
       && fails withoutHomeDirectory.system.drvPath
       && fails withoutHomeDirectory.hjemManifest
-      && refuses "sets no home directory" setByUser.machine.assertions
+      && refuses "sets no home directory" setByUser.darwinConfig.assertions
       && refuses "sets no home directory" setByUser.hjem.assertions
       && withoutUid.homeManagerConfig.home.homeDirectory == "/Users/probe"
       && withoutUid.homeManagerConfig.home.uid == null
       && withoutUid.hjem.directory == "/Users/probe";
 
-    # A hjem configuration inside a darwin machine is for a user the
-    # machine declares an account for. The machine here declares the
-    # account `probe` and holds a hjem configuration for `guest`. The
+    # A hjem configuration inside a nix-darwin configuration is for a
+    # user the nix-darwin configuration declares an account for. The
+    # nix-darwin configuration here declares the account `probe` and
+    # holds a hjem configuration for `guest`. The
     # hjem configuration has no home directory, so its manifest fails.
     # A hjem configuration for `guest` that sets its directory itself is
     # refused by an assertion that names the user.
@@ -4603,7 +4632,7 @@ let
                   configModule =
                     { lib, ... }:
                     {
-                      imports = [ probe.machine ];
+                      imports = [ probe.baseModule ];
                       caisson.hjem.configurations.guest = lib.caisson.hjem.mkConfiguration {
                         configModule = hjemUser;
                       };
@@ -4623,11 +4652,12 @@ let
         item: !item.assertion && hasInfix "`guest` has no account" item.message
       ) set.value.config.assertions;
 
-    # A darwin machine activates the profiles declared inside it in its
-    # `postActivation` step: an nvf configuration declared in the
-    # machine as root, and an nvf configuration declared inside the hjem
-    # configuration of `probe` as that user, through `launchctl asuser`.
-    # The machine installs the program with which a shell chooses the
+    # A nix-darwin configuration activates the profiles declared inside
+    # it in its `postActivation` step: an nvf configuration declared in
+    # the nix-darwin configuration as root, and an nvf configuration
+    # declared inside the hjem configuration of `probe` as that user,
+    # through `launchctl asuser`. The nix-darwin configuration installs
+    # the program with which a shell chooses the
     # profile of the system, and the hjem configuration chooses the
     # profile declared inside it for the shells of its user.
     darwinActivatesTheProfilesInsideIt =
@@ -4649,7 +4679,7 @@ let
                 configModule =
                   { lib, ... }:
                   {
-                    imports = [ probe.machine ];
+                    imports = [ probe.baseModule ];
                     caisson.nvf.configurations.editor = nvfConfiguration lib { vim.viAlias = true; };
                     caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
                       configModule =
@@ -4692,7 +4722,7 @@ let
     # A hjem configuration that is a top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
     # with targets in the user's home directory, and the packages. The
-    # manifest of the evaluation sits under `caisson.manifest`, behind an
+    # manifest of the evaluation result sits under `caisson.manifest`, behind an
     # `outPath`, so the JSON the CLI reads holds a string in its place.
     hjemTopIsWhatHjemsCliReads =
       let
@@ -4711,15 +4741,15 @@ let
       && builtins.toJSON top.caisson == builtins.toJSON "caisson manifest: read caisson.manifest"
       && top.caisson.manifest.type == "hjem";
 
-    # A hjem configuration with no machine above it, with an nvf
+    # A hjem configuration with no NixOS configuration above it, with an nvf
     # configuration inside it, has in its files what activates the
     # profile when `hjem standalone switch` applies them: the systemd
     # user units `caisson-profiles` on Linux, and the launchd agent
     # `org.caisson.profiles` on macOS, which runs at load, watches the
     # manifest of the current generation, and runs the script the files
     # link at `~/.local/state/caisson/activate-profiles`. A hjem
-    # configuration inside a machine has neither, since the machine
-    # activates its profiles.
+    # configuration inside a NixOS configuration has neither, since the
+    # NixOS configuration activates its profiles.
     hjemStandaloneHasItsProfileActivation =
       let
         linux = import ../hjem-system { inherit inputs; };
@@ -4749,11 +4779,11 @@ let
             configModule =
               { lib, ... }:
               {
-                caisson.nixos.configurations.probe-machine = lib.caisson.nixos.mkConfiguration {
+                caisson.nixos.configurations.probe-nixos = lib.caisson.nixos.mkConfiguration {
                   configModule =
                     { lib, ... }:
                     {
-                      imports = [ linux.machine ];
+                      imports = [ linux.baseModule ];
                       caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
                         configModule = {
                           imports = [
@@ -4766,7 +4796,7 @@ let
                 };
               };
           })
-          .caisson.manifest.children.system.${linux.system}.children.nixos.probe-machine.children.system.${linux.system}.children.hjem.probe;
+          .caisson.manifest.children.system.${linux.system}.children.nixos.probe-nixos.children.system.${linux.system}.children.hjem.probe;
         units = "/home/probe/.config/systemd/user";
         unitTargets = [
           "${units}/caisson-profiles.service"
@@ -4812,11 +4842,11 @@ let
       && v1.${agentTarget} == v2.${agentTarget}
       && v1.${runnerScript} != v2.${runnerScript};
 
-    # A hjem configuration inside a NixOS machine takes the home
-    # directory of the account the machine declares, and its manifest is
-    # the manifest the NixOS module of hjem makes from the same user module,
-    # the systemd user unit of the user included. The machine activates
-    # it with the template units hjem's NixOS module writes, which read
+    # A hjem configuration inside a NixOS configuration takes the home
+    # directory of the account the NixOS configuration declares, and its
+    # manifest is the manifest the NixOS module of hjem makes from the
+    # same user module, the systemd user unit of the user included. The
+    # NixOS configuration activates it with the template units hjem's NixOS module writes, which read
     # the manifest file from the directory of this generation, installs
     # the user's packages, and the top publishes it as
     # `hjemConfigurations.probe`.
@@ -4824,14 +4854,14 @@ let
       let
         probe = import ../hjem-system { inherit inputs; };
         inner = probe.inner;
-        machine = probe.top.nixosConfigurations.probe-machine;
-        services = machine.config.systemd.services;
+        evaluated = probe.top.nixosConfigurations.probe-nixos;
+        services = evaluated.config.systemd.services;
         upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
           inherit (probe) system;
           modules = [
             inputs.hjem.nixosModules.default
-            probe.machine
-            { hjem.users.probe = probe.machineUser; }
+            probe.baseModule
+            { hjem.users.probe = probe.unitUser; }
           ];
         };
         hjemLib = import "${inputs.hjem}/lib.nix" {
@@ -4840,7 +4870,7 @@ let
         };
         upstreamManifest = probe.lib.caisson.hjem.manifestOf hjemLib upstream.config.hjem.users.probe;
         targets = builtins.map (file: file.target) inner.outputs.manifest.files;
-        target = machine.config.systemd.targets.hjem;
+        target = evaluated.config.systemd.targets.hjem;
       in
       inner.value.config.directory == "/home/probe"
       && builtins.toJSON inner.outputs.manifest == builtins.toJSON upstreamManifest
@@ -4855,12 +4885,13 @@ let
       && builtins.elem "hjem-activate@probe.service" target.requires
       && probe.pkgs.lib.strings.hasInfix "hjem-activate-step" services."hjem-activate@".script
       && builtins.elem "hello" (
-        builtins.map (package: package.pname or "") machine.config.users.users.probe.packages
+        builtins.map (package: package.pname or "") evaluated.config.users.users.probe.packages
       )
       && builtins.attrNames probe.top.hjemConfigurations == [ "probe" ];
 
-    # A machine inside a caisson-facter configuration and one inside a
-    # facter configuration, from the report of nixpkgs' facter test, get
+    # A NixOS configuration inside a caisson-facter configuration and a
+    # NixOS configuration inside a facter configuration, from the report
+    # of nixpkgs' facter test, get
     # from nixpkgs' `hardware.facter` module what a NixOS configuration
     # that sets `hardware.facter.reportPath` itself gets: the same
     # report and the same kernel modules for the initrd. The
@@ -4869,7 +4900,7 @@ let
     facterHandsTheReportToNixpkgs =
       let
         reportPath = "${inputs.nixpkgs}/nixos/tests/facter/facter.json";
-        machine = {
+        nixosModule = {
           boot.loader.grub.enable = false;
           fileSystems."/" = {
             device = "none";
@@ -4880,7 +4911,7 @@ let
         upstream = import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
           system = "x86_64-linux";
           modules = [
-            machine
+            nixosModule
             { hardware.facter.reportPath = reportPath; }
           ];
         };
@@ -4895,7 +4926,7 @@ let
                   {
                     facter.reportPath = reportPath;
                     caisson.nixos.configurations.native = lib.caisson.nixos.mkConfiguration {
-                      configModule = machine;
+                      configModule = nixosModule;
                     };
                   };
               };
@@ -4905,7 +4936,7 @@ let
                   {
                     inherit reportPath;
                     caisson.nixos.configurations.upstream = lib.caisson.nixos.mkConfiguration {
-                      configModule = machine;
+                      configModule = nixosModule;
                     };
                   };
               };
@@ -5031,7 +5062,7 @@ let
     # An nvf configuration is published as
     # `nvfConfigurations.<system>.<name>`, and its Neovim is the Neovim
     # the `neovimConfiguration` of nvf builds from the same module on the same package set. An nvf configuration
-    # declared inside a NixOS machine or a home-manager configuration is
+    # declared inside a NixOS configuration or a home-manager configuration is
     # published with the others.
     nvfIsTheNeovimNvfBuilds =
       let
@@ -5061,7 +5092,7 @@ let
                       fsType = "tmpfs";
                     };
                     system.stateVersion = "25.05";
-                    caisson.nvf.configurations.machine-editor = nvfConfiguration lib;
+                    caisson.nvf.configurations.system-editor = nvfConfiguration lib;
                   };
               };
               caisson.home-manager.configurations.alice = lib.caisson.home-manager.mkConfiguration {
@@ -5081,9 +5112,9 @@ let
             inherit pkgs;
             modules = [ module ];
           }).neovim;
-        machine = top.nixosConfigurations.workstation.config;
+        nixosConfig = top.nixosConfigurations.workstation.config;
         homeManagerConfig = top.homeConfigurations.alice.config;
-        unit = machine.systemd.services.caisson-profile-nvf-machine-editor;
+        unit = nixosConfig.systemd.services.caisson-profile-nvf-system-editor;
         names = packages: builtins.map (package: package.name or "") packages;
         topProfile = top.caisson.manifest.children.system.x86_64-linux.children.nvf.editor.outputs.profile;
         published = top.nvfConfigurations.x86_64-linux.editor;
@@ -5097,14 +5128,14 @@ let
         builtins.attrNames top.nvfConfigurations.x86_64-linux == [
           "editor"
           "home-editor"
-          "machine-editor"
+          "system-editor"
         ]
-      # The machine activates the profile of the system as root, at boot
+      # The NixOS configuration activates the profile of the system as root, at boot
       # and at a switch, and lets a shell choose it with `nvim`.
       && unit.wantedBy == [ "multi-user.target" ]
       && !(unit.serviceConfig ? User)
       && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
-        names machine.environment.systemPackages
+        names nixosConfig.environment.systemPackages
       )
       # The home-manager configuration activates its profile, after its
       # files are linked, and chooses it for its shells.
@@ -5163,13 +5194,13 @@ let
           source = "nixvim";
         };
 
-    # A nixvim configuration declared inside a NixOS machine is a profile
-    # of the system, as an nvf configuration there is. The machine writes
-    # the unit that activates the profile as root, at boot and at a
+    # A nixvim configuration declared inside a NixOS configuration is a
+    # profile of the system, as an nvf configuration there is. The NixOS
+    # configuration writes the unit that activates the profile as root, at boot and at a
     # switch, and installs the program with which a shell chooses the
     # profile. The unit runs `activate` of the activation package of the
     # profile, and the top publishes the configuration with the others.
-    nixvimProfilesInsideAMachineAreActivated =
+    nixvimProfilesInsideANixosConfigurationAreActivated =
       let
         module = {
           opts.number = true;
@@ -5184,7 +5215,7 @@ let
                   { lib, ... }:
                   {
                     imports = [ minimalNixosBase ];
-                    caisson.nixvim.configurations.machine-editor = lib.caisson.nixvim.mkConfiguration {
+                    caisson.nixvim.configurations.system-editor = lib.caisson.nixvim.mkConfiguration {
                       ecosystemSrc = dependencies: dependencies.nixvim;
                       configModule = module;
                     };
@@ -5198,13 +5229,13 @@ let
             { nixpkgs.pkgs = pkgs; }
           ];
         };
-        machine = top.nixosConfigurations.workstation.config;
-        unit = machine.systemd.services.caisson-profile-nixvim-machine-editor;
+        nixosConfig = top.nixosConfigurations.workstation.config;
+        unit = nixosConfig.systemd.services.caisson-profile-nixvim-system-editor;
         profile =
-          top.caisson.manifest.children.system.x86_64-linux.children.nixos.workstation.children.system.x86_64-linux.children.nixvim.machine-editor.outputs;
+          top.caisson.manifest.children.system.x86_64-linux.children.nixos.workstation.children.system.x86_64-linux.children.nixvim.system-editor.outputs;
         names = packages: builtins.map (package: package.name or "") packages;
       in
-      builtins.attrNames top.nixvimConfigurations.x86_64-linux == [ "machine-editor" ]
+      builtins.attrNames top.nixvimConfigurations.x86_64-linux == [ "system-editor" ]
       && profile.package.drvPath == upstream.config.build.package.drvPath
       && profile.profile.scope == "system"
       && unit.wantedBy == [ "multi-user.target" ]
@@ -5213,17 +5244,17 @@ let
         builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart)
       )
       && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
-        names machine.environment.systemPackages
+        names nixosConfig.environment.systemPackages
       );
 
-    # A topology configuration with two machines declared inside it reads
-    # them as nix-topology reads NixOS configurations evaluated with its
-    # NixOS module: the same nodes, and the same rendered diagram. It is
-    # published as `topology.<system>` under the name `default`, and its
-    # machines as `nixosConfigurations`.
-    topologyReadsTheMachinesDeclaredInside =
+    # A topology configuration with NixOS configurations declared inside
+    # it reads them as nix-topology reads NixOS configurations evaluated
+    # with its NixOS module: the same nodes, and the same rendered
+    # diagram. It is published as `topology.<system>` under the name
+    # `default`, and its NixOS configurations as `nixosConfigurations`.
+    topologyReadsTheNixosConfigurationsDeclaredInside =
       let
-        machine = {
+        nixosModule = {
           boot.loader.grub.enable = false;
           fileSystems."/" = {
             device = "none";
@@ -5242,21 +5273,21 @@ let
                   { lib, ... }:
                   {
                     caisson.nixos.configurations.alpha = lib.caisson.nixos.mkConfiguration {
-                      configModule = machine;
+                      configModule = nixosModule;
                     };
                     caisson.nixos.configurations.beta = lib.caisson.nixos.mkConfiguration {
-                      configModule = machine;
+                      configModule = nixosModule;
                     };
                   };
               };
             };
         };
-        upstreamMachine =
+        upstreamNixosConfiguration =
           hostName:
           import "${inputs.nixpkgs}/nixos/lib/eval-config.nix" {
             system = "x86_64-linux";
             modules = [
-              machine
+              nixosModule
               "${inputs.nix-topology}/nixos/module.nix"
               { networking.hostName = hostName; }
             ];
@@ -5266,14 +5297,14 @@ let
           modules = [
             {
               nixosConfigurations = {
-                alpha = upstreamMachine "alpha";
-                beta = upstreamMachine "beta";
+                alpha = upstreamNixosConfiguration "alpha";
+                beta = upstreamNixosConfiguration "beta";
               };
             }
           ];
         };
         topology = top.topology.x86_64-linux;
-        evaluation = top.caisson.manifest.children.system.x86_64-linux.children.topology.topology;
+        topologyManifest = top.caisson.manifest.children.system.x86_64-linux.children.topology.topology;
       in
       builtins.attrNames top.nixosConfigurations == [
         "alpha"
@@ -5283,21 +5314,22 @@ let
       && builtins.elem "alpha" (builtins.attrNames topology.config.nodes)
       && topology.config.output.drvPath == upstream.config.output.drvPath
       # The configuration records the nix-topology it selects, and each
-      # machine inside it the module collection of the composition.
+      # NixOS configuration inside it the module collection of the
+      # composition.
       &&
-        evaluation.ecosystems.nix-topology == {
+        topologyManifest.ecosystems.nix-topology == {
           from = "ecosystemSrc";
           source = "nix-topology";
         }
       &&
-        evaluation.children.system.x86_64-linux.children.nixos.alpha.ecosystems.nixos == {
+        topologyManifest.children.system.x86_64-linux.children.nixos.alpha.ecosystems.nixos == {
           from = "defaultEcosystemSrc";
           source = "nixpkgs";
         };
 
     # A kubenix configuration is published as
-    # `kubenixConfigurations.<system>.<name>`, its evaluation, whose
-    # result is the result the `evalModules` of kubenix gives the same
+    # `kubenixConfigurations.<system>.<name>`, its evaluation result,
+    # which is the result the `evalModules` of kubenix gives the same
     # module on the same package set.
     kubenixIsTheResultKubenixBuilds =
       let
@@ -5367,16 +5399,18 @@ let
           source = "nixidy";
         };
 
-    # A machine activates the profile inside a hjem configuration as the
-    # user of that hjem configuration and of no other. The machine here
-    # holds hjem configurations for `alice` and `bob` and a home-manager
-    # configuration for `carol`, each with a profile inside it, and a
-    # profile of the system. The configurations inside the machine are
-    # at the same depth, so a machine that matched a profile to the
+    # A NixOS configuration activates the profile inside a hjem
+    # configuration as the user of that hjem configuration and of no
+    # other. The NixOS configuration here holds hjem configurations for
+    # `alice` and `bob` and a home-manager configuration for `carol`,
+    # each with a profile inside it, and a profile of the system. The
+    # configurations inside the NixOS configuration are at the same
+    # depth, so a NixOS configuration that matched a profile to the
     # configuration above it by depth would activate each profile for
-    # every user. The machine writes a unit for the profile of the
-    # system, and a unit for the profile of each hjem user, as that
-    # user; the home-manager configuration activates its profile itself.
+    # every user. The NixOS configuration writes a unit for the profile
+    # of the system, and a unit for the profile of each hjem user, as
+    # that user; the home-manager configuration activates its profile
+    # itself.
     profilesBelongToTheConfigurationAboveThem =
       let
         probe = import ../hjem-system { inherit inputs; };
@@ -5397,11 +5431,11 @@ let
           configModule =
             { lib, ... }:
             {
-              caisson.nixos.configurations.probe-machine = lib.caisson.nixos.mkConfiguration {
+              caisson.nixos.configurations.probe-nixos = lib.caisson.nixos.mkConfiguration {
                 configModule =
                   { lib, ... }:
                   {
-                    imports = [ probe.machine ];
+                    imports = [ probe.baseModule ];
                     users.users.alice.isNormalUser = true;
                     users.users.bob.isNormalUser = true;
                     users.users.carol.isNormalUser = true;
@@ -5422,7 +5456,7 @@ let
               };
             };
         };
-        services = top.nixosConfigurations.probe-machine.config.systemd.services;
+        services = top.nixosConfigurations.probe-nixos.config.systemd.services;
         profileUnits = builtins.filter (name: probe.pkgs.lib.hasPrefix "caisson-profile-" name) (
           builtins.attrNames services
         );
@@ -5435,12 +5469,12 @@ let
       && services.caisson-profile-alice-nvf-alice-editor.serviceConfig.User == "alice"
       && services.caisson-profile-bob-nvf-bob-editor.serviceConfig.User == "bob";
 
-    # A system-manager machine refuses a home-manager configuration that
+    # A system-manager configuration refuses a home-manager configuration that
     # sets `caisson.useUserPackages`, with an assertion that names the
     # home-manager configuration and the user. system-manager throws
     # the failed assertions where `systemConfigs.box` is read, so the
-    # check reads whether it throws, and that the same machine with the
-    # option unset evaluates.
+    # check reads whether it throws, and that the same system-manager
+    # configuration with the option unset evaluates.
     systemManagerRefusesUseUserPackages =
       let
         topWith =
@@ -5479,11 +5513,13 @@ let
       in
       evaluates false && !(evaluates true);
 
-    # A system-manager machine activates the home-manager configuration,
-    # the hjem configuration and the nvf configurations declared inside
-    # it, as a NixOS machine does: the home-manager configuration and the
-    # hjem configuration take their directory from the account the
-    # machine declares, the machine writes the units that activate them
+    # A system-manager configuration activates the home-manager
+    # configuration, the hjem configuration and the nvf configurations
+    # declared inside it, as a NixOS configuration does: the
+    # home-manager configuration and the hjem configuration take their
+    # directory from the account the system-manager configuration
+    # declares, the system-manager configuration writes the units that
+    # activate them
     # and the profiles, installs the packages of the hjem user, and the
     # home-manager configuration is published as `probe@box`.
     systemManagerActivatesWhatIsDeclaredInside =
@@ -5543,9 +5579,9 @@ let
           children.hjem.probe.children.system.x86_64-linux.children.nvf.hjem-editor.outputs.activationPackage;
       in
       homeManagerConfig.home.homeDirectory == "/home/probe"
-      # The machine records what it applied, and the home-manager
-      # configuration compares against it when activated by hand, as
-      # inside a NixOS machine.
+      # The system-manager configuration records what it applied, and
+      # the home-manager configuration compares against it when
+      # activated by hand, as inside a NixOS configuration.
       && box.environment.etc ? "caisson/marker.json"
       && pkgs.lib.hasInfix "/etc/caisson/marker.json" homeManagerConfig.home.activation.caissonDrift.data
       && hjem.directory == "/home/probe"
@@ -5559,7 +5595,7 @@ let
       && !(box.systemd.services ? "hjem-update-state@probe")
       && !(box.systemd.services ? caisson-profile-probe-nvf-hjem-editor)
       && builtins.elem hjemProfile.drvPath (builtins.attrNames (builtins.getContext hjemUnit.script))
-      # The machine activates its profile of the system as root; hjem
+      # The system-manager configuration activates its profile of the system as root; hjem
       # chooses the profile of the user.
       && systemUnit.wantedBy == [ "multi-user.target" ]
       && !(systemUnit.serviceConfig ? User)
@@ -5613,7 +5649,7 @@ let
         };
 
     # A system-manager configuration that is a top is its system, built
-    # for the system of the evaluation, and its modules get the composed
+    # for the system it is evaluated for, and its modules get the composed
     # library. It runs on the package set caisson selects, the set named
     # `default`, and its userborn is built on that set. A configuration
     # that sets `nixpkgs.overlays`, which that set leaves without effect,
@@ -5738,7 +5774,7 @@ let
       && builtins.isString terraform.drvPath
       && builtins.isString homeManagerConfiguration.activationPackage.drvPath;
 
-    # The manifest of each evaluation records the arguments its
+    # The manifest of each evaluation result records the arguments its
     # configuration handed to the evaluator as it gave them: the names
     # of the attributes of `ecosystemArgs` and of `specialArgs`, and the
     # file and line number where the configuration gave each. This
@@ -5953,8 +5989,9 @@ let
               config.probePkgs = pkgs;
             };
         };
-        # The manifest of such an evaluation, for its system.
-        evaluation =
+        # The manifest of the evaluation result of such a configuration,
+        # for its system.
+        resultManifest =
           (composedWithDeclaration.caisson-core.finalizeTop (
             composedWithDeclaration.caisson.nixos-minimal.mkConfiguration { configModule = { }; }
           )).x86_64-linux;
@@ -5964,10 +6001,10 @@ let
         };
       in
       system.config.probePkgs ? hello
-      # The evaluation records the library and the module collection it
-      # took from the declaration.
+      # The evaluation result records the library and the module
+      # collection the configuration took from the declaration.
       &&
-        evaluation.ecosystems == {
+        resultManifest.ecosystems == {
           nixpkgs-lib = declared;
           nixos = declared;
         };
@@ -6042,8 +6079,8 @@ let
           source = "flake-parts";
         };
 
-    # The modules that caisson exports work only inside an evaluation
-    # that caisson makes. caisson publishes none of them in its
+    # The modules that caisson exports work only inside a configuration
+    # that caisson evaluates. caisson publishes none of them in its
     # `modules` flake output. The output holds the empty `default`
     # entry of the `flake` class and nothing else. The modules are in
     # the manifest of caisson, where a flake that lists caisson in
@@ -6077,7 +6114,7 @@ in
   fixtures = {
     inherit
       hiveLib
-      machineWithUserPackages
+      nixosConfigurationWithUserPackages
       pkgs
       nixops4ArgPathsOf
       nixops4Entry

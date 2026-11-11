@@ -6,8 +6,8 @@
 # `caisson.<integration>.exported` selects, from those configurations,
 # those this configuration passes up, and what each selected
 # configuration exports is merged into `caisson.exports` here. It runs
-# in the evaluation that holds the configurations and not in the
-# childless view, where their results are not readable.
+# in the full evaluation, which holds the configurations, and not in
+# the childless evaluation, where their results are not readable.
 {
   config,
   lib,
@@ -18,7 +18,7 @@ let
 
   manifest = lib.caisson-core.evalManifest;
 
-  # The integrations whose configurations a module of this evaluation
+  # The integrations whose configurations a module of this configuration
   # declares. An integration with none declared passes nothing up,
   # whatever its `exported` selects, so it is not read.
   integrations = lib.caisson.integrations.integrationsDeclaringIn options;
@@ -27,8 +27,8 @@ let
 
   # What each integration's `exported` selected of the configurations
   # declared here, by integration and then name: nothing in the
-  # childless view, and nothing in an evaluation that carries no
-  # manifest.
+  # childless evaluation, and nothing in a module evaluation that
+  # carries no manifest.
   selected =
     if manifest == null || manifest.childless then
       { }
@@ -38,7 +38,7 @@ let
       );
 
   # The manifests passed up: a configuration evaluated per system
-  # stands for each of its evaluations. The entry of a deferred
+  # stands for each of its evaluation results. The entry of a deferred
   # configuration is no manifest and exports no registries.
   exported = builtins.concatMap (
     integration:

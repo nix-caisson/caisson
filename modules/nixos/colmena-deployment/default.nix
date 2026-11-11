@@ -19,7 +19,7 @@
 # node's name when it builds the hive, where the name is known.
 #
 # The colmena source is the source the composition declares or pins under
-# the name `colmena`, read from the library of the evaluation, so these
+# the name `colmena`, read from the library of the NixOS configuration, so these
 # options match the colmena whose command deploys the node.
 { ... }:
 { lib, ... }:

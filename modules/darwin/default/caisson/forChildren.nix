@@ -9,9 +9,9 @@
 # home-manager configuration declared inside this darwin configuration
 # imports by default, and the hjem module `darwin-parent` to those of
 # a hjem configuration declared inside it. Each sets the options that
-# come from the machine: the home directory from the account of the
-# user, and for a home-manager configuration the user ID and the Nix
-# of the machine.
+# come from the nix-darwin configuration: the home directory from the
+# account of the user, and for a home-manager configuration the user ID
+# and the Nix of the nix-darwin configuration.
 #
 # A darwin configuration that passes `moduleImports` selects its
 # modules itself, and then nothing inside it gets these modules from

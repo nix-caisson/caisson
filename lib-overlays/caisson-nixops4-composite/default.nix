@@ -60,10 +60,11 @@
       resourceType = "caisson-nixops4-resource";
 
       # The members of a composite at `path`, by name, from its
-      # evaluation: the composites and resources declared inside it,
-      # each the entry caisson-core holds for a deferred child. Their
-      # names are readable in the childless view too, and the entries
-      # only in the full evaluation. A name declared as both is refused,
+      # evaluated options: the composites and resources declared inside
+      # it, each the entry caisson-core holds for a deferred child.
+      # Their names are readable in the result of the childless
+      # evaluation too, and the entries only in the result of the full
+      # evaluation. A name declared as both is refused,
       # since NixOps4 holds one member under a name.
       memberEntriesOf =
         path: config:
@@ -167,8 +168,8 @@
         }:
         settings:
         let
-          # The evaluator's call with the args `args`, on the lib of the
-          # view being evaluated: the base modules, the framework
+          # The evaluator's call with the args `args`, on the lib the
+          # configuration is evaluated with: the base modules, the framework
           # modules of the class, the selection and the configuration's
           # module, with the composition's dependencies as the
           # `inputs` special argument and the deploying system as
@@ -193,14 +194,14 @@
                 configModule = settings.configModule or null;
               };
               # The members, by name. The names come from `naming`, and
-              # each entry comes from the evaluation, so the composite's
-              # module may read `members` wherever it does not decide
-              # which members there are.
+              # each entry comes from the evaluation result, so the
+              # module of the composite may read `members` wherever it
+              # does not decide which members there are.
               declared = memberEntriesOf path evaluated.config;
               entries = builtins.mapAttrs (member: _: declared.${member}) (memberEntriesOf path naming.config);
               # The members, each finalized once with its part of the
-              # composite's args, from the full evaluation. The
-              # childless view finalizes none.
+              # composite's args, in the full evaluation. The childless
+              # evaluation finalizes none.
               finalized =
                 if manifest.childless then
                   { }
@@ -216,9 +217,9 @@
                     }
                   ) entries;
               ofType = memberType: final.filterAttrs (_: member: member.type == memberType) finalized;
-              # The modules of an evaluation in which the `members`
-              # module argument is what `members` returns for the
-              # evaluation's config, and the base modules receive
+              # The modules of a module evaluation in which the
+              # `members` module argument is what `members` returns for
+              # its evaluated options, and the base modules receive
               # `finalized`.
               modulesWith =
                 { members, finalized }:
@@ -265,7 +266,7 @@
                   };
               };
               evaluated = evaluationOf moduleList;
-              # The evaluation that decides which members there are. The
+              # The evaluation result that decides which members there are. The
               # members and their outputs fail there when they are read,
               # with an error that names the composite, since the names
               # of the members must be known before any member is

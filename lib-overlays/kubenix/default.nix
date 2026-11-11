@@ -17,7 +17,7 @@
 # `kubectl apply -f` reads; it is the `kubernetes.result` of kubenix's
 # `k8s` module, so a configuration that imports that module has it. A
 # configuration is published as `kubenixConfigurations.<system>.<name>`,
-# the evaluation, whose `config.kubernetes.result` is the result.
+# the evaluation result, whose `config.kubernetes.result` is the result.
 {
   mkLibOverlay,
   ...
@@ -163,7 +163,7 @@
           # What evalModules received: the framework module of the
           # class, the modules selected from the registry, the
           # configuration's module and the module that hands the
-          # evaluation its arguments. The modules of kubenix reach the
+          # modules their arguments. The modules of kubenix reach the
           # configuration's module through the `kubenix` special
           # argument, imported only where a module selects them, so
           # none of kubenix's modules are declared here.
@@ -174,8 +174,8 @@
         };
 
       # A kubenix configuration is published as
-      # `kubenixConfigurations.<system>.<name>`, the evaluation kubenix's
-      # `evalModules` returns, whose `config.kubernetes.result` is its
+      # `kubenixConfigurations.<system>.<name>`, the evaluation result
+      # kubenix's `evalModules` returns, whose `config.kubernetes.result` is its
       # result.
       exportsTo = {
         attrset = "kubenixConfigurations";
@@ -192,7 +192,8 @@
           };
           type = "kubenix";
           # A kubenix configuration is evaluated per system: it has an
-          # evaluation for each system its parent evaluates its children for.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -203,8 +204,8 @@
         name = "kubenix";
         class = "kubenix";
         # A kubenix configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
@@ -223,8 +224,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

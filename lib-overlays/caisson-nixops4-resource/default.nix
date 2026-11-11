@@ -140,7 +140,7 @@
         let
           names = builtins.attrNames declared;
           only = declared.${builtins.head names};
-          evaluations = builtins.attrValues only;
+          results = builtins.attrValues only;
         in
         if builtins.length names != 1 then
           throw ''
@@ -152,13 +152,13 @@
           ''
         else if (only._type or null) == "caisson-manifest" then
           only
-        else if builtins.length evaluations == 1 then
-          builtins.head evaluations
+        else if builtins.length results == 1 then
+          builtins.head results
         else
           throw ''
             ${context}: the NixOS configuration `${builtins.head names}` of the resource
             `${resource}` is evaluated for ${builtins.concatStringsSep ", " (builtins.attrNames only)},
-            and a resource deploys one evaluation. Declare it inside a configuration that evaluates its children for a single system.
+            and a resource deploys a single evaluation result. Declare it inside a configuration that evaluates its children for a single system.
           '';
 
       # The discovery program of a root composite for `system`, the
@@ -245,8 +245,8 @@
         }:
         settings:
         let
-          # The evaluator's call with the args `args`, on the lib of the
-          # view being evaluated: the base modules, the outputs and the
+          # The evaluator's call with the args `args`, on the lib the
+          # configuration is evaluated with: the base modules, the outputs and the
           # member path, the framework modules of the class, the
           # selection and the configuration's module, with the
           # composition's dependencies as the `inputs` special
@@ -271,8 +271,8 @@
                 inherit lib name class;
                 configModule = settings.configModule or null;
               };
-              # The modules of an evaluation in which the resource's
-              # outputs are `outputs`, with what NixOps4 gives a
+              # The modules of a module evaluation in which the
+              # outputs of the resource are `outputs`, with what NixOps4 gives a
               # resource beside them, its member path.
               modulesWith =
                 outputs:
@@ -309,7 +309,7 @@
               # naming itself.
               moduleList = modulesWith args.outputValues;
               evaluated = evaluationOf moduleList;
-              # The evaluation that names the outputs, for `argsNeeded`.
+              # The evaluation result that names the outputs, for `argsNeeded`.
               # Reading an output fails there with an error that names
               # the resource, since NixOps4 needs the names of the
               # outputs before it has their values.

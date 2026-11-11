@@ -4,7 +4,7 @@
 # flake outputs. It owns the `flake` class and evaluates it with
 # flake-parts' `evalFlakeModule`, as `mkFlake` does. Beside the entry
 # points it carries the export machinery (the core flake-parts
-# module reads the manifest of the evaluation, writes the `lib` and
+# module reads the manifest of the configuration, writes the `lib` and
 # `modules` flake outputs from it, and defaults flake-parts' `systems`
 # from the `systems` the composition declared), and the `flake-parts`
 # library, copied into the composed library.
@@ -63,13 +63,13 @@
       # lib manifest of this composed library.
       defaultManifest = final.caisson-core.libManifest or { };
       # The composition's declared flake-parts, instantiated per
-      # composed library and shared by every evaluation that passes
+      # composed library and shared by every configuration that passes
       # no `ecosystemSrc`.
       flakePartsDefault = flakePartsOf (resolveEcosystemSrc {
         manifest = defaultManifest;
       });
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the flake's `inputs` from the manifest's dependencies, the special
       # arguments and the module location when the configuration is
       # named, beside the flake-parts it runs on and the module it
@@ -83,7 +83,7 @@
 
           # The flake-parts the configuration runs on. A configuration
           # that selects a source with `ecosystemSrc` selects it from
-          # the dependencies of the lib manifest of the evaluation. A
+          # the dependencies of the lib manifest of the configuration. A
           # configuration that selects none runs on the declared
           # flake-parts.
           explicit = args.ecosystemSrc or null;
@@ -202,7 +202,7 @@
           # flake-parts reads the flake's `self` from `inputs.self`, and
           # its modules take `self` and `self'` as arguments. The
           # integration ties that knot the way Nix does for a flake:
-          # `self` is the evaluation's outputs with the root's source
+          # `self` is the outputs of the evaluation result with the root's source
           # info (out path, revision, last-modified) beside them, and
           # `self.inputs` the dependencies. A composition with no root
           # names no source tree, so its `self` has no out path. An `inputs`

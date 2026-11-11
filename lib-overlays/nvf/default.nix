@@ -22,8 +22,9 @@
 # home-manager configuration keeps its generations
 # (`lib.caisson.integrations.profileOf`): its output
 # `activationPackage` holds `activate`, which points the profile at the
-# Neovim, and `profile` says where the profile is. A machine, a
-# home-manager configuration or a hjem configuration activates the nvf
+# Neovim, and `profile` says where the profile is. A NixOS, nix-darwin
+# or system-manager configuration, a home-manager configuration or a
+# hjem configuration activates the nvf
 # configurations declared inside it each time it is activated itself,
 # with the module `profile-activation` of its class.
 {
@@ -218,7 +219,8 @@
           };
           type = "nvf";
           # An nvf configuration is evaluated per system: it has an
-          # evaluation for each system its parent evaluates its children for.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -235,8 +237,8 @@
         name = "nvf";
         class = "nvf";
         # An nvf configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
@@ -255,8 +257,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

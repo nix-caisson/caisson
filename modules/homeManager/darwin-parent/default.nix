@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: MIT
 #
 # A home-manager module for a home-manager configuration that is
-# declared inside a darwin configuration. It sets the options of the
-# home-manager configuration that come from the machine, as
-# home-manager's nix-darwin module does for the home-manager
-# configurations it embeds: the home directory and the user ID from the
-# account the machine declares, and the Nix the machine runs. caisson
-# does not use that nix-darwin module.
+# declared inside a nix-darwin configuration. It sets the options of the
+# home-manager configuration that come from the nix-darwin
+# configuration, as home-manager's nix-darwin module does for the
+# home-manager configurations it embeds: the home directory and the user
+# ID from the account the nix-darwin configuration declares, and the Nix
+# the nix-darwin configuration runs. caisson does not use that
+# nix-darwin module.
 #
 # A darwin configuration adds this module to the modules that the
 # home-manager configurations declared inside it import by default.
@@ -15,30 +16,33 @@
 # `moduleImports` selects its modules itself, and gets this module only
 # if it lists it.
 #
-# The module reads the machine through the manifest of the
-# home-manager configuration, so it can only be imported by a
-# home-manager configuration that has a darwin configuration above it.
+# The module reads the nix-darwin configuration through the manifest of
+# the home-manager configuration, so it can only be imported by a
+# home-manager configuration that has a nix-darwin configuration above
+# it.
 { ... }:
 # `lib` is the library of the home-manager configuration, and `config`
-# is the configuration of the home-manager configuration.
+# holds the evaluated options of the home-manager configuration.
 { lib, config, ... }:
 let
-  # The configuration of the darwin configuration the home-manager
-  # configuration is declared inside, in its childless evaluation,
-  # which leaves out the configurations declared inside it.
-  machine = lib.caisson.evalManifest.nearest.darwin.value.config;
+  # The evaluated options of the nix-darwin configuration the
+  # home-manager configuration is declared inside, from the result of
+  # its childless evaluation, which leaves out the configurations
+  # declared inside it.
+  parentConfig = lib.caisson.evalManifest.nearest.darwin.value.config;
 
   # The account of the user of the home-manager configuration, when the
-  # machine declares one.
-  account = machine.users.users.${config.home.username} or null;
+  # nix-darwin configuration declares one.
+  account = parentConfig.users.users.${config.home.username} or null;
 
   # nix-darwin can declare `uid` without a value, so it is read with
   # `tryEval`, as home-manager's nix-darwin module reads it.
   uid = if account == null then null else builtins.tryEval account.uid;
 
-  # Why the machine gives the home-manager configuration no home
-  # directory, or null when it gives one. nix-darwin leaves `home` at
-  # `null` until the machine sets it.
+  # Why the nix-darwin configuration gives the home-manager
+  # configuration no home directory, or null when it gives one.
+  # nix-darwin leaves `home` at `null` until the nix-darwin
+  # configuration sets it.
   missing =
     if account == null then
       "declares no account for the user `${config.home.username}` in `users.users`"
@@ -51,14 +55,14 @@ in
   config = lib.mkMerge [
     {
       # home-manager reads this option to tell that the home-manager
-      # configuration is activated by a machine.
-      # `externalPackageInstall` stays false, so the activation of the
-      # home-manager configuration installs the packages of the
+      # configuration is activated by the configuration it is declared
+      # inside. `externalPackageInstall` stays false, so the activation
+      # of the home-manager configuration installs the packages of the
       # home-manager configuration.
       submoduleSupport.enable = true;
 
-      nix.enable = machine.nix.enable;
-      nix.package = lib.mkIf machine.nix.enable machine.nix.package;
+      nix.enable = parentConfig.nix.enable;
+      nix.package = lib.mkIf parentConfig.nix.enable parentConfig.nix.package;
     }
 
     (lib.mkIf (missing == null) {
@@ -68,10 +72,11 @@ in
       home.uid = lib.mkIf (uid.success && uid.value != null) uid.value;
     })
 
-    # When the machine gives no home directory, reading the home
-    # directory fails with a message that says why. home-manager reads
-    # it while it checks the assertions of the home-manager
-    # configuration, before the machine's activation module can refuse
+    # When the nix-darwin configuration gives no home directory, reading
+    # the home directory fails with a message that says why.
+    # home-manager reads it while it checks the assertions of the
+    # home-manager configuration, before the activation module of the
+    # nix-darwin configuration can refuse
     # the home-manager configuration. A home-manager configuration that
     # sets its home directory itself replaces this default, and the
     # activation module refuses that home-manager configuration.

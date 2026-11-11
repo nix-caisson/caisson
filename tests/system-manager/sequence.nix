@@ -5,26 +5,28 @@
 # a VM of a distribution. `inputs` is the dependency pool of the checks
 # partition with `caisson` set to the source of this repository.
 #
-# It returns the systems of the machine in each version (`v1`, `v2`),
-# the activation packages of the home-manager configuration of `carol`
-# in each version, and `script`, the test script. Each driver puts in
-# front of the script the definitions of `machine`,
-# `activate (toplevel)` and `exit_status (command)`, which the drivers
-# do differently, and the boot of the machine with Nix installed.
+# It returns the systems of the system-manager configuration in each
+# version (`v1`, `v2`), the activation packages of the home-manager
+# configuration of `carol` in each version, and `script`, the test
+# script. Each driver puts in front of the script the definitions of
+# `machine`, the container or VM it runs, `activate (toplevel)` and
+# `exit_status (command)`, which the drivers do differently, and the
+# boot of the container or VM with Nix installed.
 #
-# The machine comes in the versions v1 and v2, which caisson evaluates
-# separately (`topOf` below). It declares the profiles of
-# the system `editor` and, in v1 alone, `retired`, a hjem configuration
-# for `alice` with a profile inside it, a home-manager configuration for
-# `carol` with a profile inside it, and in v2 alone a home-manager
-# configuration for `erin`. A file of the machine, of each home-manager
+# The system-manager configuration comes in the versions v1 and v2,
+# which caisson evaluates separately (`topOf` below). It declares the
+# profiles of the system `editor` and, in v1 alone, `retired`, a hjem
+# configuration for `alice` with a profile inside it, a home-manager
+# configuration for `carol` with a profile inside it, and in v2 alone a
+# home-manager configuration for `erin`. A file of the system-manager
+# configuration, of each home-manager
 # configuration and of the hjem configuration names the version, and
 # the Neovims of v2 have `vim`. The test activates v1, v2 and v1 again
 # and checks after each step the files, the profiles and the units. It
 # checks that activating v2 and v1 puts the profiles of `alice` and of
 # the system back after they are changed by hand, and that the
 # activation of the home-manager configuration of `carol` in v2, run by
-# hand while the machine runs v1, warns of the drift.
+# hand while the container or VM runs v1, warns of the drift.
 { inputs }:
 let
   core = inputs.caisson.lib.caisson-core;
@@ -71,7 +73,7 @@ let
     vim.vimAlias = version == "v2";
   };
 
-  # The accounts the machine declares, each with a group of its name,
+  # The accounts the system-manager configuration declares, each with a group of its name,
   # which system-manager creates with userborn.
   accounts = {
     alice = 5000;
@@ -93,7 +95,7 @@ let
         };
     };
 
-  # The top holding the machine `box` in a version.
+  # The top holding the system-manager configuration `box` in a version.
   topOf =
     version:
     lib.caisson.structural.mkTopConfiguration {
@@ -241,7 +243,7 @@ in
     assert restored == alice_declared, f"the profile of alice is {restored}, not {alice_declared}"
 
     # The activation of the home-manager configuration of `carol` in v2,
-    # run by hand while the machine runs v1, warns of the drift and
+    # run by hand while the container or VM runs v1, warns of the drift and
     # applies the home-manager configuration; the activation in v1 is
     # quiet.
     out = machine.succeed("runuser -u carol -- ${carolV2}/activate 2>&1")

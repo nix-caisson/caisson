@@ -38,7 +38,7 @@
 
       composeNixos = import ./compose.nix;
 
-      # The composition of the class, on the view being evaluated: the
+      # The composition of the class, on the lib and manifest the configuration is evaluated with: the
       # module list, the special arguments, the system, the package
       # sets and the resolved nixpkgs source, from the caisson
       # arguments. Every entry point here builds on it, and so does an
@@ -52,31 +52,31 @@
           # set is the `pkgs` module argument.
           nixpkgsModule ? true,
         }:
-        view: args:
-        composeNixos { inherit context nixpkgsModule; } view args
+        given: args:
+        composeNixos { inherit context nixpkgsModule; } given args
         // {
           src = resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
-            manifest = view.lib.caisson-core.libManifest or { };
+            manifest = given.lib.caisson-core.libManifest or { };
           };
           # Where the module collection came from, as `src` was
-          # resolved, which an evaluation records as `ecosystems.nixos`.
+          # resolved, which the manifest records as `ecosystems.nixos`.
           srcAccount = ecosystemAccountOf {
             explicit = args.ecosystemSrc or null;
-            manifest = view.lib.caisson-core.libManifest or { };
+            manifest = given.lib.caisson-core.libManifest or { };
           };
         };
 
-      # The evaluator's call, on the view being evaluated: eval-config
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with: eval-config
       # over the composition, for the configuration's system.
       # `baseModules` is passed where the entry point names NixOS'
       # module list itself. `ecosystemArgs`, which only the pattern of
       # the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         { explicitBaseModules }:
-        args: view:
+        args: given:
         let
-          common = compose { } view args;
+          common = compose { } given args;
           callArgs = {
             modules = common.modules;
             specialArgs = common.specialArgs;
@@ -139,11 +139,12 @@
           };
           type = "nixos";
           # A NixOS configuration is evaluated per system: it has an
-          # evaluation for each system its parent evaluates its children for.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A NixOS configuration is activated on a machine; the
+          # A NixOS configuration is activated on a computer; the
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
@@ -157,8 +158,8 @@
         # reads and what a test or the REPL evaluates with no
         # configuration above it. Where the composition declares several
         # systems, it is the evaluated configurations by
-        # system, and where it has none, the empty set: the evaluations
-        # are named as anything published is (`integrations.topValue`).
+        # system, and where it has none, the empty set: the evaluation
+        # results are named as anything published is (`integrations.topValue`).
         # Its name is the name the composition declares on mkLib.
         top = final.caisson.integrations.topValue;
         class = "nixos";
@@ -189,7 +190,7 @@
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
             # declared, as an attribute set by package config name,
-            # each for the system of the evaluation, and returns the
+            # each for the system it is evaluated for, and returns the
             # set to run on. `defaultPkgs = pkgSets: pkgSets.stable;`
             # selects the set of the package config named `stable`.
             # A configuration declared inside this configuration runs on

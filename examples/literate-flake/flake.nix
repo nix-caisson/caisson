@@ -119,7 +119,7 @@
         omitted, every registered entry named `default` applies: this
         flake's `default` and "caisson/default", caisson's default module (the
         nixpkgs integration's module layer). The `core` entries of the
-        class apply to every evaluation regardless.
+        class apply to every configuration of the class regardless.
     */
     lib.caisson.flake-parts.mkTopConfiguration { };
 }

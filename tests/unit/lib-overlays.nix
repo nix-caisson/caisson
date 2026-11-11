@@ -780,9 +780,9 @@ in
     # A project `counter-project` registers `counter`, a module given
     # as a value, with no key. A composition that lists the project
     # reads the entry as `counter-project/counter`, and the library of
-    # the project reads it as `counter`. An evaluation that selects the
-    # entry from both registries imports the module once, so the list
-    # it appends to has one element. The registry keys of the two reads
+    # the project reads it as `counter`. Evaluating a module list that
+    # selects the entry from both registries imports the module a single
+    # time, so the list it appends to has a single element. The registry keys of the two reads
     # stay as each registry names the entry.
     "test: an entry read from the registry of a composition and from the library of its project is imported once" =
       {
@@ -835,8 +835,9 @@ in
       };
 
     # Each integration of caisson has the module that declares its
-    # configurations option, and an evaluation holds configurations of
-    # the integrations whose module it imports.
+    # configurations option. The evaluation result of a configuration
+    # holds configurations of the integrations whose modules the
+    # configuration imports.
     "test: an integration has the module that declares its configurations" = {
       expr = {
         key = lib.caisson.nixos.configurationsModule.key;
@@ -856,9 +857,9 @@ in
       };
     };
 
-    # The machine of a home-manager configuration is the nearest NixOS
-    # or darwin configuration above it: of the nearest ancestor of each
-    # integration, the ancestor with the most ancestors.
+    # The parent of a home-manager configuration is the nearest NixOS
+    # or nix-darwin configuration above it: of the nearest ancestor of
+    # each integration, the ancestor with the most ancestors.
     "test: nearestOf finds the nearest ancestor of the given integrations" = {
       expr =
         let
@@ -1929,8 +1930,8 @@ in
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
       # registration. A terranix configuration is evaluated per
-      # system the composition declares, here one, so a top is the
-      # value of that evaluation: what the stub returns.
+      # system the composition declares, here a single system, so a top
+      # is the evaluation result for that system: what the stub returns.
       mkResolutionLib =
         extra:
         caisson.mkLib (
@@ -2053,8 +2054,8 @@ in
   # `nixos/modules/module-list.nix`, each with the signature of the
   # file it stands in for and its treatment of `lib`, including the
   # `import ../../lib` default that imports the library of the source
-  # tree. That `lib` directory throws, so an evaluation handed no
-  # library fails where it imports a library.
+  # tree. That `lib` directory throws, so evaluating a configuration
+  # without a library fails where the evaluator imports a library.
   nixosLib =
     let
       nixosStub = ./nixos-stub;
@@ -2105,8 +2106,8 @@ in
       myLib = mkComposition { };
       # A composition that declares a single system, a stand-in package
       # config, and a NixOS configuration registered under the name
-      # `machine`, which records the name and the system of its
-      # evaluation.
+      # `probe`, which records the name and the system of its
+      # evaluation result.
       publishingLib = caisson.mkLib {
         dependencies = dependenciesWithNixos;
         name = "publishing";
@@ -2117,7 +2118,7 @@ in
           nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
         };
         configs = callbackLib: {
-          nixos.machine = callbackLib.caisson.nixos.mkModule (
+          nixos.probe = callbackLib.caisson.nixos.mkModule (
             { ... }:
             { lib, ... }:
             {
@@ -2159,14 +2160,14 @@ in
     in
     {
       # The proof that the composed library is passed to the modules of
-      # a NixOS evaluation: a module inside the evaluation sees the
-      # composition's marker and a nixpkgs function at once, on one
-      # library. `evalModules` builds the `lib` module argument from
+      # a NixOS configuration: while the configuration is evaluated, a
+      # module sees the composition's marker and a nixpkgs function on
+      # the same library. `evalModules` builds the `lib` module argument from
       # the library its `lib/modules.nix` closed over, which is
       # the fixpoint the `nixpkgs-lib` entry read rather than what
       # this composition built, so the marker is there only because the
       # composition names `lib` among the special arguments.
-      "test: the modules of a nixos evaluation see the composed library" = {
+      "test: the modules of a nixos configuration see the composed library" = {
         expr = configuration.config.seenLib;
         expected = {
           marker = "from-the-composition";
@@ -2399,7 +2400,7 @@ in
       "test: a package set selection holds inside the configuration that makes it" = {
         expr =
           let
-            machine =
+            nixosConfiguration =
               lib: args:
               lib.caisson.nixos.mkConfiguration (
                 {
@@ -2413,26 +2414,26 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations.beside = machine lib { };
+                    caisson.nixos.configurations.beside = nixosConfiguration lib { };
                     caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
                       moduleImports = _modules: [ ];
                       defaultPkgs = pkgSets: pkgSets.other;
                       configModule =
                         { lib, ... }:
                         {
-                          caisson.nixos.configurations.inherits = machine lib {
+                          caisson.nixos.configurations.inherits = nixosConfiguration lib {
                             configModule =
                               { lib, ... }:
                               {
-                                caisson.nixos.configurations.image = machine lib { };
+                                caisson.nixos.configurations.image = nixosConfiguration lib { };
                               };
                           };
-                          caisson.nixos.configurations.selects = machine lib {
+                          caisson.nixos.configurations.selects = nixosConfiguration lib {
                             defaultPkgs = pkgSets: pkgSets.default;
                             configModule =
                               { lib, ... }:
                               {
-                                caisson.nixos.configurations.image = machine lib { };
+                                caisson.nixos.configurations.image = nixosConfiguration lib { };
                               };
                           };
                         };
@@ -2440,16 +2441,16 @@ in
                   };
               }
             );
-            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            nixosConfigurationsIn = manifest: manifest.children.system.x86_64-linux.children.nixos;
             setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
-            grouped = machinesOf top.children.structural.group;
+            grouped = nixosConfigurationsIn top.children.structural.group;
           in
           {
-            beside = setOf (machinesOf top).beside;
+            beside = setOf (nixosConfigurationsIn top).beside;
             inherits = setOf grouped.inherits;
-            insideInherits = setOf (machinesOf grouped.inherits).image;
+            insideInherits = setOf (nixosConfigurationsIn grouped.inherits).image;
             selects = setOf grouped.selects;
-            insideSelects = setOf (machinesOf grouped.selects).image;
+            insideSelects = setOf (nixosConfigurationsIn grouped.selects).image;
           };
         expected = {
           beside = "the default set";
@@ -2469,7 +2470,7 @@ in
       "test: a configuration selects the package set of the configurations declared inside it" = {
         expr =
           let
-            machine =
+            nixosConfiguration =
               lib: args:
               lib.caisson.nixos.mkConfiguration (
                 {
@@ -2479,32 +2480,32 @@ in
               );
             parent =
               (myLib.caisson-core.finalizeTop (
-                machine myLib {
+                nixosConfiguration myLib {
                   configModule =
                     { lib, ... }:
                     {
                       caisson.forChildren.defaultPkgs = pkgSets: pkgSets.other;
-                      caisson.nixos.configurations.image = machine lib {
+                      caisson.nixos.configurations.image = nixosConfiguration lib {
                         configModule =
                           { lib, ... }:
                           {
-                            caisson.nixos.configurations.nested = machine lib { };
+                            caisson.nixos.configurations.nested = nixosConfiguration lib { };
                           };
                       };
-                      caisson.nixos.configurations.selects = machine lib {
+                      caisson.nixos.configurations.selects = nixosConfiguration lib {
                         defaultPkgs = pkgSets: pkgSets.default;
                       };
                     };
                 }
               )).x86_64-linux;
-            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            nixosConfigurationsIn = manifest: manifest.children.system.x86_64-linux.children.nixos;
             setOf = manifest: manifest.value.config.nixpkgs.pkgs.marker;
           in
           {
             parent = setOf parent;
-            image = setOf (machinesOf parent).image;
-            nested = setOf (machinesOf (machinesOf parent).image).nested;
-            selects = setOf (machinesOf parent).selects;
+            image = setOf (nixosConfigurationsIn parent).image;
+            nested = setOf (nixosConfigurationsIn (nixosConfigurationsIn parent).image).nested;
+            selects = setOf (nixosConfigurationsIn parent).selects;
           };
         expected = {
           parent = "the default set";
@@ -2523,7 +2524,7 @@ in
       "test: a configuration records the package config it runs on and who selected it" = {
         expr =
           let
-            machine =
+            nixosConfiguration =
               lib: args:
               lib.caisson.nixos.mkConfiguration (
                 {
@@ -2537,20 +2538,20 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations.beside = machine lib { };
+                    caisson.nixos.configurations.beside = nixosConfiguration lib { };
                     caisson.structural.configurations.group = lib.caisson.structural.mkConfiguration {
                       moduleImports = _modules: [ ];
                       defaultPkgs = pkgSets: pkgSets.other;
                       configModule =
                         { lib, ... }:
                         {
-                          caisson.nixos.configurations.inherits = machine lib { };
-                          caisson.nixos.configurations.selects = machine lib {
+                          caisson.nixos.configurations.inherits = nixosConfiguration lib { };
+                          caisson.nixos.configurations.selects = nixosConfiguration lib {
                             defaultPkgs = pkgSets: pkgSets.default;
                             configModule =
                               { lib, ... }:
                               {
-                                caisson.nixos.configurations.image = machine lib { };
+                                caisson.nixos.configurations.image = nixosConfiguration lib { };
                               };
                           };
                         };
@@ -2560,26 +2561,26 @@ in
             );
             parent =
               (myLib.caisson-core.finalizeTop (
-                machine myLib {
+                nixosConfiguration myLib {
                   configModule =
                     { lib, ... }:
                     {
                       caisson.forChildren.defaultPkgs = pkgSets: pkgSets.other;
-                      caisson.nixos.configurations.image = machine lib { };
+                      caisson.nixos.configurations.image = nixosConfiguration lib { };
                     };
                 }
               )).x86_64-linux;
-            machinesOf = manifest: manifest.children.system.x86_64-linux.children.nixos;
-            grouped = machinesOf top.children.structural.group;
-            beside = (machinesOf top).beside;
+            nixosConfigurationsIn = manifest: manifest.children.system.x86_64-linux.children.nixos;
+            grouped = nixosConfigurationsIn top.children.structural.group;
+            beside = (nixosConfigurationsIn top).beside;
           in
           {
             beside = beside.pkgSet;
             inherits = grouped.inherits.pkgSet;
             selects = grouped.selects.pkgSet;
-            insideSelects = (machinesOf grouped.selects).image.pkgSet;
+            insideSelects = (nixosConfigurationsIn grouped.selects).image.pkgSet;
             parent = parent.pkgSet;
-            image = (machinesOf parent).image.pkgSet;
+            image = (nixosConfigurationsIn parent).image.pkgSet;
             namespaces =
               builtins.elem "mkConfiguration" beside.namespaces.caisson.nixos
               && builtins.elem "namePathOf" beside.namespaces.caisson-core;
@@ -2691,28 +2692,28 @@ in
         };
       };
 
-      # A NixOS configuration declared at the top has an evaluation for
-      # each system the composition declares: finalizing it gives its
-      # evaluations by system, also when that is a single system, and
-      # none when the composition declares no system. A top read as a
-      # tool reads it is the evaluated configuration where there is a
-      # single evaluation, and the evaluated configurations by system
+      # A NixOS configuration declared at the top has an evaluation
+      # result for each system the composition declares: finalizing it
+      # gives its evaluation results by system, also when that is a
+      # single system, and none when the composition declares no system.
+      # A top read as a tool reads it is the evaluation result where
+      # there is a single system, and the evaluation results by system
       # where there are several.
-      "test: a nixos configuration has an evaluation for each system the composition declares" = {
+      "test: a nixos configuration has an evaluation result for each system the composition declares" = {
         expr =
           let
             on =
               systems:
               caisson.mkLib {
                 dependencies = dependenciesWithNixos;
-                name = "machine";
+                name = "probe";
                 defaultEcosystemSrc = nixosEcosystemSrc;
                 inherit systems;
                 libOverlays = _lib: {
                   nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
                 };
               };
-            evaluationsOn =
+            evaluationResultsOn =
               systems:
               let
                 composed = on systems;
@@ -2725,14 +2726,14 @@ in
               "x86_64-linux"
               "aarch64-linux"
             ];
-            x86 = (evaluationsOn several).x86_64-linux;
+            x86 = (evaluationResultsOn several).x86_64-linux;
           in
           {
-            none = builtins.attrNames (evaluationsOn null);
-            empty = builtins.attrNames (evaluationsOn [ ]);
-            single = builtins.attrNames (evaluationsOn [ "x86_64-linux" ]);
-            several = builtins.mapAttrs (_: evaluation: evaluation.value.config.stub.system) (
-              evaluationsOn several
+            none = builtins.attrNames (evaluationResultsOn null);
+            empty = builtins.attrNames (evaluationResultsOn [ ]);
+            single = builtins.attrNames (evaluationResultsOn [ "x86_64-linux" ]);
+            several = builtins.mapAttrs (_: result: result.value.config.stub.system) (
+              evaluationResultsOn several
             );
             name = x86.name;
             above = {
@@ -2750,7 +2751,7 @@ in
             aarch64-linux = "aarch64-linux";
             x86_64-linux = "x86_64-linux";
           };
-          name = "machine";
+          name = "probe";
           above = {
             type = "system";
             name = "x86_64-linux";
@@ -2806,22 +2807,22 @@ in
               configModule =
                 { lib, ... }:
                 {
-                  caisson.nixos.configurations.machine = lib.caisson.nixos-minimal.mkConfiguration {
+                  caisson.nixos.configurations.small = lib.caisson.nixos-minimal.mkConfiguration {
                     configModule = { ... }: { };
                   };
                 };
             };
-            machine = top.caisson.manifest.children.system.x86_64-linux.children.nixos.machine;
+            small = top.caisson.manifest.children.system.x86_64-linux.children.nixos.small;
           in
           {
-            type = machine.type;
+            type = small.type;
             published = builtins.attrNames top.nixosConfigurations;
-            # The minimal evaluator ran: its result has no `system.build`.
-            minimal = !(top.nixosConfigurations.machine.config ? system);
+            # The minimal evaluator ran: its evaluation result has no `system.build`.
+            minimal = !(top.nixosConfigurations.small.config ? system);
           };
         expected = {
           type = "nixos";
-          published = [ "machine" ];
+          published = [ "small" ];
           minimal = true;
         };
       };
@@ -2829,9 +2830,9 @@ in
       # A NixOS configuration declared inside another configuration is
       # finalized under the attribute it is declared under, and takes
       # the configuration registered under that name when it passes no
-      # module. In the tree of manifests its evaluation sits under its
-      # name, inside the system, inside the configuration that declares
-      # it.
+      # module. In the tree of manifests its evaluation result sits
+      # under its name, inside the system, inside the configuration that
+      # declares it.
       "test: a nixos configuration is declared inside a configuration and found by name" = {
         expr =
           let
@@ -2841,30 +2842,30 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration { };
+                    caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration { };
                   };
               }
             );
             system = top.children.system.x86_64-linux;
-            machine = system.children.nixos.machine;
+            probe = system.children.nixos.probe;
           in
           {
             children = builtins.attrNames top.children;
             systems = builtins.attrNames top.children.system;
             systemType = system.type;
-            type = machine.type;
-            name = machine.value.config.seenLib.name;
-            seenSystem = machine.value.config.seenLib.system;
-            ancestors = builtins.map (ancestor: ancestor.type) machine.ancestors;
-            nearest = builtins.attrNames machine.nearest;
-            outputs = builtins.attrNames machine.outputs;
+            type = probe.type;
+            name = probe.value.config.seenLib.name;
+            seenSystem = probe.value.config.seenLib.system;
+            ancestors = builtins.map (ancestor: ancestor.type) probe.ancestors;
+            nearest = builtins.attrNames probe.nearest;
+            outputs = builtins.attrNames probe.outputs;
           };
         expected = {
           children = [ "system" ];
           systems = [ "x86_64-linux" ];
           systemType = "system";
           type = "nixos";
-          name = "machine";
+          name = "probe";
           seenSystem = "x86_64-linux";
           ancestors = [
             "lib"
@@ -2901,7 +2902,7 @@ in
                 caisson.flake-parts.configurations.flake = lib.caisson.flake-parts.mkConfiguration {
                   moduleImports = _modules: [ ];
                 };
-                caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                caisson.nixos.configurations.full = lib.caisson.nixos.mkConfiguration {
                   configModule = { ... }: { };
                 };
                 caisson.nixos.configurations.small = lib.caisson.nixos-minimal.mkConfiguration {
@@ -2947,16 +2948,17 @@ in
                 builtins.removeAttrs parent.children [ "system" ]
               );
               atSystem = builtins.mapAttrs (_: builtins.attrNames) parent.children.system.x86_64-linux.children;
-              # The evaluations declared inside are finished evaluations.
-              machineIsNixos = parent.children.system.x86_64-linux.children.nixos.machine.value ? config;
+              # The configurations declared inside have finished
+              # evaluation results.
+              fullIsNixos = parent.children.system.x86_64-linux.children.nixos.full.value ? config;
             };
-            machines = top.children.system.x86_64-linux.children.nixos;
+            nixosConfigurations = top.children.system.x86_64-linux.children.nixos;
           in
           {
             structural = held top.children.structural.parent;
             flake-parts = held top.children.flake-parts.parent;
-            nixos = held machines.parent;
-            nixos-minimal = held machines.smallParent;
+            nixos = held nixosConfigurations.parent;
+            nixos-minimal = held nixosConfigurations.smallParent;
           };
         expected =
           let
@@ -2967,11 +2969,11 @@ in
               };
               atSystem = {
                 nixos = [
-                  "machine"
+                  "full"
                   "small"
                 ];
               };
-              machineIsNixos = true;
+              fullIsNixos = true;
             };
           in
           {
@@ -3073,19 +3075,19 @@ in
                   };
               }
             );
-            machines = top.children.system.x86_64-linux.children.nixos;
+            nixosConfigurations = top.children.system.x86_64-linux.children.nixos;
             rack = top.children.structural.rack;
             deep = rack.children.system.x86_64-linux.children.nixos.deep;
           in
           {
             top = top.value.config.notes;
-            direct = machines.direct.value.config.notes;
-            chosen = machines.chosen.value.config.notes;
-            added = builtins.sort builtins.lessThan machines.added.value.config.notes;
+            direct = nixosConfigurations.direct.value.config.notes;
+            chosen = nixosConfigurations.chosen.value.config.notes;
+            added = builtins.sort builtins.lessThan nixosConfigurations.added.value.config.notes;
             rack = rack.value.config.notes;
             deep = builtins.sort builtins.lessThan deep.value.config.notes;
             sameRegistryInside =
-              builtins.attrNames machines.direct.modules.nixos == builtins.attrNames top.modules.nixos;
+              builtins.attrNames nixosConfigurations.direct.modules.nixos == builtins.attrNames top.modules.nixos;
           };
         expected = {
           top = [ "top" ];
@@ -3106,10 +3108,10 @@ in
 
       # A configuration is passed up to the top through each level
       # above it, whatever their integrations: each level passes up what
-      # is declared inside it. Here a machine is declared inside a
-      # machine, inside a structural configuration, inside a
-      # flake-parts configuration, and the modules of those levels
-      # declare configurations and nothing else.
+      # is declared inside it. Here a NixOS configuration is declared
+      # inside a NixOS configuration, inside a structural configuration,
+      # inside a flake-parts configuration, and the modules of those
+      # levels declare configurations and nothing else.
       "test: a configuration is published through levels of any integration" = {
         expr =
           let
@@ -3128,7 +3130,7 @@ in
                           configModule =
                             { lib, ... }:
                             {
-                              caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                              caisson.nixos.configurations.server = lib.caisson.nixos.mkConfiguration {
                                 configModule =
                                   { lib, ... }:
                                   {
@@ -3144,18 +3146,19 @@ in
                 };
             };
             image =
-              top.caisson.manifest.children.flake-parts.site.children.structural.rack.children.system.x86_64-linux.children.nixos.machine.children.system.x86_64-linux.children.nixos.image;
+              top.caisson.manifest.children.flake-parts.site.children.structural.rack.children.system.x86_64-linux.children.nixos.server.children.system.x86_64-linux.children.nixos.image;
           in
           {
             published = builtins.attrNames top.nixosConfigurations;
-            # What is published is the evaluation in the tree of manifests.
+            # What is published is the evaluation result in the tree of
+            # manifests.
             same = top.nixosConfigurations.image == image.value;
             above = builtins.map (ancestor: ancestor.type) image.ancestors;
           };
         expected = {
           published = [
             "image"
-            "machine"
+            "server"
           ];
           same = true;
           above = [
@@ -3183,7 +3186,7 @@ in
               configModule =
                 { lib, ... }:
                 {
-                  caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                  caisson.nixos.configurations.server = lib.caisson.nixos.mkConfiguration {
                     configModule =
                       { lib, ... }:
                       {
@@ -3202,12 +3205,12 @@ in
                   };
                 };
             };
-            machine = top.caisson.manifest.children.system.x86_64-linux.children.nixos.machine;
-            image = machine.children.system.x86_64-linux.children.nixos.image;
+            server = top.caisson.manifest.children.system.x86_64-linux.children.nixos.server;
+            image = server.children.system.x86_64-linux.children.nixos.image;
           in
           {
-            children = builtins.attrNames machine.children;
-            group = machine.children.structural.group.type;
+            children = builtins.attrNames server.children;
+            group = server.children.structural.group.type;
             imageName = image.name;
             imageEvaluates = image.value.config.seenLib ? marker;
             imageNearest = image.nearest.nixos.name;
@@ -3222,7 +3225,7 @@ in
           group = "structural";
           imageName = "image";
           imageEvaluates = true;
-          imageNearest = "machine";
+          imageNearest = "server";
           imageAncestors = [
             "lib"
             "structural"
@@ -3232,7 +3235,7 @@ in
           ];
           published = [
             "image"
-            "machine"
+            "server"
           ];
         };
       };
@@ -3246,7 +3249,7 @@ in
       "test: a top publishes the nixos configurations declared inside it under names from their paths" = {
         expr =
           let
-            machineIn =
+            nixosConfigurationNamed =
               lib: name:
               lib.caisson.nixos.mkConfiguration {
                 configModule = {
@@ -3255,19 +3258,19 @@ in
                 };
               };
             group =
-              lib: machines:
+              lib: names:
               lib.caisson.structural.mkConfiguration {
                 moduleImports = _modules: [ ];
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations = lib.genAttrs machines (machineIn lib);
+                    caisson.nixos.configurations = lib.genAttrs names (nixosConfigurationNamed lib);
                   };
               };
             declarations =
               { lib, ... }:
               {
-                caisson.nixos.configurations.direct = machineIn lib "direct";
+                caisson.nixos.configurations.direct = nixosConfigurationNamed lib "direct";
                 caisson.structural.configurations.a = group lib [
                   "host-1"
                   "host-2"
@@ -3309,10 +3312,11 @@ in
         };
       };
 
-      # Where the composition declares several systems, a name is published for each
-      # evaluation, told apart by the system. `exported` selects what
-      # is passed up, and what it leaves out is not published.
-      "test: a top publishes an evaluation per system, and only what is selected" = {
+      # Where the composition declares several systems, a name is
+      # published for each evaluation result, told apart by the system.
+      # `exported` selects what is passed up, and what it leaves out is
+      # not published.
+      "test: a top publishes an evaluation result per system, and only what is selected" = {
         expr =
           let
             severalLib = caisson.mkLib {
@@ -3334,7 +3338,7 @@ in
                 configModule =
                   { lib, ... }:
                   {
-                    caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                    caisson.nixos.configurations.probe = lib.caisson.nixos.mkConfiguration {
                       configModule = probeModule;
                     };
                     caisson.nixos.exported = exported;
@@ -3347,8 +3351,8 @@ in
           };
         expected = {
           all = [
-            "aarch64-linux/machine"
-            "x86_64-linux/machine"
+            "aarch64-linux/probe"
+            "x86_64-linux/probe"
           ];
           none = false;
         };
@@ -3374,10 +3378,10 @@ in
               configModule =
                 { lib, ... }:
                 {
-                  caisson.nixos.configurations.machine = lib.caisson.nixos.mkConfiguration {
+                  caisson.nixos.configurations.original = lib.caisson.nixos.mkConfiguration {
                     configModule = probeModule;
                   };
-                  caisson.nixos.exported = configurations: { renamed = configurations.machine; };
+                  caisson.nixos.exported = configurations: { renamed = configurations.original; };
                 };
             };
           in
@@ -3394,12 +3398,12 @@ in
           let
             entry = {
               attrset = "nixosConfigurations";
-              value = "a machine";
+              value = "a NixOS configuration";
               manifest = { };
               path = [
                 {
                   type = "nixos";
-                  name = "machine";
+                  name = "probe";
                 }
               ];
             };
@@ -3530,7 +3534,7 @@ in
       hmStub = ./home-manager-stub;
       # The same stub at a second path, the store copy of the parent
       # flake: a source tree equal in content to the declared source
-      # tree at a different path, so an evaluation can name another
+      # tree at a different path, so a configuration can name another
       # home-manager and nothing but the refusal stands in its way.
       hmStubCopy = inputs.parent.outPath + "/tests/unit/home-manager-stub";
       # A home-manager configuration takes its system and its package
@@ -3574,7 +3578,8 @@ in
       myLib = mkComposition { };
       # A composition that declares no home-manager: no
       # `defaultEcosystemSrc.home-manager`, and no input of that name.
-      # The home-manager source comes from the `ecosystemSrc` of each evaluation.
+      # The home-manager source comes from the `ecosystemSrc` of each
+      # configuration.
       undeclaredLib = mkCompositionWith { } { };
       # A nixpkgs maintainer list for a composition to merge into. The
       # nixpkgs.lib mirror these tests compose on has none, so a
@@ -3704,11 +3709,11 @@ in
             );
           };
         };
-      # A flake with a home-manager configuration alone and a machine
-      # `laptop` on the set `other` with two home-manager
+      # A flake with a home-manager configuration alone and a NixOS
+      # configuration `laptop` on the set `other` with two home-manager
       # configurations, the second naming another user and selecting
-      # `default`. `serving` adds a machine `server` that holds a
-      # configuration for another system.
+      # `default`. `serving` adds a NixOS configuration `server` that
+      # holds a configuration for another system.
       homeManagerConfiguration =
         lib: args: lib.caisson.home-manager.mkConfiguration ({ check = false; } // args);
       flakeWith =
@@ -3759,9 +3764,9 @@ in
         composition.caisson.integrations.topValue (composition.caisson-core.finalizeTop declared);
     in
     {
-      # The proof that the composed library is passed to the modules: a module
-      # inside the evaluation sees the composition's marker and
-      # `lib.hm` at once, on one library. Composing `hm` with
+      # The proof that the composed library is passed to the modules:
+      # while the configuration is evaluated, a module sees the
+      # composition's marker and `lib.hm` on the same library. Composing `hm` with
       # `lib.extend` inside the evaluator cannot produce this: nixpkgs'
       # `lib/default.nix` builds its fixpoint with a bootstrap
       # `makeExtensible` that keeps no `__unfix__`, so `extend`
@@ -3807,10 +3812,10 @@ in
         expected = [ "a-nixpkgs-maintainer" ];
       };
 
-      # The library such an evaluation runs on merges the maintainers
-      # of the home-manager source it names, the way the entry does for
-      # a declared source.
-      "test: an evaluation naming its home-manager merges its maintainers" = {
+      # The library a configuration that names its home-manager runs on
+      # merges the maintainers of the home-manager source it names, the
+      # way the entry does for a declared source.
+      "test: a configuration naming its home-manager merges its maintainers" = {
         expr =
           ((mkMaintainersComposition { }).caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = dependencies: dependencies.hmStub;
@@ -3854,12 +3859,12 @@ in
         expected = "from-a-replacement-entry";
       };
 
-      # The evaluation composes home-manager's module list from the
-      # declared source and hands it `modulesPath`, the special
-      # argument home-manager's news entries interpolate. It asks for
-      # the list without home-manager's nixpkgs module, so the
+      # The home-manager integration composes home-manager's module
+      # list from the declared source and hands it `modulesPath`, the
+      # special argument home-manager's news entries interpolate. It
+      # asks for the list without home-manager's nixpkgs module, so the
       # home-manager configuration runs on the package set it is given.
-      "test: the evaluation reads the module list of the declared source" = {
+      "test: the integration reads the module list of the declared source" = {
         expr = {
           inherit (configuration.config.stub) minimal useNixpkgsModule;
           # The tail of the path, the head being the store copy of the
@@ -3873,9 +3878,9 @@ in
         };
       };
 
-      # What the evaluation publishes beside the configuration, the
+      # What the evaluation result holds beside the configuration: the
       # names `modules/default.nix` of the home-manager source adds.
-      "test: the evaluation publishes the activation package and the news" = {
+      "test: the evaluation result holds the activation package and the news" = {
         expr = {
           inherit (configuration)
             activationPackage
@@ -3894,8 +3899,8 @@ in
         };
       };
 
-      # The evaluation collects the failed assertions of the
-      # configuration and throws with their messages.
+      # Evaluating the configuration collects its failed assertions
+      # and throws with their messages.
       "test: a failed assertion stops the evaluation" = {
         expr =
           (builtins.tryEval
@@ -3929,9 +3934,9 @@ in
       };
 
       # An `ecosystemSrc` naming the declared source names the source
-      # the entry composed `hm` from, and the evaluation runs on the
+      # the entry composed `hm` from, and the configuration runs on the
       # composed library.
-      "test: an evaluation naming the declared source runs on the composed library" = {
+      "test: a configuration naming the declared source runs on the composed library" = {
         expr =
           (myLib.caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = dependencies: dependencies.hmStub;
@@ -3947,11 +3952,12 @@ in
         };
       };
 
-      # A home-manager evaluation runs on one library, so its modules
-      # and its `lib.hm` come from one source. The declared source
-      # composed `hm`, and an evaluation naming another source is
-      # refused, with the declaration that would compose an `hm` for it.
-      "test: an evaluation naming a second source beside the declared source is refused" = {
+      # A home-manager configuration is evaluated on a single library,
+      # so its modules and its `lib.hm` come from the same source. The
+      # declared source composed `hm`, and a configuration naming
+      # another source is refused, with the declaration that would
+      # compose an `hm` for it.
+      "test: a configuration naming a second source beside the declared source is refused" = {
         expr =
           builtins.deepSeq
             (myLib.caisson.home-manager.mkTopConfiguration {
@@ -3966,12 +3972,12 @@ in
         };
       };
 
-      # With no home-manager declared, the source an evaluation names
-      # supplies its modules and its `lib.hm` both: the modules see
-      # the composition's marker and `lib.hm` at once, `hm` calls back
-      # through `lib.hm` on the library the evaluation runs on, and the
+      # With no home-manager declared, the source a configuration names
+      # supplies its modules and its `lib.hm`: the modules see the
+      # composition's marker and `lib.hm`, `hm` calls back through
+      # `lib.hm` on the library the configuration runs on, and the
       # home-manager maintainers are there under `hm`.
-      "test: an evaluation names its home-manager when the composition declares none" = {
+      "test: a configuration names its home-manager when the composition declares none" = {
         expr =
           (undeclaredLib.caisson.home-manager.mkTopConfiguration {
             ecosystemSrc = dependencies: dependencies.hmStub;
@@ -3987,10 +3993,10 @@ in
         };
       };
 
-      # Inside such an evaluation, the modules read `lib.hm.dag` the
-      # way the modules of home-manager do, and the `lib` option the
-      # module list sets to `lib.hm` is that same library.
-      "test: the modules of an evaluation naming its home-manager read lib.hm" = {
+      # The modules of such a configuration read `lib.hm.dag` the way
+      # the modules of home-manager do, and the `lib` option the module
+      # list sets to `lib.hm` is that same library.
+      "test: the modules of a configuration naming its home-manager read lib.hm" = {
         expr =
           let
             evaluated = undeclaredLib.caisson.home-manager.mkTopConfiguration {
@@ -4013,11 +4019,11 @@ in
         };
       };
 
-      # The module system of the evaluation hands out the library the
-      # evaluation runs on wherever it creates a module: a submodule
-      # and an evaluation run from inside a module both see the
-      # composition and `lib.hm`, under a declared home-manager and
-      # under a home-manager the evaluation names.
+      # The module system hands out the library the configuration runs
+      # on wherever it creates a module: a submodule and an
+      # `evalModules` call inside a module both see the composition and
+      # `lib.hm`, under a declared home-manager and under a
+      # home-manager the configuration names.
       "test: submodules and nested evaluations run on the same library" = {
         expr =
           let
@@ -4085,7 +4091,7 @@ in
       # With no home-manager declared and none named, there is no
       # home-manager source to evaluate: the miss is reported with the
       # places a source comes from.
-      "test: an evaluation naming no home-manager under no declaration is refused" = {
+      "test: a configuration naming no home-manager under no declaration is refused" = {
         expr =
           builtins.deepSeq
             (undeclaredLib.caisson.home-manager.mkTopConfiguration {
@@ -4106,9 +4112,10 @@ in
       # another, and it runs on the package set selected where it is
       # declared: inside a NixOS configuration the set of that
       # configuration, unless the home-manager configuration selects.
-      # A top publishes it under `homeConfigurations`, named
-      # `<user>@<machine>` inside a NixOS configuration and by its name
-      # otherwise.
+      # A top publishes it under `homeConfigurations`. Inside a NixOS
+      # configuration its name is `<user>@<name>`, where `<name>` is the
+      # name of the NixOS configuration. Elsewhere its name is the name
+      # it is declared under.
       "test: a home-manager configuration declared inside a configuration is named, published and given its package set" =
         {
           expr =
@@ -4129,7 +4136,7 @@ in
               alone = seen homeManagerConfigurations.chris // {
                 registered = homeManagerConfigurations.chris.config.seenLib.registered;
               };
-              insideAMachine = seen homeManagerConfigurations."chris@laptop";
+              insideANixosConfiguration = seen homeManagerConfigurations."chris@laptop";
               selecting = seen homeManagerConfigurations."dana@laptop";
               aTopHasNoDeclaredName =
                 (lib.caisson.home-manager.mkTopConfiguration {
@@ -4148,7 +4155,7 @@ in
               set = "default for x86_64-linux";
               registered = true;
             };
-            insideAMachine = {
+            insideANixosConfiguration = {
               user = "chris";
               set = "other for x86_64-linux";
             };
@@ -4161,182 +4168,186 @@ in
         };
 
       # A home-manager configuration declared inside a NixOS
-      # configuration is given its machine. The home-manager
-      # integration hands it the configuration of the machine as
-      # `osConfig`. The `default` NixOS module of caisson adds the
-      # module `nixos-parent` to the modules the home-manager
-      # configuration imports by default, and that module sets the
-      # home directory and the user ID from the account the machine
-      # declares, the Nix of the machine, and the option home-manager
-      # reads to tell that a machine activates the home-manager
-      # configuration.
+      # configuration is given the evaluation result of that NixOS
+      # configuration. The home-manager integration hands it the
+      # `config` of the NixOS configuration as `osConfig`. The `default`
+      # NixOS module of caisson adds the module `nixos-parent` to the
+      # modules the home-manager configuration imports by default, and
+      # that module sets the home directory and the user ID from the
+      # account the NixOS configuration declares, the Nix of the NixOS
+      # configuration, and the option home-manager reads to tell that a
+      # NixOS configuration activates the home-manager configuration.
       #
       # The five home-manager configurations below are these. A
-      # home-manager configuration whose account the machine declares.
-      # A home-manager configuration whose account the machine does
-      # not declare, as with an account that systemd-homed manages. A
-      # home-manager configuration that passes `moduleImports` and so
-      # selects its modules itself. A home-manager configuration inside
-      # a NixOS configuration that passes `moduleImports`, and so does
-      # not import the `default` NixOS module. A home-manager
-      # configuration declared outside any machine.
-      "test: a home-manager configuration declared inside a NixOS configuration is given its machine" = {
-        expr =
-          let
-            lib = flakeLibWith [ "x86_64-linux" ];
-            # What a home-manager configuration sees of its machine
-            # through `osConfig`.
-            probe =
-              { osConfig, ... }:
-              {
-                seenLib.machineNix = if osConfig == null then null else osConfig.nix.package;
-                programs.home-manager.enable = true;
-              };
-            # The class of the machine, which only a home-manager
-            # configuration inside a machine is handed.
-            classProbe =
-              { osClass, ... }:
-              {
-                seenLib.machineClass = osClass;
-              };
-            top = lib.caisson.structural.mkTopConfiguration {
-              moduleImports = _modules: [ ];
-              configModule =
-                { lib, ... }:
+      # home-manager configuration whose account the NixOS configuration
+      # declares. A home-manager configuration whose account the NixOS
+      # configuration does not declare, as with an account that
+      # systemd-homed manages. A home-manager configuration that passes
+      # `moduleImports` and so selects its modules itself. A
+      # home-manager configuration inside a NixOS configuration that
+      # passes `moduleImports`, and so does not import the `default`
+      # NixOS module. A home-manager configuration declared outside any
+      # NixOS configuration.
+      "test: a home-manager configuration declared inside a NixOS configuration is given its evaluation result" =
+        {
+          expr =
+            let
+              lib = flakeLibWith [ "x86_64-linux" ];
+              # What a home-manager configuration sees of its NixOS
+              # configuration through `osConfig`.
+              probe =
+                { osConfig, ... }:
                 {
-                  caisson.home-manager.configurations.alone = homeManagerConfiguration lib { configModule = probe; };
-                  caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
-                    configModule =
-                      { lib, ... }:
-                      {
-                        users.users.declared = {
-                          home = "/home/declared";
-                          uid = 1001;
-                        };
-                        caisson.home-manager.configurations = {
-                          declared = homeManagerConfiguration lib {
-                            configModule.imports = [
-                              probe
-                              classProbe
-                            ];
-                          };
-                          undeclared = homeManagerConfiguration lib { configModule = probe; };
-                          selecting = homeManagerConfiguration lib {
-                            configModule = probe;
-                            moduleImports = _modules: [ ];
-                          };
-                        };
-                      };
-                  };
-                  # A NixOS configuration that selects its modules
-                  # itself. It does not import caisson's `default`
-                  # NixOS module, so it adds nothing to the default
-                  # modules of the home-manager configuration declared
-                  # inside it.
-                  caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
-                    moduleImports = _modules: [ ];
-                    configModule =
-                      { lib, ... }:
-                      {
-                        users.users.declared = {
-                          home = "/home/declared";
-                          uid = 1001;
-                        };
-                        caisson.home-manager.configurations.declared = homeManagerConfiguration lib {
-                          configModule = probe;
-                        };
-                      };
-                  };
+                  seenLib.parentNix = if osConfig == null then null else osConfig.nix.package;
+                  programs.home-manager.enable = true;
                 };
-            };
-            seen =
-              homeManagerConfiguration:
-              let
-                inherit (homeManagerConfiguration) config;
-              in
-              {
-                inherit (config.seenLib) machineNix;
-                inherit (config.home) homeDirectory uid packages;
-                nix = config.nix.package;
-                activatedByAMachine = config.submoduleSupport.enable;
+              # The class of the NixOS configuration, which only a
+              # home-manager configuration inside a NixOS configuration is
+              # handed.
+              classProbe =
+                { osClass, ... }:
+                {
+                  seenLib.parentClass = osClass;
+                };
+              top = lib.caisson.structural.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.home-manager.configurations.alone = homeManagerConfiguration lib { configModule = probe; };
+                    caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
+                      configModule =
+                        { lib, ... }:
+                        {
+                          users.users.declared = {
+                            home = "/home/declared";
+                            uid = 1001;
+                          };
+                          caisson.home-manager.configurations = {
+                            declared = homeManagerConfiguration lib {
+                              configModule.imports = [
+                                probe
+                                classProbe
+                              ];
+                            };
+                            undeclared = homeManagerConfiguration lib { configModule = probe; };
+                            selecting = homeManagerConfiguration lib {
+                              configModule = probe;
+                              moduleImports = _modules: [ ];
+                            };
+                          };
+                        };
+                    };
+                    # A NixOS configuration that selects its modules
+                    # itself. It does not import caisson's `default`
+                    # NixOS module, so it adds nothing to the default
+                    # modules of the home-manager configuration declared
+                    # inside it.
+                    caisson.nixos.configurations.bare = lib.caisson.nixos.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule =
+                        { lib, ... }:
+                        {
+                          users.users.declared = {
+                            home = "/home/declared";
+                            uid = 1001;
+                          };
+                          caisson.home-manager.configurations.declared = homeManagerConfiguration lib {
+                            configModule = probe;
+                          };
+                        };
+                    };
+                  };
               };
-            homeManagerConfigurations = top.homeConfigurations;
-          in
-          {
-            declared = seen homeManagerConfigurations."declared@laptop" // {
-              inherit (homeManagerConfigurations."declared@laptop".config.seenLib) machineClass;
+              seen =
+                homeManagerConfiguration:
+                let
+                  inherit (homeManagerConfiguration) config;
+                in
+                {
+                  inherit (config.seenLib) parentNix;
+                  inherit (config.home) homeDirectory uid packages;
+                  nix = config.nix.package;
+                  activatedByTheParent = config.submoduleSupport.enable;
+                };
+              homeManagerConfigurations = top.homeConfigurations;
+            in
+            {
+              declared = seen homeManagerConfigurations."declared@laptop" // {
+                inherit (homeManagerConfigurations."declared@laptop".config.seenLib) parentClass;
+              };
+              undeclared = seen homeManagerConfigurations."undeclared@laptop";
+              selecting = seen homeManagerConfigurations."selecting@laptop";
+              insideANixosConfigurationThatSelects = seen homeManagerConfigurations."declared@bare";
+              alone = seen homeManagerConfigurations.alone;
             };
-            undeclared = seen homeManagerConfigurations."undeclared@laptop";
-            selecting = seen homeManagerConfigurations."selecting@laptop";
-            insideAMachineThatSelects = seen homeManagerConfigurations."declared@bare";
-            alone = seen homeManagerConfigurations.alone;
-          };
-        expected = {
-          declared = {
-            machineNix = "nix-of-the-machine";
-            machineClass = "nixos";
-            homeDirectory = "/home/declared";
-            uid = 1001;
-            packages = [ "home-manager-cli" ];
-            nix = "nix-of-the-machine";
-            activatedByAMachine = true;
-          };
-          undeclared = {
-            machineNix = "nix-of-the-machine";
-            homeDirectory = "";
-            uid = null;
-            packages = [ "home-manager-cli" ];
-            nix = "nix-of-the-machine";
-            activatedByAMachine = true;
-          };
-          selecting = {
-            machineNix = "nix-of-the-machine";
-            homeDirectory = "";
-            uid = null;
-            packages = [ ];
-            nix = null;
-            activatedByAMachine = false;
-          };
-          insideAMachineThatSelects = {
-            machineNix = "nix-of-the-machine";
-            homeDirectory = "";
-            uid = null;
-            packages = [ ];
-            nix = null;
-            activatedByAMachine = false;
-          };
-          alone = {
-            machineNix = null;
-            homeDirectory = "";
-            uid = null;
-            packages = [ ];
-            nix = null;
-            activatedByAMachine = false;
+          expected = {
+            declared = {
+              parentNix = "nix-of-the-nixos-configuration";
+              parentClass = "nixos";
+              homeDirectory = "/home/declared";
+              uid = 1001;
+              packages = [ "home-manager-cli" ];
+              nix = "nix-of-the-nixos-configuration";
+              activatedByTheParent = true;
+            };
+            undeclared = {
+              parentNix = "nix-of-the-nixos-configuration";
+              homeDirectory = "";
+              uid = null;
+              packages = [ "home-manager-cli" ];
+              nix = "nix-of-the-nixos-configuration";
+              activatedByTheParent = true;
+            };
+            selecting = {
+              parentNix = "nix-of-the-nixos-configuration";
+              homeDirectory = "";
+              uid = null;
+              packages = [ ];
+              nix = null;
+              activatedByTheParent = false;
+            };
+            insideANixosConfigurationThatSelects = {
+              parentNix = "nix-of-the-nixos-configuration";
+              homeDirectory = "";
+              uid = null;
+              packages = [ ];
+              nix = null;
+              activatedByTheParent = false;
+            };
+            alone = {
+              parentNix = null;
+              homeDirectory = "";
+              uid = null;
+              packages = [ ];
+              nix = null;
+              activatedByTheParent = false;
+            };
           };
         };
-      };
 
       # A NixOS configuration activates the home-manager configurations
       # declared inside it. The `default` NixOS module of caisson
       # imports a module that writes a systemd unit for each such
       # home-manager configuration. The unit is a system unit when the
-      # machine declares the account of the user of the home-manager
-      # configuration in `users.users`. A home-manager configuration
-      # whose user has no account there is refused, unless the machine
-      # lists the user in
+      # NixOS configuration declares the account of the user of the
+      # home-manager configuration in `users.users`. A home-manager
+      # configuration whose user has no account there is refused, unless
+      # the NixOS configuration lists the user in
       # `caisson.home-manager.activation.usersDeclaredElsewhere`, and
       # then the unit is a user unit.
       #
-      # The machine `laptop` below has four home-manager
+      # The NixOS configuration `laptop` below has four home-manager
       # configurations. It declares the account of the first. It lists
       # the users of the second and the third as declared elsewhere.
       # The third is declared inside a structural configuration inside
-      # the machine, and the machine activates it too. The fourth is
-      # declared inside a second NixOS configuration, `image`, that is
-      # itself inside `laptop`. That home-manager configuration belongs
-      # to `image`, and `laptop` writes no unit for it.
+      # `laptop`, and `laptop` activates it too. The fourth is declared
+      # inside a second NixOS configuration, `image`, that is declared
+      # inside `laptop`. That home-manager configuration belongs to
+      # `image`, and `laptop` writes no unit for it.
       #
-      # Three more machines are each refused with one assertion.
+      # The NixOS configurations `clash`, `stray` and `both` are each
+      # refused with a single assertion.
       # `clash` has two home-manager configurations for one user.
       # `stray` has a home-manager configuration whose user has no
       # account and is not listed. `both` lists a user that it also
@@ -4413,16 +4424,16 @@ in
                     };
                   };
               };
-              units = machine: {
-                system = builtins.attrNames machine.config.systemd.services;
-                user = builtins.attrNames machine.config.systemd.user.services;
+              units = evaluated: {
+                system = builtins.attrNames evaluated.config.systemd.services;
+                user = builtins.attrNames evaluated.config.systemd.user.services;
                 refused = builtins.map (assertion: assertion.message) (
-                  builtins.filter (assertion: !assertion.assertion) machine.config.assertions
+                  builtins.filter (assertion: !assertion.assertion) evaluated.config.assertions
                 );
               };
               laptop = units top.nixosConfigurations.laptop;
               image = units top.nixosConfigurations.image;
-              # How many assertions of a machine fail, and whether the
+              # How many assertions of a NixOS configuration fail, and whether the
               # message of the first names each of the words given.
               refusal =
                 name: words:
@@ -4488,25 +4499,26 @@ in
 
       # A NixOS configuration with a home-manager configuration declared
       # inside it writes the file `caisson/marker.json` under `/etc`.
-      # The file holds the digest of the store path of the system of
-      # the machine with the configurations declared inside it left
-      # out.
+      # The file holds the digest of the store path of the system that
+      # the result of the childless evaluation of the NixOS
+      # configuration builds.
       #
       # The stub of NixOS puts the number of system units into the
-      # store path of a system. The machine `laptop` has one
+      # store path of a system. The NixOS configuration `laptop` has a
       # home-manager configuration, and `laptop` declares the account
       # of that home-manager configuration. The system of `laptop`
-      # therefore has one unit. The digest in the file must be that of
-      # the system with no units.
+      # therefore has a single unit. The digest in the file must be
+      # that of the system with no units.
       #
-      # The machine `bare` has no home-manager configuration, and
-      # writes no file.
+      # The NixOS configuration `bare` has no home-manager
+      # configuration, and writes no file.
       #
-      # The machine `outer` has a machine `image` declared inside it,
-      # and `image` has a home-manager configuration. That home-manager
-      # configuration belongs to `image`. So `image` writes the file,
-      # and `outer` does not: `image` is applied on a different
-      # machine, so it checks no marker of `outer`.
+      # The NixOS configuration `outer` has a NixOS configuration
+      # `image` declared inside it, and `image` has a home-manager
+      # configuration. That home-manager configuration belongs to
+      # `image`. So `image` writes the file, and `outer` does not:
+      # `image` is applied on a different machine, so it checks no
+      # marker of `outer`.
       "test: a NixOS configuration with home-manager configurations records the system it runs without them" =
         {
           expr =
@@ -4590,7 +4602,7 @@ in
         expr =
           let
             lib = flakeLibWith [ "x86_64-linux" ];
-            machine =
+            laptopModule =
               { lib, ... }:
               {
                 users.users.chris.home = "/home/chris";
@@ -4602,7 +4614,7 @@ in
                 { lib, ... }:
                 {
                   caisson.nixos.configurations.laptop = lib.caisson.nixos.mkConfiguration {
-                    configModule = machine;
+                    configModule = laptopModule;
                   };
                 };
             };
@@ -4625,15 +4637,16 @@ in
         };
       };
 
-      # The evaluation of a NixOS configuration for a system evaluates
-      # its children for that system, so a home-manager configuration
-      # declared inside it has that evaluation alone, and each
-      # evaluation of the machine publishes its home-manager
-      # configuration. A machine that states other systems for the
+      # Evaluating a NixOS configuration for a system evaluates the
+      # configurations declared inside it for that system, so a
+      # home-manager configuration declared inside it has an evaluation
+      # result for that system alone, and each evaluation result of the
+      # NixOS configuration publishes its home-manager configuration. A
+      # NixOS configuration that states other systems for the
       # configurations declared inside it
       # (`caisson.forChildren.systems`) holds those configurations for
       # the systems it states.
-      "test: a home-manager configuration declared inside a machine is evaluated for the system of the machine" =
+      "test: a home-manager configuration declared inside a NixOS configuration is evaluated for the system of the NixOS configuration" =
         {
           expr =
             let
@@ -4646,13 +4659,13 @@ in
                 configModule = flakeWith { serving = true; };
               };
               top = lib.caisson-core.finalizeTop declared;
-              machines = top.children.system.x86_64-linux.children.nixos;
+              nixosConfigurations = top.children.system.x86_64-linux.children.nixos;
             in
             {
-              systemsInsideTheMachine = builtins.attrNames machines.laptop.children.system;
+              systemsInsideTheLaptop = builtins.attrNames nixosConfigurations.laptop.children.system;
               homeManagerConfigurationSystem =
-                machines.laptop.children.system.x86_64-linux.children.home-manager.chris.system;
-              imagesOfTheServer = builtins.attrNames machines.server.children.system;
+                nixosConfigurations.laptop.children.system.x86_64-linux.children.home-manager.chris.system;
+              imagesOfTheServer = builtins.attrNames nixosConfigurations.server.children.system;
               published = builtins.filter (name: lib.hasSuffix "chris@laptop" name) (
                 builtins.attrNames
                   (lib.caisson.structural.mkTopConfiguration {
@@ -4662,7 +4675,7 @@ in
               );
             };
           expected = {
-            systemsInsideTheMachine = [ "x86_64-linux" ];
+            systemsInsideTheLaptop = [ "x86_64-linux" ];
             homeManagerConfigurationSystem = "x86_64-linux";
             imagesOfTheServer = [ "aarch64-linux" ];
             published = [
@@ -5013,7 +5026,7 @@ in
 
       # No entry point takes a `name`: a parentless configuration's name
       # is the name declared on mkLib. The pattern of the entry point
-      # refuses the argument before the evaluation exists, so a `name`
+      # refuses the argument before the configuration is evaluated, so a `name`
       # can never quietly name the configuration.
       "test: a name argument is refused" = {
         expr = namespacedLib.caisson.structural.mkConfiguration {
@@ -5059,7 +5072,7 @@ in
           in
           {
             file = builtins.toString (stamp first);
-            # Two evaluations that differ only in a rev-like fact stamp
+            # Two evaluation results that differ only in a rev-like fact stamp
             # their exported module the same, which is what lets a
             # consumer composing both deduplicate.
             sameAcrossRevs = builtins.toString (stamp first) == builtins.toString (stamp second);
@@ -5118,63 +5131,64 @@ in
 
       # Configurations declared inside a structural configuration,
       # under `caisson.structural.configurations`: each is finalized
-      # with the attribute it is declared under and the childless
-      # manifest of the configuration that declares it, and takes the
-      # configuration registered under its name when it passes no
-      # module.
-      "test: a nested configuration is finalized under its name and the childless parent" = {
-        expr =
-          let
-            top = nestingLib.caisson-core.finalizeTop (nestingLib.caisson.structural.mkConfiguration { });
-            inner = top.children.structural.inner;
-            leaf = inner.children.structural.leaf;
-          in
-          {
-            topName = top.name;
-            topChildren = builtins.mapAttrs (_: builtins.attrNames) top.children;
-            topOption = builtins.attrNames top.value.config.caisson.structural.configurations;
-            optionIsTheChild = top.value.config.caisson.structural.configurations.inner.name;
-            innerParent = {
-              inherit (inner.parent) name childless;
-              children = inner.parent.children;
+      # with the attribute it is declared under and the manifest of the
+      # result of the childless evaluation of the configuration that
+      # declares it, and takes the configuration registered under its
+      # name when it passes no module.
+      "test: a nested configuration is finalized under its name and the result of its parent's childless evaluation" =
+        {
+          expr =
+            let
+              top = nestingLib.caisson-core.finalizeTop (nestingLib.caisson.structural.mkConfiguration { });
+              inner = top.children.structural.inner;
+              leaf = inner.children.structural.leaf;
+            in
+            {
+              topName = top.name;
+              topChildren = builtins.mapAttrs (_: builtins.attrNames) top.children;
+              topOption = builtins.attrNames top.value.config.caisson.structural.configurations;
+              optionIsTheChild = top.value.config.caisson.structural.configurations.inner.name;
+              innerParent = {
+                inherit (inner.parent) name childless;
+                children = inner.parent.children;
+              };
+              innerMarker = inner.value.config.marker;
+              innerSeesItself = inner.value.config.caisson.manifest.name;
+              leafMarker = leaf.value.config.marker;
+              leafNearest = leaf.nearest.structural.name;
+              leafAncestors = builtins.map (ancestor: ancestor.name) leaf.ancestors;
+              plainHasNone = top.children.structural.plain.children;
             };
-            innerMarker = inner.value.config.marker;
-            innerSeesItself = inner.value.config.caisson.manifest.name;
-            leafMarker = leaf.value.config.marker;
-            leafNearest = leaf.nearest.structural.name;
-            leafAncestors = builtins.map (ancestor: ancestor.name) leaf.ancestors;
-            plainHasNone = top.children.structural.plain.children;
-          };
-        expected = {
-          topName = "nesting";
-          topChildren = {
-            structural = [
+          expected = {
+            topName = "nesting";
+            topChildren = {
+              structural = [
+                "inner"
+                "plain"
+              ];
+            };
+            topOption = [
               "inner"
               "plain"
             ];
+            optionIsTheChild = "inner";
+            innerParent = {
+              name = "nesting";
+              childless = true;
+              children = { };
+            };
+            innerMarker = "inner, registered";
+            innerSeesItself = "inner";
+            leafMarker = "leaf inside inner, registered";
+            leafNearest = "inner";
+            leafAncestors = [
+              "nesting"
+              "nesting"
+              "inner"
+            ];
+            plainHasNone = { };
           };
-          topOption = [
-            "inner"
-            "plain"
-          ];
-          optionIsTheChild = "inner";
-          innerParent = {
-            name = "nesting";
-            childless = true;
-            children = { };
-          };
-          innerMarker = "inner, registered";
-          innerSeesItself = "inner";
-          leafMarker = "leaf inside inner, registered";
-          leafNearest = "inner";
-          leafAncestors = [
-            "nesting"
-            "nesting"
-            "inner"
-          ];
-          plainHasNone = { };
         };
-      };
 
       # Re-export: what the configurations declared inside a
       # configuration export is passed up into the exports of the
@@ -5324,7 +5338,7 @@ in
           )).children.structural.reader.value.config.marker;
         expectedError = {
           type = "ThrownError";
-          msg = "`caisson\\.structural\\.configurations\\.quiet` was read in the evaluation[\\s\\S]*leaves out the configurations declared inside the structural\\s+configuration[\\s\\S]*Guard such a definition with `!lib\\.caisson-core\\.evalManifest\\.childless`";
+          msg = "`caisson\\.structural\\.configurations\\.quiet` was read in the childless evaluation[\\s\\S]*leaves out the configurations declared inside the structural\\s+configuration[\\s\\S]*Guard such a definition with `!lib\\.caisson-core\\.evalManifest\\.childless`";
         };
       };
 
@@ -5359,11 +5373,12 @@ in
         };
       };
 
-      # A flake-parts evaluation holds configurations declared inside it
-      # as a structural evaluation does: each is finalized under its
-      # name and the childless manifest of the flake evaluation, and
-      # what it exports is passed up into the flake outputs.
-      "test: a flake-parts evaluation holds configurations declared inside it" = {
+      # A flake-parts configuration holds the configurations declared
+      # inside it as a structural configuration does: each is finalized
+      # under its name and the manifest of the result of the childless
+      # evaluation of the flake-parts configuration, and what it exports
+      # is passed up into the flake outputs.
+      "test: a flake-parts configuration holds configurations declared inside it" = {
         expr =
           let
             top = registeringLib.caisson-core.finalizeTop (
@@ -6025,7 +6040,7 @@ in
 
   # The evaluators of the `homeManager` class: home-manager
   # imports its whole module tree or the necessary modules alone, and
-  # that is a choice between evaluations, so each way is an entry
+  # that is a choice of how to evaluate, so each way is an entry
   # point. `lib.caisson.home-manager` owns the class and evaluates it
   # with the whole module tree; `lib.caisson.home-manager-minimal` is an alt
   # over it, evaluating the same class with the necessary modules.
@@ -6059,7 +6074,7 @@ in
         };
       myLib = mkCompositionWith { default = { }; };
       # The arguments both entry points take, so the module list is
-      # the sole difference between the evaluations.
+      # the sole difference between the evaluation results.
       commonArgs = {
         configModule = { };
         check = false;
@@ -6095,8 +6110,8 @@ in
 
       # What the difference costs the configuration: an option the
       # dropped modules declare is there under the owner and absent
-      # under the alt, which is what makes the two different
-      # evaluations rather than one evaluation tuned.
+      # under the alt, which is what makes the entry points different
+      # ways of evaluating rather than a single way tuned.
       "test: an option of the dropped modules is absent from the alt" = {
         expr = {
           owner = whole.options ? programs && whole.options.programs ? stub;
@@ -6109,7 +6124,7 @@ in
       };
 
       # A minimal configuration imports what it uses from
-      # `modulesPath`, the special argument the evaluation supplies.
+      # `modulesPath`, the special argument the alt supplies.
       "test: the alt supplies modulesPath so a configuration imports for itself" = {
         expr =
           (myLib.caisson.home-manager-minimal.mkTopConfiguration (
@@ -6159,7 +6174,7 @@ in
       };
 
       # `minimal` is not an argument of either entry point: it names
-      # the evaluation, and each entry point evaluates its way.
+      # the way of evaluating, and each entry point evaluates its way.
       "test: the owner refuses minimal" = {
         expr = myLib.caisson.home-manager.mkConfiguration (commonArgs // { minimal = true; });
         expectedError = unexpectedArgument "mkConfiguration" "minimal";
@@ -6204,7 +6219,7 @@ in
       # The composition reports a package set it cannot find against
       # the entry point that called it. Here nothing selects, and the
       # composition declares no set named `default`. The package set
-      # is read back from the evaluation, which is where it is
+      # is read back from the evaluation result, which is where it is
       # selected.
       "test: a missing default package set is reported against the alt" = {
         expr =

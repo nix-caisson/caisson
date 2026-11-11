@@ -60,9 +60,9 @@ in
       caisson.manifest = lib.caisson-core.evalManifest // {
         exportRecord = lib.caisson.integrations.recordOf exports.configurations;
       };
-      # The `lib` output is the composed library of this evaluation.
+      # The `lib` output is the composed library of this configuration.
       #
-      # The manifest of this evaluation is in the composed library,
+      # The manifest of this configuration is in the composed library,
       # at `lib.caisson-core.evalManifest`. `mkLib` reads the exports
       # from that manifest for each entry of `projects`. The manifest
       # is published in `lib` because the other outputs each have a

@@ -36,9 +36,9 @@ let
   context = "caisson's NixOS adapter of the caisson-nixops4-resource class";
   declared = config.caisson.nixos.configurations;
   # Whether the resource holds a NixOS configuration. The names are
-  # known in the childless view too, so a resource without one is left
-  # alone there and in its full evaluation.
-  holdsMachine = builtins.attrNames declared != [ ];
+  # known in the childless evaluation too, so a resource without one is
+  # left alone there and in its full evaluation.
+  holdsNixos = builtins.attrNames declared != [ ];
   # The NixOS configuration the resource deploys: the NixOS
   # configuration declared inside it, evaluated for one system.
   nixos =
@@ -111,7 +111,7 @@ in
       description = "Whether the configuration is applied with `sudo`.";
     };
   };
-  config = lib.mkIf holdsMachine {
+  config = lib.mkIf holdsNixos {
     # NixOps4's `local` provider, whose `exec` type deploys the
     # configuration. A resource that declares `providers.local` or sets
     # `type` replaces them.

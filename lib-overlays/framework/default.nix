@@ -97,8 +97,8 @@ let
   # registered it. A registry names an entry of a listed project
   # `<project>/<name>`, and the registry of that project names the
   # same entry `<name>`. The outer key tells which registry entry a
-  # module of the evaluation is, as the registry it was read from
-  # names it, for the `declaration` events of the evaluation and its
+  # module of a configuration is, as the registry it was read from
+  # names it, for the `declaration` events of the configuration and its
   # selection record (`lib.caisson.integrations.declarationEventsOf`,
   # `lib.caisson.integrations.selectionAccountOf`).
   #
@@ -109,13 +109,13 @@ let
   # contributed by `<project>` (`moduleProjects`). An entry the flake
   # registers itself keeps its registry name, whatever it holds, and
   # its project is the name of the flake. So the inner key is the same
-  # whichever registry an evaluation reads the entry from. The entries
+  # whichever registry a configuration reads the entry from. The entries
   # of caisson are an example: caisson registers `default`, a flake that
   # lists caisson reads it as `caisson/default`, and an integration
   # reads it as `default` from the library of caisson.
   #
   # The module system imports the modules that share a key once. An
-  # entry that an evaluation selects twice, from one registry or from
+  # entry that a configuration selects twice, from one registry or from
   # two, is therefore imported once. Entries of the same name that
   # different projects register stay apart, since their projects
   # differ.
@@ -175,7 +175,7 @@ let
   # in the registering flake, and the project is the name of the flake.
   # The key is therefore the same in every library that holds the
   # entry, and a single module keys it. The key names the registry entry in the
-  # `declaration` events of an evaluation, whether the configuration
+  # `declaration` events of a configuration, whether the configuration
   # was taken by its name or a configuration was given the entry as its
   # `configModule`.
   keyedConfigs =

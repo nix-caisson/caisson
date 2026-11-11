@@ -5,12 +5,12 @@
 # and `lib.caisson.nixos.mkConfigurationFull` passes explicitly. The
 # real list is the NixOS module tree, which is where `nixpkgs.pkgs`
 # and the rest of the NixOS options are declared; this list declares
-# `nixpkgs.pkgs`, so an evaluation that imports NixOS' nixpkgs module
+# `nixpkgs.pkgs`, so a configuration that imports NixOS' nixpkgs module
 # has the option that module defines, and an option a configuration
-# reads to show the list was passed to the evaluation. It also declares the
-# options of a machine that a home-manager configuration declared
-# inside it is given: the accounts under `users.users`, and the Nix the
-# machine runs.
+# reads to show the list was passed to the evaluator. It also declares
+# the options of a NixOS configuration that a home-manager
+# configuration declared inside it is given: the accounts under
+# `users.users`, and the Nix the NixOS configuration runs.
 [
   (
     { config, lib, ... }:
@@ -42,9 +42,9 @@
         };
         nix.package = lib.mkOption {
           type = lib.types.str;
-          default = "nix-of-the-machine";
+          default = "nix-of-the-nixos-configuration";
         };
-        # The options a machine defines to activate the home-manager
+        # The options a NixOS configuration defines to activate the home-manager
         # configurations declared inside it: the systemd units, and the
         # assertions NixOS checks before it builds a system.
         systemd.services = lib.mkOption {
@@ -59,17 +59,17 @@
           type = lib.types.listOf lib.types.raw;
           default = [ ];
         };
-        # The files a machine installs under `/etc`. A machine with
-        # home-manager configurations declared inside it writes a
-        # record of which NixOS configuration it runs there.
+        # The files a NixOS configuration installs under `/etc`. A
+        # NixOS configuration with home-manager configurations declared
+        # inside it writes a record there of what it applied.
         environment.etc = lib.mkOption {
           type = lib.types.attrsOf lib.types.raw;
           default = { };
         };
         # The system the configuration builds. The store path of the
         # stub names how many system units the configuration has, so
-        # a test can tell the system of an evaluation that activates
-        # home-manager configurations from the system of an evaluation
+        # a test can tell the system of a configuration that activates
+        # home-manager configurations from the system of a configuration
         # that does not.
         system.build.toplevel = lib.mkOption {
           type = lib.types.raw;

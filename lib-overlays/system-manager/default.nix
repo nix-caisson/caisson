@@ -3,7 +3,7 @@
 # The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
 # system-manager flake. A system-manager configuration is the system
-# of a machine running another Linux distribution, evaluated per
+# of a computer running another Linux distribution, evaluated per
 # system, once for each system its parent evaluates its children for, and
 # published as
 # `systemConfigs.<name>`, the system `system-manager switch --flake`
@@ -130,7 +130,7 @@
           # distro's existing file, flakes stay on by default, and
           # `nix.enable` keeps the stub's off-by-default. The NixOS
           # declaration defaults it on, which would create nixbld users
-          # on machines whose configs did not ask for nix management.
+          # for system-manager configurations that did not ask for nix management.
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
           nixStubReplacementModule = final.caisson.integrations.caissonModule {
             key = "caisson.systemManager.nixpkgsCompatNixStub";
@@ -160,7 +160,7 @@
         final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
         ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
 
-      # The evaluator's call, on the view being evaluated:
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with:
       # `makeSystemConfig` over the framework modules, the selection,
       # the configuration's module and the bridge, for the
       # configuration's system. `ecosystemArgs`, which only the pattern
@@ -187,7 +187,7 @@
               "this system-manager configuration for ${system}";
 
           # The package sets available to the configuration, each for the
-          # system of the evaluation, and the set it runs on: the
+          # system it is evaluated for, and the set it runs on: the
           # package set selection that applies to its manifest, applied to those.
           pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
@@ -331,12 +331,12 @@
           };
           type = "system-manager";
           # A system-manager configuration is evaluated per system: it
-          # has an evaluation for each system its parent evaluates its
-          # children for.
+          # has an evaluation result for each system its parent evaluates
+          # its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A system-manager configuration is activated on a machine;
+          # A system-manager configuration is activated on a computer;
           # the configurations with an activation declared inside it
           # check its marker.
           activation = final.caisson.integrations.machineActivation;
@@ -367,8 +367,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

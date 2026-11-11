@@ -6,7 +6,7 @@
 # `caisson.modules.<class>`),
 # `caisson.exports`, what the selectors chose, which a top returns and
 # a parent passes up, and, through the module of each integration of
-# caisson, the configurations declared inside an evaluation
+# caisson, the configurations declared inside a configuration
 # (`caisson.<integration>.configurations`). Registered under the
 # class-free `generic` class
 # (flake-parts' name for a module any class may import), and under
@@ -16,7 +16,7 @@
 # declared here need comes through `lib`, the composed library in
 # specialArgs.
 #
-# In an evaluation whose library is not a caisson composition the
+# In a module evaluation whose library is not a caisson composition the
 # module declares nothing: a module list that carries it can be handed
 # to an evaluator that runs on a library of its making, as
 # home-manager's NixOS module does for the home-manager configurations

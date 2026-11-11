@@ -2,7 +2,7 @@
 #
 # A home-manager module with which a home-manager configuration
 # declared inside another configuration that has an activation, such
-# as a NixOS, darwin or system-manager machine, detects drift when it
+# as a NixOS, nix-darwin or system-manager configuration, detects drift when it
 # is activated.
 #
 # The user can activate such a home-manager configuration by hand,
@@ -19,13 +19,13 @@
 # marker belongs to the generation being activated, and the step prints
 # nothing.
 #
-# When the machine installs the packages of the home-manager
-# configuration (`caisson.useUserPackages`), the marker of the machine
-# also records the digest of the `home.path` it installed, and the step
-# warns when it differs from the `home.path` of this home-manager
-# configuration. A `home-manager switch` built from a newer source than
-# the machine then warns that the packages are those the machine
-# applied.
+# When the NixOS configuration installs the packages of the
+# home-manager configuration (`caisson.useUserPackages`), the marker of
+# the NixOS configuration also records the digest of the `home.path` it
+# installed, and the step warns when it differs from the `home.path` of
+# this home-manager configuration. A `home-manager switch` built from a
+# newer source than the applied NixOS configuration then warns that the
+# packages are those the NixOS configuration applied.
 #
 # The check is `lib.caisson.integrations.driftCheckOf`, the same check
 # every configuration with an activation runs against the nearest
@@ -45,9 +45,9 @@ let
   check = lib.caisson.integrations.driftCheckOf {
     jq = lib.getExe' pkgs.jq "jq";
     optionText = "`caisson.drift.warn`";
-    # The profiles of this home-manager configuration that the machine
-    # sets, read from the profile adapter of the home-manager
-    # integration over this evaluation.
+    # The profiles of this home-manager configuration that the NixOS
+    # configuration above sets, read from the profile adapter of the
+    # home-manager integration over these evaluated options.
     profiles = lib.caisson.integrations.machineProfilesOf (
       lib.caisson.evalManifest // { value = { inherit config; }; }
     );
@@ -63,7 +63,7 @@ in
       version of the configuration it is declared inside that differs
       from the version that is applied.
 
-      The configuration above, such as the machine, records what it
+      The configuration above, such as a NixOS configuration, records what it
       applied in a marker file. The activation of this home-manager
       configuration compares the marker with the configuration above as
       it is in the source this home-manager configuration was built
@@ -72,8 +72,9 @@ in
       configuration does not cause a warning.
 
       A home-manager configuration that sets `caisson.useUserPackages`
-      has its packages installed by the machine. The marker of the
-      machine also records the digest of the `home.path` it installed,
+      has its packages installed by the NixOS configuration. The marker
+      of the NixOS configuration also records the digest of the
+      `home.path` it installed,
       and the activation of the home-manager configuration warns when
       the `home.path` of the home-manager configuration differs from it.
     '';

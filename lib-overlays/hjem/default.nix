@@ -10,7 +10,8 @@
 # own `evalModules` over hjem's user module, `modules/common/user.nix`,
 # with the arguments hjem's OS modules give it: hjem's library as
 # `hjem-lib`, the user's name as `name`, the package set as `pkgs`, and
-# the machine above it, if any, as `osConfig`. The user's name is the
+# the evaluated options of the NixOS, nix-darwin or system-manager
+# configuration above it, if any, as `osConfig`. The user's name is the
 # name the configuration is declared under, unless a module of the
 # configuration sets `user`.
 #
@@ -128,38 +129,41 @@
             configModule = args.configModule or null;
           };
 
-          # The machine the configuration is declared inside, when there
-          # is one: the childless evaluation of the nearest NixOS,
-          # darwin or system-manager configuration above it, which hjem's
-          # modules receive as `osConfig`, null when there is none. A
-          # system-manager evaluation is its system, with the
-          # configuration and the options in its `passthru`.
-          machine = selection.nearestOf [
+          # The system configuration the hjem configuration is declared
+          # inside, when there is one: the result of the childless
+          # evaluation of the nearest NixOS, nix-darwin or
+          # system-manager configuration above it, whose evaluated
+          # options hjem's modules receive as `osConfig`, null when there
+          # is none. The evaluation result of a system-manager
+          # configuration is its system, with the evaluated options in
+          # its `passthru`.
+          systemConfiguration = selection.nearestOf [
             "nixos"
             "darwin"
             "system-manager"
           ] manifest;
-          osConfig = if machine != null then machine.value.config else null;
+          osConfig = if systemConfiguration != null then systemConfiguration.value.config else null;
 
           # A user hjem's NixOS module embeds also imports hjem's
           # `modules/nixos/systemd.nix`, which declares the user's
           # systemd units and links them into the user's files, with the
-          # `utils` and the options of the machine. A configuration inside
-          # a NixOS or system-manager machine that has `utils` gets the
-          # same; the minimal NixOS evaluator gives none.
-          machineArgs =
-            if machine == null then
+          # `utils` and the options of the NixOS configuration. A hjem
+          # configuration inside a NixOS or system-manager configuration
+          # that has `utils` gets the same; the minimal NixOS evaluator
+          # gives none.
+          systemConfigurationArgs =
+            if systemConfiguration == null then
               { }
             else
-              (machine.value._module or { }).args
-                or (((machine.value.options or { })._module or { }).args.value or { });
+              (systemConfiguration.value._module or { }).args
+                or (((systemConfiguration.value.options or { })._module or { }).args.value or { });
           nixosUser =
-            machine != null
-            && builtins.elem machine.type [
+            systemConfiguration != null
+            && builtins.elem systemConfiguration.type [
               "nixos"
               "system-manager"
             ]
-            && machineArgs ? utils;
+            && systemConfigurationArgs ? utils;
 
           # What hjem's OS modules set on a user that caisson sets too:
           # the user's name from the name the configuration is declared
@@ -198,13 +202,14 @@
                 hjem-lib = hjemLib;
                 name = if name != null then name else "hjem";
               }
-              # hjem's OS modules hand a user the options of the machine
-              # as `osOptions`, and the NixOS module also hands it `utils`.
-              // lib.optionalAttrs (machine != null) {
-                osOptions = machine.value.options;
+              # hjem's OS modules hand a user the options of the system
+              # configuration as `osOptions`, and the NixOS module also
+              # hands it `utils`.
+              // lib.optionalAttrs (systemConfiguration != null) {
+                osOptions = systemConfiguration.value.options;
               }
               // lib.optionalAttrs nixosUser {
-                inherit (machineArgs) utils;
+                inherit (systemConfigurationArgs) utils;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
               modules = moduleList;
@@ -239,7 +244,7 @@
           };
           # What evalModules received: hjem's user module, the module
           # that sets the user's name, hjem's systemd module where the
-          # machine has `utils`, the framework module of the class, the
+          # system configuration has `utils`, the framework module of the class, the
           # modules selected from the registry and the configuration's
           # module. The modules of hjem are recorded as modules of the
           # hjem source.
@@ -278,7 +283,7 @@
 
       # What a reader of a file gets from a hjem configuration that is
       # a top: `manifest` and `packages`, which `hjem standalone switch
-      # --config` reads, and the manifest of the evaluation under
+      # --config` reads, and the manifest of the configuration under
       # `caisson.manifest`. hjem's CLI serializes the whole value with
       # `nix eval --json`, and an attribute set with `outPath` is
       # serialized as that string, so the live manifest stays out of
@@ -292,7 +297,8 @@
       };
 
       # A top evaluated for a single system returns `topOf` that
-      # evaluation; for several, `topOf` each evaluation, by system.
+      # evaluation result; for several, `topOf` each evaluation result,
+      # by system.
       top =
         evaluations:
         let
@@ -312,7 +318,8 @@
           };
           type = "hjem";
           # A hjem configuration is evaluated per system: it has an
-          # evaluation for each system its parent evaluates its children for.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -356,8 +363,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

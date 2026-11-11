@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS module with which a machine activates the hjem configurations
-# declared inside it.
+# A NixOS module with which a NixOS configuration activates the hjem
+# configurations declared inside it.
 #
 # Activating a hjem configuration means applying its manifest with
 # hjem's CLI: `hjem internal activate` links the user's files and
@@ -21,7 +21,7 @@
 #
 # and `hjem-cleanup` removes the stored manifests of users that are no
 # longer activated. The target `hjem` requires them all, and starts at
-# boot and when the machine switches to a new generation. The units
+# boot and at each switch to a new generation of the NixOS configuration. The units
 # link with the CLI of hjem and the backup prefix of hjem's NixOS
 # module; hjem's options for another linker are not offered here.
 #
@@ -36,19 +36,19 @@
 # A NixOS configuration that passes `moduleImports` activates its hjem
 # configurations only if it lists it.
 #
-# The module reads the hjem configurations from the full evaluation of
-# the NixOS configuration; in the childless evaluation, and in an
-# evaluation without systemd options, it defines nothing.
+# The module reads the hjem configurations from the result of the full
+# evaluation of the NixOS configuration; in the childless evaluation,
+# and in a configuration without systemd options, it defines nothing.
 #
 # The same module is registered for the `systemManager` class, under
-# the same name, and a system-manager machine activates the hjem
+# the same name, and a system-manager configuration activates the hjem
 # configurations declared inside it the same way, with the units
 # written for each user rather than as templates (`perUser` below). system-manager has no
 # `system.extraDependencies`, so there the module keeps no extra
 # dependencies in the system. The module reads
 # `config.caisson.exports.configurations`, which the core module
-# declares; it imports the core module of the class of the evaluation,
-# read from its manifest.
+# declares; it imports the core module of the class of the
+# configuration, read from its manifest.
 { closure-lib, ... }:
 {
   config,
@@ -60,26 +60,28 @@
 let
   inherit (lib.caisson) evalManifest;
 
-  # True when this evaluation declares the options the module defines.
+  # True when this configuration declares the options the module defines.
   hasUnits =
     options ? systemd && options.systemd ? services && options.systemd ? targets && options ? users;
 
-  # True when the evaluation keeps extra dependencies in the system.
+  # True when the configuration keeps extra dependencies in the system.
   hasExtraDependencies = options ? system && options.system ? extraDependencies;
 
-  # The core module of the class of this evaluation: of the
-  # `systemManager` class in a system-manager evaluation, else of the
+  # The core module of the class of this configuration: of the
+  # `systemManager` class in a system-manager configuration, else of the
   # `nixos` class. The registered core modules of the two classes are
-  # one file under two names, so a module imports the name its
-  # evaluation already holds.
+  # the same file under two names, so a module imports the name its
+  # configuration already holds.
   coreModule =
     if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
       closure-lib.caisson.modules.systemManager.core
     else
       closure-lib.caisson.modules.nixos.core;
 
-  # The integrations whose configurations are machines.
-  machineTypes = [
+  # The integrations of the NixOS, nix-darwin and system-manager
+  # configurations, which activate the hjem configurations declared
+  # inside them.
+  systemConfigurationTypes = [
     "nixos"
     "darwin"
     "system-manager"
@@ -88,7 +90,9 @@ let
   isActivatedHere =
     entry:
     entry.manifest.type == "hjem"
-    && !(builtins.any (segment: builtins.elem segment.type machineTypes) (lib.lists.init entry.path))
+    && !(builtins.any (segment: builtins.elem segment.type systemConfigurationTypes) (
+      lib.lists.init entry.path
+    ))
     && entry.manifest.system == evalManifest.system;
 
   # What the units need of each enabled hjem configuration.
@@ -203,7 +207,7 @@ let
   # which fails for a template, it restarts each changed unit apart, so
   # the order between the instances does not hold, and it does not stop
   # `hjem.target` but restarts it when what it wants changes, which
-  # stops what is part of it. So on system-manager the machine writes a
+  # stops what is part of it. So on system-manager the module writes a
   # single unit for each user, `hjem-activate@<user>`, which runs the
   # steps in order and then activates the profiles declared inside the
   # hjem configuration, as the user. Its script names the manifests and
@@ -234,7 +238,7 @@ let
   );
 in
 {
-  # The core module of the class of this evaluation, which declares
+  # The core module of the class of this configuration, which declares
   # `config.caisson.exports.configurations`.
   imports = [ coreModule ];
 
@@ -246,7 +250,9 @@ in
       assertions = [
         {
           assertion = repeated == [ ];
-          message = "caisson: this machine activates more than one hjem configuration for ${lib.concatStringsSep ", " repeated}.";
+          message = "caisson: this ${
+            if onSystemManager then "system-manager" else "NixOS"
+          } configuration activates more than one hjem configuration for ${lib.concatStringsSep ", " repeated}.";
         }
       ];
 

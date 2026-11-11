@@ -12,7 +12,7 @@
 # runs the VM at
 # `/nix/.ro-store` with an overlay on `/nix/store`.
 #
-# The test installs Nix as a machine that system-manager manages has it,
+# The test installs Nix as a computer that system-manager manages has it,
 # with `nix-installer`, in the version
 # system-manager's container test driver installs in a container.
 # `nix-installer` renames what it unpacks into `/nix/store`, which
