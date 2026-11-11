@@ -79,6 +79,91 @@ in
     checkEntry = isPkgOverlay;
   };
 
+  # A check a configuration declares, an entry of `caisson.checks`. In
+  # a NixOS configuration, `caisson.checks.toplevel.enable = false;`
+  # turns off the default check `toplevel` of the nixos integration. An
+  # entry that names no `derivation` annotates the check of the same
+  # name that the configuration already has: a default check of its
+  # integration, or, under `perSystem` in flake-parts, the entry of the
+  # same name in `checks`.
+  check = lib.types.submodule {
+    options = {
+      derivation = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          The derivation that is the check: the check passes when the
+          derivation builds. Null for an entry that annotates a check the
+          configuration already has.
+        '';
+      };
+      category = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "eval";
+        description = ''
+          The name of the category of the check, a category declared in
+          `caisson.checkCategories`. A check that sets a `derivation` names
+          its category. An annotation that leaves it null keeps the
+          category of the check it annotates.
+        '';
+      };
+      description = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "the jellyfin data migrates from the last confirmed release to the pinned release";
+        description = "A sentence saying what the check checks.";
+      };
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether the check is a check of the configuration. A check with
+          `enable = false` stays in the `checks` record of the manifest with
+          the definition that turned it off, and it is not gathered.
+        '';
+      };
+    };
+  };
+
+  # A category of checks, an entry of `caisson.checkCategories`.
+  checkCategory = lib.types.submodule {
+    options = {
+      description = lib.mkOption {
+        type = lib.types.str;
+        description = "A sentence saying what the checks of the category check.";
+      };
+      volatile = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Whether the result of a check of the category depends on
+          something outside the build, such as a network, a service or a
+          piece of hardware.
+        '';
+      };
+    };
+  };
+
+  # A stage, an entry of `caisson.checkStages`.
+  checkStage = lib.types.submodule {
+    options = {
+      description = lib.mkOption {
+        type = lib.types.str;
+        description = "A sentence saying what the checks the stage selects establish.";
+      };
+      select = lib.mkOption {
+        type = lib.types.functionTo lib.types.bool;
+        example = lib.literalExpression ''entry: entry.category != "vm"'';
+        description = ''
+          The function that says whether the stage selects a check. It
+          receives an entry of the `checkRecord` of the top's manifest and
+          returns true for a check the stage selects.
+        '';
+      };
+    };
+  };
+
   # The manifest type: structural, checked on the export side only.
   # A producer validates the manifest it publishes in its CI;
   # consumers assume shape.

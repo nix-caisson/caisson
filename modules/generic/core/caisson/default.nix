@@ -3,7 +3,11 @@
 {
   imports = [
     ./manifest.nix
+    ./checkCategories.nix
+    ./checks.nix
+    ./checkStages.nix
     ./configurations.nix
+    ./exportedChecks.nix
     ./exports.nix
     ./forChildren.nix
     ./forDirectChildren.nix

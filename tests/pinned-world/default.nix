@@ -947,6 +947,195 @@ let
       ];
     };
 
+  # The checks probes compose for two systems, x86_64-linux and
+  # aarch64-linux, with a package config whose set for each of them is
+  # `pkgs`. A check is a derivation that only writes its output, named
+  # for the check.
+  checksSystems = [
+    "x86_64-linux"
+    "aarch64-linux"
+  ];
+  checksLib = core.mkLib (
+    hiveLibArgs
+    // {
+      systems = checksSystems;
+      pkgSets = _lib: {
+        default =
+          { name, parent }:
+          {
+            _type = "caisson-manifest";
+            type = "nixpkgs";
+            inherit name parent;
+            children.nixpkgs = pkgs.lib.genAttrs checksSystems (system: {
+              _type = "caisson-manifest";
+              type = "nixpkgs";
+              name = system;
+              value = pkgs;
+            });
+          };
+      };
+    }
+  );
+  checkMarker = name: pkgs.runCommand name { } "touch $out";
+  checksMachine =
+    lib: module:
+    lib.caisson.nixos.mkConfiguration {
+      ecosystemSrc = dependencies: dependencies.nixpkgs;
+      configModule = {
+        imports = [
+          minimalNixosBase
+          module
+        ];
+      };
+    };
+
+  # A structural top that declares the category `hardware` and the stage
+  # `quick`. The NixOS configuration `nas-1`, evaluated for both
+  # systems, declares the checks `smoke` and `boots`, and the check
+  # `off`, which it turns off. The structural configuration `lab`
+  # evaluates the configurations inside it for aarch64-linux, and the
+  # NixOS configuration `arm` inside it declares the check `smoke`.
+  checksTopWith =
+    extra:
+    checksLib.caisson.structural.mkTopConfiguration {
+      moduleImports = _modules: [ ];
+      configModule =
+        { lib, ... }:
+        {
+          imports = [ extra ];
+          caisson.checkCategories.hardware = {
+            description = "the machine boots on its hardware";
+            volatile = true;
+          };
+          caisson.checkStages.quick = {
+            description = "the checks that evaluate";
+            select = entry: entry.category == "eval";
+          };
+          caisson.structural.configurations.lab = lib.caisson.structural.mkConfiguration {
+            configModule =
+              { lib, ... }:
+              {
+                caisson.forChildren.systems = [ "aarch64-linux" ];
+                caisson.nixos.configurations.arm = checksMachine lib {
+                  caisson.checks.smoke = {
+                    derivation = checkMarker "arm-smoke";
+                    category = "eval";
+                    description = "the machine evaluates";
+                  };
+                };
+              };
+          };
+          caisson.nixos.configurations.nas-1 = checksMachine lib {
+            caisson.checks.smoke = {
+              derivation = checkMarker "nas-1-smoke";
+              category = "eval";
+              description = "the machine evaluates";
+            };
+            caisson.checks.boots = {
+              derivation = pkgs.runCommand "nas-1-boots" { requiredSystemFeatures = [ "kvm" ]; } "touch $out";
+              category = "hardware";
+            };
+            caisson.checks.off = {
+              derivation = checkMarker "nas-1-off";
+              category = "eval";
+              enable = false;
+            };
+          };
+        };
+    };
+  checksTop = checksTopWith { };
+
+  # True when reading `value`, checks by system and then name or a
+  # check record, fails: every name is read, and the store path of
+  # every derivation, or every field of every record entry.
+  checksFail =
+    value:
+    !(builtins.tryEval (
+      builtins.deepSeq (builtins.mapAttrs (
+        _: builtins.mapAttrs (_: entry: if entry ? drvPath then entry.drvPath else entry)
+      ) value) true
+    )).success;
+
+  # A flake that declares checks under `perSystem`: `plain`, an entry of
+  # `checks` that `caisson.checks` annotates, `bare`, an entry of
+  # `checks` nothing annotates, `declared`, a check `caisson.checks`
+  # declares, and `hidden`, a check it declares and turns off. The NixOS
+  # configuration `nas-1` inside the flake declares the check `smoke`,
+  # and the flake-parts configuration `checks` inside it defines the
+  # check `suite` under `perSystem`.
+  checksFlake = checksLib.caisson.flake-parts.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        perSystem =
+          { ... }:
+          {
+            checks.plain = checkMarker "plain";
+            checks.bare = checkMarker "bare";
+            caisson.checks.plain = {
+              category = "format";
+              description = "the files are formatted";
+            };
+            caisson.checks.declared = {
+              derivation = checkMarker "declared";
+              category = "unit";
+            };
+            caisson.checks.hidden = {
+              derivation = checkMarker "hidden";
+              category = "eval";
+              enable = false;
+            };
+          };
+        caisson.nixos.configurations.nas-1 = checksMachine lib {
+          caisson.checks.smoke = {
+            derivation = checkMarker "nas-1-smoke";
+            category = "eval";
+          };
+        };
+        caisson.flake-parts.configurations.checks = lib.caisson.flake-parts.mkConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = {
+            perSystem.checks.suite = checkMarker "suite";
+          };
+        };
+      };
+  };
+
+  # A configuration of an integration written for the probe, `stub`,
+  # evaluated per system as the module system over caisson's core
+  # module. The integration declares the default check `artifact`, of
+  # the category `probe`, which it declares as well.
+  stubChecksTopWith =
+    module:
+    let
+      lib = checksLib;
+    in
+    lib.caisson.finalizeTop (
+      lib.caisson.integrations.mkModuleConfiguration {
+        type = "stub";
+        perSystem = true;
+        checks.artifact = {
+          derivation = outputs: outputs.artifact;
+          category = "probe";
+          description = "the artifact of the configuration builds";
+        };
+        checkCategories.probe = {
+          description = "a check of the probe integration";
+          volatile = true;
+        };
+        evaluate =
+          { lib, manifest }:
+          {
+            value = lib.evalModules {
+              specialArgs = { inherit lib; };
+              modules = lib.caisson.integrations.frameworkModules "structural" { } ++ [ module ];
+            };
+            outputs.artifact = checkMarker "stub-artifact-${manifest.system}";
+          };
+      }
+    );
+
   results = {
 
     # Each NixOS module caisson registers evaluates with what it
@@ -3531,6 +3720,7 @@ let
       &&
         builtins.attrNames top == [
           "caisson"
+          "checks"
           "libOverlays"
           "modules"
           "nixops4"
@@ -5045,7 +5235,7 @@ let
       && builtins.isString (evaluation.outputs.check ./.).drvPath
       # The check is published in the composition that has a root, as the
       # check of `default` over it.
-      && !(top ? checks)
+      && top.checks == { }
       && builtins.attrNames rooted.checks == [ "x86_64-linux" ]
       && builtins.attrNames rooted.checks.x86_64-linux == [ "treefmt" ]
       && rooted.checks.x86_64-linux.treefmt.drvPath == (rootedEvaluation.outputs.check root).drvPath
@@ -6102,6 +6292,317 @@ let
       && exported.nixos ? home-manager-activation
       && exported.homeManager ? nixos-parent
       && exported.flake ? nixpkgs;
+
+    # A structural top gathers the checks of the configurations inside
+    # it under `checks.<system>` of its outputs and returns them as its
+    # `checks`. A check is published under the names of the
+    # configurations from the top down to it and its name, joined with
+    # `-`, for each system its configuration is evaluated for: the
+    # checks of `arm`, which `lab` evaluates for aarch64-linux, are
+    # under `checks.aarch64-linux` alone. A check turned off is not
+    # gathered.
+    checksGatheredUnderJoinedNames =
+      let
+        names = builtins.mapAttrs (_: builtins.attrNames) checksTop.checks;
+        drvPaths = builtins.mapAttrs (_: builtins.mapAttrs (_: check: check.drvPath));
+      in
+      names == {
+        aarch64-linux = [
+          "lab-arm-smoke"
+          "nas-1-boots"
+          "nas-1-smoke"
+        ];
+        x86_64-linux = [
+          "nas-1-boots"
+          "nas-1-smoke"
+        ];
+      }
+      && drvPaths checksTop.checks == drvPaths checksTop.caisson.manifest.outputs.checks
+      && checksTop.checks.x86_64-linux.nas-1-smoke.drvPath == (checkMarker "nas-1-smoke").drvPath;
+
+    # The manifest of a configuration records its checks by system and
+    # then name, the check turned off included, with the definition
+    # that turned it off.
+    checksRecordedOnTheManifest =
+      let
+        recorded =
+          checksTop.caisson.manifest.children.system.x86_64-linux.children.nixos.nas-1.checks.x86_64-linux;
+      in
+      builtins.attrNames recorded == [
+        "boots"
+        "off"
+        "smoke"
+      ]
+      && recorded.off.enable == false
+      && recorded.smoke.enable
+      && recorded.smoke.category == "eval"
+      && recorded.smoke.description == "the machine evaluates"
+      && builtins.map (position: position.file) recorded.off.code == [ "tests/pinned-world/default.nix" ]
+      && builtins.all (position: builtins.isInt position.line) recorded.off.code;
+
+    # The check record of the top is keyed as the gathered checks are.
+    # Each entry says where the check is declared, its category, its
+    # description, whether its category is volatile and the system
+    # features its derivation demands.
+    checkRecordOfTheTop =
+      let
+        record = checksTop.caisson.manifest.checkRecord;
+        boots = record.x86_64-linux.nas-1-boots;
+      in
+      builtins.mapAttrs (_: builtins.attrNames) record
+      == builtins.mapAttrs (_: builtins.attrNames) checksTop.checks
+      &&
+        builtins.removeAttrs boots [ "code" ] == {
+          name = "nas-1-boots";
+          system = "x86_64-linux";
+          from.namePath = [
+            {
+              type = "system";
+              name = "x86_64-linux";
+            }
+            {
+              type = "nixos";
+              name = "nas-1";
+            }
+          ];
+          category = "hardware";
+          description = null;
+          volatile = true;
+          requiredFeatures = [ "kvm" ];
+        }
+      && builtins.map (position: position.file) boots.code == [ "tests/pinned-world/default.nix" ]
+      &&
+        record.aarch64-linux.lab-arm-smoke.from.namePath == [
+          {
+            type = "structural";
+            name = "lab";
+          }
+          {
+            type = "system";
+            name = "aarch64-linux";
+          }
+          {
+            type = "nixos";
+            name = "arm";
+          }
+        ]
+      && record.x86_64-linux.nas-1-smoke.volatile == false
+      && record.x86_64-linux.nas-1-smoke.requiredFeatures == [ ];
+
+    # The top records its stages, and the function of a stage selects
+    # from the entries of the check record.
+    checkStagesRecordedOnTheTop =
+      let
+        manifest = checksTop.caisson.manifest;
+        stage = manifest.checkStages.quick;
+        selected = builtins.mapAttrs (
+          _: entries: builtins.attrNames (pkgs.lib.filterAttrs (_: stage.select) entries)
+        ) manifest.checkRecord;
+      in
+      stage.description == "the checks that evaluate"
+      && builtins.map (position: position.file) stage.code == [ "tests/pinned-world/default.nix" ]
+      &&
+        selected == {
+          aarch64-linux = [
+            "lab-arm-smoke"
+            "nas-1-smoke"
+          ];
+          x86_64-linux = [ "nas-1-smoke" ];
+        };
+
+    # The categories caisson declares and those a configuration declares are
+    # recorded on the manifests that declare them. A check whose
+    # category nothing declares is refused, and so are checks that
+    # would be gathered under the same name.
+    checksRefusedWhereTheTreeDoesNotHold =
+      let
+        categories = checksTop.caisson.manifest.checkCategories;
+        undeclared = checksTopWith (
+          { lib, ... }:
+          {
+            caisson.nixos.configurations.other = checksMachine lib {
+              caisson.checks.smoke = {
+                derivation = checkMarker "other-smoke";
+                category = "undeclared";
+              };
+            };
+          }
+        );
+        clashing = checksTopWith (
+          { lib, ... }:
+          {
+            caisson.nixos.configurations.nas = checksMachine lib {
+              caisson.checks."1-smoke" = {
+                derivation = checkMarker "nas-1-smoke-again";
+                category = "eval";
+              };
+            };
+          }
+        );
+      in
+      builtins.attrNames categories == [
+        "build"
+        "eval"
+        "format"
+        "hardware"
+        "unit"
+        "vm"
+      ]
+      && categories.hardware.volatile
+      && !categories.build.volatile
+      && checksFail undeclared.checks
+      && checksFail undeclared.caisson.manifest.checkRecord
+      && checksFail clashing.checks
+      && !checksFail checksTop.checks;
+
+    # A stage declared inside the top is refused.
+    checkStagesDeclaredInsideTheTopAreRefused =
+      let
+        top = checksLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.nas-1 = checksMachine lib {
+                caisson.checkStages.inner = {
+                  description = "a stage inside the top";
+                  select = _: true;
+                };
+              };
+            };
+        };
+      in
+      checksFail top.checks && checksFail top.caisson.manifest.checkRecord;
+
+    # `caisson.exportedChecks` keeps a check out of the `checks` the top
+    # returns. The check stays in `outputs.checks` of the manifest and
+    # in the check record.
+    exportedChecksSelectsThePublishedChecks =
+      let
+        top = checksTopWith {
+          caisson.exportedChecks = builtins.mapAttrs (
+            _: checks: builtins.removeAttrs checks [ "nas-1-boots" ]
+          );
+        };
+      in
+      !(top.checks.x86_64-linux ? nas-1-boots)
+      && top.checks.x86_64-linux ? nas-1-smoke
+      && top.caisson.manifest.outputs.checks.x86_64-linux ? nas-1-boots
+      && top.caisson.manifest.checkRecord.x86_64-linux ? nas-1-boots;
+
+    # The flake-parts integration publishes the gathered checks as the
+    # flake's `checks` output. Under `perSystem`, an entry of `checks`
+    # that nothing annotates is a check of the category `build`, an
+    # annotated entry carries the position of the entry and of the
+    # annotation, and a check declared in `caisson.checks` is defined
+    # in `checks` as well. The checks of a NixOS configuration inside
+    # the flake are published under its name, and those of a
+    # flake-parts configuration inside it under their names alone.
+    flakePartsPublishesTheGatheredChecks =
+      let
+        record = checksFlake.caisson.manifest.checkRecord.x86_64-linux;
+        perSystem = checksFlake.lib.caisson-core.evalManifest.value.config.allSystems.x86_64-linux;
+      in
+      builtins.mapAttrs (_: builtins.attrNames) checksFlake.checks == {
+        aarch64-linux = [
+          "bare"
+          "declared"
+          "nas-1-smoke"
+          "plain"
+          "suite"
+        ];
+        x86_64-linux = [
+          "bare"
+          "declared"
+          "nas-1-smoke"
+          "plain"
+          "suite"
+        ];
+      }
+      && checksFlake.checks.x86_64-linux.bare.drvPath == (checkMarker "bare").drvPath
+      && perSystem.checks ? declared
+      && !(perSystem.checks ? hidden)
+      && record.bare.category == "build"
+      && record.bare.description == null
+      && builtins.length record.bare.code == 1
+      && record.plain.category == "format"
+      && record.plain.description == "the files are formatted"
+      && builtins.length record.plain.code == 2
+      && record.declared.category == "unit"
+      &&
+        record.nas-1-smoke.from.namePath == [
+          {
+            type = "system";
+            name = "x86_64-linux";
+          }
+          {
+            type = "nixos";
+            name = "nas-1";
+          }
+        ]
+      &&
+        record.suite.from.namePath == [
+          {
+            type = "flake-parts";
+            name = "checks";
+          }
+        ];
+
+    # A flake that declares nothing in `caisson.checks` publishes the
+    # entries of `checks` under `perSystem` as flake-parts does, for
+    # every system of its `systems`.
+    flakePartsChecksUnchangedWithoutDeclarations =
+      let
+        flake = checksLib.caisson.flake-parts.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = {
+            perSystem =
+              { system, ... }:
+              {
+                checks = if system == "x86_64-linux" then { only = checkMarker "only"; } else { };
+              };
+          };
+        };
+      in
+      builtins.mapAttrs (_: builtins.mapAttrs (_: check: check.drvPath)) flake.checks == {
+        aarch64-linux = { };
+        x86_64-linux.only = (checkMarker "only").drvPath;
+      };
+
+    # The default checks an integration declares on
+    # `mkModuleConfiguration` are recorded on every manifest of the
+    # integration, as functions of its outputs, with the categories it
+    # declares. A configuration annotates a default check with the
+    # entry of the same name in `caisson.checks`, or turns it off.
+    integrationDefaultChecks =
+      let
+        plain = stubChecksTopWith { };
+        annotated = stubChecksTopWith {
+          caisson.checks.artifact.description = "the artifact builds for the probe";
+        };
+        off = stubChecksTopWith { caisson.checks.artifact.enable = false; };
+        redefined = stubChecksTopWith {
+          caisson.checks.artifact.derivation = checkMarker "another";
+        };
+        checksOf = top: top.aarch64-linux.outputs.checks;
+        recordOf = checksLib.caisson.integrations.checkRecordOf;
+        artifact = (recordOf plain.aarch64-linux).aarch64-linux.artifact;
+      in
+      builtins.attrNames plain == builtins.sort builtins.lessThan checksSystems
+      &&
+        (checksOf plain).aarch64-linux.artifact.drvPath == (checkMarker "stub-artifact-aarch64-linux")
+        .drvPath
+      && artifact.category == "probe"
+      && artifact.volatile
+      && artifact.description == "the artifact of the configuration builds"
+      && builtins.map (position: position.file) artifact.code == [ "tests/pinned-world/default.nix" ]
+      &&
+        (recordOf annotated.aarch64-linux).aarch64-linux.artifact.description
+        == "the artifact builds for the probe"
+      && builtins.length (recordOf annotated.aarch64-linux).aarch64-linux.artifact.code == 2
+      && (checksOf off) == { aarch64-linux = { }; }
+      && off.aarch64-linux.checks.aarch64-linux.artifact.enable == false
+      && checksFail (checksOf redefined);
 
   };
 
