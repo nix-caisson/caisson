@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# The checks a top publishes: the checks gathered at and inside the
-# configuration, `outputs.checks` of its manifest, as
-# `caisson.exportedChecks` selects them. A structural top returns
+# The checks a caisson top publishes: the checks gathered at and
+# inside the configuration, `outputs.checks` of its manifest, as
+# `caisson.exportedChecks` selects them. A structural caisson top returns
 # them as its `checks`, and the flake-parts integration publishes them
 # as the flake's `checks` output.
 { config, lib, ... }:

@@ -159,7 +159,7 @@ in
         example = lib.literalExpression ''entry: entry.category != "vm"'';
         description = ''
           The function that says whether the stage selects a check. It
-          receives an entry of the `checkRecord` of the top's manifest and
+          receives an entry of the `checkRecord` of the manifest of the caisson top and
           returns true for a check the stage selects.
         '';
       };

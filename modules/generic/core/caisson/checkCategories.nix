@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The categories of checks. Every check names a category, and a top
+# The categories of checks. Every check names a category, and a caisson top
 # refuses a check it gathers when no configuration it gathers checks
 # from declares the category of the check. caisson declares the categories its
 # integrations use, and a configuration declares more, as an
@@ -24,8 +24,8 @@ in
     '';
     description = ''
       The categories of checks this configuration declares, by name.
-      A category that the top or any configuration inside it declares is
-      declared for every check the top gathers. A name that several
+      A category that the caisson top or any configuration inside it
+      declares is declared for every check the caisson top gathers. A name that several
       configurations declare has the same `description` and `volatile`
       in each.
       caisson declares `build`, `eval`, `unit`, `vm` and `format`.

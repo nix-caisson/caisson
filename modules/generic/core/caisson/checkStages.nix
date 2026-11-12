@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# The stages of the checks of a top. A stage selects checks from the
-# check record of the top, and it says nothing about how to build them:
+# The stages of the checks of a caisson top. A stage selects checks
+# from the check record of the caisson top, and it says nothing about how to build them:
 # a stage holds when every check it selects has been built.
 { lib, ... }:
 let
@@ -21,9 +21,10 @@ in
     '';
     description = ''
       The stages of the checks of this configuration, by name. Stages
-      are declared at the top, the configuration with no configuration
-      above it: a top that gathers checks refuses a stage declared in a
-      configuration inside it. The top's manifest records each stage
+      are declared at the caisson top, the configuration with no
+      configuration above it: a caisson top that gathers checks refuses
+      a stage declared in a configuration inside it. The manifest of the
+      caisson top records each stage
       in `checkStages`.
     '';
   };

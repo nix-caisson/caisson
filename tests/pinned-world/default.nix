@@ -989,7 +989,7 @@ let
       };
     };
 
-  # A structural top that declares the category `hardware` and the stage
+  # A structural caisson top that declares the category `hardware` and the stage
   # `quick`. The NixOS configuration `nas-1`, evaluated for both
   # systems, declares the checks `smoke` and `boots`, and the check
   # `off`, which it turns off. The structural configuration `lab`
@@ -6294,10 +6294,10 @@ let
       && exported.homeManager ? nixos-parent
       && exported.flake ? nixpkgs;
 
-    # A structural top gathers the checks of the configurations inside
+    # A structural caisson top gathers the checks of the configurations inside
     # it under `checks.<system>` of its outputs and returns them as its
     # `checks`. A check is published under the names of the
-    # configurations from the top down to it and its name, joined with
+    # configurations from the caisson top down to it and its name, joined with
     # `-`, for each system its configuration is evaluated for: the
     # checks of `arm`, which `lab` evaluates for aarch64-linux, are
     # under `checks.aarch64-linux` alone. A check turned off is not
@@ -6324,7 +6324,7 @@ let
     # A structural configuration declares its checks under `perSystem`,
     # which is evaluated once for each system its children are evaluated
     # for, with `system`, `pkgs` and `pkgSets` among its module
-    # arguments. The structural top evaluates its children for both
+    # arguments. The structural caisson top evaluates its children for both
     # systems of the composition, and the structural configuration `lab`
     # evaluates its children for aarch64-linux. A NixOS configuration
     # has an evaluation result for each system it is evaluated for, and
@@ -6420,11 +6420,11 @@ let
       && builtins.map (position: position.file) recorded.off.code == [ "tests/pinned-world/default.nix" ]
       && builtins.all (position: builtins.isInt position.line) recorded.off.code;
 
-    # The check record of the top is keyed as the gathered checks are.
+    # The check record of the caisson top is keyed as the gathered checks are.
     # Each entry says where the check is declared, its category, its
     # description, whether its category is volatile and the system
     # features its derivation demands.
-    checkRecordOfTheTop =
+    checkRecordOfTheCaissonTop =
       let
         record = checksTop.caisson.manifest.checkRecord;
         boots = record.x86_64-linux.nas-1-boots;
@@ -6469,9 +6469,9 @@ let
       && record.x86_64-linux.nas-1-smoke.volatile == false
       && record.x86_64-linux.nas-1-smoke.requiredFeatures == [ ];
 
-    # The top records its stages, and the function of a stage selects
+    # The caisson top records its stages, and the function of a stage selects
     # from the entries of the check record.
-    checkStagesRecordedOnTheTop =
+    checkStagesRecordedOnTheCaissonTop =
       let
         manifest = checksTop.caisson.manifest;
         stage = manifest.checkStages.quick;
@@ -6535,8 +6535,8 @@ let
       && checksFail clashing.checks
       && !checksFail checksTop.checks;
 
-    # A stage declared inside the top is refused.
-    checkStagesDeclaredInsideTheTopAreRefused =
+    # A stage declared inside the caisson top is refused.
+    checkStagesDeclaredInsideTheCaissonTopAreRefused =
       let
         top = checksLib.caisson.structural.mkTopConfiguration {
           moduleImports = _modules: [ ];
@@ -6545,7 +6545,7 @@ let
             {
               caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib {
                 caisson.checkStages.inner = {
-                  description = "a stage inside the top";
+                  description = "a stage inside the caisson top";
                   select = _: true;
                 };
               };
@@ -6554,7 +6554,7 @@ let
       in
       checksFail top.checks && checksFail top.caisson.manifest.checkRecord;
 
-    # `caisson.exportedChecks` keeps a check out of the `checks` the top
+    # `caisson.exportedChecks` keeps a check out of the `checks` the caisson top
     # returns. The check stays in `outputs.checks` of the manifest and
     # in the check record.
     exportedChecksSelectsThePublishedChecks =

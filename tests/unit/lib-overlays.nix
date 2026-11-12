@@ -3524,7 +3524,7 @@ in
     };
 
   # The checks of configurations: what a configuration declares in
-  # `caisson.checks`, what a top gathers under `checks.<system>` of its
+  # `caisson.checks`, what a caisson top gathers under `checks.<system>` of its
   # outputs, and the check record. The NixOS configurations evaluate
   # the stand-in nixos tree, and a check is a stand-in derivation: an
   # attribute set of type `derivation` with a store path.
@@ -3562,7 +3562,7 @@ in
           moduleImports = _modules: [ ];
           configModule = module;
         };
-      # A structural top with the NixOS configuration `nas-1`, which
+      # A structural caisson top with the NixOS configuration `nas-1`, which
       # declares the checks `smoke` and `off`, and turns `off` off, and
       # the structural configuration `lab` with the NixOS configuration
       # `arm` inside it, which declares the check `smoke`.
@@ -3598,7 +3598,7 @@ in
       names = top: builtins.mapAttrs (_: builtins.attrNames) top.checks;
     in
     {
-      "test: a top gathers the checks inside it under the names of the configurations joined with -" = {
+      "test: a caisson top gathers the checks inside it under the joined names of the configurations" = {
         expr = {
           published = names gathering;
           inManifest = builtins.mapAttrs (_: builtins.attrNames) gathering.caisson.manifest.outputs.checks;
@@ -3671,7 +3671,7 @@ in
         };
       };
 
-      "test: a category a configuration declares is declared for every check the top gathers" = {
+      "test: a category a configuration declares applies to every check the caisson top gathers" = {
         expr =
           let
             top = topWith (
@@ -3796,7 +3796,7 @@ in
         };
       };
 
-      "test: the top records its stages" = {
+      "test: the caisson top records its stages" = {
         expr =
           let
             top = topWith {
@@ -3816,7 +3816,7 @@ in
         };
       };
 
-      "test: a stage declared inside the top is refused" = {
+      "test: a stage declared inside the caisson top is refused" = {
         expr =
           let
             top = topWith (
@@ -3824,7 +3824,7 @@ in
               {
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checkStages.inner = {
-                    description = "a stage inside the top";
+                    description = "a stage inside the caisson top";
                     select = _: true;
                   };
                 };
@@ -3890,7 +3890,7 @@ in
         };
       };
 
-      "test: a top whose configurations declare no checks gathers none" = {
+      "test: a caisson top whose configurations declare no checks gathers none" = {
         expr =
           let
             top = topWith (

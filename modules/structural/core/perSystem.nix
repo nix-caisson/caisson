@@ -63,8 +63,9 @@ let
           The checks of the structural configuration for this system, by
           name. An entry with a `derivation` declares a check, and it
           names its `category`. A check is gathered under
-          `checks.<system>` of the outputs of the top, under the names of
-          the configurations from the top down to this configuration and
+          `checks.<system>` of the outputs of the caisson top, under the
+          names of the configurations from the caisson top down to this
+          configuration and
           the name of the check, joined with `-`.
         '';
       };

@@ -945,7 +945,7 @@
               };
 
               what = "the ${type} configuration ${
-                if given.manifest ? name then "`${toString given.manifest.name}`" else "at the top"
+                if given.manifest ? name then "`${toString given.manifest.name}`" else "at the caisson top"
               }";
 
               # The checks of the configuration for a system, from the
@@ -2225,7 +2225,7 @@
       showNamePath =
         namePath:
         if namePath == [ ] then
-          "the top"
+          "the caisson top"
         else
           builtins.concatStringsSep "." (
             builtins.map (segment: "children.${segment.type}.${segment.name}") namePath
@@ -2402,7 +2402,7 @@
             caisson: ${
               builtins.concatStringsSep ", " (builtins.map (node: showNamePath node.namePath) staged)
             } declares stages of checks
-            (`caisson.checkStages`), and stages are declared at the top, the
+            (`caisson.checkStages`), and stages are declared at the caisson top, the
             configuration the checks are gathered at. Declare them there.
           ''
         else
@@ -2410,17 +2410,18 @@
 
       # The checks gathered at the configuration of `manifest`
       # (`gatheredChecksOf`), as derivations by system and then name:
-      # `checks` of the outputs of the configuration, which a top
-      # publishes.
+      # `checks` of the outputs of the configuration, which a caisson
+      # top publishes.
       checksOf =
         manifest:
         builtins.mapAttrs (_: builtins.mapAttrs (_: entry: entry.check.derivation)) (
           gatheredChecksOf manifest
         );
 
-      # The `checks` output of a top, by system and then name: the
-      # gathered checks `caisson.exportedChecks` selected (`gathered`)
-      # beside the checks the configurations inside the top publish in
+      # The `checks` output of a caisson top, by system and then name:
+      # the gathered checks `caisson.exportedChecks` selected
+      # (`gathered`) beside the checks the configurations inside the
+      # caisson top publish in
       # `checks` through their `exportsTo` (`published`), as the treefmt
       # integration publishes the check of its configuration named
       # `formatter`. A name in both is refused.
@@ -2458,9 +2459,10 @@
         else
           [ ];
 
-      # The check record of a top, keyed as `checks` of its outputs is,
-      # by system and then published name: for each check, `name` and
-      # `system`, `from.namePath`, the path from the top to the
+      # The check record of a caisson top, keyed as `checks` of its
+      # outputs is, by system and then published name: for each check,
+      # `name` and `system`, `from.namePath`, the path from the caisson
+      # top to the
       # configuration that declares the check by the names declared,
       # `category`, `description`, `volatile`, from the category,
       # `requiredFeatures` (`requiredFeaturesOf`) and `code`, the

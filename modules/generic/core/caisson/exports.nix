@@ -44,7 +44,7 @@ in
       description = ''
         The checks gathered at and inside this configuration that
         `caisson.exportedChecks` selected, by system and then name. A
-        configuration passes none of them up: the top gathers the checks
+        configuration passes none of them up: the caisson top gathers the checks
         of the configurations inside it from their manifests.
       '';
     };
