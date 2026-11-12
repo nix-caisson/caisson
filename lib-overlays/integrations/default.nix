@@ -2276,8 +2276,8 @@
             node:
             let
               # The registry wraps the module of an entry in modules that
-              # each import the next module alone. A wrapper has no file
-              # of its own, so the module system gives it the file of the
+              # each import the next module alone. A wrapper names no
+              # file, so the module system gives it the file of the
               # module that imports the entry, such as the file of the
               # configuration that selects it. The module of the entry is
               # the first module below the wrappers whose file differs
