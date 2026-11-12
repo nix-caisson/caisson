@@ -137,6 +137,7 @@ let
     "mkModules"
     "mkPkgOverlay"
     "mkPkgOverlays"
+    "mkVolatileCheck"
     "modules"
     "nixidy"
     "nixops4"
@@ -984,6 +985,18 @@ let
     }
   );
   checkMarker = name: pkgs.runCommand name { } "touch $out";
+  # A check of a volatile category is a fixed-output derivation: this
+  # check writes an empty file, whose hash it declares.
+  fixedOutputCheckMarker =
+    name: attrs:
+    pkgs.runCommand name (
+      attrs
+      // {
+        outputHashMode = "flat";
+        outputHashAlgo = "sha256";
+        outputHash = builtins.hashString "sha256" "";
+      }
+    ) "touch $out";
   checksNixosConfiguration =
     lib: module:
     lib.caisson.nixos.mkConfiguration {
@@ -1039,7 +1052,7 @@ let
               description = "the NixOS configuration evaluates";
             };
             caisson.checks.boots = {
-              derivation = pkgs.runCommand "nas-1-boots" { requiredSystemFeatures = [ "kvm" ]; } "touch $out";
+              derivation = fixedOutputCheckMarker "nas-1-boots" { requiredSystemFeatures = [ "kvm" ]; };
               category = "hardware";
             };
             caisson.checks.off = {
@@ -1216,7 +1229,7 @@ let
               specialArgs = { inherit lib; };
               modules = lib.caisson.integrations.frameworkModules "nixos" { } ++ [ module ];
             };
-            outputs.artifact = checkMarker "stub-artifact-${manifest.system}";
+            outputs.artifact = fixedOutputCheckMarker "stub-artifact-${manifest.system}" { };
           };
       }
     );
@@ -6712,6 +6725,114 @@ let
       && checksFail clashing.checks
       && !checksFail checksTop.checks;
 
+    # `mkVolatileCheck` returns a fixed-output derivation whose output
+    # is the file holding `pass`, named for the check and the hash part
+    # of the store path of the program. A changed program changes the
+    # name and the output path; the same program, given again or with
+    # other `impureEnvVars`, keeps them. The `drvAttrs` keep the
+    # program, so their context names its derivation. A program
+    # outside the store is refused.
+    volatileCheckNamesItsMarkerForTheProgram =
+      let
+        mk = composed.lib.caisson.mkVolatileCheck;
+        program = text: pkgs.writeShellScript "probe" text;
+        hashOf = path: builtins.head (builtins.match "${builtins.storeDir}/([0-9a-z]{32})-.*" "${path}");
+        passing = mk {
+          inherit pkgs;
+          name = "probe";
+          program = program "exit 0";
+        };
+        again = mk {
+          inherit pkgs;
+          name = "probe";
+          program = program "exit 0";
+        };
+        withVariables = mk {
+          inherit pkgs;
+          name = "probe";
+          program = program "exit 0";
+          impureEnvVars = [ "PROBE_TOKEN" ];
+        };
+        changed = mk {
+          inherit pkgs;
+          name = "probe";
+          program = program "exit 1";
+        };
+        application = pkgs.writeShellApplication {
+          name = "probe";
+          runtimeInputs = [ pkgs.coreutils ];
+          text = "true";
+        };
+        fromApplication = mk {
+          inherit pkgs;
+          name = "probe";
+          program = pkgs.lib.getExe application;
+        };
+        outside = mk {
+          inherit pkgs;
+          name = "probe";
+          program = "/usr/bin/true";
+        };
+      in
+      passing.name == "probe-${hashOf (program "exit 0")}"
+      && fromApplication.name == "probe-${hashOf application}"
+      && passing.outPath == again.outPath
+      && passing.drvPath == again.drvPath
+      && passing.outPath == withVariables.outPath
+      && passing.drvPath != withVariables.drvPath
+      && passing.name != changed.name
+      && passing.outPath != changed.outPath
+      && passing.system == pkgs.stdenv.hostPlatform.system
+      && passing.drvAttrs.outputHashMode == "flat"
+      && passing.drvAttrs.outputHashAlgo == "sha256"
+      && passing.drvAttrs.outputHash == builtins.hashString "sha256" "pass\n"
+      && passing.drvAttrs.impureEnvVars == [ ]
+      && withVariables.drvAttrs.impureEnvVars == [ "PROBE_TOKEN" ]
+      && builtins.getContext (builtins.toJSON passing.drvAttrs)
+        ? ${builtins.unsafeDiscardStringContext (program "exit 0").drvPath}
+      && !(builtins.tryEval (builtins.deepSeq outside.drvPath true)).success;
+
+    # A check of a volatile category whose derivation is not a
+    # fixed-output derivation is refused in the `volatile` field of
+    # its record entry. The other fields of the entry read, and so does
+    # the `checks` output. The derivation `mkVolatileCheck` returns is
+    # taken.
+    volatileChecksAreFixedOutputDerivations =
+      let
+        withProbe =
+          derivation:
+          checksTopWith (
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.probe = checksNixosConfiguration lib {
+                caisson.checks.reaches = {
+                  derivation = derivation lib;
+                  category = "hardware";
+                };
+              };
+            }
+          );
+        hermetic = withProbe (_: checkMarker "probe-reaches");
+        fixedOutput = withProbe (
+          lib:
+          lib.caisson.mkVolatileCheck {
+            inherit pkgs;
+            name = "probe-reaches";
+            program = pkgs.writeShellScript "probe-reaches" "exit 0";
+          }
+        );
+        record = top: top.caisson.manifest.checkRecord.x86_64-linux.probe-reaches;
+      in
+      !(builtins.tryEval (record hermetic).volatile).success
+      && checksFail hermetic.caisson.manifest.checkRecord
+      && (record hermetic).category == "hardware"
+      && (record hermetic).requiredFeatures == [ ]
+      && !checksFail hermetic.checks
+      && !checksFail fixedOutput.caisson.manifest.checkRecord
+      && !checksFail fixedOutput.checks
+      && fixedOutput.checks.x86_64-linux.probe-reaches.drvAttrs ? outputHash
+      && (record fixedOutput).volatile;
+
     # A stage declared inside the caisson top is refused.
     checkStagesDeclaredInsideTheCaissonTopAreRefused =
       let
@@ -6849,7 +6970,7 @@ let
         };
         off = stubChecksTopWith { caisson.checks.artifact.enable = false; };
         redefined = stubChecksTopWith {
-          caisson.checks.artifact.derivation = checkMarker "another";
+          caisson.checks.artifact.derivation = fixedOutputCheckMarker "another" { };
         };
         checksOf = top: top.aarch64-linux.outputs.checks;
         recordOf = checksLib.caisson.integrations.checkRecordOf;
@@ -6857,8 +6978,8 @@ let
       in
       builtins.attrNames plain == builtins.sort builtins.lessThan checksSystems
       &&
-        (checksOf plain).aarch64-linux.artifact.drvPath == (checkMarker "stub-artifact-aarch64-linux")
-        .drvPath
+        (checksOf plain).aarch64-linux.artifact.drvPath
+        == (fixedOutputCheckMarker "stub-artifact-aarch64-linux" { }).drvPath
       && artifact.category == "probe"
       && artifact.volatile
       && artifact.description == "the artifact of the configuration builds"

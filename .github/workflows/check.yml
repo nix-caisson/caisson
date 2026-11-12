@@ -25,6 +25,19 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: nix flake check -L
+  # The checks `lib.caisson.mkVolatileCheck` returns, built into the
+  # store of the runner (tests/volatile-checks/check.sh): a pass writes
+  # its marker and a failure leaves none. A check of `nix flake check`
+  # is itself a build, and its builder cannot run `nix build` against
+  # the store of the runner, so the script runs as a step of the job.
+  volatile-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          determinate: false
+      - run: bash tests/volatile-checks/check.sh
   # A system-manager configuration activated in a container of each
   # distribution (tests/system-manager/container.nix). system-manager's
   # container test driver runs the container in the build sandbox, which
