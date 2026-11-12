@@ -7187,6 +7187,36 @@ let
       in
       top.checks.x86_64-linux.registries.message == "";
 
+    # The registry entry `caisson/activation-marker` of the generic
+    # class, from the project caisson, imports the module that caisson exports for it through a
+    # module that names no file and imports several modules. The module
+    # system gives that module the file of the module that imports the
+    # entry. The module `importer` imports the entry, and defines
+    # `caisson.importerNote` in its file. The check `registries` takes
+    # the files of the entry from the modules below it that name their
+    # file. It records the definition for `importer`, which imports the
+    # declaration of the option, and not for
+    # `caisson/activation-marker`, which does not, and it passes.
+    registriesIgnoresTheDefinitionsOfTheModuleThatImportsAnEntry =
+      let
+        top = registriesTopWith "importer";
+        # The registry entries of the NixOS configuration `nas-1`.
+        entries = builtins.foldl' (found: manifest: found // manifest.registryEntries or { }) { } (
+          builtins.filter (manifest: manifest.type or null == "nixos") (manifestsOf top.caisson.manifest)
+        );
+      in
+      top.checks.x86_64-linux.registries.message == ""
+      && builtins.all (
+        definition: definition.option != "caisson.importerNote"
+      ) entries."modules.generic.caisson/activation-marker".defines
+      && entries."modules.generic.caisson/activation-marker".file == "modules/generic/activation-marker"
+      && builtins.any (
+        definition:
+        definition.option == "caisson.importerNote"
+        && definition.files == [ "tests/pinned-world/registries/modules/nixos/importer" ]
+        && definition.declared
+      ) entries."modules.nixos.importer".defines;
+
     # The check `registries` fails to build where a registry entry
     # defines an option under `caisson` and imports no module that
     # declares it, as the module `undeclared` does. Its message names
