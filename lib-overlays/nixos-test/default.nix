@@ -273,11 +273,15 @@
           # A test is published in no output attribute set: it leaves
           # the flake as its check alone.
           exportsTo = null;
-          checks.test = {
-            derivation = { outputs, ... }: outputs.test;
-            category = "vm";
-            description = "The test driver starts the nodes of the test and the test script passes.";
-          };
+          checks =
+            { outputs, ... }:
+            {
+              test = {
+                derivation = outputs.test;
+                category = "vm";
+                description = "The test driver starts the nodes of the test and the test script passes.";
+              };
+            };
           evaluate = evaluate args;
         };
 

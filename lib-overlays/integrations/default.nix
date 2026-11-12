@@ -846,20 +846,41 @@
       # `caisson.forChildren` and `caisson.forNearestChildren`
       # (`additionsOf`).
       #
-      # `checks` are the default checks of the integration, which every
-      # evaluation result it builds carries, by name. Each is
-      # `{ derivation; category; description; }`: `derivation` is a
-      # function of `{ outputs, pkgs, pkgSets }` that returns the
-      # derivation of the check for the system of the evaluation result:
+      # `checks` is a function that returns the default checks of the
+      # integration for an evaluation result that has a system, by
+      # name. caisson calls it with `{ outputs, system, pkgs, pkgSets }`:
       # `outputs` are the outputs of the evaluation result as its
-      # manifest holds them, `pkgSets` the package sets for that system
-      # by the name of the package config, and `pkgs` the set the
-      # selection of the configuration picks of them. `category` is the name of a category of
-      # checks, and `description` a sentence saying what the check
-      # checks. A nixos integration that declares `toplevel` writes
-      # `{ derivation = { outputs, ... }: outputs.toplevel; … }`. A
-      # configuration annotates a default check, or turns it off,
-      # with the entry of the same name in `caisson.checks`.
+      # manifest holds them, `system` is the system of the evaluation
+      # result, `pkgSets` are the package sets for that system by the
+      # name of the package config, and `pkgs` is the set the selection
+      # of the configuration picks of them. Each check it returns is
+      # `{ derivation; category; description; }`: `derivation` is the
+      # derivation of the check for that system, `category` is the name
+      # of a category of checks, and `description` is a sentence saying
+      # what the check checks. The nixos integration declares the check
+      # `toplevel` with
+      # `checks = { outputs, ... }: { toplevel = { derivation = outputs.toplevel; … }; }`.
+      # A configuration annotates a default check, or turns it off,
+      # with the entry of the same name in `caisson.checks`. An
+      # evaluation result that has no system carries no default checks.
+      #
+      # The record writes two code positions for a default check: the
+      # position where the integration passes `checks`, and the
+      # position of the definition that declares the configuration
+      # inside its parent, the line of
+      # `caisson.nixos.configurations.nas-1 = …` for the NixOS
+      # configuration `nas-1`. A caisson top is declared inside no
+      # configuration, so its default checks carry the first position
+      # alone. Each configuration records in `childrenCode` the
+      # positions of the definitions that declare the configurations
+      # inside it, by integration and then name, and a configuration
+      # reads its position there in the result of the childless
+      # evaluation of its parent.
+      #
+      # A caisson top also carries the check `registries`
+      # (`registriesCheckOf`), which reads `registryEntries`, the
+      # record of the registry entries each evaluation result
+      # evaluated (`registryEntriesOf`).
       # `checkCategories` are the categories of checks the integration
       # declares, by name, each `{ description; volatile ? false; }`,
       # for the categories its default checks name beyond those caisson
@@ -882,7 +903,7 @@
           exportsTo ? null,
           activation ? null,
           selection ? null,
-          checks ? { },
+          checks ? _: { },
           checkCategories ? { },
           evaluate,
         }:
@@ -911,9 +932,11 @@
             "checkCategories"
             "checks"
             "checkStages"
+            "childrenCode"
             "ecosystems"
             "namespaces"
             "pkgSet"
+            "registryEntries"
           ]
           ++ (if selection == null then [ ] else [ "moduleImports" ]);
           record =
@@ -948,11 +971,36 @@
                 if given.manifest ? name then "`${toString given.manifest.name}`" else "at the caisson top"
               }";
 
+              # The configuration that declares this configuration: the
+              # parent, or, for an evaluation result of a configuration
+              # evaluated per system, the parent of its system. Null for
+              # a caisson top, whose parent is the manifest of the lib.
+              declaring =
+                let
+                  parent = given.manifest.parent or null;
+                  above = if (parent.type or null) == "system" then parent.parent or null else parent;
+                in
+                if above == null || (above.type or "lib") == "lib" then null else above;
+
+              # The positions of the definitions that declare this
+              # configuration inside the configuration that declares it,
+              # as that configuration records them in `childrenCode`.
+              declaringCode =
+                let
+                  recorded = if declaring == null then null else declaring.childrenCode or null;
+                in
+                if recorded == null || !(given.manifest ? name) then
+                  [ ]
+                else
+                  (recorded.${type} or { }).${toString given.manifest.name} or [ ];
+
               # The checks of the configuration for a system, from the
-              # declarations of its modules. caisson calls the
-              # `derivation` of each default check with the outputs, the
-              # package sets for that system, by the name of the package
-              # config, as `pkgSets`, and the set the selection of the
+              # declarations of its modules: the default checks of the
+              # integration for that system, the check `registries` at a
+              # caisson top, and the checks the modules declare. caisson
+              # calls `checks` with the outputs, the system, the package
+              # sets for that system, by the name of the package config,
+              # as `pkgSets`, and the set the selection of the
               # configuration picks of them as `pkgs`.
               checksFor =
                 system:
@@ -962,17 +1010,36 @@
                     what = "the checks of ${what} for ${system}";
                   };
                   pkgSets = pkgSetsForSystem messages given.manifest system;
+                  pkgs = pkgSetOf messages given.manifest pkgSets;
+                  ofIntegration =
+                    builtins.mapAttrs
+                      (
+                        _: check:
+                        check
+                        // {
+                          code = defaultChecksCode ++ declaringCode;
+                        }
+                      )
+                      (checks {
+                        inherit
+                          outputs
+                          system
+                          pkgs
+                          pkgSets
+                          ;
+                      });
+                  ofTop =
+                    if declaring == null then
+                      registriesCheckOf {
+                        inherit system;
+                        inherit (given) manifest;
+                      }
+                    else
+                      { };
                 in
                 checksOfConfiguration {
-                  inherit
-                    what
-                    type
-                    outputs
-                    pkgSets
-                    ;
-                  pkgs = pkgSetOf messages given.manifest pkgSets;
-                  defaults = checks;
-                  defaultsCode = defaultChecksCode;
+                  inherit what type;
+                  defaults = ofTop // ofIntegration;
                 };
 
               # The system of this evaluation result: the system it is
@@ -1010,21 +1077,36 @@
               recordedChecks =
                 if evaluated ? checkDeclarations then
                   builtins.mapAttrs checksFor evaluated.checkDeclarations
-                else if checks == { } && declaredHere == { } then
+                else if system != null then
+                  { ${system} = checksFor system declaredHere; }
+                else if declaredHere == { } then
                   { }
-                else if system == null then
+                else
                   throw ''
                     caisson: ${what} has the checks ${
-                      builtins.concatStringsSep ", " (
-                        builtins.map (name: "`${name}`") (builtins.attrNames (checks // declaredHere))
-                      )
+                      builtins.concatStringsSep ", " (builtins.map (name: "`${name}`") (builtins.attrNames declaredHere))
                     }, and its evaluation result has no system: it is not evaluated for a
                     system, and no configuration it is declared inside is. Declare the checks in
                     a configuration evaluated for a system, such as a NixOS configuration, or
                     under `perSystem` of a structural or flake-parts configuration.
-                  ''
-                else
-                  { ${system} = checksFor system declaredHere; };
+                  '';
+
+              # The positions of the definitions that declare the
+              # configurations inside this configuration, by integration
+              # and then name (`childrenCodeOf`).
+              recordedChildrenCode = childrenCodeOf options;
+
+              # The registry entries this evaluation result evaluated,
+              # with the `caisson` options they define
+              # (`registryEntriesOf`). An evaluator that returns no import
+              # graph of its modules gives no record of them.
+              recordedRegistryEntries =
+                let
+                  graph =
+                    evaluated.graph
+                      or (if builtins.isAttrs evaluated.value then evaluated.value.graph or null else null);
+                in
+                if graph == null then { } else registryEntriesOf { inherit graph options; };
 
               recordedCategories = categoriesUnion [
                 declaredCategories
@@ -1094,6 +1176,11 @@
                 checks = recordedChecks;
                 checkCategories = recordedCategories;
                 checkStages = recordedStages;
+                # Where the configurations declared inside are declared,
+                # and the registry entries the evaluation result
+                # evaluated.
+                childrenCode = recordedChildrenCode;
+                registryEntries = recordedRegistryEntries;
                 # Where each part of the stack the configuration used came
                 # from (`ecosystemAccountOf`): the library of the lib it
                 # runs on, and each ecosystem the integration resolved,
@@ -2110,16 +2197,248 @@
           code = definitionCodeOf option name;
         }) value;
 
+      # The positions of the definitions that declare the
+      # configurations inside a configuration, from its options: by
+      # integration and then the name a configuration is declared
+      # under, the positions `definitionCodeOf` gives for that name in
+      # `caisson.<integration>.configurations`. Reading the definitions
+      # finalizes no configuration, so the childless evaluation records
+      # them too, and the configurations declared inside read them
+      # there.
+      childrenCodeOf =
+        options:
+        genAttrs (integrationsDeclaringIn options) (
+          integration:
+          let
+            option = options.caisson.${integration}.configurations;
+            names = unique (
+              builtins.concatMap (
+                definition: if builtins.isAttrs definition.value then builtins.attrNames definition.value else [ ]
+              ) option.definitionsWithLocations
+            );
+          in
+          genAttrs names (definitionCodeOf option)
+        );
+
+      # The registry entries a module evaluation evaluated, with the
+      # options under `caisson` that each entry defines.
+      #
+      # A registry entry that defines an option under `caisson`, such as
+      # `caisson.forChildren.systems`, depends on the module that
+      # declares the option. Most of these options are declared by the
+      # framework module of the class, `closure-lib.caisson.modules.<class>.core`.
+      # caisson imports the framework module into every evaluation it
+      # makes, so a missing import changes nothing there. A consumer
+      # who evaluates the entry outside caisson, with
+      # `nixpkgs.lib.nixosSystem` over the `nixosModules` output of a
+      # flake, gets no framework module, and the definition fails as a
+      # definition of an option that no module declares. An entry
+      # declares that dependence by importing the module that declares
+      # the option.
+      #
+      # `graph` is the import graph `lib.evalModules` returns: for each
+      # module, its `key`, its `file`, whether it is `disabled`, and the
+      # modules it imports. `options` are the options of the evaluation.
+      # A registry entry is a module whose key is
+      # `modules.<class>.<name>@<project>` (`keyedModules`). The files
+      # of an entry are the files of the entry and of every module it
+      # imports, at any depth. The result holds each entry by registry
+      # key, with `project`, `file`, and `defines`: for each option
+      # under `caisson` that a file of the entry defines, the option
+      # as `option`, the files of the entry that define it as `files`,
+      # the files that declare it as `declarations`, and `declared`,
+      # true when a file of the entry declares it. A
+      # module the graph reaches under several paths is read at its
+      # first occurrence.
+      registryEntriesOf =
+        { graph, options }:
+        let
+          isOption = value: builtins.isAttrs value && (value._type or null) == "option";
+          optionsUnder =
+            value:
+            if isOption value then
+              [ value ]
+            else if builtins.isAttrs value then
+              builtins.concatMap optionsUnder (builtins.attrValues value)
+            else
+              [ ];
+          caissonOptions = optionsUnder (options.caisson or { });
+          enabled = builtins.filter (node: !(node.disabled or false));
+          filesOf = node: [ node.file ] ++ builtins.concatMap filesOf (enabled node.imports);
+          entriesIn =
+            nodes:
+            builtins.concatMap (
+              node:
+              (if builtins.substring 0 8 (toString (node.key or "")) == "modules." then [ node ] else [ ])
+              ++ entriesIn (enabled node.imports)
+            ) (enabled nodes);
+          entryOf =
+            node:
+            let
+              # The registry wraps the module of an entry in modules that
+              # each import the next module alone. A wrapper names no
+              # file, so the module system gives it the file of the
+              # module that imports the entry, such as the file of the
+              # configuration that selects it. The module of the entry is
+              # the first module below the wrappers whose file differs
+              # from the file of the wrappers, and the files of the entry
+              # are the files of that module and of every module it
+              # imports.
+              below =
+                wrapper:
+                let
+                  imported = enabled wrapper.imports;
+                in
+                if builtins.length imported != 1 then
+                  wrapper
+                else if (builtins.head imported).file == node.file then
+                  below (builtins.head imported)
+                else
+                  builtins.head imported;
+              module = below node;
+              inherit (module) file;
+              files = unique (filesOf module);
+              inEntry = file: builtins.elem file files;
+              defined = builtins.filter (option: builtins.any inEntry option.files) caissonOptions;
+              registered = registryPartsOf node.key;
+            in
+            {
+              name = registered.key;
+              value = {
+                inherit (registered) project;
+                file = inSource file;
+                defines = builtins.map (option: {
+                  option = builtins.concatStringsSep "." option.loc;
+                  files = builtins.map inSource (builtins.filter inEntry option.files);
+                  declarations = builtins.map inSource option.declarations;
+                  declared = builtins.any inEntry option.declarations;
+                }) defined;
+              };
+            };
+        in
+        builtins.listToAttrs (builtins.map entryOf (entriesIn graph));
+
+      # The check `registries` of a caisson top for `system`, by name,
+      # the default check every caisson top carries.
+      #
+      # It checks that every registry entry that defines an option under
+      # `caisson` imports a module that declares that option
+      # (`registryEntriesOf`). The entries it reads are those that the
+      # evaluation results gathered at the caisson top evaluated
+      # (`checkNodesOf`), each evaluation result that is for `system`
+      # or for no system. Its category is `eval`: the derivation builds
+      # nothing, and its build fails, printing the entries and the
+      # options, when any entry defines an option that it imports no
+      # declaration of. The derivation runs `/bin/sh`, so it needs no
+      # package set.
+      registriesCheckOf =
+        { manifest, system }:
+        let
+          nodes = builtins.filter (
+            node:
+            let
+              nodeSystem =
+                let
+                  above = builtins.filter (ancestor: ancestor ? system) (node.manifest.ancestors or [ ]);
+                in
+                if node.manifest ? system then
+                  node.manifest.system
+                else if above == [ ] then
+                  null
+                else
+                  (last above).system;
+            in
+            nodeSystem == null || nodeSystem == system
+          ) (checkNodesOf manifest);
+          missing = builtins.concatMap (
+            node:
+            let
+              entries = node.manifest.registryEntries or null;
+            in
+            if entries == null then
+              [ ]
+            else
+              builtins.concatMap (
+                key:
+                let
+                  entry = entries.${key};
+                  undeclared = builtins.filter (definition: !definition.declared) entry.defines;
+                in
+                if undeclared == [ ] then
+                  [ ]
+                else
+                  [
+                    {
+                      inherit key entry undeclared;
+                      inherit (node) namePath;
+                    }
+                  ]
+              ) (builtins.attrNames entries)
+          ) nodes;
+          # Each entry is reported for the first evaluation result that
+          # evaluated it.
+          firstOf = builtins.foldl' (
+            seen: found: if seen ? ${found.key} then seen else seen // { ${found.key} = found; }
+          ) { } missing;
+          showFound =
+            found:
+            let
+              project = if found.entry.project == null then "" else " of the project `${found.entry.project}`";
+            in
+            ''
+              `${found.key}`${project}, file ${found.entry.file}, evaluated in ${showNamePath found.namePath}:
+              ${builtins.concatStringsSep "\n" (
+                builtins.map (
+                  definition:
+                  "  defines `${definition.option}` in ${builtins.concatStringsSep ", " definition.files}, declared in ${builtins.concatStringsSep ", " definition.declarations}"
+                ) found.undeclared
+              )}'';
+          message = ''
+            caisson: these registry entries define options under `caisson` and import no
+            module that declares them:
+
+            ${builtins.concatStringsSep "\n" (builtins.map showFound (builtins.attrValues firstOf))}
+
+            caisson imports the framework module of the class into every evaluation it
+            makes, so the definitions work inside caisson. A configuration evaluated outside
+            caisson, such as a NixOS configuration built with `nixpkgs.lib.nixosSystem` from
+            the `nixosModules` output of this flake, does not import it, and each of these
+            definitions fails there as a definition of an undeclared option. Import the
+            module that declares each option into the entry. Most of these options are
+            declared by the core module of caisson for the class, the registry entry
+            `core` of the class, which a flake that lists caisson in `projects` reads as
+            `closure-lib.caisson.modules.<class>."caisson/core"`.
+          '';
+          passes = firstOf == { };
+          position = positionOf (builtins.unsafeGetAttrPos "registries" declared);
+          declared = {
+            registries = {
+              derivation = builtins.derivation {
+                name = "registries";
+                inherit system;
+                builder = "/bin/sh";
+                args = [
+                  "-c"
+                  (if passes then "echo pass > $out" else "printf '%s\\n' \"$message\" >&2; exit 1")
+                ];
+                message = if passes then "" else message;
+              };
+              category = "eval";
+              description = "every registry entry that defines an option under `caisson` imports a module that declares it";
+              # The position of the attribute `registries` in this file.
+              code = if position == null then [ ] else [ (position // { file = inSource position.file; }) ];
+            };
+          };
+        in
+        declared;
+
       # The checks a configuration records for a system, by name: the
-      # default checks of its integration and the checks its modules
+      # default checks for that system and the checks its modules
       # declare for that system (`checkDeclarationsOf`). `what` names
-      # the configuration in the messages, `type` its integration,
-      # `outputs` are the outputs of the evaluation result, `pkgSets`
-      # are the package sets for the system by the name of the package
-      # config, `pkgs` is the set the selection of the configuration
-      # picks of them, and `defaultsCode` is where the integration
-      # declares its default checks. The `derivation` of a default check
-      # is called with `{ outputs, pkgs, pkgSets }`.
+      # the configuration in the messages, `type` its integration, and
+      # `defaults` are the default checks by name, each
+      # `{ derivation; category; description; code; }`, where `code`
+      # holds the positions that declare the default check.
       #
       # A declaration with a `derivation` declares a check, and it
       # names its category. A declaration without a `derivation`
@@ -2134,15 +2453,10 @@
         {
           what,
           type,
-          outputs,
-          pkgs,
-          pkgSets,
           defaults,
-          defaultsCode,
         }:
         declarations:
         let
-          ofDefault = default: default.derivation { inherit outputs pkgs pkgSets; };
           entryOf =
             name:
             let
@@ -2168,10 +2482,13 @@
                 declaration
             else if declaration == null then
               {
-                derivation = ofDefault default;
-                inherit (default) category description;
+                inherit (default)
+                  derivation
+                  category
+                  description
+                  code
+                  ;
                 enable = true;
-                code = defaultsCode;
               }
             else if declaration.derivation != null then
               throw ''
@@ -2181,12 +2498,12 @@
               ''
             else
               {
-                derivation = ofDefault default;
+                inherit (default) derivation;
                 category = if declaration.category != null then declaration.category else default.category;
                 description =
                   if declaration.description != null then declaration.description else default.description;
                 inherit (declaration) enable;
-                code = defaultsCode ++ declaration.code;
+                code = default.code ++ declaration.code;
               };
         in
         genAttrs (unique (builtins.attrNames defaults ++ builtins.attrNames declarations)) entryOf;

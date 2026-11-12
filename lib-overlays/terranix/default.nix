@@ -176,6 +176,18 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # Each evaluation result of a terranix configuration checks
+          # that its `config.tf.json` file, the file Terraform reads,
+          # builds.
+          checks =
+            { outputs, ... }:
+            {
+              json = {
+                derivation = outputs.json;
+                category = "build";
+                description = "the `config.tf.json` file of the terranix configuration, which Terraform reads, builds";
+              };
+            };
           evaluate = evaluate args;
         };
 

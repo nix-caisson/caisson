@@ -335,6 +335,20 @@
               manifest:
               "${manifest.value.config.directory}/${markerDirectory}/${final.caisson.integrations.markerFileName manifest}";
           };
+          # Each evaluation result of a hjem configuration checks that
+          # its manifest file builds. The build of the manifest file
+          # runs `cue vet` against the schema `manifest/v3.cue` of hjem,
+          # as the OS modules of hjem check the manifest they write, so
+          # the check is of the category `eval`.
+          checks =
+            { outputs, ... }:
+            {
+              manifest = {
+                derivation = outputs.manifestFile;
+                category = "eval";
+                description = "the manifest of the hjem configuration builds and passes `cue vet` against the manifest schema of hjem";
+              };
+            };
           evaluate = evaluate args;
         };
 

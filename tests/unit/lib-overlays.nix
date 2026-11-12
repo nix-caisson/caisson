@@ -3609,15 +3609,24 @@ in
         expected = {
           published.x86_64-linux = [
             "lab-arm-smoke"
+            "lab-arm-toplevel"
             "nas-1-smoke"
+            "nas-1-toplevel"
+            "registries"
           ];
           inManifest.x86_64-linux = [
             "lab-arm-smoke"
+            "lab-arm-toplevel"
             "nas-1-smoke"
+            "nas-1-toplevel"
+            "registries"
           ];
           record.x86_64-linux = [
             "lab-arm-smoke"
+            "lab-arm-toplevel"
             "nas-1-smoke"
+            "nas-1-toplevel"
+            "registries"
           ];
           smoke = "arm-smoke";
         };
@@ -3638,6 +3647,7 @@ in
           names = [
             "off"
             "smoke"
+            "toplevel"
           ];
           enable = false;
           gathered = false;
@@ -3785,7 +3795,7 @@ in
               { lib, ... }:
               {
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
-                  caisson.checks.toplevel.enable = false;
+                  caisson.checks.missing.enable = false;
                 };
               }
             );
@@ -3793,7 +3803,7 @@ in
           builtins.attrNames top.checks.x86_64-linux;
         expectedError = {
           type = "ThrownError";
-          msg = "annotates the check `toplevel`, and the configuration\\s+has no check of that name";
+          msg = "annotates the check `missing`, and the configuration\\s+has no check of that name";
         };
       };
 
@@ -3878,12 +3888,16 @@ in
             "bare"
             "declared"
             "nas-1-smoke"
+            "nas-1-toplevel"
+            "registries"
             "treefmt"
           ];
           categories = {
             bare = "build";
             declared = "unit";
             nas-1-smoke = "eval";
+            nas-1-toplevel = "build";
+            registries = "eval";
             treefmt = "format";
           };
           treefmtPositions = 2;
@@ -3891,7 +3905,7 @@ in
         };
       };
 
-      "test: a caisson top whose configurations declare no checks gathers none" = {
+      "test: a caisson top whose configurations declare no checks gathers the default checks alone" = {
         expr =
           let
             top = topWith (
@@ -3902,12 +3916,18 @@ in
             );
           in
           {
-            checks = top.checks;
-            record = top.caisson.manifest.checkRecord;
+            checks = names top;
+            record = builtins.mapAttrs (_: builtins.attrNames) top.caisson.manifest.checkRecord;
           };
         expected = {
-          checks.x86_64-linux = { };
-          record.x86_64-linux = { };
+          checks.x86_64-linux = [
+            "nas-1-toplevel"
+            "registries"
+          ];
+          record.x86_64-linux = [
+            "nas-1-toplevel"
+            "registries"
+          ];
         };
       };
     };
