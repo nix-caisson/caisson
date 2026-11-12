@@ -752,6 +752,106 @@
           caisson-core = builtins.attrNames (lib.caisson-core or { });
         };
 
+      # The dependencies of a configuration that adds `dependencies` to
+      # those of the configuration it is declared inside, as its
+      # manifest records them. A flake-parts configuration that holds
+      # the checks of a flake declares the pins only its checks need
+      # this way, so the pin file of the caisson top stays free of them:
+      #
+      #   caisson.flake-parts.configurations.checks = lib.caisson.flake-parts.mkConfiguration {
+      #     inherit (lib.caisson.pins.flake-compat ../../../tests/dependencies) dependencies;
+      #   };
+      #
+      # `dependencies` of the record are the dependencies of the parent
+      # with the added dependencies beside them, so the configuration
+      # and the configurations declared inside it are evaluated with
+      # both. A name that the parent already pins keeps the dependency
+      # of the parent: an added dependency cannot replace a dependency
+      # of the caisson top. The added dependency of that name is
+      # recorded in `shadowedDependencies` and is used nowhere. Its
+      # entry in the pin files that hold it still serves the `follows`
+      # lines written in those files, which can name only the inputs of
+      # those files.
+      #
+      # Each added dependency keeps the `pin` its reader gave it, with
+      # its pin files relative to the root of the caisson top, as mkLib
+      # records the pin files of the dependencies of the caisson top.
+      # `topside` reads the pin files of each dependency from there, so
+      # a dependency added here is moved by the writer of its pin system
+      # in the directory that holds those files. The caisson top passes
+      # its dependencies to mkLib, so `dependencies` here is refused for
+      # the configuration at the caisson top.
+      dependencyRecordOf =
+        {
+          what,
+          manifest,
+          dependencies,
+        }:
+        let
+          parent = manifest.parent;
+          above = parent.dependencies or { };
+          root = manifest.root or null;
+          added =
+            if (parent.type or "lib") == "lib" then
+              throw ''
+                caisson: ${what} is given `dependencies`. A configuration is given
+                `dependencies` when it is declared inside another configuration, and this
+                configuration is the caisson top. Pass the dependencies of the caisson top
+                to mkLib.
+              ''
+            else if dependencies == null then
+              { }
+            else if builtins.isAttrs dependencies then
+              dependencies
+            else
+              throw ''
+                caisson: ${what} takes `dependencies` as an attribute set of pinned
+                dependencies by name, as a pin reader returns them
+                (`inherit (lib.caisson.pins.flake-compat ./tests/dependencies) dependencies;`),
+                and was given a ${builtins.typeOf dependencies}.
+              '';
+          relativeTo =
+            prefix: dir:
+            let
+              path = builtins.toString dir;
+              length = builtins.stringLength prefix;
+            in
+            if path == prefix then
+              ""
+            else if builtins.substring 0 (length + 1) path == prefix + "/" then
+              builtins.substring (length + 1) (builtins.stringLength path) path
+            else
+              null;
+          recorded =
+            dependency:
+            let
+              pin = dependency.pin or null;
+              relative =
+                if pin == null || !(pin ? dir) || root == null then
+                  null
+                else
+                  relativeTo (builtins.toString root.outPath) pin.dir;
+            in
+            if relative == null then
+              dependency
+            else
+              dependency
+              // {
+                pin = builtins.removeAttrs pin [ "dir" ] // {
+                  files = builtins.mapAttrs (
+                    _: file: if relative == "" then file else relative + "/" + file
+                  ) pin.files;
+                };
+              };
+          shadowed = builtins.filter (name: above ? ${name}) (builtins.attrNames added);
+        in
+        {
+          dependencies = above // builtins.mapAttrs (_: recorded) (builtins.removeAttrs added shadowed);
+          shadowedDependencies = builtins.mapAttrs (_: recorded) (
+            builtins.intersectAttrs (genAttrs shadowed (_: null)) added
+          );
+        };
+
       # A configuration that is a module evaluation. `type` is the
       # name of the integration and `perSystem` whether it evaluates a
       # configuration per system, as caisson-core.mkConfiguration
@@ -895,6 +995,18 @@
       # `checkCategories`, and the stages the modules declare in
       # `checkStages`. The checks gathered at and inside the
       # configuration are `checks` of its outputs (`checksOf`).
+      #
+      # `dependencies` are pinned dependencies the configuration adds to
+      # the dependencies of the configuration it is declared inside, in
+      # the shape a pin reader returns them. The flake-parts integration
+      # passes them from the `dependencies` argument of its
+      # `mkConfiguration`, and an integration that passes none leaves
+      # the argument out. The manifest of a configuration given the
+      # argument records `dependencies` and `shadowedDependencies`
+      # (`dependencyRecordOf`). Whether the argument is given decides
+      # the fields of the manifest, and its value is read when those
+      # fields are read, so a configuration whose manifest nothing reads
+      # reads no pin file.
       mkModuleConfiguration =
         args@{
           type,
@@ -905,6 +1017,7 @@
           selection ? null,
           checks ? _: { },
           checkCategories ? { },
+          dependencies ? null,
           evaluate,
         }:
         let
@@ -938,7 +1051,16 @@
             "pkgSet"
             "registryEntries"
           ]
-          ++ (if selection == null then [ ] else [ "moduleImports" ]);
+          ++ (if selection == null then [ ] else [ "moduleImports" ])
+          ++ (
+            if args ? dependencies then
+              [
+                "dependencies"
+                "shadowedDependencies"
+              ]
+            else
+              [ ]
+          );
           record =
             (if defaultPkgs == null then { } else { inherit defaultPkgs; })
             // (
@@ -1038,7 +1160,7 @@
                       { };
                 in
                 checksOfConfiguration {
-                  inherit what type;
+                  inherit what type system;
                   defaults = ofTop // ofIntegration;
                 };
 
@@ -1216,7 +1338,18 @@
                     );
               }
               # How the configuration selected its modules.
-              // (if selection == null then { } else { moduleImports = selectionAccountOf selection given; });
+              // (if selection == null then { } else { moduleImports = selectionAccountOf selection given; })
+              # The dependencies the configuration and the configurations
+              # declared inside it are evaluated with.
+              // (
+                if args ? dependencies then
+                  dependencyRecordOf {
+                    inherit what dependencies;
+                    inherit (given) manifest;
+                  }
+                else
+                  { }
+              );
             }
             # The args of a deferred configuration and the program that
             # finds them, where the integration's `evaluate` returns
@@ -2183,7 +2316,8 @@
       # The checks the modules of a configuration declare in `caisson.checks`, by name,
       # from the option and its value: each entry with its
       # `derivation`, null for an annotation, `category`,
-      # `description`, `enable` and `code`, the positions of the
+      # `description`, `enable`, `top`, the test caisson top whose
+      # checks the entry declares, and `code`, the positions of the
       # definitions of the entry (`definitionCodeOf`).
       checkDeclarationsOf =
         { option, value }:
@@ -2193,6 +2327,7 @@
             category
             description
             enable
+            top
             ;
           code = definitionCodeOf option name;
         }) value;
@@ -2449,14 +2584,22 @@
       # check, a declaration without a `derivation` that has no default check to
       # annotate, and a check with no category are refused, each when
       # its entry is read.
+      #
+      # A declaration with a `top` declares the checks of a test caisson
+      # top for `system`, the system of the evaluation result
+      # (`topChecksOf`). Each recorded check carries `top`, null for a
+      # check that no such declaration declares.
       checksOfConfiguration =
         {
           what,
           type,
+          system,
           defaults,
         }:
-        declarations:
+        allDeclarations:
         let
+          fromTops = filterAttrs (_: declaration: (declaration.top or null) != null) allDeclarations;
+          declarations = builtins.removeAttrs allDeclarations (builtins.attrNames fromTops);
           entryOf =
             name:
             let
@@ -2479,7 +2622,7 @@
                   category declared in `caisson.checkCategories`, such as `build` or `eval`.
                 ''
               else
-                declaration
+                declaration // { top = null; }
             else if declaration == null then
               {
                 inherit (default)
@@ -2489,6 +2632,7 @@
                   code
                   ;
                 enable = true;
+                top = null;
               }
             else if declaration.derivation != null then
               throw ''
@@ -2504,9 +2648,106 @@
                   if declaration.description != null then declaration.description else default.description;
                 inherit (declaration) enable;
                 code = default.code ++ declaration.code;
+                top = null;
               };
+          declared = genAttrs (unique (
+            builtins.attrNames defaults ++ builtins.attrNames declarations
+          )) entryOf;
+          fromTop = builtins.foldl' (
+            gathered: name:
+            let
+              checks = topChecksOf {
+                inherit
+                  what
+                  type
+                  system
+                  defaults
+                  name
+                  ;
+                declaration = fromTops.${name};
+              };
+              clashing = builtins.filter (checkName: declared ? ${checkName} || gathered ? ${checkName}) (
+                builtins.attrNames checks
+              );
+            in
+            if clashing == [ ] then
+              gathered // checks
+            else
+              throw ''
+                caisson: `caisson.checks.${name}` of ${what}, defined at ${showCode fromTops.${name}.code},
+                declares the check `${builtins.head clashing}` of its test caisson top, and the
+                configuration declares another check of that name. Rename the entry or the check.
+              ''
+          ) { } (builtins.attrNames fromTops);
         in
-        genAttrs (unique (builtins.attrNames defaults ++ builtins.attrNames declarations)) entryOf;
+        declared // fromTop;
+
+      # The checks that the declaration `name` with a `top` declares for
+      # `system`, by name: for each check of `top.checks.<system>`, the
+      # test caisson top, an entry named `<name>-<check>`. Its category
+      # and description are those of the declaration where it gives
+      # them, then those of the check record of the test caisson top
+      # (`caisson.manifest.checkRecord`) where it is a caisson top, and
+      # the category is `build` where neither gives a category. `top` holds
+      # `name`, the name of the declaration, `check`, the name of the
+      # check in the test caisson top, and `record`, the entry of its
+      # check record, null for a test caisson top that publishes none. A
+      # declaration with a `top` that also sets a `derivation`, or that
+      # has the name of a default check of the integration, is refused.
+      topChecksOf =
+        {
+          what,
+          type,
+          system,
+          defaults,
+          name,
+          declaration,
+        }:
+        let
+          option = "`caisson.checks.${name}` of ${what}, defined at ${showCode declaration.code},";
+          top = declaration.top;
+          published = (top.checks or { }).${system} or { };
+          manifest = (top.caisson or { }).manifest or null;
+          records = if builtins.isAttrs manifest then (manifest.checkRecord or { }).${system} or { } else { };
+          entryFor =
+            check: derivation:
+            let
+              record = records.${check} or null;
+              fromRecord = field: if record == null then null else record.${field} or null;
+              category =
+                if declaration.category != null then
+                  declaration.category
+                else if fromRecord "category" != null then
+                  fromRecord "category"
+                else
+                  "build";
+            in
+            {
+              name = "${name}-${check}";
+              value = {
+                inherit derivation category;
+                description =
+                  if declaration.description != null then declaration.description else fromRecord "description";
+                inherit (declaration) enable code;
+                top = {
+                  inherit name check record;
+                };
+              };
+            };
+        in
+        if declaration.derivation != null then
+          throw ''
+            caisson: ${option} sets both a `derivation` and a `top`. An entry with a
+            `top` declares the checks of that caisson top; declare a single check in a
+            separate entry.
+          ''
+        else if defaults ? ${name} then
+          throw ''
+            caisson: ${option} sets a `top`, and the ${type} integration declares a
+            default check named `${name}`. Declare the test caisson top under another name.
+          ''
+        else
+          builtins.listToAttrs (builtins.attrValues (builtins.mapAttrs entryFor published));
 
       # The categories of checks that `declarations` declare, a list of
       # attribute sets of categories by name, each
@@ -2796,8 +3037,14 @@
       # top to the
       # configuration that declares the check by the names declared,
       # `category`, `description`, `volatile`, from the category,
-      # `requiredFeatures` (`requiredFeaturesOf`) and `code`, the
-      # positions of the definitions that declare the check.
+      # `requiredFeatures` (`requiredFeaturesOf`), `code`, the
+      # positions of the definitions that declare the check, and `top`.
+      # For a check of a test caisson top that an entry of
+      # `caisson.checks` declares with a `top`, `top` holds the name of
+      # that entry as `name`, the name of the check in the test caisson
+      # top as `check`, and the entry of the check record of the test
+      # caisson top as `record`, null when the test caisson top publishes
+      # no check record. For every other check `top` is null.
       checkRecordOf =
         manifest:
         builtins.mapAttrs (
@@ -2806,7 +3053,12 @@
             name: entry: {
               inherit name system;
               from.namePath = entry.namePath;
-              inherit (entry.check) category description code;
+              inherit (entry.check)
+                category
+                description
+                code
+                top
+                ;
               inherit (entry) volatile;
               requiredFeatures = requiredFeaturesOf entry.check.derivation;
             }
@@ -3174,6 +3426,7 @@
             checksOutputOf
             childrenOf
             definitionCodeOf
+            showCode
             displayName
             declarationEventsOf
             ecosystemUnit

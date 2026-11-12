@@ -85,7 +85,8 @@ in
   # entry that names no `derivation` annotates the check of the same
   # name that the configuration already has: a default check of its
   # integration, or, under `perSystem` in flake-parts, the entry of the
-  # same name in `checks`.
+  # same name in `checks`. An entry with a `top` declares the checks of
+  # a test caisson top under `<name>-`.
   check = lib.types.submodule {
     options = {
       derivation = lib.mkOption {
@@ -96,7 +97,31 @@ in
           The derivation that is the check, for the system of the
           evaluation result that declares it: the check passes when the
           derivation builds. Null for an entry that annotates a check the
-          configuration already has.
+          configuration already has, and for an entry with a `top`.
+        '';
+      };
+      top = lib.mkOption {
+        type = lib.types.nullOr (lib.types.addCheck lib.types.raw builtins.isAttrs);
+        default = null;
+        example = lib.literalExpression ''
+          lib.caisson.callConsumerFlake {
+            path = ../../../tests/integration/basic-composition;
+            pool = { inherit (inputs) flake-parts nixpkgs; };
+          }
+        '';
+        description = ''
+          A test caisson top, as a flake that `lib.caisson.callConsumerFlake`
+          evaluates from source returns it, or any value with a `checks`
+          output. Each check of that output for the system of this
+          evaluation result is a check here, named `<name>-<check>`, where
+          `<name>` is the name of this entry. When the value is a caisson
+          top, its `caisson.manifest.checkRecord` gives each check its
+          category and its description, and the check record of the
+          configuration that declares this entry keeps that record entry
+          under `top`. The `category` and `description` of this entry,
+          where they are given, apply to every check of the test caisson
+          top, and a check that neither names falls in the category
+          `build`. An entry with a `top` sets no `derivation`.
         '';
       };
       category = lib.mkOption {
