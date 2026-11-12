@@ -190,26 +190,33 @@ in
         }
       '';
 
-      # The checks of a test flake for this system, without its check
-      # `registries`. A test flake that is a caisson top has the check
-      # `registries`, and the caisson top of caisson publishes the check
-      # `registries` of caisson under that name.
-      testChecksOf = outputs: builtins.removeAttrs outputs.checks.${system} [ "registries" ];
+      # The checks of the test flake `name` for this system. A test
+      # flake that is a caisson top has the check `registries`, and the
+      # caisson top of caisson publishes the check `registries` of
+      # caisson under that name, so the check `registries` of the test
+      # flake is published as `<name>-registries`.
+      testChecksOf =
+        name: outputs:
+        let
+          checks = outputs.checks.${system};
+        in
+        builtins.removeAttrs checks [ "registries" ]
+        // (if checks ? registries then { "${name}-registries" = checks.registries; } else { });
 
       # The checks for x86_64-linux.
       linuxChecks =
-        testChecksOf integrationOutputs
-        // testChecksOf minimalConsumerOutputs
-        // testChecksOf moduleClassExportOutputs
-        // testChecksOf libConsumerChainFinalOutputs
-        // testChecksOf nixpkgsConsumerOutputs
-        // testChecksOf nixpkgsOverlayExportOutputs
-        // testChecksOf nixpkgsNoPkgSetsOutputs
-        // testChecksOf nixpkgsPkgSetsOutputs
-        // testChecksOf nixpkgsLibOnlyOutputs
-        // testChecksOf pkgOverlaysProducerOutputs
-        // testChecksOf pkgOverlaysConsumerOutputs
-        // testChecksOf unitTestOutputs
+        testChecksOf "basic-composition" integrationOutputs
+        // testChecksOf "minimal-consumer" minimalConsumerOutputs
+        // testChecksOf "module-class-export" moduleClassExportOutputs
+        // testChecksOf "lib-consumer-chain" libConsumerChainFinalOutputs
+        // testChecksOf "nixpkgs-consumer" nixpkgsConsumerOutputs
+        // testChecksOf "nixpkgs-overlay-export" nixpkgsOverlayExportOutputs
+        // testChecksOf "nixpkgs-no-pkg-sets" nixpkgsNoPkgSetsOutputs
+        // testChecksOf "nixpkgs-pkg-sets" nixpkgsPkgSetsOutputs
+        // testChecksOf "nixpkgs-lib-only" nixpkgsLibOnlyOutputs
+        // testChecksOf "pkg-overlays-registry-producer" pkgOverlaysProducerOutputs
+        // testChecksOf "pkg-overlays-registry-consumer" pkgOverlaysConsumerOutputs
+        // testChecksOf "unit" unitTestOutputs
         // {
           literate-flake-default = exampleOutputs.packages.${system}.default;
           literate-flake-greeting = exampleOutputs.packages.${system}.greeting;
