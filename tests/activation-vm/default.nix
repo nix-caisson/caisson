@@ -24,7 +24,7 @@
 # switch puts the profile of `alice` back after it is changed by hand,
 # and that a boot puts the profiles of the system and of `carol` back.
 #
-# The user `frank` has a home-manager configuration that is a top, with
+# The user `frank` has a home-manager configuration that is a caisson top, with
 # an nvf and a nixvim configuration inside it, which `home-manager
 # switch` would activate.
 # The test runs its activation package as `frank` in v1, v2 and v1
@@ -32,7 +32,7 @@
 # activating v1 again puts the nvf profile back after it is changed by
 # hand.
 #
-# The user `bob` has a hjem configuration that is a top, with the nvf
+# The user `bob` has a hjem configuration that is a caisson top, with the nvf
 # configuration `standalone-editor` inside it, applied with
 # `hjem standalone switch`, as on a computer that caisson does not
 # manage. The test applies v1, which activates nothing until the
@@ -168,7 +168,7 @@ let
     };
 
   # The home-manager configuration of `frank` in a version, a
-  # home-manager configuration that is a top, which `home-manager
+  # home-manager configuration that is a caisson top, which `home-manager
   # switch` activates: the activation package of the home-manager
   # configuration. It holds the nvf configuration `home-editor` and the
   # nixvim configuration `vim-editor`, and the Neovims of v2 have `vim`.
@@ -490,7 +490,7 @@ pkgs.testers.runNixOSTest {
       holds("${bobProfile}", "v1")
       has_file("bob", "v1")
 
-      # The home-manager configuration of `frank` is a top, activated as
+      # The home-manager configuration of `frank` is a caisson top, activated as
       # `home-manager switch` activates it, by its activation package, as
       # `frank`: v1, v2 and v1 again. The nvf and the nixvim profiles
       # inside it follow, and activating v1 again puts the nvf profile

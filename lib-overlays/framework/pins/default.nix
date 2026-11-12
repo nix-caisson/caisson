@@ -19,7 +19,7 @@
 #   pins.npins ./npins           npins' sources.json in `dir`, each pin
 #                                fetched as npins' generated default.nix
 #                                fetches it; returns { dependencies; }
-#   pins.gitRoot ./.             the `root` of a flakeless top in a git
+#   pins.gitRoot ./.             the `root` of a flakeless caisson top in a git
 #                                working tree: its revision when clean,
 #                                marked dirty otherwise
 #
@@ -294,7 +294,7 @@ let
       dependencies = builtins.mapAttrs sourceOf (npins.describe "pins.npins" data);
     };
 
-  # The root of a flakeless top whose tree is a git working tree. It
+  # The root of a flakeless caisson top whose tree is a git working tree. It
   # needs an impure evaluation, as `nix-build` of a default.nix is,
   # since the working tree is not locked. A directory that is not a git
   # working tree has no revision to name, and its root is the directory.

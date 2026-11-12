@@ -206,14 +206,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "darwin";
         class = "darwin";
-        # A darwin configuration that is a top, as a tool reads it: the
+        # A darwin configuration that is a caisson top, as a tool reads it: the
         # evaluated configuration, or the evaluated configurations by
         # system where the composition declares several systems, as for NixOS.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.darwin.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration

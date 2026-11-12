@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# What the selectors chose: a top returns it, the flake-parts
+# What the selectors chose: a caisson top returns it, the flake-parts
 # integration copies it into the flake outputs, and a parent passes
 # it up. Each part is defined by the module that declares its
 # selector, and a configuration with another declared inside it merges
@@ -28,7 +28,7 @@ in
       description = ''
         The configurations declared inside this configuration, nested
         configurations included, that it passes up: for each, its manifest and its path
-        from here, a list of `{ type, name }` segments. A top names
+        from here, a list of `{ type, name }` segments. A caisson top names
         them from their paths and publishes each under the output
         attribute set its integration declares.
       '';

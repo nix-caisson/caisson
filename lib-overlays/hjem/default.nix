@@ -282,7 +282,7 @@
       };
 
       # What a reader of a file gets from a hjem configuration that is
-      # a top: `manifest` and `packages`, which `hjem standalone switch
+      # a caisson top: `manifest` and `packages`, which `hjem standalone switch
       # --config` reads, and the manifest of the configuration under
       # `caisson.manifest`. hjem's CLI serializes the whole value with
       # `nix eval --json`, and an attribute set with `outPath` is
@@ -296,7 +296,7 @@
         };
       };
 
-      # A top evaluated for a single system returns `topOf` that
+      # A caisson top evaluated for a single system returns `topOf` that
       # evaluation result; for several, `topOf` each evaluation result,
       # by system.
       top =
@@ -349,7 +349,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.hjem.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration

@@ -10,9 +10,9 @@
 # module collection declared as its ecosystems, the library and the
 # module collection from the same nixpkgs pin. `user` is a hjem module
 # with a file and a package.
-# `standalone` is a hjem configuration that is a top, for the user
-# `probe` with the home directory it sets itself. `top` is a structural
-# top holding a NixOS configuration `probe-nixos` from `baseModule`,
+# `standalone` is a hjem configuration that is a caisson top, for the
+# user `probe` with the home directory it sets itself. `top` is a
+# structural caisson top holding a NixOS configuration `probe-nixos` from `baseModule`,
 # which declares the account of `probe`, and a hjem configuration
 # `probe` from `unitUser`, which is `user` with a systemd user unit.
 { inputs }:

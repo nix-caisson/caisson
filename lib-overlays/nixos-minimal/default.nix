@@ -123,7 +123,7 @@
               ecosystemArgs ? null,
             }@args:
             configuration args;
-          # A minimal configuration that is a top, as
+          # A minimal configuration that is a caisson top, as
           # `lib.caisson.nixos.mkTopConfiguration` returns it.
           top = final.caisson.integrations.topValue;
         };

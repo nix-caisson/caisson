@@ -139,7 +139,7 @@ let
 
   nixosModule = nixosModuleOf "v1";
 
-  # A structural top with the NixOS configuration of a version declared
+  # A structural caisson top with the NixOS configuration of a version declared
   # inside it as `probe`, which publishes the NixOS configuration
   # and its home-manager configurations,
   # `homeConfigurations."carol@probe"` among them. A module of the

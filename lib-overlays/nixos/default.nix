@@ -153,7 +153,7 @@
 
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
-        # A NixOS configuration that is a top, as a tool reads it: the
+        # A NixOS configuration that is a caisson top, as a tool reads it: the
         # evaluated configuration, which is what `nixos-rebuild --file`
         # reads and what a test or the REPL evaluates with no
         # configuration above it. Where the composition declares several
@@ -166,7 +166,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixos.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. The colmena node
+        # `mkTopConfiguration` finalizes it at a caisson top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
         # configuration is evaluated per system, once for each system its

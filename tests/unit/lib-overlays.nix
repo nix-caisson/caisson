@@ -1930,8 +1930,8 @@ in
       # (built from its source file, like the flake-parts
       # registration) alongside the harness's flake-parts
       # registration. A terranix configuration is evaluated per
-      # system the composition declares, here a single system, so a top
-      # is the evaluation result for that system: what the stub returns.
+      # system the composition declares, here a single system, so a caisson
+      # top is the evaluation result for that system: what the stub returns.
       mkResolutionLib =
         extra:
         caisson.mkLib (
@@ -2632,7 +2632,7 @@ in
           };
       };
 
-      # Where no configuration from the top down selects, a
+      # Where no configuration from the caisson top down selects, a
       # configuration runs on the set named `default`, and a
       # composition that declares none says so, with the sets it does
       # declare.
@@ -2655,7 +2655,7 @@ in
           }).config.nixpkgs.pkgs;
         expectedError = {
           type = "ThrownError";
-          msg = "runs on the package set named `default`,\\s+since no configuration from the top down to it selects one, and the\\s+package sets available here are stable";
+          msg = "runs on the package set named `default`,\\s+since no configuration from the caisson top down to it selects one, and the\\s+package sets available here are stable";
         };
       };
 
@@ -2692,11 +2692,11 @@ in
         };
       };
 
-      # A NixOS configuration declared at the top has an evaluation
+      # A NixOS configuration declared at the caisson top has an evaluation
       # result for each system the composition declares: finalizing it
       # gives its evaluation results by system, also when that is a
       # single system, and none when the composition declares no system.
-      # A top read as a tool reads it is the evaluation result where
+      # A caisson top read as a tool reads it is the evaluation result where
       # there is a single system, and the evaluation results by system
       # where there are several.
       "test: a nixos configuration has an evaluation result for each system the composition declares" = {
@@ -3106,7 +3106,7 @@ in
         };
       };
 
-      # A configuration is passed up to the top through each level
+      # A configuration is passed up to the caisson top through each level
       # above it, whatever their integrations: each level passes up what
       # is declared inside it. Here a NixOS configuration is declared
       # inside a NixOS configuration, inside a structural configuration,
@@ -3174,9 +3174,9 @@ in
       };
 
       # The configurations declared inside a NixOS configuration, in the
-      # tree of manifests and at a top: they are in its manifest, under
+      # tree of manifests and at a caisson top: they are in its manifest, under
       # their system where they are evaluated per system, they see it as
-      # the nearest NixOS configuration, and a top publishes them with
+      # the nearest NixOS configuration, and a caisson top publishes them with
       # the others.
       "test: a nixos configuration holds configurations declared inside it" = {
         expr =
@@ -3240,13 +3240,13 @@ in
         };
       };
 
-      # What a top publishes: the NixOS configurations declared inside
+      # What a caisson top publishes: the NixOS configurations declared inside
       # it, nested ones included, as `nixosConfigurations.<name>`, each
       # the evaluated configuration. The names come from the paths: a
       # name that is alone stays bare, with the system above it and the
       # structural configuration it sits in left out, and the same
       # name in several structural configurations gains their names.
-      "test: a top publishes the nixos configurations declared inside it under names from their paths" = {
+      "test: a caisson top publishes the nixos configurations inside it under names from their paths" = {
         expr =
           let
             nixosConfigurationNamed =
@@ -3316,7 +3316,7 @@ in
       # published for each evaluation result, told apart by the system.
       # `exported` selects what is passed up, and what it leaves out is
       # not published.
-      "test: a top publishes an evaluation result per system, and only what is selected" = {
+      "test: a caisson top publishes an evaluation result per system, and only what is selected" = {
         expr =
           let
             severalLib = caisson.mkLib {
@@ -3750,15 +3750,15 @@ in
             };
           };
         };
-      # A home-manager configuration finalized as a top, read as the
+      # A home-manager configuration finalized as a caisson top, read as the
       # home-manager CLI reads it: the evaluated home-manager
       # configuration.
       configuration = myLib.caisson.home-manager.mkTopConfiguration {
         configModule = probeModule;
         check = false;
       };
-      # The same for a configuration an entry point with no top form
-      # returned.
+      # The same for a configuration an entry point with no
+      # `mkTopConfiguration` returned.
       topOf =
         composition: declared:
         composition.caisson.integrations.topValue (composition.caisson-core.finalizeTop declared);
@@ -4112,7 +4112,7 @@ in
       # another, and it runs on the package set selected where it is
       # declared: inside a NixOS configuration the set of that
       # configuration, unless the home-manager configuration selects.
-      # A top publishes it under `homeConfigurations`. Inside a NixOS
+      # A caisson top publishes it under `homeConfigurations`. Inside a NixOS
       # configuration its name is `<user>@<name>`, where `<name>` is the
       # name of the NixOS configuration. Elsewhere its name is the name
       # it is declared under.
@@ -4691,7 +4691,7 @@ in
       # value. A library that composes neither the nixos nor the
       # home-manager integration publishes such entries: it reads
       # nothing but the entries.
-      "test: an entry holds what a top needs to publish it" = {
+      "test: an entry holds what a caisson top needs to publish it" = {
         expr =
           let
             lib = flakeLibWith [ "x86_64-linux" ];
@@ -4839,7 +4839,7 @@ in
         {
           options.marker = lib.mkOption { type = lib.types.str; };
         };
-      # A composition whose registered configurations nest: the top,
+      # A composition whose registered configurations nest: the caisson top,
       # found under the name the composition declares, declares `inner`
       # (found under its name) and `plain` (a module passed), and
       # `inner` declares `leaf`, which reads the marker of the
@@ -4888,7 +4888,7 @@ in
         };
     in
     {
-      "test: a top returns the selected exports with the manifest beside them" = {
+      "test: a caisson top returns the selected exports with the manifest beside them" = {
         expr =
           let
             top = registeringLib.caisson.structural.mkTopConfiguration {
@@ -4938,7 +4938,7 @@ in
         };
       };
 
-      "test: the flake top and the structural top export the same registries" = {
+      "test: flake-parts and structural caisson tops export the same registries" = {
         expr =
           let
             top = registeringLib.caisson.structural.mkTopConfiguration {
@@ -5995,7 +5995,7 @@ in
       };
 
       # A colmena configuration declared under the name `colmenaHive` fills
-      # the `colmenaHive` of the top it is declared inside, an output
+      # the `colmenaHive` of the caisson top it is declared inside, an output
       # that holds a single value: the hive, with the colmena
       # configuration's `meta` and no nodes when no NixOS configuration
       # is declared inside it.

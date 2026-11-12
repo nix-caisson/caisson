@@ -69,7 +69,7 @@
           mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
         - `configs` is the same registration for `configs/<class>/<name>`,
-          the configurations a top evaluates.
+          the configurations a caisson top evaluates.
         - `libOverlays` is a function from the `mkLibOverlay`
           helper returning the registered library overlays; `mkLibOverlays`
           derives it from `lib-overlays/<name>/default.nix`. Registering

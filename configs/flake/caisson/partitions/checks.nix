@@ -326,7 +326,7 @@
                     # composed lib, since the raw scenario's flake-parts is
                     # built over the plain nixpkgs lib and is not shared,
                     # and the evaluation of the structural configuration
-                    # declared inside the top of caisson's flake, which reading
+                    # declared inside the caisson top of caisson's flake, which reading
                     # caisson's outputs pays.
                     {
                       name = "caisson-overhead";
@@ -430,7 +430,7 @@
           # configuration and a hjem configuration inside it, whose
           # system holds the activation of the home-manager
           # configuration and the launchd agents of hjem. Beside them,
-          # the manifests of a hjem configuration that is a top, in the
+          # the manifests of a hjem configuration that is a caisson top, in the
           # versions v1 and v2, and the hjem CLI, with which the darwin
           # job applies it on the runner
           # (tests/darwin-system/hjem-standalone.sh).

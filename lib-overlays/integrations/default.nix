@@ -626,7 +626,7 @@
       # configuration between them select another
       # (`mkModuleConfiguration` records it). A configuration that
       # passes none runs on what the nearest configuration above it
-      # selected. Where no configuration from the top down to this
+      # selected. Where no configuration from the caisson top down to this
       # configuration selected, it runs on the set named `default`. Every integration
       # whose configurations run on a package set selects it here.
       pkgSetOf =
@@ -637,7 +637,7 @@
         else
           pkgSets.default or (throw ''
             ${context}: ${what} runs on the package set named `default`,
-            since no configuration from the top down to it selects one, and the
+            since no configuration from the caisson top down to it selects one, and the
             package sets available here are ${
               if pkgSets == { } then "none" else builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
             }. Declare a package config named `default` with `pkgSets` on mkLib,
@@ -1353,7 +1353,7 @@
             description = ''
               A sentence saying what `caisson.${name}.exported` does to the
               ${name} configurations it passes up, for a selector that does
-              more than pass every configuration up unchanged. The top
+              more than pass every configuration up unchanged. The caisson top
               records it in the export record (`exportRecord` of the
               manifest it publishes) for each name published from those
               configurations, with the notes of the levels declared inside it.
@@ -1563,7 +1563,7 @@
         && placeOf ancestor == placeOf manifest;
 
       # Where a configuration is in the tree of configurations: the integration and the name
-      # of each configuration from the top down to it, the nodes of the
+      # of each configuration from the caisson top down to it, the nodes of the
       # systems included. Configurations at the same depth have
       # different places, such as a home-manager configuration and a
       # hjem configuration inside the same NixOS configuration, and the
@@ -1692,7 +1692,7 @@
       # a NixOS, nix-darwin or system-manager configuration it is a
       # profile of the system, `/nix/var/nix/profiles/caisson/<kind>/<name>`,
       # which that configuration activates as root. Inside a home-manager configuration or a hjem
-      # configuration, or as a top, it is a profile of the user,
+      # configuration, or as a caisson top, it is a profile of the user,
       # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
       # names `$HOME` and not `$XDG_STATE_HOME`: the units of a NixOS
       # configuration run without `$XDG_STATE_HOME`, and a shell may set it, and the
@@ -1886,7 +1886,7 @@
       # its path, on which the name its `exportsTo` gives, where it
       # gives one, stands in place of that name.
       #
-      # The entry also carries what the export record of the top holds
+      # The entry also carries what the export record of the caisson top holds
       # for it (`recordOf`): `namePath`, its path by the names the
       # configurations are declared under, which is its address under
       # the `children` of the manifests from here; `notes`, the
@@ -1960,7 +1960,7 @@
       # is passed up under is known, from what the manifest records;
       # and every configuration contributes the entries it passes up
       # in turn, with its segments in front. An entry carries all a
-      # top needs to publish it.
+      # caisson top needs to publish it.
       #
       # `levels` is what this configuration adds, by integration, to
       # the entries of the configurations of that integration it passes
@@ -2041,9 +2041,9 @@
           ) (builtins.attrNames selected.${integration})
         ) (builtins.attrNames selected);
 
-      # What a top publishes of the entries passed up to it, by the
-      # output attribute set each entry carries and then name. The
-      # top reads nothing but the entries. Within an attribute set the names come from
+      # What a caisson top publishes of the entries passed up to it, by
+      # the output attribute set each entry carries and then name. The
+      # caisson top reads nothing but the entries. Within an attribute set the names come from
       # `caisson-core.elide` over the paths: a name that is alone stays
       # bare, and names that collide gain the segments that tell them
       # apart. Entries that still share a name are refused, with their
@@ -2061,13 +2061,13 @@
       # paths without the systems on them, or the single value there.
       publish = entries: publicationOf (entry: entry.value) entries;
 
-      # The export record of a top, keyed as `publish` keys the outputs:
-      # for each name published, `from.namePath`, the path from the top
-      # to the manifest of the configuration by the names declared,
-      # which is its address under the `children` of the top's
-      # manifest; `notes`, the sentences each side that transformed the
+      # The export record of a caisson top, keyed as `publish` keys the
+      # outputs: for each name published, `from.namePath`, the path from
+      # the caisson top to the manifest of the configuration by the
+      # names declared, which is its address under the `children` of the
+      # manifest of the caisson top; `notes`, the sentences each side that transformed the
       # configuration on the way up wrote, from the configuration up to
-      # the top; and `code`, the positions of that code, the
+      # the caisson top; and `code`, the positions of that code, the
       # definitions of each `exported` and each integration's
       # `exportsTo`, in the same order.
       recordOf =
@@ -2156,11 +2156,11 @@
         in
         genAttrs attrsets publishIn;
 
-      # What a tool reads from a top that is a configuration evaluated
-      # per system, given its evaluation results by system. They are named
-      # like anything published, by `caisson-core.elide` over their
-      # paths; the top is addressed by the file that returns it, so the
-      # name of the top is left out of each. Where that leaves a single
+      # What a tool reads from a caisson top that is a configuration
+      # evaluated per system, given its evaluation results by system. They
+      # are named like anything published, by `caisson-core.elide` over
+      # their paths; the caisson top is addressed by the file that returns
+      # it, so the name of the caisson top is left out of each. Where that leaves a single
       # evaluation result with no name, the result is its value, the evaluated
       # configuration; otherwise it is the values by what is left of
       # each name.

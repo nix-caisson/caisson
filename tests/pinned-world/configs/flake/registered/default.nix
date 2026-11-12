@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# A flake of the registered world, declared inside its top.
+# A flake of the registered world, declared inside its caisson top.
 { ... }:
 { ... }:
 {

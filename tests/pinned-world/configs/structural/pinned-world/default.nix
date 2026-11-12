@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# The configuration of the top of the registered world of the
+# The configuration of the caisson top of the registered world of the
 # pinned-world suite, registered under the name of its composition. It
 # declares a configuration of each integration whose module is
 # registered under the configuration's name, and none of them is given

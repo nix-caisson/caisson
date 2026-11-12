@@ -41,7 +41,7 @@ let
     };
   };
 
-  # A top whose root composite `nixops4` holds the composite `group`,
+  # A caisson top whose root composite `nixops4` holds the composite `group`,
   # with the state resource `gstate` and the resource `inner`, which
   # records its outputs there. With `rootState`, the root also holds the
   # state resource `state` and the resource `a`, which records its
@@ -125,7 +125,7 @@ let
     in
     walk [ ];
 
-  # The discovery program of a top's root and the output values it must
+  # The discovery program of the root of a caisson top and the output values it must
   # print. The values are those the dumps record, and their paths are
   # the paths of the outputs the root names in `argsNeeded`.
   caseOf =

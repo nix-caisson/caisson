@@ -108,7 +108,7 @@
           moduleImports = selection.moduleImportsOf "flake" { inherit lib manifest; } args;
 
           # The name this configuration holds: the attribute its parent
-          # declares it under, or, at a top, the name the composition
+          # declares it under, or, at a caisson top, the name the composition
           # declares on mkLib.
           name = manifest.name or null;
 
@@ -227,7 +227,7 @@
                     caisson.flake-parts.mkConfiguration: `self.outPath` was read, but the
                     composition names no root. Pass `root` to mkLib
                     (`inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;`
-                    at a flake top).
+                    in a flake).
                   ''
                 else
                   root.outPath;
@@ -281,15 +281,16 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "flake-parts";
         class = "flake";
-        # What a flake returns from `outputs`, and what a flakeless top
-        # that keeps flake-parts returns from `default.nix`: the flake
-        # outputs of the configuration, finalized as a top is, under the
+        # What a flake returns from `outputs`, and what a flakeless
+        # caisson top that keeps flake-parts returns from `default.nix`:
+        # the flake outputs of the configuration, finalized as a caisson
+        # top is, under the
         # name the composition declares on mkLib.
         top = manifest: manifest.outputs.flake;
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.flake-parts.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. What the
+        # `mkTopConfiguration` finalizes it at a caisson top. What the
         # evaluator takes beyond these arguments comes from the
         # manifest: the flake's `inputs` (`self` among them) and its
         # `moduleLocation`, the name of the configuration.

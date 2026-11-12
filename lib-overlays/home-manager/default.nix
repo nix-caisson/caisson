@@ -5,7 +5,7 @@
 # as `lib.hm`, and evaluates the class over the composed library with
 # home-manager's module list. A home-manager configuration is
 # evaluated per system, once for each system its parent evaluates its
-# children for, on the package set selected there, and a top publishes it
+# children for, on the package set selected there, and a caisson top publishes it
 # under `homeConfigurations`.
 #
 # A home-manager configuration can be declared inside a NixOS
@@ -231,7 +231,7 @@
 
           # The user of a home-manager configuration is the name it is
           # declared under, unless a module of the home-manager
-          # configuration names another. A top is
+          # configuration names another. A caisson top is
           # declared under no name: the name it holds is the name of
           # the composition.
           declaredUnderAName = name != null && (manifest.parent.parent.type or "lib") != "lib";
@@ -669,7 +669,7 @@
       integration = selection.mkIntegration {
         name = "home-manager";
         class = "homeManager";
-        # A home-manager configuration that is a top, as the
+        # A home-manager configuration that is a caisson top, as the
         # home-manager CLI reads it: the evaluated home-manager
         # configuration, with its `activationPackage`. Where the
         # composition declares several systems, it is the evaluated
@@ -679,7 +679,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.home-manager.configurations.<name>` finalizes it,
-        # and `mkTopConfiguration` finalizes it at a top.
+        # and `mkTopConfiguration` finalizes it at a caisson top.
         # `lib.caisson.home-manager-minimal` takes the same arguments.
         # The home-manager configuration is evaluated per system, once
         # for each system its parent evaluates its children for, and its

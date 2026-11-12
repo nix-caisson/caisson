@@ -72,7 +72,7 @@
               ecosystemArgs ? null,
             }@args:
             configuration args;
-          # A minimal home-manager configuration that is a top, as
+          # A minimal home-manager configuration that is a caisson top, as
           # `lib.caisson.home-manager.mkTopConfiguration` returns it.
           top = final.caisson.integrations.topValue;
         };

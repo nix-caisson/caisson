@@ -4,7 +4,7 @@
 # the same for every class. It declares the composition's manifest, the
 # registry selectors (`caisson.libOverlays`, `caisson.pkgOverlays`,
 # `caisson.modules.<class>`),
-# `caisson.exports`, what the selectors chose, which a top returns and
+# `caisson.exports`, what the selectors chose, which a caisson top returns and
 # a parent passes up, and, through the module of each integration of
 # caisson, the configurations declared inside a configuration
 # (`caisson.<integration>.configurations`). Registered under the

@@ -58,7 +58,7 @@ let
         };
     };
 
-  # A top whose root composite `nixops4` has the module `module`.
+  # A caisson top whose root composite `nixops4` has the module `module`.
   topWith =
     module:
     lib.caisson.structural.mkTopConfiguration {
@@ -70,7 +70,7 @@ let
         };
     };
 
-  # A top whose root is an upstream-compatible nixops4 configuration
+  # A caisson top whose root is an upstream-compatible nixops4 configuration
   # made from `modules`.
   upstreamTopWith =
     modules:
@@ -86,7 +86,7 @@ let
         };
     };
 
-  # The root of a top, finalized with the deploying system alone, as
+  # The root of a caisson top, finalized with the deploying system alone, as
   # `getProviders` finalizes it: every output fails when it is read.
   rootOf =
     top:

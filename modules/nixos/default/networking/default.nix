@@ -5,7 +5,7 @@
 # as `nas-1` names the computer it runs on `nas-1`. The default is at
 # `mkDefault` priority, so a definition of `networking.hostName` in a
 # module of the NixOS configuration replaces it. A NixOS configuration
-# with no name, a top of a composition that declares none on mkLib,
+# with no name, a caisson top of a composition that declares none on mkLib,
 # keeps NixOS's default. A NixOS configuration evaluated without
 # NixOS's networking module, such as by the minimal NixOS evaluator,
 # has no host name to set.

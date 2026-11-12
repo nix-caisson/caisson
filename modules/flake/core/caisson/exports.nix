@@ -54,7 +54,7 @@ in
 
   config = {
     flake = lib.caisson.integrations.publish exports.configurations // {
-      # The manifest of the flake, for the tools that read a top
+      # The manifest of the flake, for the tools that read a caisson top
       # (`topside --flake`), with the export record of what the flake
       # publishes, keyed as the outputs are.
       caisson.manifest = lib.caisson-core.evalManifest // {

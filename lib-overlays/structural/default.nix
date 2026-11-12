@@ -6,7 +6,7 @@
 # carries nothing but caisson's core module: the manifest, the
 # configurations declared inside it, the registry selectors and
 # `caisson.exports`. Its evaluator is the module system of the composed
-# library, `evalModules`. A structural configuration is the top of a
+# library, `evalModules`. A structural configuration is the caisson top of a
 # repository whose point is what it exports, and `default.nix` returns
 # what `mkTopConfiguration` returns from it. It can also be a layer
 # declared inside another configuration under
@@ -101,13 +101,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "structural";
         class = "structural";
-        # What a tool reads from a top: the registries it exports and the
+        # What a tool reads from a caisson top: the registries it exports and the
         # configurations declared inside it, each published under the
         # output attribute set its integration declares and named from
         # its path (`nixosConfigurations.<name>`), with the manifest
         # beside them for `manifestOf` and `topside --file`, carrying
-        # the export record of what the top publishes. A top has no
-        # parent to declare it under an attribute, so its name is the name
+        # the export record of what the caisson top publishes. A caisson
+        # top has no parent to declare it under an attribute, so its name
+        # is the name
         # the composition declares on mkLib.
         top =
           manifest:
@@ -124,7 +125,7 @@
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.structural.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. The integration
+        # `mkTopConfiguration` finalizes it at a caisson top. The integration
         # wraps no ecosystem, so there is no `ecosystemSrc` here.
         mkConfiguration =
           {

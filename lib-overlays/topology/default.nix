@@ -206,14 +206,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "topology";
         class = "topology";
-        # A topology configuration that is a top, as a tool reads it:
+        # A topology configuration that is a caisson top, as a tool reads it:
         # the evaluation result, or the evaluation results by system where the
         # composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.topology.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module: the nodes and networks of the

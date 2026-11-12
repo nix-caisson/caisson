@@ -253,7 +253,7 @@ let
 
   # The registered world: the composition of `hiveLib` under the name
   # `pinned-world`, with a configuration registered for each class in
-  # tests/pinned-world/configs. Its top is the structural configuration
+  # tests/pinned-world/configs. Its caisson top is the structural configuration
   # registered under that name, which declares a configuration of each
   # integration and gives none of them a module, so each takes the
   # module registered under its name.
@@ -266,7 +266,7 @@ let
   );
   registeredWorld = registeredLib.caisson.structural.mkTopConfiguration { };
 
-  # Every manifest of a top, from the top down through `children`. A
+  # Every manifest of a caisson top, from the caisson top down through `children`. A
   # configuration evaluated per system has a manifest for each system,
   # with the configurations evaluated for that system inside it.
   manifestsOf =
@@ -312,7 +312,7 @@ let
       ];
     };
 
-  # A top holding a disko configuration of `integration` named
+  # A caisson top holding a disko configuration of `integration` named
   # `nas-1`, over `layout`. With `nixosModule`, the layout declares a
   # NixOS configuration named `nas-1` from that module, installed onto
   # the layout. `args` are further arguments passed to `mkConfiguration`
@@ -355,7 +355,7 @@ let
   # The manifest of the disko configuration `nas-1` of a `layoutTop`.
   layoutManifest = integration: top: top.caisson.manifest.children.${integration}.nas-1;
 
-  # A top holding a colmena configuration named `colmenaHive`, with a NixOS
+  # A caisson top holding a colmena configuration named `colmenaHive`, with a NixOS
   # configuration declared inside it for each NixOS module given, by
   # name. `nixosArgs` are further arguments of the constructor of each
   # NixOS configuration. The colmena configuration disallows a bare
@@ -382,7 +382,7 @@ let
     };
   colmenaTop = colmenaTopWith { };
 
-  # A top holding the root composite of a NixOps4 deployment, declared
+  # A caisson top holding the root composite of a NixOps4 deployment, declared
   # under the name `nixops4`, which declares a resource for each NixOS
   # module given, by name, holding a NixOS configuration of that name. `root`
   # is a further module of the root composite, `resources` a further
@@ -435,7 +435,7 @@ let
         };
     };
 
-  # The entry the top holds for the root composite named `nixops4`, of
+  # The entry the caisson top holds for the root composite named `nixops4`, of
   # the native or the upstream-compatible integration.
   nixops4Entry =
     top:
@@ -468,7 +468,7 @@ let
       nixops4StubOutputs member.members
   );
 
-  # The root composite of a top's `nixops4`, finalized as NixOps4
+  # The root composite of a caisson top's `nixops4`, finalized as NixOps4
   # finalizes it, with `stub` outputs: its manifest.
   nixops4RootManifest =
     top:
@@ -480,7 +480,7 @@ let
       argsSource = _: "the probe";
     };
 
-  # A top holding a nixops4 configuration named `nixops4` made from the
+  # A caisson top holding a nixops4 configuration named `nixops4` made from the
   # root modules given, as NixOps4's `mkRoot` takes them, with the
   # allow-list `cacheableOutputs`.
   nixops4UpstreamTopWith =
@@ -603,7 +603,7 @@ let
       config.seen = members;
     };
 
-  # A top whose root composite `nixops4` has the module `module`.
+  # A caisson top whose root composite `nixops4` has the module `module`.
   nixops4RootTopWith =
     module:
     hiveLib.caisson.structural.mkTopConfiguration {
@@ -714,7 +714,7 @@ let
   };
 
   # A NixOS host named `host` that selects caisson's `microvm-host`
-  # module, inside the structural top of `registeredLib`. The host holds
+  # module, inside the structural caisson top of `registeredLib`. The host holds
   # the caisson-microvm configuration `pool` and the microvm
   # configuration `upstream`. `pool` starts its guests at boot and
   # leaves a running guest whose configuration changed as it is. Its
@@ -792,7 +792,7 @@ let
     ];
   };
 
-  # A top holding the upstream hive as a colmena configuration named
+  # A caisson top holding the upstream hive as a colmena configuration named
   # `colmenaHive`.
   upstreamHiveTop = hiveLib.caisson.structural.mkTopConfiguration {
     moduleImports = _modules: [ ];
@@ -1201,7 +1201,7 @@ let
     homeConfigurationEvaluatesEndToEnd =
       let
         # A home-manager configuration takes its system and its
-        # package set from the composition, and a top is read as the
+        # package set from the composition, and a caisson top is read as the
         # home-manager CLI reads it: the evaluated home-manager
         # configuration.
         homeManagerConfiguration = hiveLib.caisson.home-manager.mkTopConfiguration {
@@ -1261,8 +1261,8 @@ let
       && hasTheProgram declared
       && hasTheProgram undeclared;
 
-    # The manifest a top publishes holds the export record, an entry
-    # for each name the top publishes, keyed as the outputs are. The
+    # The manifest a caisson top publishes holds the export record, an entry
+    # for each name the caisson top publishes, keyed as the outputs are. The
     # name path of an entry, followed from that manifest through
     # `children`, leads to the configuration published under the name.
     # The home-manager integration names a home-manager configuration
@@ -1366,7 +1366,7 @@ let
 
     # Every module caisson adds to a configuration is keyed, so the
     # history of the evaluation result names it. The suite walks every
-    # manifest of the tops of the pinned world below, from the top
+    # manifest of the caisson tops of the pinned world below, from the top
     # down through `children`, which holds a configuration of every
     # integration. An `inline/<index>` event is a module a
     # configuration was given as a value, and the only such events are
@@ -1396,7 +1396,7 @@ let
             builtins.concatStringsSep " / " (
               builtins.map (segment: "${segment.type} ${segment.name}") event.manifest
             );
-        # The `inline/<index>` events of a top, each as the place of
+        # The `inline/<index>` events of a caisson top, each as the place of
         # the configuration that records it and its key, once.
         inlineOf =
           top:
@@ -1529,7 +1529,7 @@ let
           )
         ) == [ "configs.nixos.minimal" ];
 
-    # Each configuration records how it selected its modules. The top
+    # Each configuration records how it selected its modules. The caisson top
     # above the NixOS configuration gives `moduleImports`, which
     # replaces the default, and the record holds where it gave it. The
     # NixOS configuration takes the default of its class, the entries
@@ -1590,7 +1590,7 @@ let
     # composition. The NixOS configuration selects its module
     # collection with its `ecosystemSrc`, and the home-manager
     # configuration inside it selects home-manager the same way. The
-    # top resolves no ecosystem beside the library.
+    # caisson top resolves no ecosystem beside the library.
     ecosystemsRecordWhereEachPartCameFrom =
       let
         top = nixosConfigurationWithHomeManagerConfigurations.caisson.manifest;
@@ -1621,7 +1621,7 @@ let
           };
         };
 
-    # The configurations of the shared probe tops record where each
+    # The configurations of the shared probe caisson tops record where each
     # ecosystem they resolved came from. `hiveLib` pins colmena and
     # disko under those names and selects nothing for them, so a colmena
     # configuration and a disko configuration of either integration
@@ -1997,7 +1997,7 @@ let
       systemOf insideStructural == systemOf alone && systemOf insideFlake == systemOf alone;
 
     # A flake publishes its manifest as the output `caisson.manifest`,
-    # as a structural top does, with the export record of what it
+    # as a structural caisson top does, with the export record of what it
     # publishes. The name path of the record's entry for the NixOS
     # configuration, followed from that manifest through `children`,
     # leads to the NixOS configuration the flake publishes.
@@ -2130,8 +2130,8 @@ let
       builtins.attrNames alone.libOverlays == [ "caisson/structural" ]
       && builtins.attrNames parent.libOverlays == builtins.attrNames alone.libOverlays;
 
-    # The same for a flake. A flake-parts configuration can be the top
-    # of a flake, or it can be declared inside another configuration,
+    # The same for a flake. A flake-parts configuration can be the
+    # caisson top of a flake, or it can be declared inside another configuration,
     # under `caisson.flake-parts.configurations`. A flake declared
     # inside another publishes its NixOS configurations through its
     # parent.
@@ -2139,7 +2139,7 @@ let
     # The flake here declares a NixOS configuration. The flake is
     # evaluated alone, inside a flake-parts configuration, and inside a
     # structural configuration. The parents give their children
-    # nothing. Each of these tops publishes the NixOS configuration as
+    # nothing. Each of these caisson tops publishes the NixOS configuration as
     # `nixosConfigurations.probe`, and its system is the same
     # derivation in each.
     aFlakeInsideAParentPublishesTheSameNixosConfiguration =
@@ -2178,11 +2178,11 @@ let
       && systemOf insideStructural == systemOf alone;
 
     # An integration declares `top` when a configuration of it can be
-    # a top, and only then has `mkTopConfiguration`. A colmena
+    # a caisson top, and only then has `mkTopConfiguration`. A colmena
     # configuration and a disko configuration are declared inside
     # another configuration, so their integrations declare no
     # `top`.
-    onlyAnIntegrationWithATopHasMkTopConfiguration =
+    onlyAnIntegrationDeclaringTopHasMkTopConfiguration =
       hiveLib.caisson.nixos ? mkTopConfiguration
       && hiveLib.caisson.darwin ? mkTopConfiguration
       && hiveLib.caisson.home-manager ? mkTopConfiguration
@@ -2194,8 +2194,8 @@ let
       && !(hiveLib.caisson.disko ? mkTopConfiguration);
 
     # A colmena configuration declared under the name `colmenaHive` inside
-    # a top fills the top's `colmenaHive`. Its nodes are the NixOS
-    # configurations declared inside it, which the top also publishes
+    # a caisson top fills the caisson top's `colmenaHive`. Its nodes are the NixOS
+    # configurations declared inside it, which the caisson top also publishes
     # as `nixosConfigurations`, so the node of the hive and the
     # published NixOS configuration are the same evaluation result.
     colmenaHiveEvaluatesEndToEnd =
@@ -2292,11 +2292,11 @@ let
     # A node is a single evaluation result. A NixOS configuration
     # declared inside a colmena configuration whose children are
     # evaluated for two systems has an evaluation result for each
-    # system, and the hive refuses it. The top still publishes each
+    # system, and the hive refuses it. The caisson top still publishes each
     # evaluation result as a NixOS configuration, and each evaluates,
     # so it is the hive that refuses them. When the children of the
     # colmena configuration are evaluated for a single system, the same
-    # top has a single node.
+    # caisson top has a single node.
     colmenaRefusesNodesEvaluatedMoreThanOnce =
       let
         systems = [
@@ -2448,9 +2448,9 @@ let
     # A structural configuration groups NixOS configurations so the
     # group can be declared wherever NixOS configurations are, as a
     # unit. The same group of NixOS configurations is declared under a
-    # structural top and inside a colmena configuration: each NixOS
+    # structural caisson top and inside a colmena configuration: each NixOS
     # configuration has the same evaluation result in both places, the
-    # top publishes the NixOS configurations under their names, and the
+    # caisson top publishes the NixOS configurations under their names, and the
     # colmena configuration finds its nodes through the group, under
     # the same names.
     structuralGroupsNixosConfigurationsForReuse =
@@ -2612,7 +2612,7 @@ let
     # `meta.nodeSpecialArgs` as special arguments, running on
     # `meta.nixpkgs`, and `deployment.targetHost` defaulting to the
     # name of the node. A node reads another through `nodes`, and the
-    # top publishes the nodes as NixOS configurations.
+    # caisson top publishes the nodes as NixOS configurations.
     colmenaUpstreamHiveEvaluates =
       let
         top = upstreamHiveTop;
@@ -2654,7 +2654,7 @@ let
         ];
 
     # The root composite, declared under the name `nixops4`, fills the
-    # `nixops4` of the top, the root NixOps4's command reads. A resource holding a
+    # `nixops4` of the caisson top, the root NixOps4's command reads. A resource holding a
     # NixOS configuration becomes, through the NixOS adapter, an `exec`
     # resource of NixOps4's `local` provider that copies the toplevel of
     # that configuration and runs its `bin/apply switch` over SSH, to
@@ -2753,7 +2753,7 @@ let
       }));
 
     # The root composite is a deferred configuration declared at the
-    # top: the manifest of the top holds its entry, and nothing declared
+    # caisson top: the manifest of the caisson top holds its entry, and nothing declared
     # inside it is evaluated at flake time. Finalized, its manifest names the
     # args it takes: the deploying system and the outputs of its
     # resources, which are not cacheable unless a resource lists them.
@@ -3485,7 +3485,7 @@ let
 
     # A deferred configuration whose parent does not finalize it stays
     # an entry in the children of that parent, for a tool to finalize:
-    # a resource declared at the top, and a composite declared inside
+    # a resource declared at the caisson top, and a composite declared inside
     # a resource. Neither has a composite above it, so each is at the
     # root of its member paths, and neither is published.
     nixops4EntriesAParentDoesNotFinalize =
@@ -3920,7 +3920,7 @@ let
     # A layout declared inside a colmena configuration passes up the
     # NixOS configuration installed onto it, so the NixOS configuration
     # `nas-1` is the node
-    # `nas-1` of the hive, and the top publishes it as
+    # `nas-1` of the hive, and the caisson top publishes it as
     # `nixosConfigurations.nas-1` beside `diskoConfigurations.nas-1`.
     diskoLayoutsInsideColmenaAreNodes =
       let
@@ -3966,7 +3966,7 @@ let
     # node, `image` inside `nas-1` and `guest` inside `plain`, belongs to
     # that node: it is not a node of the hive, it has no deployment
     # options, and `image` does not get the file systems of the layout.
-    # The top still publishes all four as NixOS configurations.
+    # The caisson top still publishes all four as NixOS configurations.
     nixosConfigurationsInsideANodeAreNotNodes =
       let
         nested =
@@ -4138,8 +4138,8 @@ let
           false
         ]
       && builtins.all (has "every") names
-      # The default entry of caisson, the addition the top gives through
-      # `caisson.forChildren`, the addition the top gives the nearest
+      # The default entry of caisson, the addition the caisson top gives through
+      # `caisson.forChildren`, the addition the caisson top gives the nearest
       # NixOS configurations, and the layout entry of caisson-disko,
       # which is an addition for the nearest NixOS configurations too.
       &&
@@ -4184,7 +4184,7 @@ let
     # the guests of its caisson-microvm configuration, `a`, `b` and
     # `c`, and its microvm configuration `upstream`. Each is a
     # `microvm.vms.<guest>` whose `evaluatedConfig` is caisson's
-    # evaluation of the guest, the configuration the top publishes as
+    # evaluation of the guest, the configuration the caisson top publishes as
     # `nixosConfigurations.<guest>`. Each guest of `pool` gets the
     # `autostart` and `restartIfChanged` of `pool` as
     # `microvm.vms.<guest>.autostart` and
@@ -4719,7 +4719,7 @@ let
         inside.hjem.probe.value.config.environment.sessionVariables.CAISSON_NVIM_PROFILE
         == "/Users/probe/.local/state/caisson/profiles/nvf/hjem-editor";
 
-    # A hjem configuration that is a top gives what hjem's standalone
+    # A hjem configuration that is a caisson top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
     # with targets in the user's home directory, and the packages. The
     # manifest of the evaluation result sits under `caisson.manifest`, behind an
@@ -4848,7 +4848,7 @@ let
     # same user module, the systemd user unit of the user included. The
     # NixOS configuration activates it with the template units hjem's NixOS module writes, which read
     # the manifest file from the directory of this generation, installs
-    # the user's packages, and the top publishes it as
+    # the user's packages, and the caisson top publishes it as
     # `hjemConfigurations.probe`.
     hjemInsideNixosIsActivated =
       let
@@ -5143,7 +5143,7 @@ let
       &&
         homeManagerConfig.home.sessionVariables.CAISSON_NVIM_PROFILE
         == "$HOME/.local/state/caisson/profiles/nvf/home-editor"
-      # The profile of `editor`, declared at the top, is a profile of
+      # The profile of `editor`, declared at the caisson top, is a profile of
       # the user, and it points at the Neovim nvf builds.
       && topProfile.scope == "user"
       && topProfile.path == "$HOME/.local/state/caisson/profiles/nvf/editor"
@@ -5199,7 +5199,7 @@ let
     # configuration writes the unit that activates the profile as root, at boot and at a
     # switch, and installs the program with which a shell chooses the
     # profile. The unit runs `activate` of the activation package of the
-    # profile, and the top publishes the configuration with the others.
+    # profile, and the caisson top publishes the configuration with the others.
     nixvimProfilesInsideANixosConfigurationAreActivated =
       let
         module = {
@@ -5606,10 +5606,10 @@ let
       && builtins.elem pkgs.hello.name (names box.users.users.probe.packages)
       && builtins.attrNames top.homeConfigurations == [ "probe@box" ];
 
-    # A terranix configuration that is a top is its `config.tf.json`
+    # A terranix configuration that is a caisson top is its `config.tf.json`
     # file, built from the package set of the composition with the
     # evaluated configuration in its `passthru`, and its modules get the
-    # composed library. Declared under a structural top, it is published
+    # composed library. Declared under a structural caisson top, it is published
     # as `terranixConfigurations.<name>`.
     terranixConfigurationEvaluatesEndToEnd =
       let
@@ -5648,12 +5648,12 @@ let
           source = "terranix";
         };
 
-    # A system-manager configuration that is a top is its system, built
+    # A system-manager configuration that is a caisson top is its system, built
     # for the system it is evaluated for, and its modules get the composed
     # library. It runs on the package set caisson selects, the set named
     # `default`, and its userborn is built on that set. A configuration
     # that sets `nixpkgs.overlays`, which that set leaves without effect,
-    # is refused. Declared under a structural top under the name
+    # is refused. Declared under a structural caisson top under the name
     # `default`, it is published as `systemConfigs.default`, which
     # `system-manager switch --flake` reads when no name is given.
     systemManagerConfigEvaluatesEndToEnd =
@@ -6029,7 +6029,7 @@ let
       && withPackages.probeScope.probe.pname == "hello"
       && withPolyfill.polyfillProbe.pname == "hello";
 
-    # The structural integration: a top over the empty class returns
+    # The structural integration: a caisson top over the empty class returns
     # the selected registries with the manifest beside them, and the
     # same selectors under flake-parts export the same registries.
     structuralTopMatchesFlakeParts =

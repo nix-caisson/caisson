@@ -144,7 +144,7 @@ source by.
 | `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `kubenixConfigurations.<system>.<name>`, the evaluation result, whose `config.kubernetes.result` is the JSON `kubectl apply -f` reads |
 | `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |
 | `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the home-manager configurations and hjem configurations declared inside them, and the profiles of the nvf and nixvim configurations declared inside them |
-| `structural` | none | a configuration that only exports and holds the configurations declared inside it: the top of a repository whose point is what it exports, such as caisson itself, or a layer declared inside another configuration |
+| `structural` | none | a configuration that only exports and holds the configurations declared inside it: the caisson top of a repository whose point is what it exports, such as caisson itself, or a layer declared inside another configuration |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
 argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then

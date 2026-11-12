@@ -95,7 +95,7 @@ let
         };
     };
 
-  # The top holding the system-manager configuration `box` in a version.
+  # The caisson top holding the system-manager configuration `box` in a version.
   topOf =
     version:
     lib.caisson.structural.mkTopConfiguration {

@@ -346,14 +346,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "system-manager";
         class = "systemManager";
-        # A system-manager configuration that is a top, as a tool reads
+        # A system-manager configuration that is a caisson top, as a tool reads
         # it: the system, or the systems by system where several are in
         # force.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.system-manager.configurations.<name>` finalizes it,
-        # and `mkTopConfiguration` finalizes it at a top.
+        # and `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration

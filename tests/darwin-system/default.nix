@@ -8,7 +8,7 @@
 # The composition is for aarch64-darwin, with a package config whose set
 # there is nixpkgs for aarch64-darwin, and with nixpkgs, nix-darwin,
 # home-manager, hjem and nvf declared as its ecosystems. A structural
-# top declares the nix-darwin configuration `probe` from `baseModule`,
+# caisson top declares the nix-darwin configuration `probe` from `baseModule`,
 # and the nix-darwin configuration `family`, which is `baseModule` with
 # a home-manager configuration and a hjem configuration for the user
 # `probe` declared inside it. Evaluating them needs no Mac: the package
@@ -83,7 +83,7 @@ let
     packages = [ pkgs.hello ];
   };
 
-  # A hjem configuration that is a top, applied with
+  # A hjem configuration that is a caisson top, applied with
   # `hjem standalone switch`, with the nvf configuration
   # `standalone-editor` inside it, in a version: the Neovim of v2 also
   # has `vim`. It is for the user `runner`, the user of the macOS runner
@@ -106,7 +106,7 @@ let
     }).caisson.manifest;
   standaloneHjem = standaloneHjemOf "v1";
 
-  # A top holding a nix-darwin configuration for the runner of the
+  # A caisson top holding a nix-darwin configuration for the runner of the
   # workflow, which activates it there, in a version. The nix-darwin
   # configuration declares the nvf configuration `editor`, a profile of
   # the system, a home-manager configuration for `runner`, the account
