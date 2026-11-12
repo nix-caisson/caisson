@@ -54,6 +54,7 @@
           "kubenix"
           "microvm"
           "nemacs"
+          "nix-unit"
           "nixidy"
           "nixops4"
           "nixos"
