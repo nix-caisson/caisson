@@ -261,6 +261,15 @@
                     caisson = self;
                   };
                 };
+                # A NixOS test declared through the nixos-test
+                # integration inside a NixOS configuration, run in a VM:
+                # its node reads the NixOS configuration it is declared
+                # inside (tests/nixos-test-vm).
+                nixos-test-vm = import (self.outPath + "/tests/nixos-test-vm") {
+                  inputs = inputs // {
+                    caisson = self;
+                  };
+                };
                 # The argument error of every entry point comes from Nix
                 # itself, raised at the call site with no frame of caisson
                 # above it: the real evaluator runs each wrong call and the
