@@ -148,6 +148,18 @@
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a NixOS configuration checks that
+          # its system closure builds, the closure `nixos-rebuild`
+          # builds and switches to.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system closure of the NixOS configuration builds";
+              };
+            };
           evaluate = evaluate variant args;
         };
 

@@ -281,6 +281,26 @@
           };
           type = "flake-parts";
           defaultPkgs = args.defaultPkgs or null;
+          # A flake-parts configuration checks that each package of its
+          # `packages` output builds, for each system: the check of the
+          # package `foo` is `foo-package`. `nix flake check` evaluates
+          # the packages of a flake and builds none of them, so a
+          # package that is published and never built is checked here.
+          checks =
+            { outputs, system, ... }:
+            let
+              packages = (outputs.flake.packages or { }).${system} or { };
+            in
+            builtins.listToAttrs (
+              builtins.map (name: {
+                name = "${name}-package";
+                value = {
+                  derivation = packages.${name};
+                  category = "build";
+                  description = "the package `${name}` of the flake builds";
+                };
+              }) (builtins.attrNames packages)
+            );
           evaluate = evaluate args;
         };
 

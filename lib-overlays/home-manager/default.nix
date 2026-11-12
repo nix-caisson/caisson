@@ -663,6 +663,18 @@
             marker = manifest: "$HOME/.local/state/caisson/markers/${selection.markerFileName manifest}";
             inherit profileAdapter;
           };
+          # Each evaluation result of a home-manager configuration
+          # checks that its activation package builds, the package
+          # `home-manager switch` builds and activates.
+          checks =
+            { outputs, ... }:
+            {
+              activation = {
+                derivation = outputs.activationPackage;
+                category = "build";
+                description = "the activation package of the home-manager configuration builds";
+              };
+            };
           evaluate = evaluation variant args;
         };
 

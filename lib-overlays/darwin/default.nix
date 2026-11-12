@@ -200,6 +200,18 @@
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a nix-darwin configuration checks
+          # that its system closure builds, the closure `darwin-rebuild`
+          # builds and switches to.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system closure that `darwin-rebuild` builds for the nix-darwin configuration builds";
+              };
+            };
           evaluate = evaluate args;
         };
 

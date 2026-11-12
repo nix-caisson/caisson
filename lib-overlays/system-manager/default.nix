@@ -340,6 +340,18 @@
           # the configurations with an activation declared inside it
           # check its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a system-manager configuration
+          # checks that the system `system-manager switch` activates
+          # builds.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system that `system-manager switch` activates for the system-manager configuration builds";
+              };
+            };
           evaluate = evaluate args;
         };
 
