@@ -13,7 +13,7 @@
 # manifest of the library, and `lib.caisson.modules`,
 # `lib.caisson.configs`, `lib.caisson.libOverlays` and
 # `lib.caisson.pkgOverlays` read them from there. So does
-# `lib.caisson.dependencies`, the pinned trees the library was built
+# `lib.caisson.dependencies`, the pinned source trees the library was built
 # from, which a registered file reads through its `closure-lib`. The rest of
 # `lib.caisson-core` is what integrations and caisson itself are
 # written on.
@@ -79,7 +79,7 @@ let
       ecosystemSrc
       ;
     mkLib = mkLibIn lib;
-    # the pinned trees the library was built from
+    # the pinned source trees the library was built from
     dependencies = lib.caisson-core.libManifest.dependencies;
     # the registries
     modules = keyedModules lib (registryIn lib "modules");
@@ -97,8 +97,8 @@ let
   # registered it. A registry names an entry of a listed project
   # `<project>/<name>`, and the registry of that project names the
   # same entry `<name>`. The outer key tells which registry entry a
-  # module of the evaluation is, as the registry it was read from
-  # names it, for the `declaration` events of the evaluation and its
+  # module of a configuration is, as the registry it was read from
+  # names it, for the `declaration` events of the configuration and its
   # selection record (`lib.caisson.integrations.declarationEventsOf`,
   # `lib.caisson.integrations.selectionAccountOf`).
   #
@@ -106,16 +106,16 @@ let
   # with the name the entry has in the registry of the project that
   # registered it. That name is the registry name with the leading
   # `<project>/` removed, when the manifest records the entry as
-  # contributed by `<project>` (`moduleProjects`). An entry the tree
+  # contributed by `<project>` (`moduleProjects`). An entry the flake
   # registers itself keeps its registry name, whatever it holds, and
-  # its project is the name of the tree. So the inner key is the same
-  # whichever registry an evaluation reads the entry from. The entries
-  # of caisson are an example: caisson registers `default`, a tree that
+  # its project is the name of the flake. So the inner key is the same
+  # whichever registry a configuration reads the entry from. The entries
+  # of caisson are an example: caisson registers `default`, a flake that
   # lists caisson reads it as `caisson/default`, and an integration
   # reads it as `default` from the library of caisson.
   #
   # The module system imports the modules that share a key once. An
-  # entry that an evaluation selects twice, from one registry or from
+  # entry that a configuration selects twice, from one registry or from
   # two, is therefore imported once. Entries of the same name that
   # different projects register stay apart, since their projects
   # differ.
@@ -170,12 +170,12 @@ let
   # The configuration registry as an integration reads it: each
   # configuration module wrapped in a module that imports it, keyed
   # `configs.<class>.<name>@<project>`. The configurations of a registry
-  # are those of the tree that registered them: mkLib takes no
+  # are those of the flake that registered them: mkLib takes no
   # configuration from a listed project, so a registry name is the name
-  # in the registering tree, and the project is the name of the tree.
+  # in the registering flake, and the project is the name of the flake.
   # The key is therefore the same in every library that holds the
-  # entry, and one module keys it. The key names the registry entry in the
-  # `declaration` events of an evaluation, whether the configuration
+  # entry, and a single module keys it. The key names the registry entry in the
+  # `declaration` events of a configuration, whether the configuration
   # was taken by its name or a configuration was given the entry as its
   # `configModule`.
   keyedConfigs =

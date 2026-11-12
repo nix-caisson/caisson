@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: MIT
 #
-# What this configuration gives the configurations beneath it, nested
-# ones included: additions to the default selection of a class, which
-# a configuration gets when it passes no `moduleImports`; a default
-# package set, which a configuration runs on when neither it nor a
-# configuration between selects another; and the systems that
+# What this configuration gives the configurations declared inside it,
+# nested configurations included: additions to the default selection of
+# a class, which a configuration gets when it passes no `moduleImports`;
+# a default package set, which a configuration runs on when neither it
+# nor a configuration between selects another; and the systems that
 # configurations evaluated per system are evaluated for. This
 # configuration is not among those they are given to. They are read
-# from the childless view, which the configurations beneath are built
-# against.
+# from the result of the childless evaluation, which the configurations
+# declared inside it are built against.
 { lib, ... }:
 {
   options.caisson.forChildren = {
@@ -23,7 +23,7 @@
       '';
       description = ''
         Additions to the default selection of a class for the
-        configurations beneath this configuration: by class, a
+        configurations declared inside this configuration: by class, a
         function of the lib of such a configuration returning
         registered modules. A configuration that passes no
         `moduleImports` gets every entry named `default` followed by
@@ -32,11 +32,10 @@
         gets none of them. Definitions from several modules are
         concatenated.
 
-        These additions reach the configurations of the class at any
-        depth beneath this configuration.
+        A configuration of the class gets these additions however many
+        configurations lie between it and this configuration.
         `caisson.forNearestChildren.extraDefaultModuleImports` gives
-        additions that reach only the nearest configurations of a
-        class.
+        additions to the nearest configurations of a class alone.
 
         A module listed here is a module registered in the
         composition, on `mkLib` or by a project.
@@ -48,15 +47,16 @@
       default = null;
       example = lib.literalExpression "pkgSets: pkgSets.stable";
       description = ''
-        The package set the configurations beneath this configuration
-        get by default: a function that receives the package sets
-        available to such a configuration, as an attribute set by
-        package config name, and returns the set to run on. A
-        configuration beneath runs on it unless that configuration, or
-        a configuration between the two, is constructed with
-        `defaultPkgs` or sets this option. This configuration runs on
-        the set it was constructed with. When null, the default
-        beneath is the selection in force at this configuration.
+        The package set the configurations declared inside this
+        configuration get by default: a function that receives the
+        package sets available to such a configuration, as an attribute
+        set by package config name, and returns the set to run on. A
+        configuration declared inside runs on it unless that
+        configuration, or a configuration between the two, is
+        constructed with `defaultPkgs` or sets this option. This
+        configuration runs on the set it was constructed with. When
+        null, the configurations declared inside get the package set
+        selection that applies to this configuration.
       '';
     };
 
@@ -68,11 +68,11 @@
         "aarch64-linux"
       ];
       description = ''
-        The systems the configurations declared inside this one are
-        evaluated for. It applies to configurations that are
+        The systems the configurations declared inside this
+        configuration are evaluated for. It applies to configurations that are
         evaluated per system, such as a NixOS configuration or a
-        home-manager configuration: each gets one evaluation per
-        system listed.
+        home-manager configuration: each gets an evaluation result for
+        each system listed.
 
         When null, a configuration that is itself evaluated per
         system has its children evaluated for its system only, so a
@@ -95,18 +95,23 @@
         nixos = true;
       };
       description = ''
-        By class, whether the configurations of that class beneath this
-        configuration, at any depth, read the full evaluation of this
-        configuration, with its children, in place of the childless
-        view of their parent (`lib.caisson-core.evalManifest.crossChildLevel`).
-        They can then reach every configuration beneath this one, and
-        a loop between them is a Nix infinite recursion, which the
-        childless view otherwise rules out.
+        By class, whether the configurations of that class declared
+        inside this configuration, however many configurations lie
+        between, read the result of the full evaluation of this
+        configuration, with its children, in place of the result of the
+        childless evaluation of their parent
+        (`lib.caisson-core.evalManifest.crossChildLevel`). They can
+        then read any configuration declared inside this configuration,
+        and a loop between them is a Nix infinite recursion, which the
+        childless evaluation otherwise rules out.
 
-        A setting through `caisson.forDirectChildren` beats one through
-        `caisson.forNearestChildren`, which beats this one, and within
-        one container the nearest parent that sets it wins. This
-        reaches every depth, so it is rarely the one to use.
+        A setting through `caisson.forDirectChildren` beats a setting
+        through `caisson.forNearestChildren`, which beats a setting
+        here, and within one container the nearest parent that sets it
+        wins. A setting here applies to the configurations of the class
+        at every level inside this configuration, so
+        `caisson.forDirectChildren` or `caisson.forNearestChildren`
+        usually fits better.
       '';
     };
 

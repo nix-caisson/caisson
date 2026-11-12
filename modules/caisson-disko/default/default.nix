@@ -2,12 +2,12 @@
 #
 # The default module of the caisson-disko class.
 #
-# The nearest NixOS configurations beneath a disko configuration are
+# The nearest NixOS configurations declared inside a disko configuration are
 # installed onto its layout. This module adds caisson's NixOS module
 # `caisson-disko-layout`, which gives a NixOS configuration the
 # `fileSystems`, `boot` and `swapDevices` of the layout, to the modules
 # that such a NixOS configuration imports by default. A NixOS
-# configuration declared inside one of those machines, such as an
+# configuration declared inside one of those NixOS configurations, such as an
 # image, is not installed onto the layout and does not get it. A NixOS
 # configuration that passes `moduleImports` selects its modules
 # itself, and then it lists `caisson-disko-layout` itself, as

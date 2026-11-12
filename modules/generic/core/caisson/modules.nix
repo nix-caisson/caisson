@@ -17,9 +17,9 @@ let
   localModules = class: lib.filterAttrs (name: _: (moduleProjects.${class}.${name} or null) == null);
 
   # The classes that have a registered module, in the registry of the
-  # library and in the registry the manifest of this evaluation holds.
-  # Both manifests are in the library, so the classes are known before
-  # this evaluation starts. A setting for a class that is not in the
+  # library and in the registry the manifest of this configuration
+  # holds. Both manifests are in the library, so the classes are known
+  # before the module evaluation starts. A setting for a class that is not in the
   # list is refused.
   evalManifest = lib.caisson-core.evalManifest;
   classes = lib.lists.unique (
@@ -70,10 +70,9 @@ let
       ) registeredModules;
 in
 {
-  # The export settings of each class, in one option for every class:
-  # a class no module sets costs nothing to evaluate, where options per
-  # class would be merged in every evaluation for every class, and a
-  # submodule per class would be an evaluation of its own.
+  # The export settings of each class, in a single option holding all
+  # classes, so a class no module sets costs nothing to evaluate in any
+  # configuration.
   options.caisson.modules = lib.mkOption {
     type = lib.types.lazyAttrsOf (lib.types.lazyAttrsOf lib.types.raw);
     default = { };

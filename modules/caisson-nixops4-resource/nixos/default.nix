@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The NixOS adapter of the caisson-nixops4-resource class: it deploys
-# the NixOS configuration declared beneath a resource, as
+# the NixOS configuration declared inside a resource, as
 # nixops4-nixos deploys the NixOS configuration of its resource.
 #
 # When the resource holds a NixOS configuration, the adapter makes the
@@ -36,11 +36,11 @@ let
   context = "caisson's NixOS adapter of the caisson-nixops4-resource class";
   declared = config.caisson.nixos.configurations;
   # Whether the resource holds a NixOS configuration. The names are
-  # known in the childless view too, so a resource without one is left
-  # alone there and in its full evaluation.
-  holdsMachine = builtins.attrNames declared != [ ];
-  # The NixOS configuration the resource deploys: the one declared
-  # beneath it, evaluated for one system.
+  # known in the childless evaluation too, so a resource without one is
+  # left alone there and in its full evaluation.
+  holdsNixos = builtins.attrNames declared != [ ];
+  # The NixOS configuration the resource deploys: the NixOS
+  # configuration declared inside it, evaluated for one system.
   nixos =
     (lib.caisson.caisson-nixops4-resource.machineOf {
       inherit context declared;
@@ -66,8 +66,8 @@ in
       type = types.raw;
       readOnly = true;
       description = ''
-        The NixOS configuration this resource deploys: the one declared
-        beneath it, as caisson evaluated it.
+        The NixOS configuration this resource deploys: the NixOS
+        configuration declared inside it, as caisson evaluated it.
       '';
     };
     ssh.user = mkOption {
@@ -111,7 +111,7 @@ in
       description = "Whether the configuration is applied with `sudo`.";
     };
   };
-  config = lib.mkIf holdsMachine {
+  config = lib.mkIf holdsNixos {
     # NixOps4's `local` provider, whose `exec` type deploys the
     # configuration. A resource that declares `providers.local` or sets
     # `type` replaces them.

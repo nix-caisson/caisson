@@ -3,13 +3,13 @@
 # The caisson-nixops4-resource integration: a resource of a NixOps4
 # deployment, one real thing a provider creates, updates and deletes.
 # A resource is a member of a caisson-nixops4-composite configuration,
-# declared beneath it, and a deferred configuration like the composite
+# declared inside it, and a deferred configuration like the composite
 # (caisson-core's `mkDeferredConfiguration`). Its args are
 # `outputValues`, its outputs as NixOps4 passes them, and
 # `resourceProviderSystem`, the system NixOps4 runs providers on. The
 # composite finalizes it with its part of the composite's args.
 #
-# A resource is evaluated with NixOps4's own resource options
+# A resource is evaluated with the resource options of NixOps4
 # (`nix/component/resource.nix`), its `type` option and its
 # `providers` option. `type` is a resource type of a provider, which
 # the composite usually writes from its `providers`. The resource
@@ -19,12 +19,12 @@
 # NixOps4 members: `members` is not an option here, and setting it is
 # refused where it is set.
 #
-# A resource may hold caisson configurations beneath it, such as a
+# Caisson configurations may be declared inside a resource, such as a
 # NixOS configuration with its home-manager configurations. NixOps4
 # does not see them. A module of the class turns them into the
 # resource's inputs: the NixOS adapter, registered as `nixos` in the
 # class and selected by its default module, deploys the NixOS
-# configuration declared beneath a resource.
+# configuration declared inside a resource.
 #
 # The resource declares which of its outputs a tool that evaluates the
 # deployment ahead of time may keep in a cache (`cacheableOutputs`);
@@ -128,8 +128,8 @@
           [ ];
 
       # The NixOS configuration a resource named `resource` deploys, from
-      # the NixOS configurations declared beneath it (`declared`): the
-      # only one, evaluated for one system. `context` names the module
+      # the NixOS configurations declared inside it (`declared`): the
+      # only such configuration, evaluated for one system. `context` names the module
       # that asks, for the errors.
       machineOf =
         {
@@ -140,23 +140,25 @@
         let
           names = builtins.attrNames declared;
           only = declared.${builtins.head names};
-          evaluations = builtins.attrValues only;
+          results = builtins.attrValues only;
         in
         if builtins.length names != 1 then
           throw ''
             ${context}: the resource `${resource}` declares the NixOS configurations
-            ${builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") names)}, and a resource deploys one.
-            Declare each as the NixOS configuration of a resource of its own.
+            ${
+              builtins.concatStringsSep ", " (builtins.map (n: "`${n}`") names)
+            }, and a resource deploys a single NixOS configuration.
+            Declare each as the NixOS configuration of a separate resource.
           ''
         else if (only._type or null) == "caisson-manifest" then
           only
-        else if builtins.length evaluations == 1 then
-          builtins.head evaluations
+        else if builtins.length results == 1 then
+          builtins.head results
         else
           throw ''
             ${context}: the NixOS configuration `${builtins.head names}` of the resource
             `${resource}` is evaluated for ${builtins.concatStringsSep ", " (builtins.attrNames only)},
-            and a resource deploys one evaluation. Declare it where a single system is in force.
+            and a resource deploys a single evaluation result. Declare it inside a configuration that evaluates its children for a single system.
           '';
 
       # The discovery program of a root composite for `system`, the
@@ -165,7 +167,7 @@
       # It runs `nixops4 state dump` for each of `stateResources`, the
       # member paths of the resources that hold state joined with `.`,
       # in the working directory, which NixOps4 finds the flake from. It
-      # passes its own arguments to NixOps4, such as `--override-input`,
+      # passes the arguments it is run with to NixOps4, such as `--override-input`,
       # and prints `{ outputValues, resourceProviderSystem }`. A dump
       # holds the resources that record their outputs in that state, at
       # their member paths from the root: the resources of the root
@@ -233,8 +235,8 @@
       # and the member path, and the settings the constructor received.
       # The native integration evaluates its class with NixOps4's
       # resource, provider-value and provider-declaration modules; the
-      # upstream-compatible one builds on this with NixOps4's class and
-      # its own modules.
+      # upstream-compatible integration builds on this with NixOps4's
+      # class and the modules of that integration.
       mkResourceConfiguration =
         {
           class,
@@ -243,8 +245,8 @@
         }:
         settings:
         let
-          # The evaluator's call with the args `args`, on the lib of the
-          # view being evaluated: the base modules, the outputs and the
+          # The evaluator's call with the args `args`, on the lib the
+          # configuration is evaluated with: the base modules, the outputs and the
           # member path, the framework modules of the class, the
           # selection and the configuration's module, with the
           # composition's dependencies as the `inputs` special
@@ -269,8 +271,8 @@
                 inherit lib name class;
                 configModule = settings.configModule or null;
               };
-              # The modules of an evaluation in which the resource's
-              # outputs are `outputs`, with what NixOps4 gives a
+              # The modules of a module evaluation in which the
+              # outputs of the resource are `outputs`, with what NixOps4 gives a
               # resource beside them, its member path.
               modulesWith =
                 outputs:
@@ -307,13 +309,13 @@
               # naming itself.
               moduleList = modulesWith args.outputValues;
               evaluated = evaluationOf moduleList;
-              # The evaluation that names the outputs, for `argsNeeded`.
+              # The evaluation result that names the outputs, for `argsNeeded`.
               # Reading an output fails there with an error that names
               # the resource, since NixOps4 needs the names of the
               # outputs before it has their values.
               naming = evaluationOf (
                 modulesWith (throw ''
-                  ${context}: the resource at ${showPath path} reads its own outputs in its
+                  ${context}: the resource at ${showPath path} reads its outputs in its
                   `outputsSkeleton`, which names its outputs. NixOps4 needs the names of the
                   outputs of a resource before it has their values.
                 '')
@@ -333,7 +335,7 @@
                 export.resource = evaluated.config._resourceForNixOps;
                 providerConfigs = evaluated.config.providers;
               };
-              # The deploying system and the resource's own outputs,
+              # The deploying system and the outputs of the resource,
               # which its type names. An output is cacheable when the
               # resource lists it.
               argsNeeded = {
@@ -394,10 +396,10 @@
           {
             # The resource's module: its `type`, `inputs`, the options
             # of the modules it selects, and the caisson configurations
-            # declared beneath it. When absent, the configuration
+            # declared inside it. When absent, the configuration
             # registered under the configuration's name, if any.
             configModule ? null,
-            # The package set the configurations beneath run on: a
+            # The package set the configurations declared inside run on: a
             # function that receives the package sets available, by
             # package config name, and returns the set to run on.
             defaultPkgs ? null,

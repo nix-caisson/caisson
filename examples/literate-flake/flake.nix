@@ -50,7 +50,7 @@
         manifest) are under `lib.caisson`, beside the integrations. Your
         overlays contribute your extensions (here, `lib.literate-flake`).
 
-        - `dependencies` are the pinned trees the composition is built
+        - `dependencies` are the pinned source trees the composition is built
           from. A module or overlay reads them through `closure-lib`, as
           `closure-lib.caisson.dependencies.<name>`, without threading
           them through every call site.
@@ -69,7 +69,7 @@
           mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
         - `configs` is the same registration for `configs/<class>/<name>`,
-          the configurations a top evaluates.
+          the configurations a caisson top evaluates.
         - `libOverlays` is a function from the `mkLibOverlay`
           helper returning the registered library overlays; `mkLibOverlays`
           derives it from `lib-overlays/<name>/default.nix`. Registering
@@ -119,7 +119,7 @@
         omitted, every registered entry named `default` applies: this
         flake's `default` and "caisson/default", caisson's default module (the
         nixpkgs integration's module layer). The `core` entries of the
-        class apply to every evaluation regardless.
+        class apply to every configuration of the class regardless.
     */
     lib.caisson.flake-parts.mkTopConfiguration { };
 }

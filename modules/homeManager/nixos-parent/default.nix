@@ -2,13 +2,14 @@
 #
 # A home-manager module for a home-manager configuration that is
 # declared inside a NixOS configuration. It sets the options of the
-# home-manager configuration that come from the machine.
+# home-manager configuration that come from the NixOS configuration.
 #
 # home-manager has a NixOS module that embeds home-manager
-# configurations in a machine. For each home-manager configuration,
-# that module sets a few options of the home-manager configuration from
-# the machine: the home directory and the user ID from the account the
-# machine declares, and the Nix package the machine runs. caisson does
+# configurations in a NixOS configuration. For each home-manager
+# configuration, that module sets a few options of the home-manager
+# configuration from the NixOS configuration: the home directory and
+# the user ID from the account the NixOS configuration declares, and
+# the Nix package the NixOS configuration runs. caisson does
 # not use that NixOS module. A home-manager configuration declared
 # inside a NixOS configuration is a caisson configuration, and this
 # module gives it the same settings.
@@ -21,23 +22,23 @@
 # if it lists it. A system-manager configuration does the same with
 # this file, registered also as `system-manager-parent`.
 #
-# The module reads the machine through the manifest of the
-# home-manager configuration, so it can only be imported by a
-# home-manager configuration that has a NixOS or system-manager
-# configuration above it.
+# The module reads the NixOS or system-manager configuration through
+# the manifest of the home-manager configuration, so it can only be
+# imported by a home-manager configuration that has a NixOS or
+# system-manager configuration above it.
 { ... }:
 # `lib` is the library of the home-manager configuration, and `config`
-# is the configuration of the home-manager configuration.
+# holds the evaluated options of the home-manager configuration.
 { lib, config, ... }:
 let
-  # The configuration of the machine the home-manager configuration is
-  # declared inside, the nearest NixOS or system-manager configuration
-  # above it. The home-manager configuration reads the childless
-  # evaluation of the machine, which is the evaluation that leaves out
-  # the configurations declared inside it. The home-manager
+  # The evaluated options of the NixOS or system-manager configuration
+  # the home-manager configuration is declared inside, the nearest such
+  # configuration above it. The home-manager configuration reads the
+  # result of the childless evaluation of that configuration, which
+  # leaves out the configurations declared inside it. The home-manager
   # configuration is one of those configurations, so it cannot read an
-  # evaluation that includes it.
-  machine =
+  # evaluation result that includes it.
+  parentConfig =
     (lib.caisson.integrations.nearestOf [
       "nixos"
       "system-manager"
@@ -50,28 +51,31 @@ let
   # account that systemd-homed manages. It is also null in a NixOS
   # configuration that has no `users` options, which the nixos-minimal
   # integration can produce.
-  account = (machine.users.users or { }).${config.home.username} or null;
+  account = (parentConfig.users.users or { }).${config.home.username} or null;
 in
 {
   options.caisson.useUserPackages = lib.mkOption {
     type = lib.types.bool;
     default = false;
     description = ''
-      Whether the NixOS machine installs the packages of this
-      home-manager configuration in `/etc/profiles/per-user/<user>`.
+      Whether the NixOS configuration this home-manager configuration
+      is declared inside installs its packages in
+      `/etc/profiles/per-user/<user>`.
 
       When it is false, the activation of the home-manager
       configuration installs its packages into a Nix profile in the
       home directory, `~/.nix-profile`. The activation runs as the
       user, and it can write the home directory only while the home
-      directory is mounted and unlocked. On a machine whose home
+      directory is mounted and unlocked. On a computer whose home
       directories are encrypted, or managed by systemd-homed, that is
-      only while the user is logged in. A switch of the machine then
-      changes the packages of the user at the next login.
+      only while the user is logged in. A switch of the NixOS
+      configuration then changes the packages of the user at the next
+      login.
 
-      When it is true, the machine builds `/etc/profiles/per-user/<user>`
-      from the packages of the home-manager configuration, `home.path`,
-      as part of the system. Every switch of the machine changes them,
+      When it is true, the NixOS configuration builds
+      `/etc/profiles/per-user/<user>` from the packages of the
+      home-manager configuration, `home.path`, as part of the system.
+      Every switch of the NixOS configuration changes them,
       whether the user is logged in or not. NixOS puts
       `/etc/profiles/per-user/$USER` on the `PATH` of every login
       shell. home-manager's NixOS option `home-manager.useUserPackages`
@@ -85,38 +89,39 @@ in
       packages, and it removes the package `home-manager-path` from
       `~/.nix-profile` when it finds it there. A `home-manager switch`
       run by hand changes the files of the home-manager configuration,
-      and its packages change at the next switch of the machine. The
-      marker of the machine records the digest of the `home.path` it
-      installed. When the `home.path` of the home-manager configuration
+      and its packages change at the next switch of the NixOS
+      configuration. The marker of the NixOS configuration records the
+      digest of the `home.path` it installed. When the `home.path` of the home-manager configuration
       that `home-manager switch` activates differs from it, the
       activation prints a warning, unless `caisson.drift.warn` is false.
       `home-manager packages` lists the packages of `~/.nix-profile`,
       so it finds none of these.
 
-      A system-manager machine refuses a home-manager configuration
-      that sets this option.
+      A system-manager configuration refuses a home-manager
+      configuration that sets this option.
     '';
   };
 
   config = lib.mkMerge [
     {
       # home-manager reads this option to tell that the home-manager
-      # configuration is activated by a machine.
+      # configuration is activated by the configuration it is declared
+      # inside.
       submoduleSupport.enable = true;
       # When it is false, the activation of the home-manager
       # configuration installs the packages of the home-manager
       # configuration into a profile in the home directory. When it is
-      # true, the machine installs them (`caisson.useUserPackages`).
+      # true, the NixOS configuration installs them (`caisson.useUserPackages`).
       submoduleSupport.externalPackageInstall = config.caisson.useUserPackages;
     }
 
     # The home-manager configuration is activated with the Nix that the
-    # machine runs. A NixOS configuration from the nixos-minimal
-    # integration may have no `nix` options, and then the home-manager
-    # configuration keeps the settings it has.
-    (lib.mkIf (machine ? nix) {
-      nix.enable = machine.nix.enable;
-      nix.package = lib.mkIf machine.nix.enable machine.nix.package;
+    # NixOS or system-manager configuration runs. A NixOS configuration
+    # from the nixos-minimal integration may have no `nix` options, and
+    # then the home-manager configuration keeps the settings it has.
+    (lib.mkIf (parentConfig ? nix) {
+      nix.enable = parentConfig.nix.enable;
+      nix.package = lib.mkIf parentConfig.nix.enable parentConfig.nix.package;
     })
 
     # The home directory and the user ID come from the account, when

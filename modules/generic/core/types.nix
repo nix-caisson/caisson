@@ -17,9 +17,9 @@ let
 
   # An attribute set of registered entries, merged as one attribute set.
   # The definitions are joined with `//`, and an entry is checked when
-  # it is read. Every evaluation defines the exports of its library, so
-  # merging each entry as an option of its own would cost a merge per
-  # entry in every evaluation.
+  # it is read. Every configuration defines the exports of its library,
+  # so merging each entry as a separate option would cost a merge per
+  # entry in every configuration.
   #
   # An option of such a type can have more than one definition of the
   # same entry. A configuration and the configurations declared inside

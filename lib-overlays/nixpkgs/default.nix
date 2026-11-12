@@ -244,7 +244,7 @@
         else
           pkgs;
 
-      # A nixpkgs config evaluated over `config.nix` of the tree at
+      # A nixpkgs config evaluated over `config.nix` of the source tree at
       # `src`, with its assertions and warnings applied, the way
       # upstream evaluates the `config` argument.
       checkedConfig =
@@ -293,14 +293,14 @@
               default =
                 if (parent.systems or null) == null then
                   throw ''
-                    The nixpkgs package config builds a set per system in force where it is
-                    declared, but none are declared. Declare `systems` in the mkLib call
+                    The nixpkgs package config builds a set for each system of the level it is
+                    declared at, but that level declares none. Declare `systems` in the mkLib call
                     (e.g. `systems = [ "x86_64-linux" ];`), or set `caisson.nixpkgs.systems`
                     in the config's module.
                   ''
                 else
                   parent.systems;
-              defaultText = lib.literalMD "the systems in force at the level the config is declared at";
+              defaultText = lib.literalMD "the systems of the level the config is declared at";
             };
             overlays = lib.mkOption {
               description = "The package overlay registry entries this package config's sets apply, each after the entries it imports and each key once.";
@@ -309,7 +309,7 @@
               defaultText = lib.literalMD "every registry entry named `default` or `<project>/default`";
             };
             extraOverlays = lib.mkOption {
-              description = "Package overlay registry entries applied in addition to `overlays`. A definition of `overlays` replaces its default, and a definition here adds to whichever selection is in force.";
+              description = "Package overlay registry entries applied in addition to `overlays`. A definition of `overlays` replaces its default, and a definition here adds to the selection `overlays` holds, its default or its definition.";
               type = lib.types.listOf lib.types.raw;
               default = [ ];
             };
@@ -419,9 +419,9 @@
             ancestors = (parent.ancestors or [ ]) ++ [ parent ];
             nearest = parent.nearest or { };
             inputs = [ ];
-            # A package config declares no configurations beneath it
-            # (its sets are built, not declared), so its
-            # childless and full manifests coincide.
+            # No configurations are declared inside a package config:
+            # its sets are built from the config. So its childless and
+            # full manifests coincide.
             childless = false;
             inherit (caissonConfig) systems;
             ecosystemSrc = src;

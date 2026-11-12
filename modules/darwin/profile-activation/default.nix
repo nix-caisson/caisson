@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: MIT
 #
-# A darwin module with which a macOS machine activates the profiles
-# declared inside it, as the NixOS module `profile-activation` does for a
-# NixOS machine: see there.
+# A darwin module with which a nix-darwin configuration activates the
+# profiles declared inside it, as the NixOS module `profile-activation`
+# does for a NixOS configuration: see there.
 #
-# A step of the machine's `postActivation` script runs `activate` of
-# each profile of the system as root, and of each profile declared
-# inside a hjem configuration inside the machine as its user, through
-# `launchctl asuser` and `sudo`, after the hjem agents are restarted. A
-# profile inside a home-manager configuration is activated by the
-# home-manager configuration. The machine installs the programs that
+# A step of the `postActivation` script of the nix-darwin configuration
+# runs `activate` of each profile of the system as root, and of each
+# profile declared inside a hjem configuration inside the nix-darwin
+# configuration as its user, through `launchctl asuser` and `sudo`,
+# after the hjem agents are restarted. A profile inside a home-manager
+# configuration is activated by the home-manager configuration. The
+# nix-darwin configuration installs the programs that
 # choose among the profiles of the system in
 # `environment.systemPackages`.
 #
@@ -52,7 +53,7 @@ let
 
   choices = selection.profileChoicesOf {
     selected = config.caisson.profiles.selected;
-    what = "this machine";
+    what = "this nix-darwin configuration";
   } ofSystem;
 
   shims = lib.mapAttrsToList (

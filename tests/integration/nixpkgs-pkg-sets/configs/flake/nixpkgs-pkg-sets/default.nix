@@ -4,7 +4,7 @@
 # nixpkgs integration built: the same derivations as nixpkgs'
 # `import nixpkgs { system; }`, variants included, the registered
 # overlay and config module applied where selected, and each set
-# carrying its manifest in `pkgs.lib`.
+# holding its manifest in `pkgs.lib`.
 { ... }:
 {
   inputs,
@@ -79,8 +79,8 @@
           }).hello.drvPath;
         assert fails (top { }).hello.drvPath;
         assert !(top ? hello);
-        # A traced package is the same derivation, and carries how it
-        # was made. The set that is not traced carries nothing.
+        # A traced package is the same derivation, and records how it
+        # was made. The set that is not traced records nothing.
         assert traced.hello.drvPath == pkgs.hello.drvPath;
         assert !(pkgs.hello ? caissonTrace);
         assert bottom.step == "callPackage" && bottom.from == null;

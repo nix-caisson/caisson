@@ -13,9 +13,9 @@ name: drift
 # checks run the upstream tools: the VM test of activation runs
 # home-manager's activation, hjem's CLI and caisson's copies of the
 # units of hjem, the system-manager tests activate a system-manager
-# machine in containers and VMs of several distributions, and the darwin
-# job applies a standalone hjem configuration and activates a machine on
-# a macOS runner. What they rely on of hjem, such as where
+# configuration in containers and VMs of several distributions, and the
+# darwin job applies a standalone hjem configuration and activates a
+# nix-darwin configuration on a macOS runner. What they rely on of hjem, such as where
 # `hjem standalone switch` keeps its state, is not part of an interface
 # hjem documents, so only running it shows that it still holds.
 on:
@@ -76,4 +76,4 @@ jobs:
       - run: nix flake update --flake ./tests/dependencies
       - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
       - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"
-      - run: bash tests/darwin-system/runner-machine.sh "$(readlink -f result)"
+      - run: bash tests/darwin-system/runner-darwin.sh "$(readlink -f result)"

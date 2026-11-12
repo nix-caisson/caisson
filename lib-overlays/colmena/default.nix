@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# The colmena integration, the upstream-compatible one: it takes a hive
-# in the format colmena reads, `meta`, `defaults` and a module or list
-# of modules per node, and turns each node into a caisson NixOS
-# configuration declared beneath the colmena configuration. The native
+# The colmena integration, the upstream-compatible colmena integration:
+# it takes a hive in the format colmena reads, `meta`, `defaults` and a
+# module or list of modules per node, and turns each node into a caisson
+# NixOS configuration declared inside the colmena configuration. The native
 # integration, caisson-colmena, takes caisson's form instead.
 #
 # A node is built as colmena builds it, from colmena's deployment,
@@ -41,7 +41,7 @@
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
     # The native colmena integration, whose `meta` options, hive and
-    # publishing this one builds on.
+    # publishing this integration builds on.
     ((mkLibOverlay ../caisson-colmena) // { key = "caisson-colmena"; })
   ];
 
@@ -162,16 +162,16 @@
         // (if pkgs == null then { } else { defaultPkgs = _pkgSets: pkgs; });
 
       # The module of the colmena configuration: the keys of `meta` the
-      # class declares, and a NixOS configuration beneath it for each
-      # node.
+      # class declares, and a NixOS configuration declared inside it for
+      # each node.
       hiveModule =
         src: hive:
         { lib, ... }:
         let
           # The nodes as the `nodes` special argument: the NixOS
-          # configurations declared beneath this colmena configuration,
-          # each evaluated, from the full evaluation of this
-          # configuration. A node reads that evaluation through
+          # configurations declared inside this colmena configuration,
+          # each evaluated, from the result of the full evaluation of
+          # this configuration. A node reads that evaluation result through
           # `unsafeCrossChildReferences`, set below, which records the
           # read on each node; it is the configuration this module runs
           # in, so its manifest here holds the same children.
@@ -196,12 +196,12 @@
           ) hive.nodes;
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the `meta` options, the framework modules of the class, the
       # selection and the module made from the hive, with the
       # composition's dependencies as the `inputs` special argument.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:

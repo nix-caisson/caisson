@@ -7,7 +7,8 @@
 #
 # - `profile-activation`, which lets a shell choose among the profiles
 #   of the nvf or nixvim configurations declared inside the hjem
-#   configuration, which the machine activates;
+#   configuration, which the NixOS, nix-darwin or system-manager
+#   configuration above activates;
 # - `activation-marker`, which records what the hjem configuration
 #   applied, for the configurations declared inside it to check.
 { closure-lib, ... }:

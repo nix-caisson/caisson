@@ -11,12 +11,12 @@
 #                        integration takes exactly the caisson-shaped
 #                        arguments (configModule, moduleImports,
 #                        specialArgs, pkgSets, ecosystemSrc, and the
-#                        few of its target) and composes the evaluator's
+#                        few of its ecosystem) and composes the evaluator's
 #                        call from them. Nothing else is forwarded: an
 #                        evaluator argument handed in directly would be
 #                        silently overwritten, silently dropped, or
 #                        surface as a conflict deep inside the
-#                        evaluator. The `...WithEcosystemArgs` twin of
+#                        evaluator. The `...WithEcosystemArgs` variant of
 #                        each entry point is the way to the evaluator's
 #                        full surface: the same arguments plus
 #                        `ecosystemArgs`, merged over the composed call
@@ -55,27 +55,29 @@
 #                        every entry named `core` (the local `core` and
 #                        a consumed project's `<project>/core`) is the
 #                        framework module of the class, forced into
-#                        every evaluation before anything the
-#                        evaluation selects; every entry named
-#                        `default`, likewise, is the default default,
-#                        what `moduleImports` selects when the
-#                        evaluation names nothing. Any project a
+#                        the modules of every configuration of the
+#                        class before anything the configuration
+#                        selects; every entry named `default`,
+#                        likewise, is the default default, what
+#                        `moduleImports` selects when the
+#                        configuration names nothing. Any project a
 #                        composition lists may register either, for any
 #                        class: a `core` is the big hammer, for a module
 #                        the class cannot function without; a `default`
 #                        is what the project gives every configuration
 #                        of the class unless it selects otherwise.
 #   frameworkModules     the framework module of a class, forced into
-#                        every evaluation of it: the core of caisson
+#                        the modules of every configuration of the
+#                        class: the core of caisson
 #                        itself for the class, which declares the
-#                        manifest, the configurations declared beneath
+#                        manifest, the configurations declared inside it
 #                        and `caisson.exports`, followed by
 #                        `coreModules` of the registry.
 #   mkModuleConfiguration
 #                        a configuration that is a module evaluation,
 #                        from the evaluator step of an integration.
-#                        It holds configurations of any integration
-#                        beneath it: the configurations its modules
+#                        Configurations of any integration can be
+#                        declared inside it: the configurations its modules
 #                        declare are its children, and what they
 #                        export is passed up through it.
 { closure-lib, mkLibOverlay, ... }:
@@ -85,7 +87,7 @@
   # and function helpers of caisson-core (`caisson-core.lists` and its
   # neighbours), so this overlay composes in a library that holds no
   # library of nixpkgs. An integration that evaluates modules imports
-  # that library itself. The one import is the names of the framework
+  # that library itself. The import is the names of the framework
   # under `lib.caisson`, so a library that holds an integration holds
   # those names.
   imports = [ ((mkLibOverlay ../framework) // { key = "framework"; }) ];
@@ -105,11 +107,11 @@
       inherit (final.caisson-core.functions) functionArgs setFunctionArgs;
 
       # The source a configuration's `ecosystemSrc` selects: the
-      # argument is a function of the tree's dependencies, as
+      # argument is a function of the dependencies passed to mkLib, as
       # `defaultEcosystemSrc` on mkLib is, so a configuration chooses
-      # among the dependencies the tree pins. Null when the configuration
+      # among the dependencies the flake pins. Null when the configuration
       # passes none. `manifest` is the manifest whose `dependencies` it
-      # selects from, the lib manifest of the evaluation.
+      # selects from, the lib manifest of the configuration.
       selectedEcosystemSrc =
         context: manifest: explicit:
         if explicit == null then
@@ -118,7 +120,7 @@
           explicit (manifest.dependencies or { })
         else
           throw ''
-            ${context}: `ecosystemSrc` is a function of the tree's dependencies that
+            ${context}: `ecosystemSrc` is a function of the dependencies passed to mkLib that
             returns the source to use, `ecosystemSrc = dependencies: dependencies.<name>;`,
             but got a ${builtins.typeOf explicit}.
           '';
@@ -153,13 +155,13 @@
             to mkLib.
           '';
 
-      # How an evaluation came by the source of the ecosystem `name`, as
+      # How a configuration came by the source of the ecosystem `name`, as
       # its manifest records it under `ecosystems.<name>`. It takes the
       # arguments `resolveEcosystemSrc` takes and follows the same
       # order. `from` names the declaration that supplied the source:
       # `ecosystemSrc` for the selection of the configuration,
-      # `defaultEcosystemSrc` for the selection of the tree, and
-      # `dependencies` for the dependency the tree pins under exactly that name.
+      # `defaultEcosystemSrc` for the selection on mkLib, and
+      # `dependencies` for the dependency the flake pins under exactly that name.
       # `source` is the name of that dependency among the pinned dependencies,
       # where `pin` records its revision, or null where a selection
       # builds the value in another way. Reading the account forces no
@@ -249,7 +251,7 @@
         else
           null;
 
-      # A module an integration adds to an evaluation itself, keyed
+      # A module an integration adds to the modules of a configuration, keyed
       # `key` (`caisson.<class>.<purpose>`) and named by the file `file`
       # (`caisson-<class>:<purpose>`). The wrapper carries the file, so
       # its `declaration` event names it even where `module` is a
@@ -345,7 +347,7 @@
             module
         );
 
-      # The `declaration` events of an evaluation: an event for each
+      # The `declaration` events of a configuration: an event for each
       # element of `modules`, the list the integration hands the
       # evaluator, in that order, with the module list of the ecosystem
       # as the single event of its `ecosystemUnit`. A module selected
@@ -354,7 +356,7 @@
       # with the name the registry it was read from gives the entry, and
       # its origin is the project that registered the module and the
       # file of the module, where the module has a file. An entry of a
-      # listed project read from the registry of the tree is therefore
+      # listed project read from the registry of the flake is therefore
       # `modules.<class>.<project>/<name>`, and the same entry read from
       # the library of that project is `modules.<class>.<name>`. A
       # configuration module taken from the registry of configurations
@@ -369,7 +371,7 @@
       # the configuration was given as a value. A file inside
       # a source in the Nix store is written relative to that source,
       # the way a project's files are named in the project. `lib` is the
-      # lib of the evaluation.
+      # lib the configuration is evaluated over.
       declarationEventsOf =
         { lib, modules }:
         let
@@ -451,7 +453,7 @@
         in
         lib.imap0 eventOf modules;
 
-      # How an evaluation of the class `class`, constructed with `args`,
+      # How a configuration of the class `class`, constructed with `args`,
       # selected its modules, as its manifest records it in
       # `moduleImports`:
       #
@@ -462,7 +464,8 @@
       # - `position`: where the configuration gave `moduleImports` or
       #   `extraModuleImports`, the file and line number, null for
       #   `default`;
-      # - `default`: the default in force, whatever the act, as
+      # - `default`: the default selection of the class for this
+      #   configuration, whatever the act, as
       #   `{ key; level; file; }` entries: first the entries of the
       #   registry named `default`, with a null `level` and `file`,
       #   then what each level above added
@@ -528,7 +531,7 @@
       # to its evaluator as it gave them, as its manifest records them
       # in `evaluatorArgs`. Every entry point takes `specialArgs`, which
       # the integration merges over the special arguments it supplies.
-      # The `WithEcosystemArgs` twin takes `ecosystemArgs`, which the
+      # The `WithEcosystemArgs` variant takes `ecosystemArgs`, which the
       # integration merges over the evaluator's call last. For each of
       # the two that the configuration gave, the record holds:
       #
@@ -563,16 +566,16 @@
         in
         builtins.listToAttrs (accountOf "specialArgs" ++ accountOf "ecosystemArgs");
 
-      # The selection of an evaluation over the registry of its class,
+      # The selection of a configuration over the registry of its class,
       # from the arguments of the configuration, as a function of that
       # registry: what `moduleImports` selects, and with none
       # given the default of the class, every entry named `default`
-      # followed by what the levels above the evaluation added for the
+      # followed by what the configurations above it added for the
       # class (`caisson.forChildren.extraDefaultModuleImports`), then
       # what they added for the nearest configurations of the class
-      # where this evaluation is one of them
+      # where this configuration is one of them
       # (`caisson.forNearestChildren.extraDefaultModuleImports`), each
-      # applied to the lib of the evaluation.
+      # applied to the lib of the configuration.
       #
       # `extraModuleImports` of the configuration is appended to
       # either: it adds to the selection where `moduleImports`
@@ -595,7 +598,7 @@
         )
         ++ (if extra == null then [ ] else extra registry);
 
-      # The package sets available to an evaluation, by package config
+      # The package sets available to a configuration, by package config
       # name: the package configs its manifest holds, each projected to
       # its set for `system`. `context` names the entry point and `what`
       # the configuration, for the message of a config that builds no
@@ -613,16 +616,18 @@
           ).value
         ) (manifest.pkgSets or { });
 
-      # The package set a configuration runs on: the selection in
-      # force at its manifest, applied to the package sets available
-      # to it. A selection is a function that receives those sets, as
-      # an attribute set by package config name, and returns the set to
-      # run on. The `defaultPkgs` argument of a constructor makes one for
-      # that configuration and everything beneath it
-      # (`mkModuleConfiguration` records it), and a configuration that
+      # The package set a configuration runs on: the package set
+      # selection that applies to its manifest, applied to the package
+      # sets available to it. A selection is a function that receives
+      # those sets, as an attribute set by package config name, and
+      # returns the set to run on. The `defaultPkgs` argument of a
+      # constructor makes a selection for that configuration, and the
+      # configurations declared inside it run on it unless they or a
+      # configuration between them select another
+      # (`mkModuleConfiguration` records it). A configuration that
       # passes none runs on what the nearest configuration above it
-      # selected. Where no configuration from the top down to this one
-      # selected, it runs on the set named `default`. Every integration
+      # selected. Where no configuration from the caisson top down to this
+      # configuration selected, it runs on the set named `default`. Every integration
       # whose configurations run on a package set selects it here.
       pkgSetOf =
         { context, what }:
@@ -632,7 +637,7 @@
         else
           pkgSets.default or (throw ''
             ${context}: ${what} runs on the package set named `default`,
-            since no configuration from the top down to it selects one, and the
+            since no configuration from the caisson top down to it selects one, and the
             package sets available here are ${
               if pkgSets == { } then "none" else builtins.concatStringsSep ", " (builtins.attrNames pkgSets)
             }. Declare a package config named `default` with `pkgSets` on mkLib,
@@ -642,14 +647,14 @@
 
       # Which package config a configuration runs on, as its manifest
       # records it under `pkgSet`. `name` is the name of the package
-      # config whose set the selection in force at `manifest` returns.
+      # config whose set the selection that applies to `manifest` returns.
       # It is read from the selection applied to `pkgSets` tagged with
       # their names, so it is null where the selection returns a set it
       # builds in another way. `level` is the name path of the
       # configuration that made the selection: the configuration itself
       # when `own` says it was constructed with `defaultPkgs`, else the
       # nearest configuration above that selected for the
-      # configurations beneath it. Where no configuration selects,
+      # configurations declared inside it. Where no configuration selects,
       # `name` is `default` and `level` is null, as `pkgSetOf` runs the
       # configuration on the set named `default`. `perSystem` says
       # whether the configuration is evaluated per system. A
@@ -682,10 +687,10 @@
           };
 
       # The name path of the configuration above `manifest` that made
-      # the package set selection in force at `manifest`: the nearest
-      # parent that selects for the configurations beneath it with
+      # the package set selection that applies to `manifest`: the nearest
+      # parent that selects for the configurations declared inside it with
       # `caisson.forChildren.defaultPkgs`, or else the level a parent
-      # records for its own selection. A system between a configuration
+      # records for the selection it runs on. A system between a configuration
       # and its parent is passed over. Null where no configuration
       # above selects.
       selectionLevelAbove =
@@ -726,7 +731,7 @@
           ]
         ) containerConfig.extraDefaultModuleImports;
 
-      # The names of the namespaces of the lib an evaluation runs on, as
+      # The names of the namespaces of the lib a configuration runs on, as
       # its manifest records them under `namespaces`: for each entry of
       # `lib.caisson`, the names of its attributes where it is an
       # attribute set and null where it is not, and the names of
@@ -751,9 +756,9 @@
       # name of the integration and `perSystem` whether it evaluates a
       # configuration per system, as caisson-core.mkConfiguration
       # takes them. `evaluate` is the evaluator step of the
-      # integration: it takes the view being evaluated, `{ lib,
-      # manifest }`, and returns `value`, the evaluation as the
-      # evaluator returned it, `outputs`, the references into it that
+      # integration: it takes the lib and manifest the configuration is
+      # evaluated with, `{ lib, manifest }`, and returns `value`, the
+      # evaluation result as the evaluator returned it, `outputs`, the references into it that
       # the integration declares, and `config` where the evaluated
       # options are not `value.config`. Its module list carries
       # `frameworkModules` of its class.
@@ -762,11 +767,11 @@
       # `caisson.<integration>.configurations`, of any integration,
       # are its children, and `caisson.exports`, which carries what
       # they pass up, is its `exports` output. An integration whose
-      # evaluation finalizes its children itself returns them as
+      # evaluator finalizes the children returns them as
       # `children`, by integration and then name, and they are its
       # children in place of those values. A deferred configuration
       # (`caisson-core.mkDeferredConfiguration`) finalizes the deferred
-      # configurations declared beneath it this way, with their part of
+      # configurations declared inside it this way, with their part of
       # its args.
       #
       # `evaluate` may also return `argsNeeded`, the args a deferred
@@ -778,21 +783,22 @@
       #
       # `defaultPkgs` is the selection of a package set the configuration
       # was constructed with, null when it was given none. It is
-      # recorded on the manifest, where it is in force for the
-      # configuration and everything beneath it.
+      # recorded on the manifest. The configuration runs on it, and so
+      # do the configurations declared inside it unless they or a
+      # configuration between them select another.
       #
       # `exportsTo` says how the configuration is published: `attrset`,
       # the output attribute set (`nixosConfigurations`), and `value`,
       # the function from the manifest of the configuration to what is
       # published. It may carry `name`, for an integration whose
-      # configurations are known by a name other than the one they are
+      # configurations are known by a name other than the name they are
       # declared under: a function of `{ name, manifest }`, the name
       # the configuration is passed up under and its manifest,
       # returning `value`, the name to publish it under, and
       # optionally `description`, a sentence saying what it did. It may
-      # carry `single`, for an output that holds the one configuration
+      # carry `single`, for an output that holds the configuration
       # named for that output, and `bySystem`, for an output keyed by the
-      # system of each evaluation first (`packages.<system>.<name>`). It
+      # system of each evaluation result first (`packages.<system>.<name>`). It
       # may carry `only`, a function of the manifest that says whether
       # the configuration is published there at all; a configuration it
       # leaves out is still passed up.
@@ -805,18 +811,19 @@
       # under a name.
       #
       # `activation` is given by an integration whose configurations
-      # are activated on a machine or for a user: NixOS, darwin and
-      # system-manager machines, home-manager configurations, hjem
+      # are activated on a computer or for a user: NixOS, nix-darwin and
+      # system-manager configurations, home-manager configurations, hjem
       # configurations. It holds
-      # two functions of a manifest of the configuration. `identity`
+      # functions of a manifest of the configuration. `identity`
       # returns the store path that names what the activation applies,
-      # computed from the childless evaluation, or null where there is
-      # none. `standsAlone`, when true, says the configuration is
-      # applied on its own, as a machine is on its own host, so that it
-      # checks no configuration above it. `marker` returns the path of the file the activation
+      # computed from the result of the childless evaluation, or null
+      # where there is none. `standsAlone`, when true, says the
+      # configuration is applied by itself, as a NixOS configuration is
+      # activated on the computer it describes, so that it checks no
+      # configuration above it. `marker` returns the path of the file the activation
       # writes that identity into, as shell text, which may name
       # variables such as `$HOME`. It is recorded on the manifest. A
-      # configuration with an activation declared beneath one checks
+      # configuration with an activation declared inside another such configuration checks
       # the marker of the nearest such configuration above it when it
       # is activated (`driftCheckOf`). `profileAdapter`, where an
       # integration gives it, is a function of a full manifest of the
@@ -827,15 +834,15 @@
       # what sets it. The home-manager integration gives one. Null for
       # a configuration that is not activated.
       #
-      # `selection` is `{ class; args; }`, the class of the evaluation
+      # `selection` is `{ class; args; }`, the class of the configuration
       # and the arguments the configuration was constructed with, from
-      # which the manifest records how the evaluation selected its
+      # which the manifest records how the configuration selected its
       # modules as `moduleImports` (`selectionAccountOf`), and which
       # arguments it handed to the evaluator as it gave them as
       # `evaluatorArgs` (`evaluatorArgsAccountOf`). Null for a
       # configuration whose modules are not selected from a class.
       #
-      # What the modules give the configurations beneath is read from
+      # What the modules give the configurations declared inside is read from
       # `caisson.forChildren` and `caisson.forNearestChildren`
       # (`additionsOf`).
       mkModuleConfiguration =
@@ -850,7 +857,7 @@
         }:
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
-          # The class of the evaluation, where the additions for the
+          # The class of the configuration, where the additions for the
           # nearest children of that class connect.
           class = if selection == null then null else selection.class;
           recordFromEvaluation = [
@@ -875,9 +882,9 @@
             # as it gave them, and where.
             // (if selection == null then { } else { evaluatorArgs = evaluatorArgsAccountOf selection.args; });
           evaluate =
-            view:
+            given:
             let
-              evaluated = evaluate view;
+              evaluated = evaluate given;
               config = evaluated.config or evaluated.value.config;
               options = evaluated.options or evaluated.value.options;
             in
@@ -887,8 +894,8 @@
                 exports = config.caisson.exports;
               };
               children =
-                evaluated.children or (view.lib.caisson.integrations.childrenOf { inherit options config; });
-              # What the modules give the configurations beneath
+                evaluated.children or (given.lib.caisson.integrations.childrenOf { inherit options config; });
+              # What the modules give the configurations declared inside
               # (`caisson.forChildren`).
               forChildren = {
                 extraDefaultModuleImports = additionsOf options.caisson.forChildren config.caisson.forChildren;
@@ -897,13 +904,13 @@
                 inherit (config.caisson.forChildren) unsafeCrossChildReferences;
               };
               # What the modules give the nearest configurations of a
-              # class beneath (`caisson.forNearestChildren`).
+              # class declared inside (`caisson.forNearestChildren`).
               forNearestChildren = {
                 extraDefaultModuleImports = additionsOf options.caisson.forNearestChildren config.caisson.forNearestChildren;
                 inherit (config.caisson.forNearestChildren) unsafeCrossChildReferences;
               };
               # What the modules give the configurations of a class
-              # declared directly beneath (`caisson.forDirectChildren`).
+              # declared directly inside (`caisson.forDirectChildren`).
               forDirectChildren = {
                 extraDefaultModuleImports = additionsOf options.caisson.forDirectChildren config.caisson.forDirectChildren;
                 inherit (config.caisson.forDirectChildren) unsafeCrossChildReferences;
@@ -913,11 +920,11 @@
               # it handed the evaluator, with an `ecosystemUnit` where
               # the module list of the ecosystem is.
               events = declarationEventsOf {
-                inherit (view) lib;
+                inherit (given) lib;
                 modules = evaluated.modules or [ ];
               };
               record = {
-                # Where each part of the stack the evaluation used came
+                # Where each part of the stack the configuration used came
                 # from (`ecosystemAccountOf`): the library of the lib it
                 # runs on, and each ecosystem the integration resolved,
                 # which its `evaluate` returns as `ecosystems`.
@@ -925,14 +932,14 @@
                   nixpkgs-lib = ecosystemAccountOf {
                     name = "nixpkgs-lib";
                     context = "the nixpkgs-lib entry";
-                  } { manifest = view.lib.caisson-core.libManifest or { }; };
+                  } { manifest = given.lib.caisson-core.libManifest or { }; };
                 }
                 // (evaluated.ecosystems or { });
-                # The names of the namespaces of the lib the evaluation
+                # The names of the namespaces of the lib the configuration
                 # runs on (`namespacesOf`).
-                namespaces = namespacesOf view.lib;
+                namespaces = namespacesOf given.lib;
               }
-              # Which package config the evaluation runs on and the
+              # Which package config the configuration runs on and the
               # configuration that selected it (`pkgSetAccountOf`). A
               # configuration evaluated once for every system runs on
               # no single set, so it records the level alone.
@@ -943,16 +950,16 @@
                       own = defaultPkgs != null;
                       inherit perSystem;
                     }
-                    view.manifest
+                    given.manifest
                     (
                       pkgSetsForSystem {
                         context = "the pkgSet record";
                         what = "the configuration";
-                      } view.manifest view.manifest.system
+                      } given.manifest given.manifest.system
                     );
               }
-              # How the evaluation selected its modules.
-              // (if selection == null then { } else { moduleImports = selectionAccountOf selection view; });
+              # How the configuration selected its modules.
+              // (if selection == null then { } else { moduleImports = selectionAccountOf selection given; });
             }
             # The args of a deferred configuration and the program that
             # finds them, where the integration's `evaluate` returns
@@ -965,8 +972,8 @@
       # pattern admitted: `compose` takes them and returns an attrset
       # holding `ecosystemArgs`, the evaluator's call as composed,
       # beside whatever `evaluate` needs; `evaluate` takes that attrset
-      # and the call to make. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the composed call verbatim,
+      # and the call to make. `ecosystemArgs`, which only the pattern
+      # of the `WithEcosystemArgs` variant admits, is merged over the composed call verbatim,
       # last.
       mkEvaluation =
         { compose, evaluate }:
@@ -1019,8 +1026,8 @@
       # The option type of a module of the class `class`: the
       # `deferredModule` type of nixpkgs, which refuses a definition
       # whose module states another class (`classOfModule`). A module
-      # that states no class is taken as it is, and the evaluation it
-      # is imported into checks what it declares.
+      # that states no class is taken as it is, and the module
+      # evaluation it is imported into checks what it declares.
       moduleTypeOf =
         lib: class:
         let
@@ -1117,7 +1124,7 @@
               ''
                 ${defined} No integration of this library declares
                 `caisson.${declared}.configurations`, so a ${declared} configuration
-                cannot be declared beneath another configuration.
+                cannot be declared inside another configuration.
               '';
           checked =
             loc: def:
@@ -1164,7 +1171,7 @@
 
       # An integration that owns a module class, declared. The
       # declaration carries the entry points as pattern functions,
-      # `mkConfiguration` and its `WithEcosystemArgs` twin, and the
+      # `mkConfiguration` and its `WithEcosystemArgs` variant, and the
       # result holds `namespace`, the value of `lib.caisson.<name>`: the
       # entry points, the registration form `mkModule` bound to the
       # class, the option types `types` (`typesOf`) built from the
@@ -1201,7 +1208,7 @@
           # A configuration for every configuration registered in the
           # class (`configs/<class>/<name>`), by its name, each as
           # `mkConfiguration` builds it without `configModule`. The
-          # arguments apply to all of them; a tree that wants only some,
+          # arguments apply to all of them; a flake that wants only some,
           # or a configuration that differs, declares them with
           # `mkConfiguration`.
           # It exists for an integration whose `mkConfiguration` takes
@@ -1237,14 +1244,15 @@
         };
 
       # The module of the integration `name` that lets a configuration
-      # hold configurations of that integration beneath it. It declares
+      # declare configurations of that integration inside it. It declares
       # `caisson.<name>.configurations`, which takes what
       # `lib.caisson.<name>.mkConfiguration` returns and holds the
       # finished manifest, and `caisson.<name>.exported`, which selects
       # those that are passed up. A configuration learns its name and
       # its parent from where it is declared, so the option finalizes
       # each entry when it is read, with the attribute it is declared
-      # under and the childless manifest of the evaluation. caisson's
+      # under and the manifest of the childless evaluation of the
+      # configuration it is declared inside. caisson's
       # core module imports this module for each integration of
       # caisson. An integration written outside caisson registers a
       # module that imports it where its configurations may be declared.
@@ -1269,14 +1277,14 @@
       };
 
       # The options `caisson.<name>.configurations` and
-      # `caisson.<name>.exported` of the integration `name`, in the
-      # evaluation whose `lib` is given. Each entry of
+      # `caisson.<name>.exported` of the integration `name`, in a
+      # configuration evaluated over the given `lib`. Each entry of
       # `configurations` has the configuration type of the integration
-      # (`configurationTypeOf`), built on the `lib` of the evaluation.
+      # (`configurationTypeOf`), built on that `lib`.
       # A library that composes the integration publishes the same type
       # as `lib.caisson.<name>.types.configuration`. The module system
       # builds the type of an option when the value of the option is
-      # read, and the evaluation reads the configurations of an
+      # read, and caisson reads the configurations of an
       # integration only where a module defines them
       # (`integrationsDeclaringIn`). `exported` is the type of
       # `exported`, the same for every integration.
@@ -1307,20 +1315,20 @@
             in
             if manifest == null then
               throw ''
-                ${what childName} is declared in an evaluation that carries no manifest
+                ${what childName} is declared in a module evaluation that carries no manifest
                 (`lib.caisson-core.evalManifest` is null there), so no
-                configuration can be finalized beneath it.
+                configuration can be finalized inside it.
               ''
             else if manifest.childless then
               throw ''
-                ${what childName} was read in the evaluation of the ${manifest.type}
-                configuration that the configurations beneath it read. That evaluation
-                leaves out the configurations declared beneath the ${manifest.type}
+                ${what childName} was read in the childless evaluation of the ${manifest.type}
+                configuration, whose result the configurations declared inside it read. The childless evaluation
+                leaves out the configurations declared inside the ${manifest.type}
                 configuration, so `${childName}` has no value there. A configuration
-                beneath read `${childName}` through its parent, or it read a value of the
+                declared inside it read `${childName}` through its parent, or it read a value of the
                 ${manifest.type} configuration whose definition reads `${childName}`.
                 Guard such a definition with `!lib.caisson-core.evalManifest.childless`.
-                The configurations beneath then read the value without that definition.
+                The configurations declared inside it then read the value without that definition.
               ''
             else
               finalized;
@@ -1332,7 +1340,7 @@
             defaultText = lib.literalMD "every configuration declared";
             description = ''
               Function that selects which of the ${name} configurations
-              declared beneath this configuration it passes up. Receives
+              declared inside this configuration it passes up. Receives
               `caisson.${name}.configurations` and returns the subset to
               export; `_: { }` exports none. What each selected configuration
               exports is merged into this configuration's `caisson.exports`.
@@ -1341,14 +1349,14 @@
           exportNote = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            example = "office machines carry the site prefix; lab machines are never deployed from this flake";
+            example = "office NixOS configurations take the site prefix; lab NixOS configurations are not deployed from this flake";
             description = ''
               A sentence saying what `caisson.${name}.exported` does to the
               ${name} configurations it passes up, for a selector that does
-              more than pass every configuration up unchanged. The top
+              more than pass every configuration up unchanged. The caisson top
               records it in the export record (`exportRecord` of the
               manifest it publishes) for each name published from those
-              configurations, with the notes of the levels beneath.
+              configurations, with the notes of the levels declared inside it.
             '';
           };
           configurations = lib.mkOption {
@@ -1356,21 +1364,21 @@
             default = { };
             apply = builtins.mapAttrs finalize;
             description = ''
-              The ${name} configurations declared beneath this
+              The ${name} configurations declared inside this
               configuration, by name: each is what
               `lib.caisson.${name}.mkConfiguration` returns, and reads
               back as its manifest, finalized with the name it is declared
               under and this configuration as its parent. A configuration
-              beneath sees this configuration without the configurations declared
-              beneath it, so a definition that reads one of them is guarded
+              declared inside sees this configuration without the configurations declared
+              inside it, so a definition that reads one of them is guarded
               with `!lib.caisson-core.evalManifest.childless`.
             '';
           };
         };
 
-      # The integrations whose configurations an evaluation can hold
-      # beneath it: those whose `configurationsModule` the evaluation
-      # imports, read from its options. The module declares both
+      # The integrations whose configurations can be declared inside a
+      # configuration: those whose `configurationsModule` its modules
+      # import, read from its options. The module declares both
       # `configurations` and `exported`; `caisson.exports` declares
       # `configurations` alone.
       integrationsIn =
@@ -1384,20 +1392,20 @@
         ) (builtins.attrNames (options.caisson or { }));
 
       # Of `integrationsIn options`, the integrations whose
-      # `caisson.<integration>.configurations` a module of the evaluation
+      # `caisson.<integration>.configurations` a module of the configuration
       # defines: those whose highest priority is above the priority of
       # an option default. The others hold no configurations, so neither
       # their configurations nor their `exported` selector is read, which
-      # spares merging those options in every evaluation for every
-      # integration the evaluation could hold.
+      # spares merging those options in every configuration for every
+      # integration the configuration could hold.
       integrationsDeclaringIn =
         options:
         builtins.filter (name: options.caisson.${name}.configurations.highestPrio < 1500) (
           integrationsIn options
         );
 
-      # The configurations an evaluated configuration declares beneath
-      # it, by integration and then name, as the `children` an
+      # The configurations declared inside an evaluated configuration,
+      # by integration and then name, as the `children` an
       # integration's `evaluate` returns: the values of its
       # `caisson.<integration>.configurations` options, which finalize
       # each entry when read. An integration with none declared is left
@@ -1413,13 +1421,13 @@
       # the configurations of the integration `type`: no configuration
       # of `type` sits between the two, so the nearest configuration
       # above the entry that a reader of `type` stops at is that
-      # configuration. The path of the entry runs from beneath that
+      # configuration. The path of the entry runs from the children of that
       # configuration down to the entry, so the entry belongs to it
       # when no segment of the path before the last is of `type`.
       # Segments of other integrations and systems do not count. A
       # colmena configuration builds its nodes from the NixOS
       # configurations that belong to it in this sense:
-      # `belongsHere "nixos"` keeps a machine beneath a disk layout or a
+      # `belongsHere "nixos"` keeps a NixOS configuration declared inside a disk layout or a
       # structural group and leaves out a NixOS configuration declared
       # inside a node.
       belongsHere = type: entry: !(builtins.any (segment: segment.type == type) (init entry.path));
@@ -1428,8 +1436,8 @@
       # one of `types`, null when there is none. The manifest records
       # the nearest ancestor of each integration; of those, the nearest
       # is the ancestor with the most ancestors itself. A home-manager
-      # configuration reads its machine this way, which is a NixOS or a
-      # darwin configuration.
+      # configuration reads the NixOS or nix-darwin configuration it is
+      # declared inside this way.
       nearestOf =
         types: manifest:
         builtins.foldl' (
@@ -1448,7 +1456,8 @@
       # The nearest configuration above `manifest` that has an
       # activation (`mkModuleConfiguration`'s `activation`), as its
       # childless manifest, or null when there is none. A home-manager
-      # configuration inside a NixOS machine finds the machine; an nvf
+      # configuration inside a NixOS configuration finds the NixOS
+      # configuration; an nvf
       # configuration inside that home-manager configuration finds the
       # home-manager configuration.
       activatingAncestorOf =
@@ -1460,17 +1469,17 @@
         in
         if found == [ ] then null else last found;
 
-      # The `activation` of a machine: a NixOS, darwin or system-manager
+      # The `activation` of a NixOS, nix-darwin or system-manager
       # configuration. Its identity is its system, `toplevel`, null for
       # a configuration that builds none, as the nixos-minimal
       # integration can produce. Its marker is a file under `/etc`,
       # which the module `activation-marker` of its class writes.
       #
-      # A machine is activated on its own host. A machine declared
-      # inside another, such as an image, is applied on a different host
-      # than the machine above, and the marker under `/etc` that it
-      # finds there is its own, so it checks nothing above it:
-      # `standsAlone`.
+      # Such a configuration is activated on the computer it describes.
+      # A NixOS configuration declared inside another, such as an image,
+      # is applied on a different computer than the configuration above,
+      # and the marker under `/etc` that it finds there is the marker it
+      # wrote, so it checks nothing above it: `standsAlone`.
       machineActivation = {
         standsAlone = true;
         identity =
@@ -1491,15 +1500,15 @@
         }.json";
 
       # The digest a marker holds for an identity: the SHA-256 of its
-      # store path. Computing the store path evaluates the childless
+      # store path. Computing the store path runs the childless
       # evaluation and builds nothing, and the digest refers to no store
       # path, so a marker that holds it depends on nothing. The digest
-      # is compared, never read as a path.
+      # is compared and not read as a path.
       digestOf = identity: builtins.hashString "sha256" identity;
 
       # What the activation of the configuration of `manifest` writes
-      # into its marker: the digest of the identity of its childless
-      # evaluation (`digestOf`). `path` is the shell text of the path of
+      # into its marker: the digest of the identity in the result of its
+      # childless evaluation (`digestOf`). `path` is the shell text of the path of
       # the marker. Null when the configuration has no activation or no
       # identity.
       markerOf =
@@ -1519,14 +1528,15 @@
           };
 
       # The profiles of the configuration of `manifest` that a switch of
-      # the machine above sets, `setBy = "machine"` in its profile
-      # adapter (`profileAdapter` of `activation`), by profile name. Each
-      # is the digest of the store path the profile holds once the
-      # configuration is applied (`digestOf`). The marker of the machine
-      # records these digests for each configuration whose profiles it
-      # sets, and the drift check of the configuration compares them
+      # the NixOS or nix-darwin configuration above sets,
+      # `setBy = "machine"` in its profile adapter (`profileAdapter` of
+      # `activation`), by profile name. Each is the digest of the store
+      # path the profile holds once the configuration is applied
+      # (`digestOf`). The marker of the configuration above records
+      # these digests for each configuration whose profiles it sets, and
+      # the drift check of the configuration compares them
       # (`driftCheckOf`). Empty for a configuration without a profile
-      # adapter, or whose profiles the machine does not set.
+      # adapter, or whose profiles the configuration above does not set.
       machineProfilesOf =
         manifest:
         let
@@ -1552,12 +1562,12 @@
         && ancestor != null
         && placeOf ancestor == placeOf manifest;
 
-      # Where a configuration is in the tree: the integration and the name
-      # of each configuration from the top down to it, the nodes of the
+      # Where a configuration is in the tree of configurations: the integration and the name
+      # of each configuration from the caisson top down to it, the nodes of the
       # systems included. Configurations at the same depth have
       # different places, such as a home-manager configuration and a
-      # hjem configuration inside the same machine, and the childless
-      # and the full manifest of a
+      # hjem configuration inside the same NixOS configuration, and the
+      # manifests of the childless and the full evaluation of a
       # configuration have the same place.
       placeOf =
         manifest:
@@ -1571,7 +1581,7 @@
       # identity of that configuration as this configuration was built
       # for it, and prints a warning to standard error when the marker is
       # missing or names another identity. It does not stop the
-      # activation. When that configuration activates this one, its
+      # activation. When that configuration activates this configuration, its
       # marker already belongs to the generation being activated, and
       # the check prints nothing. Empty when there is no such
       # configuration, or it has no identity. `jq` is the path of a jq
@@ -1579,15 +1589,16 @@
       # warning off, for the message.
       #
       # `profiles` are the profiles of this configuration that a switch
-      # of the machine sets (`machineProfilesOf`). The identity of the
-      # machine leaves out the configurations declared inside it, so it
-      # is the same when this configuration changes. For each such
-      # profile, the check also compares the digest that the marker of
-      # the machine records for this configuration with the digest of
-      # what the profile holds in this configuration, and prints a
-      # warning when they differ: then this configuration was built from
-      # another version than the machine applied, and the profile holds
-      # what the machine applied.
+      # of the configuration above sets (`machineProfilesOf`). The
+      # identity of the configuration above leaves out the
+      # configurations declared inside it, so it is the same when this
+      # configuration changes. For each such profile, the check also
+      # compares the digest that the marker of the configuration above
+      # records for this configuration with the digest of what the
+      # profile holds in this configuration, and prints a warning when
+      # they differ: then this configuration was built from another
+      # version than the switch applied, and the profile holds what the
+      # switch applied.
       driftCheckOf =
         {
           jq,
@@ -1609,7 +1620,7 @@
           # names in it are in backticks, which the shell would run
           # inside double quotes.
           say = text: "echo ${final.escapeShellArg text} >&2";
-          # The name under which the marker of the machine records the
+          # The name under which the marker of the configuration above records the
           # profiles of this configuration.
           key = markerFileName manifest;
           profileCheck = name: digest: ''
@@ -1624,7 +1635,7 @@
               ${say "  or set ${optionText} to false in ${self}."}
             fi
           '';
-          # The checks of the profiles, each on lines of its own after the
+          # The checks of the profiles, each on separate lines after the
           # check of the identity. A configuration without such profiles
           # gets no text here.
           profileChecks = final.concatStrings (
@@ -1666,7 +1677,7 @@
         );
 
       # A configuration that is a program a person runs, such as a
-      # Neovim, kept in a Nix profile of its own, the way a home-manager
+      # Neovim, kept in a separate Nix profile, the way a home-manager
       # configuration keeps its generations in the home-manager profile.
       #
       # `activationPackage` holds `activate`, which checks for drift
@@ -1678,13 +1689,13 @@
       # generation again adds no generation to the profile.
       #
       # Where the profile is depends on the configuration above. Inside
-      # a machine it is a profile of the system,
-      # `/nix/var/nix/profiles/caisson/<kind>/<name>`, which the machine
-      # activates as root. Inside a home-manager configuration or a hjem
-      # configuration, or as a top, it is a profile of the user,
+      # a NixOS, nix-darwin or system-manager configuration it is a
+      # profile of the system, `/nix/var/nix/profiles/caisson/<kind>/<name>`,
+      # which that configuration activates as root. Inside a home-manager configuration or a hjem
+      # configuration, or as a caisson top, it is a profile of the user,
       # `$HOME/.local/state/caisson/profiles/<kind>/<name>`. The path
-      # names `$HOME` and not `$XDG_STATE_HOME`: the units of a machine
-      # run without `$XDG_STATE_HOME`, and a shell may set it, and the
+      # names `$HOME` and not `$XDG_STATE_HOME`: the units of a NixOS
+      # configuration run without `$XDG_STATE_HOME`, and a shell may set it, and the
       # profile must be the same file for both. The
       # configuration above activates it each time it is activated
       # itself, so activating the configuration above puts the profile
@@ -1758,8 +1769,8 @@
       # configuration of `manifest` that it activates as profiles
       # (`profileOf`): those with a `profile`, evaluated for the system
       # of the configuration, whose nearest configuration above with an
-      # activation is this one. A profile inside a home-manager
-      # configuration inside this machine is activated by that
+      # activation is this configuration. A profile inside a home-manager
+      # configuration inside this configuration is activated by that
       # home-manager configuration, and is left out.
       profilesActivatedBy =
         manifest: configurations:
@@ -1772,8 +1783,8 @@
 
       # For each variable the profiles in `entries` are chosen with, the
       # profile a configuration runs when a shell sets no other, and the
-      # programs of all of them. The profile is the one `selected` names
-      # for the variable, as `<kind>/<name>`, or the only one. `what`
+      # programs of all of them. The profile is the profile `selected` names
+      # for the variable, as `<kind>/<name>`, or the only profile for it. `what`
       # names the configuration, for the message when several profiles
       # share a variable and `selected` names none of them.
       profileChoicesOf =
@@ -1796,7 +1807,7 @@
                 else if builtins.length sharing == 1 then
                   builtins.head sharing
                 else
-                  throw "caisson: ${what} activates several profiles chosen with `${variable}` (${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}). Set `caisson.profiles.selected.${variable}` to the one a shell runs when it sets no other.";
+                  throw "caisson: ${what} activates several profiles chosen with `${variable}` (${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}). Set `caisson.profiles.selected.${variable}` to the profile a shell runs when it sets no other.";
             in
             {
               inherit chosen;
@@ -1864,8 +1875,8 @@
         path:
         builtins.concatStringsSep " / " (builtins.map (segment: "${segment.type} ${segment.name}") path);
 
-      # A position as the export record holds it: the file and the line
-      # number (`line`) of what `builtins.unsafeGetAttrPos` returns, null
+      # A position as the export record holds it: the file and the
+      # line number (`line`) of what `builtins.unsafeGetAttrPos` returns, null
       # when it returns none.
       positionOf = position: if position == null then null else { inherit (position) file line; };
 
@@ -1875,7 +1886,7 @@
       # its path, on which the name its `exportsTo` gives, where it
       # gives one, stands in place of that name.
       #
-      # The entry also carries what the export record of the top holds
+      # The entry also carries what the export record of the caisson top holds
       # for it (`recordOf`): `namePath`, its path by the names the
       # configurations are declared under, which is its address under
       # the `children` of the manifests from here; `notes`, the
@@ -1936,24 +1947,24 @@
       displayName = builtins.concatStringsSep "/";
 
       # The entries a configuration passes up for the configurations
-      # declared beneath it, nested ones included: for each, its
+      # declared inside it, nested configurations included: for each, its
       # manifest, the output attribute set it is published under, the
       # value published, and its path from here, a list of
-      # `{ type, name }` segments. An evaluation of a configuration
+      # `{ type, name }` segments. An evaluation result of a configuration
       # evaluated per system has its system above its name on the
       # path. `selected`
       # is what each integration's `exported` selected, by integration
-      # and then name, each value a manifest or the evaluations of a
+      # and then name, each value a manifest or the evaluation results of a
       # configuration by system. A configuration whose manifest
       # records `exportsTo` is an entry, made here, where the name it
       # is passed up under is known, from what the manifest records;
       # and every configuration contributes the entries it passes up
       # in turn, with its segments in front. An entry carries all a
-      # top needs to publish it.
+      # caisson top needs to publish it.
       #
       # `levels` is what this configuration adds, by integration, to
       # the entries of the configurations of that integration it passes
-      # up, nested ones included: `notes`, its `exportNote` as a list,
+      # up, nested configurations included: `notes`, its `exportNote` as a list,
       # and `code`, the positions of the definitions of its `exported`.
       # The segments of `namePath` carry the names the configurations
       # are declared under, which a parent's `exported` may have
@@ -1979,7 +1990,7 @@
                 type = "system";
                 name = system;
               };
-              beneath =
+              evaluations =
                 if isManifest finalized || final.caisson-core.isDeferred finalized then
                   [
                     {
@@ -2009,8 +2020,8 @@
               }:
               builtins.map (entryOf level declared prefix manifest) (exportsOf manifest)
               # The entry of a deferred child is published as its
-              # `exportsTo` says, and nothing beneath it is evaluated at
-              # flake time, so it passes nothing else up.
+              # `exportsTo` says, and no configuration declared inside it is
+              # evaluated at flake time, so it passes nothing else up.
               ++ (
                 if final.caisson-core.isDeferred manifest then
                   [ ]
@@ -2026,13 +2037,13 @@
                     }
                   ) (manifest.outputs.exports.configurations or [ ])
               )
-            ) beneath
+            ) evaluations
           ) (builtins.attrNames selected.${integration})
         ) (builtins.attrNames selected);
 
-      # What a top publishes of the entries passed up to it, by the
-      # output attribute set each entry carries and then name. The
-      # top reads nothing but the entries. Within an attribute set the names come from
+      # What a caisson top publishes of the entries passed up to it, by
+      # the output attribute set each entry carries and then name. The
+      # caisson top reads nothing but the entries. Within an attribute set the names come from
       # `caisson-core.elide` over the paths: a name that is alone stays
       # bare, and names that collide gain the segments that tell them
       # apart. Entries that still share a name are refused, with their
@@ -2044,19 +2055,19 @@
       # output has no names to hold it under.
       #
       # An output whose entries' `exportsTo` says `bySystem` is keyed by
-      # the system of each evaluation first, as flakes key `packages`
+      # the system of each evaluation result first, as flakes key `packages`
       # and `formatter`: `<attrset>.<system>`, holding the entries
       # evaluated for that system, named by the rules above over their
       # paths without the systems on them, or the single value there.
       publish = entries: publicationOf (entry: entry.value) entries;
 
-      # The export record of a top, keyed as `publish` keys the outputs:
-      # for each name published, `from.namePath`, the path from the top
-      # to the manifest of the configuration by the names declared,
-      # which is its address under the `children` of the top's
-      # manifest; `notes`, the sentences each side that transformed the
+      # The export record of a caisson top, keyed as `publish` keys the
+      # outputs: for each name published, `from.namePath`, the path from
+      # the caisson top to the manifest of the configuration by the
+      # names declared, which is its address under the `children` of the
+      # manifest of the caisson top; `notes`, the sentences each side that transformed the
       # configuration on the way up wrote, from the configuration up to
-      # the top; and `code`, the positions of that code, the
+      # the caisson top; and `code`, the positions of that code, the
       # definitions of each `exported` and each integration's
       # `exportsTo`, in the same order.
       recordOf =
@@ -2145,12 +2156,12 @@
         in
         genAttrs attrsets publishIn;
 
-      # What a tool reads from a top that is a configuration evaluated
-      # per system, given its evaluations by system. They are named
-      # like anything published, by `caisson-core.elide` over their
-      # paths; the top is addressed by the file that returns it, so the
-      # name of the top is left out of each. Where that leaves a single
-      # evaluation with no name, the result is its value, the evaluated
+      # What a tool reads from a caisson top that is a configuration
+      # evaluated per system, given its evaluation results by system. They
+      # are named like anything published, by `caisson-core.elide` over
+      # their paths; the caisson top is addressed by the file that returns
+      # it, so the name of the caisson top is left out of each. Where that leaves a single
+      # evaluation result with no name, the result is its value, the evaluated
       # configuration; otherwise it is the values by what is left of
       # each name.
       topValue =

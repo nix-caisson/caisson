@@ -13,7 +13,7 @@
       { inputs, self, ... }:
       let
         # The inputs of the system-manager tests: the dependency pool
-        # with `caisson` set to this tree.
+        # with `caisson` set to this flake.
         testInputs = inputs // {
           caisson = self;
         };
@@ -119,8 +119,8 @@
 
             pkgs = inputs.nixpkgs.legacyPackages.${system};
 
-            # Imported directly (not via lib) because a partition's
-            # inputs.self is the extra-inputs flake, not caisson itself.
+            # The `inputs.self` of a partition is the extra-inputs flake,
+            # so the overlay is imported from the source tree of caisson.
             evalWeight = import (self.outPath + "/lib-overlays/tooling/eval-weight") {
               lib = pkgs.lib;
             };
@@ -176,7 +176,7 @@
                   assert !(self ? debug);
                   pkgs.runCommand "debug-disabled" { } "touch $out";
                 # The pinned-world suite, forced at evaluation time: the
-                # tree itself composed with the upstream pins of
+                # caisson itself composed with the upstream pins of
                 # tests/dependencies, so the check evaluates caisson
                 # against the committed world. The drift workflow builds
                 # this check alone over advanced pins.
@@ -190,10 +190,10 @@
                   in
                   builtins.seq suite.summary (pkgs.runCommand "pinned-world" { } "touch $out");
                 # The manifest file of a hjem configuration inside a NixOS
-                # machine and the units that activate it, built. Building
-                # the manifest file checks it against hjem's own schema
-                # with `cue vet`, so the file the machine activates is one
-                # hjem's CLI accepts. Building the units runs shellcheck
+                # configuration and the units that activate it, built.
+                # Building the manifest file checks it against the schema
+                # of hjem with `cue vet`, so the file the NixOS
+                # configuration activates is a file hjem's CLI accepts. Building the units runs shellcheck
                 # on their scripts.
                 hjem-system =
                   let
@@ -202,7 +202,7 @@
                         caisson = self;
                       };
                     };
-                    units = probe.top.nixosConfigurations.probe-machine.config.systemd.units;
+                    units = probe.top.nixosConfigurations.probe-nixos.config.systemd.units;
                   in
                   pkgs.linkFarm "hjem-system" (
                     [
@@ -242,7 +242,7 @@
                     caisson = self;
                   };
                 };
-                # A machine booted in a VM that activates the
+                # A NixOS configuration booted in a VM that activates the
                 # home-manager configurations, the hjem configurations
                 # and the profiles declared inside it, and a standalone
                 # hjem configuration, each through sequences of changes
@@ -252,7 +252,7 @@
                     caisson = self;
                   };
                 };
-                # A machine booted in a VM that installs the packages of
+                # A NixOS configuration booted in a VM that installs the packages of
                 # the home-manager configurations that set
                 # `caisson.useUserPackages`, through switches and a boot
                 # (tests/user-packages-vm).
@@ -326,7 +326,7 @@
                     # composed lib, since the raw scenario's flake-parts is
                     # built over the plain nixpkgs lib and is not shared,
                     # and the evaluation of the structural configuration
-                    # caisson's flake top holds beneath it, which reading
+                    # declared inside the caisson top of caisson's flake, which reading
                     # caisson's outputs pays.
                     {
                       name = "caisson-overhead";
@@ -350,7 +350,7 @@
               };
           };
 
-        # A system-manager machine activated in a container of each
+        # A system-manager configuration activated in a container of each
         # distribution of tests/system-manager/container-distros.nix,
         # through sequences of changes, as
         # `system-manager-<distribution>`. The container runs in the
@@ -391,7 +391,7 @@
                 caisson = self;
               };
             };
-        # The same machine and sequences in a VM of each distribution
+        # The same system-manager configuration and sequences in a VM of each distribution
         # below, booted from the cloud image of the distribution with
         # its kernel and its systemd, as
         # `system-manager-vm-<distribution>`. The systemd of these
@@ -412,10 +412,11 @@
             ]
         );
 
-        # A macOS machine declared through the darwin integration, built:
-        # the system `darwin-rebuild` would build for it. It is the only
-        # check for aarch64-darwin. The pinned-world suite evaluates the
-        # same machine on any host; building it needs a darwin builder,
+        # A nix-darwin configuration declared through the darwin
+        # integration, built: the system `darwin-rebuild` would build for
+        # it. It is the only check for aarch64-darwin. The pinned-world
+        # suite evaluates the same nix-darwin configuration on a Linux or
+        # macOS machine; building it needs a darwin builder,
         # so the darwin job of the workflow builds it on a macOS runner.
         flake.checks.aarch64-darwin.darwin-system =
           let
@@ -425,11 +426,11 @@
               };
             };
           in
-          # The bare machine, and the machine with a home-manager
+          # The bare nix-darwin configuration, and the nix-darwin configuration with a home-manager
           # configuration and a hjem configuration inside it, whose
           # system holds the activation of the home-manager
           # configuration and the launchd agents of hjem. Beside them,
-          # the manifests of a hjem configuration that is a top, in the
+          # the manifests of a hjem configuration that is a caisson top, in the
           # versions v1 and v2, and the hjem CLI, with which the darwin
           # job applies it on the runner
           # (tests/darwin-system/hjem-standalone.sh).
@@ -458,27 +459,27 @@
               name = "hjem-standalone/hjem";
               path = probe.standaloneHjem.outputs.cli;
             }
-            # The machine for the runner in each version, which the
-            # darwin job activates on the runner
-            # (tests/darwin-system/runner-machine.sh).
+            # The nix-darwin configuration for the runner in each
+            # version, which the darwin job activates on the runner
+            # (tests/darwin-system/runner-darwin.sh).
             {
-              name = "runner-machine/v1";
-              path = (probe.runnerMachineOf "v1").darwinConfigurations.runner-machine.system;
+              name = "runner-darwin/v1";
+              path = (probe.runnerDarwinOf "v1").darwinConfigurations.runner-darwin.system;
             }
             {
-              name = "runner-machine/v2";
-              path = (probe.runnerMachineOf "v2").darwinConfigurations.runner-machine.system;
+              name = "runner-darwin/v2";
+              path = (probe.runnerDarwinOf "v2").darwinConfigurations.runner-darwin.system;
             }
             # The activation package of the home-manager configuration
             # of `runner` in each version, which the script runs by
             # hand.
             {
-              name = "runner-machine/home-v1";
-              path = (probe.runnerMachineOf "v1").homeConfigurations."runner@runner-machine".activationPackage;
+              name = "runner-darwin/home-v1";
+              path = (probe.runnerDarwinOf "v1").homeConfigurations."runner@runner-darwin".activationPackage;
             }
             {
-              name = "runner-machine/home-v2";
-              path = (probe.runnerMachineOf "v2").homeConfigurations."runner@runner-machine".activationPackage;
+              name = "runner-darwin/home-v2";
+              path = (probe.runnerDarwinOf "v2").homeConfigurations."runner@runner-darwin".activationPackage;
             }
           ];
       };

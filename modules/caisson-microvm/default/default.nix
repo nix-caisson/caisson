@@ -2,7 +2,7 @@
 #
 # The default module of the caisson-microvm class.
 #
-# The nearest NixOS configurations beneath a caisson-microvm
+# The nearest NixOS configurations declared inside a caisson-microvm
 # configuration are its guests. This module adds caisson's NixOS module
 # `microvm-guest`, which imports microvm.nix's guest module from the
 # microvm.nix source of the caisson-microvm configuration, to the

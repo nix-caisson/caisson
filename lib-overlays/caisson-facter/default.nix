@@ -8,10 +8,10 @@
 # configuration declares NixOS configurations, under
 # `caisson.nixos.configurations`.
 #
-# The evaluation is caisson's own `evalModules` over the report
+# The evaluation is an `evalModules` call of caisson over the report
 # options, the assertions, the framework modules, the selection and the
 # configuration's module, on the composed library. A project extends
-# the class with options of its own about the hardware, beside the
+# the class with further options about the hardware, beside the
 # report. The outputs are the report, checked against the report
 # versions the integration knows, the report as the file nixos-facter
 # writes, the configuration as data and its hash. Every output fails
@@ -169,9 +169,9 @@
           hash = builtins.hashString "sha256" (builtins.toJSON serializableConfig);
         };
 
-      # The evaluator's call, on the lib of the view being evaluated.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # The evaluator's call, on the lib the configuration is evaluated with.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -257,8 +257,8 @@
             # if any. Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,

@@ -4,7 +4,7 @@
 # host runs through caisson's NixOS module `microvm-host` and the units
 # of microvm.nix's host module, in a VM that runs the guest on nested
 # KVM. `inputs` is the dependency pool of the checks partition with
-# `caisson` set to the tree itself.
+# `caisson` set to the source of this repository.
 #
 # The test host holds the caisson-microvm configuration `pool`,
 # registered as `configs/caisson-microvm/pool` here. Its one guest is
@@ -71,8 +71,9 @@ let
       caisson.caisson-microvm.configurations.pool = lib.caisson.caisson-microvm.mkConfiguration { };
     };
 
-  # The caisson evaluation of the test host. A module of the evaluation
-  # hands its library out through an option.
+  # The NixOS configuration of the test host, as caisson evaluates it.
+  # A module of the configuration hands its library out through an
+  # option.
   hostTop = lib.caisson.nixos.mkTopConfiguration {
     moduleImports = modules: [
       modules."caisson/default"
@@ -135,7 +136,7 @@ pkgs.testers.runNixOSTest {
       host
     ];
     system.stateVersion = "25.05";
-    # caisson's `default` module names the machine after the
+    # caisson's `default` module names the host after the
     # composition, `microvm-host-vm`. The test framework names the node
     # `host`, and the node keeps that name.
     networking.hostName = pkgs.lib.mkForce "host";

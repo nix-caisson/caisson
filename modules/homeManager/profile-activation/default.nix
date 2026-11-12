@@ -3,7 +3,7 @@
 # A home-manager module with which a home-manager configuration
 # activates the profiles declared inside it: the configurations that
 # are programs a person runs, such as an nvf or nixvim Neovim, each kept
-# in a Nix profile of its own, here a profile of the user,
+# in a separate Nix profile, here a profile of the user,
 # `$HOME/.local/state/caisson/profiles/<kind>/<name>`
 # (`lib.caisson.integrations.profileOf`).
 #
@@ -11,16 +11,16 @@
 # `activate` of each, after the files of the home-manager configuration
 # are linked and the home-manager configuration has recorded what it
 # applied. So `home-manager switch` puts each profile back to what the
-# home-manager configuration declares, and so does the machine when it
-# activates the home-manager configuration, at a switch of the machine
-# and at boot.
+# home-manager configuration declares, and so does the NixOS
+# configuration above when it activates the home-manager configuration,
+# at a switch of the NixOS configuration and at boot.
 #
 # The home-manager configuration also installs the programs with which
 # a shell chooses among profiles
 # (`lib.caisson.integrations.profileShimsOf`), and sets the variable
 # that chooses, `CAISSON_NVIM_PROFILE` for a Neovim, to the profile of
-# the home-manager configuration, so that the programs the machine
-# installs choose the same. A shell can `export` another value.
+# the home-manager configuration, so that the programs the NixOS
+# configuration above installs choose the same. A shell can `export` another value.
 #
 # caisson's `default` home-manager module imports this module. It
 # defines nothing in the childless evaluation.

@@ -4,14 +4,14 @@
 # imports the `apply` NixOS module of nixops4-nixos, which adds
 # `bin/apply` to the toplevel: the script that sets the system profile
 # and switches to the configuration. NixOps4 runs `bin/apply switch` on
-# the host after it copies the toplevel there. Where nixpkgs declares
+# the machine after it copies the toplevel there. Where nixpkgs declares
 # `system.apply` itself, the module of nixops4-nixos adds nothing.
 #
 # The default module of the caisson-nixops4-resource class adds this
-# module to the nearest NixOS configurations beneath a resource, the
-# configurations the resource deploys.
+# module to the nearest NixOS configurations declared inside a resource,
+# the configurations the resource deploys.
 #
-# The nixops4-nixos source is the one the composition declares or pins
+# The nixops4-nixos source is the source the composition declares or pins
 # under the name `nixops4-nixos`, read from the library of the
 # evaluation.
 { ... }:

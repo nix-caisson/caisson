@@ -3,7 +3,7 @@
 # The nixvim integration: it owns the `nixvim` class, the class of
 # nixvim's modules. A nixvim configuration is a Neovim, written as
 # nixvim modules (`plugins.*`, `opts`, `keymaps`), evaluated per
-# system, once for each system in force where it is declared, on the package set selected for
+# system, once for each system its parent evaluates its children for, on the package set selected for
 # it.
 #
 # nixvim evaluates its modules with `evalNixvim`: `evalModules` over
@@ -16,10 +16,10 @@
 #
 # The output is `package`, the Neovim, `config.build.package`. A
 # configuration is published as `nixvimConfigurations.<system>.<name>`,
-# the evaluated configuration, under the name nixvim's flake publishes
-# its own configurations under.
+# the evaluated configuration, under the output name the nixvim flake
+# uses for nixvim configurations.
 #
-# A nixvim configuration is kept in a Nix profile of its own, as an nvf
+# A nixvim configuration is kept in a separate Nix profile, as an nvf
 # configuration is (`lib.caisson.integrations.profileOf`): its output
 # `activationPackage` holds `activate`, and the configuration it is
 # declared inside activates it with the module `profile-activation` of
@@ -198,7 +198,8 @@
           };
           type = "nixvim";
           # A nixvim configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -214,14 +215,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nixvim";
         class = "nixvim";
-        # A nixvim configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # A nixvim configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixvim.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -235,8 +236,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

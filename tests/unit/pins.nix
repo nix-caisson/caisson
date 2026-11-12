@@ -16,8 +16,8 @@ let
   throws = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
 
   # The inputs a flake's `outputs` would receive, for the pins-flake
-  # fixture: `self` points at its tree (whose flake.lock is read), and
-  # each input carries what Nix puts on a resolved input.
+  # fixture: `self` points at its source tree, whose flake.lock is
+  # read, and each input has what Nix puts on a resolved input.
   pinsFlakeInputs = rec {
     self = {
       outPath = ./fixtures/pins-flake;
@@ -131,10 +131,10 @@ let
       && s.nixpkgs.pin.follows == null
       && s.nonflake.pin.url == "git+https://example.com/nonflake.git?ref=main"
       && !s.nonflake.pin.overridden
-      # The resolved tree differs from the lock: an override was in force.
+      # The resolved tree differs from the lock: an override was passed.
       && s.overridden.pin.overridden
       && s.overridden.pin.narHash == "sha256-OVERRIDE"
-      # An input the lock does not name carries no ref.
+      # An input the lock does not name has no ref.
       && s.unlocked.pin.url == null
       && !s.unlocked.pin.overridden;
 

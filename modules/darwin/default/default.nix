@@ -5,20 +5,21 @@
 # `moduleImports`, so this is what a darwin configuration gets from
 # caisson when it does not select its modules itself.
 #
-# It holds what a macOS machine does for the home-manager
+# It holds what a nix-darwin configuration does for the home-manager
 # configurations and the hjem configurations declared inside it:
 #
 # - `./caisson/forChildren.nix` gives each home-manager configuration
 #   the home-manager module `darwin-parent`, and each hjem
 #   configuration the hjem module `darwin-parent`. Both set the options
-#   that come from the machine.
+#   that come from the nix-darwin configuration.
 # - The registered module `home-manager-activation` activates the
-#   home-manager configurations when the machine is activated.
+#   home-manager configurations when the nix-darwin configuration is
+#   activated.
 # - The registered module `hjem-activation` writes the launchd agents
 #   that apply the hjem configurations.
 #
 # The parts read options of caisson's core module. The core module
-# leaves its options out when the library of the evaluation is not a
+# leaves its options out when the library of the configuration is not a
 # caisson composition, so the parts are left out in the same case.
 { closure-lib, mkModule, ... }:
 { lib, ... }:

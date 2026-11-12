@@ -5,7 +5,7 @@
 # file's signature, `{ lib }:`, and the properties the entry
 # depends on.
 #
-# Its functions reach the library they were built over, so reading
+# Its functions read the library they were built over, so reading
 # `reachesLib` shows which library the entry composed `hm` on top of.
 # `dag.entryAnywhere` calls back through `lib.hm`, the way the real
 # `generators` and `deprecations` call `lib.hm.dag` and

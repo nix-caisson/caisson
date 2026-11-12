@@ -8,7 +8,7 @@
 # declares NixOS configurations, under `caisson.nixos.configurations`,
 # and it may declare none: a data array, a removable disk.
 #
-# The evaluation is caisson's own `evalModules` over that option, the
+# The evaluation is an `evalModules` call of caisson over that option, the
 # framework modules, the selection and the configuration's module. It
 # runs on the composed library, with the type library built from the
 # disko source the composition declares. Its outputs are the layout
@@ -23,7 +23,7 @@
 # NixOS module to the NixOS configurations declared inside the layout.
 # That module gives a NixOS configuration the layout's `fileSystems`,
 # `boot` and `swapDevices`, and nothing of disko itself: a NixOS
-# configuration beneath a caisson-disko configuration carries no disko
+# configuration declared inside a caisson-disko configuration carries no disko
 # module, so the scripts that format and destroy the disks are not
 # reachable from it. They are outputs of the layout alone.
 #
@@ -202,12 +202,12 @@
           scripts = pkgs: accepted._scripts { inherit pkgs checked; };
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the devices option and the assertions, the framework modules of
       # the class, the selection and the configuration's module, with
       # the composition's dependencies as the `inputs` special
-      # argument. `ecosystemArgs`, which only the twin's pattern admits,
-      # is merged over the call last.
+      # argument. `ecosystemArgs`, which only the pattern of the
+      # `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -286,8 +286,8 @@
         };
 
       # A disko configuration is published as
-      # `diskoConfigurations.<name>`, which disko's command reads with
-      # its own evaluator: `disko.devices`, the device tree as data.
+      # `diskoConfigurations.<name>`, which the disko command evaluates
+      # itself: `disko.devices`, the device tree as data.
       exportsTo = {
         attrset = "diskoConfigurations";
         value = manifest: { disko.devices = manifest.outputs.serializableLayout; };
@@ -325,8 +325,8 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,

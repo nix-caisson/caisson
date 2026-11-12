@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# A NixOS machine of the registered world, with a home-manager
+# A NixOS configuration of the registered world, with a home-manager
 # configuration declared inside it that takes its module from the
 # registry as well.
 { ... }:

@@ -8,7 +8,7 @@
 #
 # The module writes a file into `/etc`. The file holds the name of the
 # composition that defined the module, read from `closure-lib`, and
-# whether the `lib` of the evaluation has `caisson`.
+# whether the `lib` of the configuration that imports it has `caisson`.
 { closure-lib, ... }:
 { lib, ... }:
 {

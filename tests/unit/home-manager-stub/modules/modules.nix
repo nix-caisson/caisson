@@ -52,9 +52,9 @@ let
         };
         # The options a NixOS configuration sets in the home-manager
         # configurations declared inside it: the home directory and the
-        # user ID of the account, the Nix of the machine, and the
-        # option home-manager reads to tell that a machine activates
-        # the home-manager configuration.
+        # user ID of the account, the Nix of the NixOS configuration,
+        # and the option home-manager reads to tell that the
+        # configuration above activates the home-manager configuration.
         home.homeDirectory = lib.mkOption {
           type = lib.types.str;
           default = "";
@@ -80,8 +80,8 @@ let
           default = false;
         };
         # home-manager's command-line program, which home-manager
-        # leaves out of a home-manager configuration that a machine
-        # activates.
+        # leaves out of a home-manager configuration that the
+        # configuration above activates.
         programs.home-manager.enable = lib.mkOption {
           type = lib.types.bool;
           default = false;

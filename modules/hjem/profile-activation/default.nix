@@ -6,18 +6,20 @@
 # `$HOME/.local/state/caisson/profiles/<kind>/<name>`
 # (`lib.caisson.integrations.profileOf`).
 #
-# hjem's activation has no step a configuration can add, so the machine
-# the hjem configuration is declared inside activates the profiles, as
-# the user, after the hjem configuration is applied (the module
-# `profile-activation` of the class of the machine). This module adds
-# to the packages of the user the programs with which a shell chooses
-# among profiles (`lib.caisson.integrations.profileShimsOf`), and sets
-# the variable that chooses, `CAISSON_NVIM_PROFILE` for a Neovim, to the
-# profile of the user, so that the programs the machine installs choose
-# the same.
+# hjem's activation has no step a configuration can add, so the NixOS,
+# nix-darwin or system-manager configuration the hjem configuration is
+# declared inside activates the profiles, as the user, after the hjem
+# configuration is applied (the module `profile-activation` of the
+# class of that configuration). This module adds to the packages of the
+# user the programs with which a shell chooses among profiles
+# (`lib.caisson.integrations.profileShimsOf`), and sets the variable
+# that chooses, `CAISSON_NVIM_PROFILE` for a Neovim, to the profile of
+# the user, so that the programs that configuration installs choose the
+# same.
 #
-# A hjem configuration with no machine above it is applied with
-# `hjem standalone switch`, and no machine activates its profiles. On
+# A hjem configuration with no such configuration above it is applied
+# with `hjem standalone switch`, and no configuration above activates
+# its profiles. On
 # Linux, this module adds to its files the systemd user units that do.
 # The service `caisson-profiles` runs
 # `~/.local/state/caisson/activate-profiles`, which the files link to
@@ -75,7 +77,7 @@ let
     builtins.replaceStrings [ "$HOME" ] [ config.directory ]
       choice.chosen.manifest.outputs.profile.path;
 
-  # True when no machine applies this hjem configuration: there is no
+  # True when no configuration above applies this hjem configuration: there is no
   # configuration above it with an activation.
   standalone = selection.activatingAncestorOf evalManifest == null;
 

@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: MIT
 #
-# A darwin module with which a macOS machine activates the hjem
-# configurations declared inside it.
+# A darwin module with which a nix-darwin configuration activates the
+# hjem configurations declared inside it.
 #
 # Activating a hjem configuration means applying its manifest with
 # hjem's CLI. hjem has a nix-darwin module that does this for the users
 # it embeds, with a launchd agent, `org.hjem.activate`, that applies the
 # manifest of the user it runs for and keeps the state in
 # `~/Library/Application Support/Hjem`, and restarts the agent of each
-# user from the machine's activation script, with `launchctl
-# kickstart`. caisson does not use that nix-darwin module, and this
-# module writes the same agent and script. For a user who is logged in
-# when the machine is activated, it applies the files in the activation
+# user from the activation script of the nix-darwin configuration, with
+# `launchctl kickstart`. caisson does not use that nix-darwin module,
+# and this module writes the same agent and script. For a user who is
+# logged in when the nix-darwin configuration is activated, it applies the files in the activation
 # itself and loads the agent of the new generation into the session of
 # the user (`reload` below).
 #
@@ -19,8 +19,8 @@
 # which nix-darwin installs for `system.primaryUser` alone. This module
 # declares it in `launchd.agents`, which nix-darwin installs in
 # `/Library/LaunchAgents`, where launchd loads it for every user who
-# logs in, so each hjem user gets the agent, and the machine needs no
-# primary user for it. The agent exits for a user no hjem configuration
+# logs in, so each hjem user gets the agent, and the nix-darwin
+# configuration needs no primary user for it. The agent exits for a user no hjem configuration
 # here names.
 #
 # The module also writes hjem's second agent, `org.nix.link-nix-apps`,
@@ -30,13 +30,14 @@
 # `extraDependencies` in the system, in `/etc/hjem/extra-dependencies`,
 # as hjem's nix-darwin module does.
 #
-# Which configurations: the enabled hjem configurations this darwin
-# configuration passes up, leaving out those declared inside a machine
-# that is itself inside this one, and those evaluated for another
+# Which configurations: the enabled hjem configurations this nix-darwin
+# configuration passes up, leaving out those declared inside a NixOS,
+# nix-darwin or system-manager configuration that is itself declared
+# inside this nix-darwin configuration, and those evaluated for another
 # system. caisson's `default` darwin module imports this module.
 #
-# The module reads the hjem configurations from the full evaluation of
-# the darwin configuration; in the childless evaluation it defines
+# The module reads the hjem configurations from the result of the full
+# evaluation of the nix-darwin configuration; in the childless evaluation it defines
 # nothing.
 { closure-lib, ... }:
 {
@@ -196,7 +197,7 @@ let
   # nix-darwin installs the agents in `/Library/LaunchAgents` and loads
   # them as root, which loads them into no session: launchd loads an
   # agent there into a session when its user logs in. A user who is
-  # logged in when the machine is activated therefore has the agent of
+  # logged in when the nix-darwin configuration is activated therefore has the agent of
   # the generation that was current at the login, or none, and
   # restarting it would apply the files of that generation. So for each
   # hjem user with a session, the step removes the agent from the

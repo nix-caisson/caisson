@@ -19,9 +19,9 @@
 # read: a component whose `resourceType` is defined is a resource. A
 # composite here declares `members` again, as `lazyAttrsOf
 # deferredModule`, and decides the same way for each member, with a
-# probe evaluation of the member's modules over NixOps4's own base
-# modules. A member becomes a caisson-nixops4-resource or a
-# caisson-nixops4-composite configuration declared beneath the
+# probe evaluation of the member's modules over the base modules of
+# NixOps4. A member becomes a caisson-nixops4-resource or a
+# caisson-nixops4-composite configuration declared inside the
 # composite, evaluated with the same modules. A member that sets `type`
 # and also has members is refused; upstream drops the members.
 #
@@ -34,9 +34,9 @@
 # sets `unsafeCrossChildReferences` for the class of its members.
 #
 # A member that imports nixops4-nixos's module gets its `nixos.module`
-# evaluated as a caisson NixOS configuration beneath it, rather than by
-# the `nixosSystem` call of nixops4-nixos: see the module `nixos` of the
-# `nixops4Component` class.
+# evaluated as a caisson NixOS configuration declared inside the
+# member. The module `nixos` of the `nixops4Component` class does this
+# in place of the `nixosSystem` call of nixops4-nixos.
 {
   mkLibOverlay,
   ...
@@ -51,7 +51,7 @@
     # What an integration is written from, imported by key so it is
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
-    # The native integrations, whose evaluators this one builds on.
+    # The native integrations, whose evaluators this integration builds on.
     ((mkLibOverlay ../caisson-nixops4-composite) // { key = "caisson-nixops4-composite"; })
     ((mkLibOverlay ../caisson-nixops4-resource) // { key = "caisson-nixops4-resource"; })
   ];
@@ -123,11 +123,12 @@
 
       # The module of an upstream composite at `path` that declares
       # `members` and turns the modules defined there into the
-      # configurations declared beneath it. The members are computed
+      # configurations declared inside it. The members are computed
       # from the definitions of `members`, since its value is the
       # members' configs: in the full evaluation those of the members
-      # the composite finalized (`finalized`), and in the childless view
-      # those of the full evaluation, which the composite reads through
+      # the composite finalized (`finalized`), and in the childless
+      # evaluation those in the result of the full evaluation, which the
+      # composite reads through
       # `unsafeCrossChildReferences`.
       membersModule =
         ctx:
@@ -234,7 +235,7 @@
 
       # An upstream composite of the integration `type`: NixOps4's class
       # and options, `members` declared and its definitions declared
-      # beneath as configurations, and `config.members` as its `members`
+      # inside it as configurations, and `config.members` as its `members`
       # argument. `settings` are further arguments of the native
       # constructor.
       compositeWith =

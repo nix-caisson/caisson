@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
 # The warning a drift check prints, run. `inputs` is the dependency pool
-# of the checks partition with `caisson` set to the tree itself.
+# of the checks partition with `caisson` set to the source of this repository.
 #
 # The nvf configuration `editor` inside a hjem configuration that is a
-# top checks, when it is activated, the marker of the hjem
+# caisson top checks, when it is activated, the marker of the hjem
 # configuration. The check runs its `activate` in the build sandbox,
 # where the marker does not exist, and compares what it prints to
 # standard error, up to the activation step that needs a Nix daemon,

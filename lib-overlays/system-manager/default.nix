@@ -3,8 +3,8 @@
 # The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
 # system-manager flake. A system-manager configuration is the system
-# of a machine running another Linux distribution, evaluated per
-# system, once for each system in force where it is declared, and
+# of a computer running another Linux distribution, evaluated per
+# system, once for each system its parent evaluates its children for, and
 # published as
 # `systemConfigs.<name>`, the system `system-manager switch --flake`
 # reads.
@@ -126,11 +126,11 @@
           # the same options (nix/modules/upstream/nixpkgs/nix.nix, which
           # predates them landing in the NixOS module). When the NixOS
           # module owns the options, disable the stub and re-provide the
-          # config facts it carried: nix.conf must replace a foreign
+          # config facts it held: nix.conf must replace a foreign
           # distro's existing file, flakes stay on by default, and
-          # `nix.enable` keeps the stub's off-by-default (the NixOS
-          # declaration defaults it on, which would materialize nixbld
-          # users on hosts whose configs did not ask for nix management).
+          # `nix.enable` keeps the stub's off-by-default. The NixOS
+          # declaration defaults it on, which would create nixbld users
+          # for system-manager configurations that did not ask for nix management.
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
           nixStubReplacementModule = final.caisson.integrations.caissonModule {
             key = "caisson.systemManager.nixpkgsCompatNixStub";
@@ -160,11 +160,11 @@
         final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
         ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
 
-      # The evaluator's call, on the view being evaluated:
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with:
       # `makeSystemConfig` over the framework modules, the selection,
       # the configuration's module and the bridge, for the
-      # configuration's system. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last; `modules`,
+      # configuration's system. `ecosystemArgs`, which only the pattern
+      # of the `WithEcosystemArgs` variant admits, is merged over the call last; `modules`,
       # `specialArgs` and `allowUnsupportedNixpkgs` can be set or
       # replaced there. `overlays` is refused: the selected set is the
       # package set, so an overlay passed there would change nothing.
@@ -187,8 +187,8 @@
               "this system-manager configuration for ${system}";
 
           # The package sets available to the configuration, each for the
-          # system of the evaluation, and the set it runs on: the
-          # selection in force at its manifest, applied to those.
+          # system it is evaluated for, and the set it runs on: the
+          # package set selection that applies to its manifest, applied to those.
           pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
@@ -199,7 +199,8 @@
 
           # `makeSystemConfig` from system-manager's `nix/lib.nix`, called
           # as system-manager's flake calls it, with the composition's
-          # nixpkgs and the composed library in place of its own.
+          # nixpkgs and the composed library in place of the nixpkgs and
+          # library system-manager pins.
           systemManagerLib = import "${src}/nix/lib.nix" {
             nixpkgs = nixpkgsSrc;
             inherit lib;
@@ -269,7 +270,7 @@
                   modules = moduleList;
                   # The module system takes a special argument before an
                   # entry of `_module.args`, so `pkgs` and `userborn`
-                  # here are the ones every module receives, and the
+                  # here are the values every module receives, and the
                   # default of the read-only `nixpkgs.pkgs`.
                   specialArgs = {
                     inherit
@@ -330,12 +331,12 @@
           };
           type = "system-manager";
           # A system-manager configuration is evaluated per system: it
-          # has an evaluation for every system in force where it is
-          # declared.
+          # has an evaluation result for each system its parent evaluates
+          # its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A system-manager configuration is activated on a machine;
+          # A system-manager configuration is activated on a computer;
           # the configurations with an activation declared inside it
           # check its marker.
           activation = final.caisson.integrations.machineActivation;
@@ -345,14 +346,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "system-manager";
         class = "systemManager";
-        # A system-manager configuration that is a top, as a tool reads
+        # A system-manager configuration that is a caisson top, as a tool reads
         # it: the system, or the systems by system where several are in
         # force.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.system-manager.configurations.<name>` finalizes it,
-        # and `mkTopConfiguration` finalizes it at a top.
+        # and `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -366,8 +367,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

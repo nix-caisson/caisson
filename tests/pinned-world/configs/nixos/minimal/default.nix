@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# A machine of the registered world evaluated with the minimal NixOS
-# evaluator, which carries no NixOS module list.
+# A NixOS configuration of the registered world evaluated with the minimal NixOS
+# evaluator, which imports no NixOS module list.
 { ... }:
 { ... }:
 { }

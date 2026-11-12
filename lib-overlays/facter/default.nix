@@ -2,7 +2,7 @@
 #
 # The facter integration, the upstream-compatible facter integration:
 # it owns the `facter` class. A facter configuration is a hardware
-# report as nixos-facter writes it, `facter.json`, named by the one
+# report as nixos-facter writes it, `facter.json`, named by the
 # option of the class, `reportPath`. It declares the NixOS
 # configurations that run on that hardware under
 # `caisson.nixos.configurations`.
@@ -10,7 +10,7 @@
 # The default module of the class adds caisson's NixOS module
 # `facter-hardware` to the NixOS configurations declared inside it.
 # That module sets nixpkgs' `hardware.facter.reportPath` to the report,
-# the line a NixOS configuration written for nixos-facter carries, so
+# the setting a NixOS configuration written for nixos-facter makes, so
 # nixpkgs' `hardware.facter` module reads the file as it does for any
 # NixOS configuration.
 #
@@ -143,8 +143,8 @@
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,

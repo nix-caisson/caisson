@@ -2,7 +2,7 @@
 #
 # Marks two functions of the composed lib: `getExe`, of the package-set
 # library `meta`, and `splitString`, a general utility. The checks read
-# which of the two a package set's lib still carries.
+# which of the two a package set's lib still has.
 { ... }:
 {
   overlay = _final: _prev: {

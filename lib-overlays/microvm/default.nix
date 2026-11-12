@@ -12,7 +12,7 @@
 # configurations declared inside it, which get microvm.nix's guest
 # module through the default of the class.
 #
-# The evaluation is the NixOS evaluation of the nixos integration:
+# A microvm configuration is evaluated as the nixos integration evaluates a NixOS configuration:
 # eval-config over the composition the nixos integration publishes
 # (`lib.caisson.nixos.compose`), with microvm.nix's guest module after
 # the modules of that composition. So a microvm configuration gets what
@@ -36,11 +36,11 @@
     # What an integration is written from, imported by key so it is
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
-    # The nixos integration, whose composition and publishing this one
-    # builds on.
+    # The nixos integration, whose composition and publishing this
+    # integration builds on.
     ((mkLibOverlay ../nixos) // { key = "nixos"; })
     # The native microvm integration, whose resolution of the
-    # microvm.nix source this one builds on.
+    # microvm.nix source this integration builds on.
     ((mkLibOverlay ../caisson-microvm) // { key = "caisson-microvm"; })
   ];
 
@@ -50,18 +50,18 @@
       nixos = final.caisson.nixos;
       native = final.caisson.caisson-microvm;
 
-      # The evaluator's call, on the view being evaluated: eval-config
-      # over the composition of the nixos class, with microvm.nix's
-      # guest module, for the configuration's system. `ecosystemArgs`,
-      # which only the twin's pattern admits, is merged over the call
-      # last.
+      # The evaluator's call, on the lib and manifest the configuration
+      # is evaluated with: eval-config over the composition of the nixos
+      # class, with microvm.nix's guest module, for the configuration's
+      # system. `ecosystemArgs`, which only the pattern of the
+      # `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
-        args: view:
+        args: given:
         let
-          common = nixos.compose { context = "lib.caisson.microvm.mkConfiguration"; } view args;
+          common = nixos.compose { context = "lib.caisson.microvm.mkConfiguration"; } given args;
           microvmSrc = native.ecosystemSrcOf {
             explicit = args.microvmSrc or null;
-            manifest = view.lib.caisson-core.libManifest or { };
+            manifest = given.lib.caisson-core.libManifest or { };
           };
           guestModule = "${microvmSrc}/nixos-modules/microvm";
           callArgs = {
@@ -78,7 +78,7 @@
             nixos = common.srcAccount;
             microvm = native.ecosystemAccountOf {
               explicit = args.microvmSrc or null;
-              manifest = view.lib.caisson-core.libManifest or { };
+              manifest = given.lib.caisson-core.libManifest or { };
             };
           };
           # What eval-config received: NixOS' module list, the modules
@@ -123,8 +123,8 @@
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit (nixos) exportsTo;
-          # A guest is a machine of its own; a configuration with an
-          # activation declared inside it checks its marker.
+          # A guest runs as a separate virtual computer. A configuration
+          # with an activation declared inside it checks its marker.
           activation = final.caisson.integrations.machineActivation;
           evaluate = evaluate args;
         };
@@ -149,7 +149,7 @@
             # declarations when absent.
             ecosystemSrc ? null,
             # The microvm.nix flake or source tree, as a function of the
-            # tree's dependencies (`microvmSrc = dependencies: dependencies.<name>;`);
+            # dependencies passed to mkLib (`microvmSrc = dependencies: dependencies.<name>;`);
             # resolved from the composition's declarations under the
             # name `microvm` when absent.
             microvmSrc ? null,

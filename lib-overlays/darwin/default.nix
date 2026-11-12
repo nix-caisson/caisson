@@ -2,17 +2,18 @@
 #
 # The darwin integration: it owns the `darwin` class and evaluates it
 # with nix-darwin's `eval-config.nix`, over the composed library. A
-# darwin configuration is a macOS machine, evaluated per system,
-# once for each system in force where it is declared, as a NixOS configuration is, and
-# published as `darwinConfigurations.<name>`, the value `darwin-rebuild`
-# reads: the evaluated configuration with its `system` beside it.
+# nix-darwin configuration describes a macOS system, evaluated per
+# system, once for each system its parent evaluates its children for,
+# as a NixOS configuration is, and published as
+# `darwinConfigurations.<name>`, the value `darwin-rebuild` reads: the
+# evaluated configuration with its `system` beside it.
 #
-# The evaluation is the one nix-darwin's `darwinSystem` makes: the
+# caisson evaluates it as nix-darwin's `darwinSystem` does: the
 # configuration's modules with nix-darwin's module list, and the
 # settings `darwinSystem` adds to them, `nixpkgs.source` from the
 # nixpkgs the composition declares, no check of `NIX_PATH`, and the
 # revision of the nix-darwin source in the version of the system. The
-# package set is the one caisson selects for the configuration, as for
+# package set is the set caisson selects for the configuration, as for
 # a NixOS configuration, handed to nix-darwin's `nixpkgs.pkgs`.
 {
   mkLibOverlay,
@@ -61,11 +62,11 @@
         else
           throw "${context} requires `ecosystemSrc` to be a nix-darwin flake or source tree (holding eval-config.nix).";
 
-      # The evaluator's call, on the view being evaluated: eval-config
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with: eval-config
       # over the framework modules, the selection, the configuration's
       # module and the settings of `darwinSystem`, for the
-      # configuration's system. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last.
+      # configuration's system. `ecosystemArgs`, which only the pattern
+      # of the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -87,7 +88,7 @@
               "this darwin configuration for ${system}";
 
           # The package sets available to the configuration, each for the
-          # system of the evaluation, and the one it runs on.
+          # system it is evaluated for, and the set it runs on.
           pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
@@ -189,12 +190,13 @@
             inherit args;
           };
           type = "darwin";
-          # A darwin configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # A nix-darwin configuration is evaluated per system: it has an
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A darwin configuration is activated on a machine; the
+          # A nix-darwin configuration is activated on a computer; the
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
@@ -204,14 +206,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "darwin";
         class = "darwin";
-        # A darwin configuration that is a top, as a tool reads it: the
+        # A darwin configuration that is a caisson top, as a tool reads it: the
         # evaluated configuration, or the evaluated configurations by
-        # system where several are in force, as for NixOS.
+        # system where the composition declares several systems, as for NixOS.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.darwin.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -225,8 +227,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

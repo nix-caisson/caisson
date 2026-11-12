@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: MIT
 #
 # What this configuration gives the configurations of a class declared
-# directly beneath it: additions to the default selection of that
-# class, and whether they read the full evaluation of this
-# configuration. A configuration evaluated per system and declared here
-# is a direct child, since a system is no level of its own. Nothing
+# directly inside it: additions to the default selection of that
+# class, and whether they read the result of the full evaluation of
+# this configuration. A configuration evaluated per system and declared here
+# is a direct child, since a system does not count as a level. Nothing
 # here passes through a configuration of another class, and the
-# configurations beneath a direct child do not get it. It is read from
-# the childless view, which the configurations beneath are built
-# against.
+# configurations declared inside a direct child do not get it. It is
+# read from the result of the childless evaluation, which the
+# configurations declared inside this configuration are built against.
 { lib, ... }:
 {
   options.caisson.forDirectChildren = {
@@ -23,7 +23,7 @@
       '';
       description = ''
         Additions to the default selection of a class for the
-        configurations of that class declared directly beneath this
+        configurations of that class declared directly inside this
         configuration: by class, a function of the lib of such a
         configuration returning registered modules. A direct child that
         passes no `moduleImports` gets every entry named `default`, then
@@ -45,14 +45,15 @@
       };
       description = ''
         By class, whether the configurations of that class declared
-        directly beneath this configuration read the full evaluation
-        of this configuration, with its children, in place of its
-        childless view (`lib.caisson-core.evalManifest.crossChildLevel`).
-        They can then reach every configuration beneath this one, and
-        a loop between them is a Nix infinite recursion, which the
-        childless view otherwise rules out.
+        directly inside this configuration read the result of the full
+        evaluation of this configuration, with its children, in place of
+        the result of its childless evaluation
+        (`lib.caisson-core.evalManifest.crossChildLevel`). They can then
+        read any configuration declared inside this configuration, and a
+        loop between them is a Nix infinite recursion, which the
+        childless evaluation otherwise rules out.
 
-        This setting beats one through `caisson.forNearestChildren` or
+        This setting beats a setting through `caisson.forNearestChildren` or
         `caisson.forChildren`.
       '';
     };

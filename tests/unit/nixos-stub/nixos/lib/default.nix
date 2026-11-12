@@ -3,9 +3,9 @@
 # A stand-in for `nixos/lib/default.nix` of a nixpkgs source tree,
 # with that file's signature and its treatment of `lib`: the library
 # it is given is what `evalModules` runs on, and `lib` defaults to
-# `import ../../lib`, the library of the tree this file lives in. The
-# nixos-minimal integration imports this file directly, so the library
-# it names here is what reaches a minimal evaluation.
+# `import ../../lib`, the library of the source tree this file lives
+# in. The nixos-minimal integration imports this file directly, so the
+# library it names here is what a minimal evaluation runs on.
 {
   lib ? import ../../lib,
   featureFlags ? { },

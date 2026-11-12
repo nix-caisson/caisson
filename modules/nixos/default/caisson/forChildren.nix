@@ -12,9 +12,9 @@
 #
 # `nixos-parent` is the module caisson registers as
 # `modules/homeManager/nixos-parent`. It sets the options of a
-# home-manager configuration that come from its machine: the home
-# directory and the user ID of the account, and the Nix of the
-# machine. home-manager has a NixOS module that sets the same options
+# home-manager configuration that come from the NixOS configuration it
+# is declared inside: the home directory and the user ID of the
+# account, and the Nix of the NixOS configuration. home-manager has a NixOS module that sets the same options
 # in the home-manager configurations it embeds, and caisson does not
 # use that NixOS module.
 #
@@ -35,8 +35,9 @@
   ];
 
   # The hjem module `nixos-parent` sets the home directory of a hjem
-  # configuration declared inside this machine from the account of its
-  # user, and refuses a user the machine has no account for.
+  # configuration declared inside this NixOS configuration from the
+  # account of its user, and refuses a user the NixOS configuration has
+  # no account for.
   caisson.forChildren.extraDefaultModuleImports.hjem = _lib: [
     closure-lib.caisson.modules.hjem.nixos-parent
   ];

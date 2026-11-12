@@ -6,9 +6,9 @@
 # It is declared inside the host as
 # `caisson.caisson-microvm.configurations.<name>`, and it declares its
 # guests as NixOS configurations, under `caisson.nixos.configurations`.
-# Each guest sets its own `microvm.*` options in its own modules.
+# Each guest sets its `microvm.*` options in the modules of the guest.
 #
-# The evaluation is caisson's own `evalModules` over the start
+# The evaluation is an `evalModules` call of caisson over the start
 # options, the framework modules, the selection and the configuration's
 # module. The start options, `autostart` and `restartIfChanged`, say
 # how the host starts the guests. caisson's `microvm-host` NixOS module
@@ -110,12 +110,12 @@
           };
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the start options, the framework modules of the class, the
       # selection and the configuration's module, with the composition's
       # dependencies as the `inputs` special argument. `ecosystemArgs`,
-      # which only the twin's pattern admits, is merged over the call
-      # last.
+      # which only the pattern of the `WithEcosystemArgs` variant admits,
+      # is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:

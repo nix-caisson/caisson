@@ -3,7 +3,7 @@
 # A hjem module with which a hjem configuration records what it
 # applied, so that the configurations declared inside it can detect
 # drift. It is the counterpart, for a hjem configuration, of the
-# machine module `activation-marker`: see there for why.
+# NixOS module `activation-marker`: see there for why.
 #
 # The module adds a file to the files of the configuration,
 # `.local/state/caisson/markers/hjem-<name>.json` in the directory of

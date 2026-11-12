@@ -2,13 +2,13 @@
 #
 # The default module of the colmena class.
 #
-# The nearest NixOS configurations beneath a colmena configuration are
-# its nodes, and colmena reads the `deployment` options back from each
-# of them. This module adds caisson's NixOS module
-# `colmena-deployment`, which declares those options, to the modules
-# that such a NixOS configuration imports by default. It reaches the
-# machines inside a structural group or a disk layout beneath the
-# colmena configuration. A NixOS configuration declared inside a node
+# The nearest NixOS configurations declared inside a colmena
+# configuration are its nodes, and colmena reads the `deployment`
+# options back from each of them. This module adds caisson's NixOS
+# module `colmena-deployment`, which declares those options, to the
+# modules that such a NixOS configuration imports by default. The NixOS
+# configurations inside a structural group or a disk layout declared inside
+# the colmena configuration get it too. A NixOS configuration declared inside a node
 # is not a node and does not get it.
 #
 # A NixOS configuration that passes `moduleImports` selects its modules

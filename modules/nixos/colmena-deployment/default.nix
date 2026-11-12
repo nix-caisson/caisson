@@ -7,7 +7,7 @@
 # assertions on them and the services that install the keys.
 #
 # The default module of the colmena class adds this module to the
-# nearest NixOS configurations beneath a colmena configuration, its
+# nearest NixOS configurations declared inside a colmena configuration, its
 # nodes. A NixOS
 # configuration that is also deployed some other way, and sets these
 # options, imports this module itself.
@@ -18,8 +18,8 @@
 # The colmena integration fills a `targetHost` left at `null` with the
 # node's name when it builds the hive, where the name is known.
 #
-# The colmena source is the one the composition declares or pins under
-# the name `colmena`, read from the library of the evaluation, so these
+# The colmena source is the source the composition declares or pins under
+# the name `colmena`, read from the library of the NixOS configuration, so these
 # options match the colmena whose command deploys the node.
 { ... }:
 { lib, ... }:

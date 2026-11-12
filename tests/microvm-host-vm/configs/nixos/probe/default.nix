@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
-# The guest `probe` of the microvm host test. It sets its own
-# `microvm.*` options: it runs on cloud-hypervisor with one virtual
+# The guest `probe` of the microvm host test. It sets its
+# `microvm.*` options itself: it runs on cloud-hypervisor with one virtual
 # CPU, 512 megabytes and the vsock CID 10. It answers on its vsock port
 # 5000 with what it reads there.
 { ... }:
