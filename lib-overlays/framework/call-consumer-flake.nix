@@ -3,9 +3,11 @@
 # The consumer flake caller, built on call-flake.nix: minimal
 # flake-output wiring over explicitly provided, already-wired inputs
 # (no lock handling, no fetching). call-flake.nix is self-contained on
-# purpose; see its header. A lockfile'd subflake's inputs, which a
-# flake-parts partition takes as `extraInputs`, are what
-# `pins.flake-compat` reads. This file is the function itself.
+# purpose; see its header. `pins.flake-compat` reads the inputs of a
+# flake.nix and flake.lock pair that Nix's flake evaluator does not
+# see, such as tests/dependencies, which a flake-parts configuration
+# declared inside a caisson top takes as its `dependencies`. This file
+# is the function itself.
 let
 
   callFlake = builtins.import ./call-flake.nix;

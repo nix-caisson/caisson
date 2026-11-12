@@ -7,7 +7,11 @@ name: drift
 # pins are the last known good and move only in the commit that fixes
 # what the advance broke. The checks are built by name rather than the
 # whole `nix flake check`, whose eval-weight baseline and formatter
-# would report nixpkgs churn as failures.
+# would report nixpkgs churn as failures. The checks configuration
+# (configs/flake/checks) reads tests/dependencies/flake.lock, and for a
+# dependency that flake.lock pins as well (caisson-core, flake-parts,
+# nixpkgs-lib) it uses the pin of flake.lock. So each job advances
+# those dependencies in flake.lock as well, in the same working tree.
 #
 # The pinned-world suite (tests/pinned-world) evaluates. The other
 # checks run the upstream tools: the VM test of activation runs
@@ -34,6 +38,7 @@ jobs:
           # project targets the Nix everyone else runs.
           determinate: false
       - run: nix flake update --flake ./tests/dependencies
+      - run: nix flake update caisson-core flake-parts nixpkgs-lib
       - run: nix build -L '.#checks.x86_64-linux.pinned-world'
       - run: nix build -L '.#checks.x86_64-linux.hjem-system'
       - run: nix build -L '.#checks.x86_64-linux.drift-message'
@@ -65,6 +70,7 @@ jobs:
             use-cgroups = true
             extra-system-features = uid-range
       - run: nix flake update --flake ./tests/dependencies
+      - run: nix flake update caisson-core flake-parts nixpkgs-lib
       - run: nix build -L '.#containerTests.x86_64-linux.system-manager-${{ matrix.distro }}'
   darwin:
     runs-on: macos-latest
@@ -74,6 +80,7 @@ jobs:
         with:
           determinate: false
       - run: nix flake update --flake ./tests/dependencies
+      - run: nix flake update caisson-core flake-parts nixpkgs-lib
       - run: nix build -L '.#checks.aarch64-darwin.darwin-system'
       - run: bash tests/darwin-system/hjem-standalone.sh "$(readlink -f result)"
       - run: bash tests/darwin-system/runner-darwin.sh "$(readlink -f result)"

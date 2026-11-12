@@ -27,8 +27,11 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.flake-parts.follows = "flake-parts";
 
-    # The tests compose with the deps world's caisson-core, not the
-    # caisson-core the parent's lock names.
+    # The tests compose with the caisson-core of `deps`. In the checks
+    # of caisson, `deps` holds the inputs of the checks configuration,
+    # whose caisson-core is the caisson-core that the lock of caisson
+    # names. A standalone evaluation of this flake takes the
+    # caisson-core of tests/dependencies.
     caisson-core.follows = "deps/caisson-core";
 
   };

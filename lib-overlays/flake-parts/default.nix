@@ -131,8 +131,11 @@
           # deduplicate. It comes from the manifest rather than the
           # module evaluation because moduleLocation is consumed before
           # that evaluation exists.
-          # flake-parts' `inputs` are the composition's dependencies,
-          # with `self` added below.
+          # flake-parts' `inputs` are the dependencies the manifest of
+          # the configuration records: the dependencies of the caisson
+          # top, with those that this configuration or a configuration
+          # it is declared inside adds (`dependencies`), and `self`,
+          # added below.
           callArgs =
             (if name != null then { moduleLocation = name; } else { })
             // {
@@ -274,35 +277,40 @@
 
       configuration =
         args:
-        final.caisson.integrations.mkModuleConfiguration {
-          selection = {
-            class = "flake";
-            inherit args;
-          };
-          type = "flake-parts";
-          defaultPkgs = args.defaultPkgs or null;
-          # A flake-parts configuration checks that each package of its
-          # `packages` output builds, for each system: the check of the
-          # package `foo` is `foo-package`. `nix flake check` evaluates
-          # the packages of a flake and builds none of them, so a
-          # package that is published and never built is checked here.
-          checks =
-            { outputs, system, ... }:
-            let
-              packages = (outputs.flake.packages or { }).${system} or { };
-            in
-            builtins.listToAttrs (
-              builtins.map (name: {
-                name = "${name}-package";
-                value = {
-                  derivation = packages.${name};
-                  category = "build";
-                  description = "the package `${name}` of the flake builds";
-                };
-              }) (builtins.attrNames packages)
-            );
-          evaluate = evaluate args;
-        };
+        final.caisson.integrations.mkModuleConfiguration (
+          {
+            selection = {
+              class = "flake";
+              inherit args;
+            };
+            type = "flake-parts";
+            defaultPkgs = args.defaultPkgs or null;
+            # A flake-parts configuration checks that each package of its
+            # `packages` output builds, for each system: the check of the
+            # package `foo` is `foo-package`. `nix flake check` evaluates
+            # the packages of a flake and builds none of them, so a
+            # package that is published and never built is checked here.
+            checks =
+              { outputs, system, ... }:
+              let
+                packages = (outputs.flake.packages or { }).${system} or { };
+              in
+              builtins.listToAttrs (
+                builtins.map (name: {
+                  name = "${name}-package";
+                  value = {
+                    derivation = packages.${name};
+                    category = "build";
+                    description = "the package `${name}` of the flake builds";
+                  };
+                }) (builtins.attrNames packages)
+              );
+            evaluate = evaluate args;
+          }
+          # Passed only where the configuration is given them, since the
+          # argument being present decides the fields of the manifest.
+          // (if args ? dependencies then { inherit (args) dependencies; } else { })
+        );
 
       integration = final.caisson.integrations.mkIntegration {
         name = "flake-parts";
@@ -356,6 +364,21 @@
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
+            # Pinned dependencies added to those of the configuration
+            # this configuration is declared inside, as a pin reader
+            # returns them: `inherit (lib.caisson.pins.flake-compat
+            # ../../../tests/dependencies) dependencies;`. The flake's
+            # `inputs` are then both, for this configuration and the
+            # configurations declared inside it. A name the
+            # configuration above already pins keeps the dependency of
+            # that configuration, and the manifest records the added
+            # dependency of that name as shadowed. A configuration that
+            # holds the checks of a flake declares the pins only its
+            # checks need here, so the pin file of the caisson top, which
+            # every flake that uses the caisson top locks, does not hold
+            # them. Refused at the caisson top, whose dependencies are
+            # passed to mkLib.
+            dependencies ? null,
           }@args:
           configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
@@ -369,6 +392,7 @@
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
+            dependencies ? null,
             ecosystemArgs ? null,
           }@args:
           configuration args;

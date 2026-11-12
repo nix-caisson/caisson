@@ -9,14 +9,18 @@
 # that moves and breaks an expectation fails at evaluation, in this
 # suite, rather than in a consumer.
 #
-# The checks partition runs it as the `pinned-world` check, so
-# `nix flake check` evaluates the suite at the committed pins and a
-# change to caisson is judged against the last known good world. The
-# drift workflow advances the pins in the working tree, committing
-# nothing, and runs the same check against today's upstreams.
+# The checks configuration (configs/flake/checks) runs it as the
+# `pinned-world` check, so `nix flake check` evaluates the suite at the
+# committed pins and a change to caisson is judged against the last
+# known good world. The drift workflow advances the pins in the working
+# tree, committing nothing, and runs the same check against today's
+# upstreams.
 #
-# `inputs` is the dependency pool of the checks partition with
-# `caisson` set to the source of this repository. caisson-core is read
+# `inputs` are the inputs of the checks configuration, with `caisson`
+# set to the flake of caisson evaluated from the source of this
+# repository. Where tests/dependencies names a dependency that the
+# flake.lock of caisson pins as well (caisson-core, flake-parts,
+# nixpkgs-lib), `inputs` hold the pin of flake.lock. caisson-core is read
 # through the composed library of caisson,
 # `inputs.caisson.lib.caisson-core`, the caisson-core that caisson
 # pins, and the suite composes no other.
@@ -1394,8 +1398,11 @@ let
 
     # The module system of the composed library comes from the declared
     # world, not from the pin of the flake that built the exported
-    # overlays. The two differ as soon as tests/dependencies moves ahead
-    # of caisson's lock, which is what the drift workflow does.
+    # overlays. In the checks of caisson the declared world takes
+    # nixpkgs-lib from the flake.lock of caisson, since that pin shadows
+    # the nixpkgs-lib of tests/dependencies, so the two are the same
+    # tree there. The drift workflow advances that pin in flake.lock,
+    # so the probe runs against today's nixpkgs-lib.
     composedLibraryIsTheDeclaredNixpkgsLib =
       (builtins.unsafeGetAttrPos "evalModules" composed.lib.modules).file
       == "${inputs.nixpkgs-lib}/lib/modules.nix";
@@ -6615,6 +6622,7 @@ let
           description = null;
           volatile = true;
           requiredFeatures = [ "kvm" ];
+          top = null;
         }
       && builtins.map (position: position.file) boots.code == [ "tests/pinned-world/default.nix" ]
       &&

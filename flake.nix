@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MIT
 #
-# The flake-parts caisson top of caisson: the structural configuration
-# in configs/structural/caisson evaluated through flake-parts, which
-# adds the checks partition. default.nix is the structural caisson top
-# over the
-# same configuration for a reader that is not a flake.
+# The flake-parts caisson top of caisson: the flake-parts configuration
+# in configs/flake/caisson, which declares the configuration of what
+# caisson exports (configs/structural/impl) and the configuration that
+# holds the checks (configs/flake/checks). default.nix is the
+# structural caisson top over the configuration of what caisson exports,
+# for a reader that is not a flake.
 {
 
   description = "The foundation framework for composable Nix flakes";
