@@ -74,6 +74,7 @@ let
       registered."caisson/treefmt"
       registered."caisson/nvf"
       registered."caisson/nixvim"
+      registered."caisson/nemacs"
       registered."caisson/topology"
       registered."caisson/kubenix"
       registered."caisson/nixidy"
@@ -121,6 +122,7 @@ let
     "mkPkgOverlay"
     "mkPkgOverlays"
     "modules"
+    "nemacs"
     "nixidy"
     "nixos"
     "nixos-minimal"
@@ -203,13 +205,15 @@ let
   # The colmena and disko probes compose with declared ecosystems: a
   # node resolves the colmena source, a layout resolves the disko
   # source, and nixpkgs resolves from the declaration, as it does in a
-  # consumer flake.
+  # consumer flake. The flake of nemacs is listed in `projects`, which
+  # registers its `core` module for the `nemacs` class.
   hiveLib = core.mkLib (
     declaresPkgs
     // {
       sources = { };
       projects = {
         caisson = inputs.caisson;
+        nemacs = inputs.nemacs;
       };
       defaultEcosystemSrc = {
         inherit (inputs)
@@ -500,6 +504,7 @@ let
           "caisson/treefmt"
           "caisson/nvf"
           "caisson/nixvim"
+          "caisson/nemacs"
           "caisson/topology"
           "caisson/kubenix"
           "caisson/nixidy"
@@ -605,6 +610,7 @@ let
       "treefmt"
       "nvf"
       "nixvim"
+      "nemacs"
       "topology"
       "kubenix"
       "nixidy"
@@ -2338,6 +2344,77 @@ let
       &&
         top.nixvimConfigurations.x86_64-linux.editor.config.build.package.drvPath
         == upstream.config.build.package.drvPath;
+
+    # A nemacs configuration is published as
+    # `nemacsConfigurations.<system>.<name>`, and its editor is the one
+    # `evalNemacs` of nemacs builds from the same module on the same
+    # package set. The core module comes from the flake of nemacs, which
+    # registers it for the class. A configuration declared inside a NixOS
+    # machine is a profile of the system, activated by a unit that runs
+    # as root, and the machine installs the program with which a shell
+    # chooses the profile.
+    nemacsIsTheEditorNemacsBuilds =
+      let
+        module = {
+          bundles.hello = {
+            enable = true;
+            init = "(message \"hello\")";
+          };
+        };
+        nemacsConfiguration =
+          lib:
+          lib.caisson.nemacs.mkConfiguration {
+            configModule = module;
+          };
+        top = hiveLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nemacs.configurations.editor = nemacsConfiguration lib;
+              caisson.nixos.configurations.workstation = lib.caisson.nixos.mkConfiguration {
+                configModule =
+                  { lib, ... }:
+                  {
+                    boot.loader.grub.enable = false;
+                    fileSystems."/" = {
+                      device = "none";
+                      fsType = "tmpfs";
+                    };
+                    system.stateVersion = "25.05";
+                    caisson.nemacs.configurations.machine-editor = nemacsConfiguration lib;
+                  };
+              };
+            };
+        };
+        upstream = inputs.nemacs.lib.nemacs.evalNemacs {
+          inherit pkgs;
+          modules = [ module ];
+        };
+        machine = top.nixosConfigurations.workstation.config;
+        unit = machine.systemd.services.caisson-profile-nemacs-machine-editor;
+        names = packages: builtins.map (package: package.name or "") packages;
+        topProfile =
+          top.caisson.manifest.children.system.x86_64-linux.children.nemacs.editor.outputs.profile;
+        published = top.nemacsConfigurations.x86_64-linux.editor;
+      in
+      published.package.drvPath == upstream.config.build.package.drvPath
+      && published.config.bundles.hello.enable
+      && published.options ? build
+      && builtins.isString published.activationPackage.drvPath
+      &&
+        builtins.attrNames top.nemacsConfigurations.x86_64-linux == [
+          "editor"
+          "machine-editor"
+        ]
+      && unit.wantedBy == [ "multi-user.target" ]
+      && !(unit.serviceConfig ? User)
+      && builtins.elem "caisson-profile-shims-CAISSON_NEMACS_PROFILE" (
+        names machine.environment.systemPackages
+      )
+      && topProfile.scope == "user"
+      && topProfile.path == "$HOME/.local/state/caisson/profiles/nemacs/editor"
+      && topProfile.package.drvPath == upstream.config.build.package.drvPath;
 
     # A nixvim configuration declared inside a NixOS machine is a profile
     # of the system, as an nvf configuration there is. The machine writes

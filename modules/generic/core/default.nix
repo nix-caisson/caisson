@@ -39,6 +39,7 @@
           "hjem"
           "home-manager"
           "kubenix"
+          "nemacs"
           "nixidy"
           "nixos"
           "nixpkgs"

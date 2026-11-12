@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # The `default` module caisson registers for the `nvf` class, and, for
-# the same file, for the `nixvim` class. A configuration of either
-# class imports every registered module named `default` unless it
-# passes `moduleImports`.
+# the same file, for the `nixvim` and `nemacs` classes. A configuration
+# of any of the three classes imports every registered module named
+# `default` unless it passes `moduleImports`.
 #
 # It declares `caisson.drift.warn`. The configuration is kept in a Nix
 # profile of its own, and its `activate` checks for drift against the
