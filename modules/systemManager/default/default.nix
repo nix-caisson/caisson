@@ -10,8 +10,8 @@
 # module does for a NixOS configuration:
 #
 # - `./caisson/forChildren.nix` gives each home-manager configuration
-#   the home-manager module `system-manager-parent` and each hjem
-#   configuration the hjem module `system-manager-parent`, which set
+#   the home-manager module `nixos-parent` and each hjem
+#   configuration the hjem module `nixos-parent`, which set
 #   the options that come from the account of the user that the
 #   system-manager configuration declares.
 # - The registered modules `home-manager-activation` and
@@ -37,10 +37,10 @@
     if lib ? caisson && lib ? caisson-core then
       [
         (mkModule ./caisson)
-        closure-lib.caisson.modules.systemManager.home-manager-activation
-        closure-lib.caisson.modules.systemManager.hjem-activation
-        closure-lib.caisson.modules.systemManager.profile-activation
-        closure-lib.caisson.modules.systemManager.activation-marker
+        closure-lib.caisson.modules.generic.home-manager-activation
+        closure-lib.caisson.modules.generic.hjem-activation
+        closure-lib.caisson.modules.generic.profile-activation
+        closure-lib.caisson.modules.generic.activation-marker
       ]
     else
       [ ];

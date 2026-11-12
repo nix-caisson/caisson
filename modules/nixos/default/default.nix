@@ -47,10 +47,10 @@
       [
         (mkModule ./networking)
         (mkModule ./caisson)
-        closure-lib.caisson.modules.nixos.home-manager-activation
-        closure-lib.caisson.modules.nixos.hjem-activation
-        closure-lib.caisson.modules.nixos.profile-activation
-        closure-lib.caisson.modules.nixos.activation-marker
+        closure-lib.caisson.modules.generic.home-manager-activation
+        closure-lib.caisson.modules.generic.hjem-activation
+        closure-lib.caisson.modules.generic.profile-activation
+        closure-lib.caisson.modules.generic.activation-marker
       ]
     else
       [ ];

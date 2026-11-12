@@ -1296,14 +1296,13 @@ let
     # lists caisson in `projects` has them.
     aNixosModuleImportsWhatDeclaresItsCaissonOptions =
       let
-        registry = hiveLib.caisson.modules.nixos;
         evaluates =
-          name:
+          registry: name:
           builtins.isString
             (nixosSystemFromOnly registry."caisson/${name}").config.system.build.toplevel.drvPath;
       in
-      builtins.all evaluates [
-        "default"
+      evaluates hiveLib.caisson.modules.nixos "default"
+      && builtins.all (evaluates hiveLib.caisson.modules.generic) [
         "home-manager-activation"
         "activation-marker"
       ];
@@ -6452,7 +6451,7 @@ let
       && !(inputs.caisson ? pkgOverlays)
       && inputs.caisson.lib.caisson-core.evalManifest.outputs.exports.libOverlays ? flake-parts
       && exported.nixos ? default
-      && exported.nixos ? home-manager-activation
+      && exported.generic ? home-manager-activation
       && exported.homeManager ? nixos-parent
       && exported.flake ? nixpkgs;
 
@@ -7200,7 +7199,7 @@ let
       in
       has "`modules.nixos.undeclared`, file tests/pinned-world/registries/modules/nixos/undeclared,"
       && has "evaluated in children.system.x86_64-linux.children.nixos.nas-1"
-      && has "defines `caisson.structural.exportNote` in tests/pinned-world/registries/modules/nixos/undeclared, declared in modules/nixos/core"
+      && has "defines `caisson.structural.exportNote` in tests/pinned-world/registries/modules/nixos/undeclared, declared in modules/generic/caisson"
       && builtins.elem "exit 1" (
         builtins.map (arg: pkgs.lib.last (pkgs.lib.splitString "; " arg)) check.args
       );

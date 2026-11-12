@@ -20,7 +20,7 @@
 # `caisson.forChildren`. A home-manager configuration that passes
 # `moduleImports` selects its modules itself, and gets this module only
 # if it lists it. A system-manager configuration does the same with
-# this file, registered also as `system-manager-parent`.
+# this file.
 #
 # The module reads the NixOS or system-manager configuration through
 # the manifest of the home-manager configuration, so it can only be

@@ -56,7 +56,6 @@
           nixpkgs
           ;
       };
-      generic.exported = modules: { inherit (modules) core; };
       structural.exported = modules: { inherit (modules) core; };
     };
 

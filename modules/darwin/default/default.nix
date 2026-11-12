@@ -31,7 +31,7 @@
         closure-lib.caisson.modules.darwin.home-manager-activation
         closure-lib.caisson.modules.darwin.hjem-activation
         closure-lib.caisson.modules.darwin.profile-activation
-        closure-lib.caisson.modules.darwin.activation-marker
+        closure-lib.caisson.modules.generic.activation-marker
       ]
     else
       [ ];
