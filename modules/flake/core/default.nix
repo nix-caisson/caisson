@@ -16,8 +16,8 @@
   ];
 
   # A flake declares its checks under `perSystem` (./perSystem.nix),
-  # where `perSystem` has the `pkgs` of each system of the flake, and
-  # not at the top level of the options of the flake, where the core
-  # module of caisson declares them for every other class.
+  # which is evaluated once for each system with the `pkgs` of that
+  # system in scope, and not at the top level of the options of the
+  # flake, which has no single system.
   disabledModules = [ { key = "caisson.checks.top-level"; } ];
 }

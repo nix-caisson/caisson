@@ -847,14 +847,14 @@
       # (`additionsOf`).
       #
       # `checks` are the default checks of the integration, which every
-      # configuration it builds carries, by name. Each is
+      # evaluation result it builds carries, by name. Each is
       # `{ derivation; category; description; }`: `derivation` is a
       # function of `{ outputs, pkgs, pkgSets }` that returns the
-      # derivation of the check for a system the check is built for:
-      # `outputs` are the outputs of the configuration as its manifest
-      # holds them, `pkgSets` the package sets for that system by the
-      # name of the package config, and `pkgs` the set the selection of
-      # the configuration picks of them. `category` is the name of a category of
+      # derivation of the check for the system of the evaluation result:
+      # `outputs` are the outputs of the evaluation result as its
+      # manifest holds them, `pkgSets` the package sets for that system
+      # by the name of the package config, and `pkgs` the set the
+      # selection of the configuration picks of them. `category` is the name of a category of
       # checks, and `description` a sentence saying what the check
       # checks. A nixos integration that declares `toplevel` writes
       # `{ derivation = { outputs, ... }: outputs.toplevel; … }`. A
@@ -949,10 +949,11 @@
               }";
 
               # The checks of the configuration for a system, from the
-              # declarations of its modules. caisson calls each `derivation`
-              # with the package sets for that system, by the name of the
-              # package config, as `pkgSets`, and the set the selection
-              # of the configuration picks of them as `pkgs`.
+              # declarations of its modules. caisson calls the
+              # `derivation` of each default check with the outputs, the
+              # package sets for that system, by the name of the package
+              # config, as `pkgSets`, and the set the selection of the
+              # configuration picks of them as `pkgs`.
               checksFor =
                 system:
                 let
@@ -974,11 +975,23 @@
                   defaultsCode = defaultChecksCode;
                 };
 
-              # The systems the configuration is evaluated for, which
-              # its manifest records in `systems`. The configuration has
-              # an evaluation result for each of them, and caisson calls
-              # the `derivation` of each check once for each of them.
-              checkSystems = if (given.manifest.systems or null) != null then given.manifest.systems else [ ];
+              # The system of this evaluation result: the system it is
+              # evaluated for, or, for a configuration declared inside an
+              # evaluation result that has a system, the system of the
+              # nearest such evaluation result above it. A disko
+              # configuration declared inside a NixOS configuration
+              # evaluated for aarch64-linux has the system aarch64-linux.
+              # Null where neither has a system.
+              system =
+                let
+                  above = builtins.filter (ancestor: ancestor ? system) (given.manifest.ancestors or [ ]);
+                in
+                if given.manifest ? system then
+                  given.manifest.system
+                else if above == [ ] then
+                  null
+                else
+                  (last above).system;
 
               declaredHere =
                 if caissonOptions ? checks then
@@ -989,18 +1002,29 @@
                 else
                   { };
 
-              # The flake-parts integration returns the declarations of
-              # each system of the flake as `checkDeclarations`, read from
-              # `perSystem`. In any other configuration the modules
-              # declare the checks in `caisson.checks`, and they are built
-              # for each system of `checkSystems`.
+              # The flake-parts and structural integrations return the
+              # declarations of each system as `checkDeclarations`, read
+              # from `perSystem`. In any other configuration the modules
+              # declare the checks in `caisson.checks`, for the system of
+              # the evaluation result.
               recordedChecks =
                 if evaluated ? checkDeclarations then
                   builtins.mapAttrs checksFor evaluated.checkDeclarations
                 else if checks == { } && declaredHere == { } then
                   { }
+                else if system == null then
+                  throw ''
+                    caisson: ${what} has the checks ${
+                      builtins.concatStringsSep ", " (
+                        builtins.map (name: "`${name}`") (builtins.attrNames (checks // declaredHere))
+                      )
+                    }, and its evaluation result has no system: it is not evaluated for a
+                    system, and no configuration it is declared inside is. Declare the checks in
+                    a configuration evaluated for a system, such as a NixOS configuration, or
+                    under `perSystem` of a structural or flake-parts configuration.
+                  ''
                 else
-                  genAttrs checkSystems (system: checksFor system declaredHere);
+                  { ${system} = checksFor system declaredHere; };
 
               recordedCategories = categoriesUnion [
                 declaredCategories
@@ -2065,8 +2089,7 @@
 
       # The checks the modules of a configuration declare in `caisson.checks`, by name,
       # from the option and its value: each entry with its
-      # `derivation`, a function of `{ pkgs, pkgSets }` or null for an
-      # annotation, `category`,
+      # `derivation`, null for an annotation, `category`,
       # `description`, `enable` and `code`, the positions of the
       # definitions of the entry (`definitionCodeOf`).
       checkDeclarationsOf =
@@ -2083,15 +2106,14 @@
 
       # The checks a configuration records for a system, by name: the
       # default checks of its integration and the checks its modules
-      # declare (`checkDeclarationsOf`), each with the derivation built
-      # for that system. `what` names the configuration in the messages,
-      # `type` its integration, `outputs` are the outputs of the
-      # configuration, `pkgSets` are the package sets for the system by
-      # the name of the package config, `pkgs` is the set the selection
-      # of the configuration picks of them, and `defaultsCode` is where
-      # the integration declares its default checks. The `derivation`
-      # of a declaration is called with `{ pkgs, pkgSets }`, and the
-      # `derivation` of a default check with `{ outputs, pkgs, pkgSets }`.
+      # declare for that system (`checkDeclarationsOf`). `what` names
+      # the configuration in the messages, `type` its integration,
+      # `outputs` are the outputs of the evaluation result, `pkgSets`
+      # are the package sets for the system by the name of the package
+      # config, `pkgs` is the set the selection of the configuration
+      # picks of them, and `defaultsCode` is where the integration
+      # declares its default checks. The `derivation` of a default check
+      # is called with `{ outputs, pkgs, pkgSets }`.
       #
       # A declaration with a `derivation` declares a check, and it
       # names its category. A declaration without a `derivation`
@@ -2137,7 +2159,7 @@
                   category declared in `caisson.checkCategories`, such as `build` or `eval`.
                 ''
               else
-                declaration // { derivation = declaration.derivation { inherit pkgs pkgSets; }; }
+                declaration
             else if declaration == null then
               {
                 derivation = ofDefault default;

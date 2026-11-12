@@ -3571,11 +3571,11 @@ in
         {
           caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
             caisson.checks.smoke = {
-              derivation = _: check "nas-1-smoke";
+              derivation = check "nas-1-smoke";
               category = "eval";
             };
             caisson.checks.off = {
-              derivation = _: check "nas-1-off";
+              derivation = check "nas-1-off";
               category = "eval";
               enable = false;
             };
@@ -3587,7 +3587,7 @@ in
               {
                 caisson.nixos.configurations.arm = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = _: check "arm-smoke";
+                    derivation = check "arm-smoke";
                     category = "eval";
                   };
                 };
@@ -3683,7 +3683,7 @@ in
                 };
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.boots = {
-                    derivation = _: check "boots";
+                    derivation = check "boots";
                     category = "hardware";
                   };
                 };
@@ -3716,7 +3716,7 @@ in
               {
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = _: check "smoke";
+                    derivation = check "smoke";
                     category = "undeclared";
                   };
                 };
@@ -3738,13 +3738,13 @@ in
               {
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.smoke = {
-                    derivation = _: check "smoke";
+                    derivation = check "smoke";
                     category = "eval";
                   };
                 };
                 caisson.nixos.configurations.nas = nixosConfiguration lib {
                   caisson.checks."1-smoke" = {
-                    derivation = _: check "other-smoke";
+                    derivation = check "other-smoke";
                     category = "eval";
                   };
                 };
@@ -3765,7 +3765,7 @@ in
               { lib, ... }:
               {
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
-                  caisson.checks.smoke.derivation = _: check "smoke";
+                  caisson.checks.smoke.derivation = check "smoke";
                 };
               }
             );
@@ -3851,14 +3851,14 @@ in
                     checks.bare = check "bare";
                     caisson.checks.treefmt.category = "format";
                     caisson.checks.declared = {
-                      derivation = _: check "declared";
+                      derivation = check "declared";
                       category = "unit";
                       description = "the unit tests pass";
                     };
                   };
                   caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                     caisson.checks.smoke = {
-                      derivation = _: check "smoke";
+                      derivation = check "smoke";
                       category = "eval";
                     };
                   };
@@ -3905,8 +3905,8 @@ in
             record = top.caisson.manifest.checkRecord;
           };
         expected = {
-          checks = { };
-          record = { };
+          checks.x86_64-linux = { };
+          record.x86_64-linux = { };
         };
       };
     };

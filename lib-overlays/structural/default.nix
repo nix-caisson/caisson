@@ -84,6 +84,13 @@
           # class, the modules selected from the registry and the
           # configuration's module.
           modules = moduleList;
+          # The checks the configuration declares under `perSystem`, for
+          # each system its children are evaluated for, as the core
+          # module of the class reads them
+          # (modules/structural/core/perSystem.nix).
+          checkDeclarations = builtins.mapAttrs (
+            _: evaluation: evaluation.caisson.checkDeclarations
+          ) evaluated.config.allSystems;
         };
 
       configuration =

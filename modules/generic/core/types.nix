@@ -89,23 +89,14 @@ in
   check = lib.types.submodule {
     options = {
       derivation = lib.mkOption {
-        type = lib.types.nullOr (lib.types.functionTo lib.types.package);
+        type = lib.types.nullOr lib.types.package;
         default = null;
-        example = lib.literalExpression ''{ pkgs, ... }: pkgs.runCommand "smoke" { } "touch $out"'';
+        example = lib.literalExpression ''pkgs.runCommand "smoke" { } "touch $out"'';
         description = ''
-          The function that returns the derivation of the check for a
-          system. It takes `{ pkgs, pkgSets }`: `pkgs` is the package set
-          the selection of the configuration picks for that system, and
-          `pkgSets` holds the package set of every package config for that
-          system, by the name of the package config. The system is
-          `pkgs.stdenv.hostPlatform.system`. The check passes when the
-          derivation the function returns builds. A configuration has an
-          evaluation result for each system it is evaluated for, and
-          caisson calls the function once for each evaluation result of the
-          configuration that declares the check. Under `perSystem` in
-          flake-parts, caisson calls it with the `pkgs` of `perSystem` and
-          the package sets for its system. Null for an entry that
-          annotates a check the configuration already has.
+          The derivation that is the check, for the system of the
+          evaluation result that declares it: the check passes when the
+          derivation builds. Null for an entry that annotates a check the
+          configuration already has.
         '';
       };
       category = lib.mkOption {

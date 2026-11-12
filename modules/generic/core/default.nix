@@ -11,9 +11,10 @@
 # class-free `generic` class
 # (flake-parts' name for a module any class may import), and under
 # every class whose integration forces it, as that class's `core`:
-# `modules/structural/core` is a symlink here, and `modules/flake/core`
-# imports this entry and adds the flake mechanics. What the modules
-# declared here need comes through `lib`, the composed library in
+# `modules/nixos/core` is a symlink here, and `modules/structural/core`
+# and `modules/flake/core` import this entry and add `perSystem`. What
+# the modules declared here need comes through `lib`, the composed
+# library in
 # specialArgs.
 #
 # In a module evaluation whose library is not a caisson composition the
