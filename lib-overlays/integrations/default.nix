@@ -1076,11 +1076,17 @@
               # What the evaluator received, as `declaration` events:
               # the integration's `evaluate` returns `modules`, the list
               # it handed the evaluator, with an `ecosystemUnit` where
-              # the module list of the ecosystem is.
-              events = declarationEventsOf {
-                inherit (given) lib;
-                modules = evaluated.modules or [ ];
-              };
+              # the module list of the ecosystem is. An evaluator that
+              # evaluates modules it was handed inside a module of the
+              # configuration records those modules as `events` beside
+              # them: the nixos-test integration records the modules of
+              # each node of a test, which the test framework evaluates.
+              events =
+                declarationEventsOf {
+                  inherit (given) lib;
+                  modules = evaluated.modules or [ ];
+                }
+                ++ (evaluated.events or [ ]);
               record = {
                 # The checks of the configuration, by system and then
                 # name, the categories of checks and the stages it
@@ -2448,14 +2454,22 @@
 
       # The system features a check demands of the machine that builds
       # it: the `requiredSystemFeatures` of its derivation, or, for the
-      # driver of a NixOS test, whose derivation carries a fixed set of
-      # attributes, the `requiredFeatures` of the `config` it carries.
+      # run of a NixOS test, the features its `config.requiredFeatures`
+      # turns on. The test framework builds the run with
+      # `lib.lazyDerivation`, whose result carries a fixed set of
+      # attributes and the `passthru` of the test, so the run has no
+      # `requiredSystemFeatures` attribute. The `passthru` holds the
+      # evaluated test as `config`, and its `requiredFeatures` is an
+      # attribute set of booleans by feature, from which the framework
+      # computes the `requiredSystemFeatures` of the derivation it builds.
       requiredFeaturesOf =
         derivation:
         if derivation ? requiredSystemFeatures then
           derivation.requiredSystemFeatures
         else if builtins.isAttrs (derivation.config or null) && derivation.config ? requiredFeatures then
-          derivation.config.requiredFeatures
+          builtins.filter (feature: derivation.config.requiredFeatures.${feature}) (
+            builtins.attrNames derivation.config.requiredFeatures
+          )
         else
           [ ];
 

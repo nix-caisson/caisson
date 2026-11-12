@@ -25,7 +25,7 @@ without nixpkgs can depend on it directly.
 ## caisson
 
 The layer users reach for: the integrations (`structural`,
-`flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `home-manager`,
+`flake-parts`, `nixpkgs`, `nixos`, `nixos-minimal`, `nixos-test`, `home-manager`,
 `home-manager-minimal`, `darwin`, `hjem`, `caisson-colmena`, `colmena`,
 `caisson-disko`, `disko`, `caisson-facter`, `facter`,
 `caisson-microvm`, `microvm`, `caisson-nixops4-composite`,

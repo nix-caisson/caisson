@@ -33,4 +33,5 @@
   caisson.topology.configurations.registered = lib.caisson.topology.mkConfiguration { };
   caisson.kubenix.configurations.registered = lib.caisson.kubenix.mkConfiguration { };
   caisson.nixidy.configurations.registered = lib.caisson.nixidy.mkConfiguration { };
+  caisson.nixos-test.configurations.registered = lib.caisson.nixos-test.mkConfiguration { };
 }

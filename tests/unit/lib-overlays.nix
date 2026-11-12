@@ -127,6 +127,7 @@ let
   integrationNames = [
     "nixos"
     "nixos-minimal"
+    "nixos-test"
     "darwin"
     "hjem"
     "home-manager"
@@ -6324,6 +6325,7 @@ in
                     "flake-parts"
                     "nixos"
                     "nixos-minimal"
+                    "nixos-test"
                     "darwin"
                     "hjem"
                     "home-manager"
@@ -6346,6 +6348,7 @@ in
                   setsFromTheComposition = builtins.elem name [
                     "nixos"
                     "nixos-minimal"
+                    "nixos-test"
                     "darwin"
                     "hjem"
                     "home-manager"

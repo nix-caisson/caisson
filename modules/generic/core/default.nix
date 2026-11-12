@@ -48,6 +48,7 @@
           "nixidy"
           "nixops4"
           "nixos"
+          "nixos-test"
           "nixpkgs"
           "nixvim"
           "nvf"
