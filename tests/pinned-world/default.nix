@@ -7217,6 +7217,27 @@ let
         && definition.declared
       ) entries."modules.nixos.importer".defines;
 
+    # The module system evaluates the modules that share a key once,
+    # so the declarations of the options of the core module of caisson
+    # are in the files of the copy of the core module it reaches
+    # first. The module `copied-core` imports a module at another file
+    # under the key of the core module, as a project that pins another
+    # revision of caisson does, and defines an option that the core
+    # module declares. The check `registries` follows the key to the
+    # files of the core module that caisson imports, and passes.
+    registriesFollowsTheKeyOfAModuleToItsDeclarations =
+      let
+        top = registriesTopWith "copied-core";
+        # The registry entries of the NixOS configuration `nas-1`.
+        entries = builtins.foldl' (found: manifest: found // manifest.registryEntries or { }) { } (
+          builtins.filter (manifest: manifest.type or null == "nixos") (manifestsOf top.caisson.manifest)
+        );
+      in
+      top.checks.x86_64-linux.registries.message == ""
+      && builtins.any (
+        definition: definition.option == "caisson.structural.exportNote" && definition.declared
+      ) entries."modules.nixos.copied-core".defines;
+
     # The check `registries` fails to build where a registry entry
     # defines an option under `caisson` and imports no module that
     # declares it, as the module `undeclared` does. Its message names
