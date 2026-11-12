@@ -309,6 +309,16 @@ in
               inherit caisson;
             };
           };
+          # The nix-unit integration: the checks of a passing and a
+          # failing nix-unit configuration, declared in a flake-parts
+          # caisson top evaluated for x86_64-linux and aarch64-linux.
+          # The passing check builds and the failing check fails to
+          # build (tests/nix-unit).
+          nix-unit-integration = import (self.outPath + "/tests/nix-unit") {
+            inputs = inputs // {
+              inherit caisson;
+            };
+          };
           # A NixOS configuration booted in a VM that installs the packages of
           # the home-manager configurations that set
           # `caisson.useUserPackages`, through switches and a boot
