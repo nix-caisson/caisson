@@ -3156,13 +3156,13 @@
     in
     {
       # The option types the core module of caisson declares its
-      # options with (modules/generic/core/types.nix), built on the
+      # options with (modules/generic/caisson/types.nix), built on the
       # library of nixpkgs in this library. caisson-core is written on
       # builtins alone, and an option type is built on the library of
       # nixpkgs, so caisson adds the types to the namespace of
       # caisson-core here, beside the manifests they type.
       caisson-core = (prev.caisson-core or { }) // {
-        types = import ../../modules/generic/core/types.nix { lib = final; };
+        types = import ../../modules/generic/caisson/types.nix { lib = final; };
       };
 
       caisson = (prev.caisson or { }) // {

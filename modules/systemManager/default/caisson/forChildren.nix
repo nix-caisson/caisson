@@ -5,11 +5,12 @@
 #
 # A configuration gives things to the configurations declared inside
 # it through the options under `caisson.forChildren`. This file adds the
-# home-manager module `system-manager-parent` to the modules that a
+# home-manager module `nixos-parent` to the modules that a
 # home-manager configuration declared inside this system-manager
 # configuration imports by default, and the hjem module
-# `system-manager-parent` to those of a hjem configuration declared
-# inside it. Each sets the options that come from the system-manager
+# `nixos-parent` to those of a hjem configuration declared
+# inside it. Both modules read a NixOS or a system-manager
+# configuration. Each sets the options that come from the system-manager
 # configuration: the home directory from the account of the user that
 # the system-manager configuration declares in `users.users`, and for a
 # home-manager configuration the user ID and the Nix of the
@@ -27,10 +28,10 @@
 { ... }:
 {
   caisson.forChildren.extraDefaultModuleImports.homeManager = _lib: [
-    closure-lib.caisson.modules.homeManager.system-manager-parent
+    closure-lib.caisson.modules.homeManager.nixos-parent
   ];
 
   caisson.forChildren.extraDefaultModuleImports.hjem = _lib: [
-    closure-lib.caisson.modules.hjem.system-manager-parent
+    closure-lib.caisson.modules.hjem.nixos-parent
   ];
 }

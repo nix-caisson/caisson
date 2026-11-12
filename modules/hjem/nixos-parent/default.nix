@@ -10,10 +10,9 @@
 # configuration adds this module to the modules that the hjem
 # configurations declared inside it import by default; caisson's
 # `default` module of either class does that, through
-# `caisson.forChildren`. The module is registered as `nixos-parent` and,
-# for the same file, as `system-manager-parent`. A hjem configuration
-# that passes `moduleImports` selects its modules itself, and gets this
-# module only if it lists it.
+# `caisson.forChildren`. The module is registered as `nixos-parent`. A
+# hjem configuration that passes `moduleImports` selects its modules
+# itself, and gets this module only if it lists it.
 #
 # The module reads the NixOS or system-manager configuration through
 # the manifest of the hjem configuration, so it can only be imported by
