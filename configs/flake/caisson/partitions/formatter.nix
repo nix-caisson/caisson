@@ -8,8 +8,10 @@
       { inputs, ... }:
       {
         imports = [ inputs.treefmt-nix.flakeModule ];
-        # Duplicated in checks.nix: partitions evaluate independently,
-        # so sharing would require more boilerplate than the duplication.
+        # Duplicated in configs/flake/checks, whose check of the
+        # formatter uses the same settings: the partition and that
+        # configuration are separate evaluations, so sharing the
+        # settings would need more wiring than the duplication.
         perSystem.treefmt = {
           programs.nixfmt.enable = true;
         };
