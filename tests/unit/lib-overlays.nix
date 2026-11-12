@@ -3679,6 +3679,7 @@ in
           description = null;
           volatile = false;
           requiredFeatures = [ ];
+          top = null;
         };
       };
 
@@ -3928,6 +3929,291 @@ in
             "nas-1-toplevel"
             "registries"
           ];
+        };
+      };
+
+      "test: a check with `top` publishes the checks of the test caisson top under its name" = {
+        expr =
+          let
+            flake = checksLib.caisson.flake-parts.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = {
+                perSystem = {
+                  # A test caisson top that publishes a check record.
+                  caisson.checks.basic.top = {
+                    checks.x86_64-linux = {
+                      smoke = check "smoke";
+                      plain = check "plain";
+                    };
+                    caisson.manifest.checkRecord.x86_64-linux.smoke = {
+                      category = "eval";
+                      description = "the smoke test passes";
+                    };
+                  };
+                  # A flake that is no caisson top, with a category for
+                  # its checks.
+                  caisson.checks.other = {
+                    top.checks.x86_64-linux.a = check "a";
+                    category = "unit";
+                  };
+                };
+              };
+            };
+            # The record entries of the checks of the test caisson tops,
+            # beside which the caisson top records its default check
+            # `registries`.
+            record = builtins.removeAttrs flake.caisson.manifest.checkRecord.x86_64-linux [ "registries" ];
+          in
+          {
+            published = builtins.attrNames record;
+            smoke = flake.checks.x86_64-linux.basic-smoke.name;
+            categories = builtins.mapAttrs (_: entry: entry.category) record;
+            descriptions = builtins.mapAttrs (_: entry: entry.description) record;
+            tops = builtins.mapAttrs (_: entry: entry.top) record;
+          };
+        expected = {
+          published = [
+            "basic-plain"
+            "basic-smoke"
+            "other-a"
+          ];
+          smoke = "smoke";
+          categories = {
+            basic-plain = "build";
+            basic-smoke = "eval";
+            other-a = "unit";
+          };
+          descriptions = {
+            basic-plain = null;
+            basic-smoke = "the smoke test passes";
+            other-a = null;
+          };
+          tops = {
+            basic-plain = {
+              name = "basic";
+              check = "plain";
+              record = null;
+            };
+            basic-smoke = {
+              name = "basic";
+              check = "smoke";
+              record = {
+                category = "eval";
+                description = "the smoke test passes";
+              };
+            };
+            other-a = {
+              name = "other";
+              check = "a";
+              record = null;
+            };
+          };
+        };
+      };
+
+      "test: a check with both `top` and `derivation` is refused" = {
+        expr =
+          let
+            flake = checksLib.caisson.flake-parts.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule = {
+                perSystem.caisson.checks.basic = {
+                  top.checks.x86_64-linux.smoke = check "smoke";
+                  derivation = check "basic";
+                  category = "eval";
+                };
+              };
+            };
+          in
+          builtins.attrNames flake.checks.x86_64-linux;
+        expectedError = {
+          type = "ThrownError";
+          msg = "`caisson\\.checks\\.basic` of the flake-parts configuration at the caisson top, defined at [^ ]*lib-overlays\\.nix:[0-9]+,\\s+sets both a `derivation` and a `top`";
+        };
+      };
+    };
+
+  # The dependencies a flake-parts configuration declared inside a
+  # caisson top adds to those of the caisson top: the flake's `inputs`
+  # inside it hold both, a name the caisson top pins keeps the
+  # dependency of the caisson top, and the manifest records the added
+  # dependencies with their pin files relative to the root.
+  nestedDependencies =
+    let
+      pin = dir: {
+        system = "flake";
+        files = {
+          refs = "flake.nix";
+          revisions = "flake.lock";
+        };
+        inherit dir;
+        url = null;
+        follows = null;
+      };
+      added = {
+        extra = {
+          outPath = "/extra";
+          pin = pin "/src/tests/dependencies";
+        };
+        nixpkgs-lib = {
+          outPath = "/shadowed-nixpkgs-lib";
+          pin = pin "/src/tests/dependencies";
+        };
+      };
+      dependenciesLib = caisson.mkLib {
+        dependencies = mockDependencies;
+        root.outPath = "/src";
+        systems = [ "x86_64-linux" ];
+      };
+      topWith =
+        child:
+        dependenciesLib.caisson.flake-parts.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.flake-parts.configurations.checks = child lib;
+            };
+        };
+      flake = topWith (
+        lib:
+        lib.caisson.flake-parts.mkConfiguration {
+          dependencies = added;
+          moduleImports = _modules: [ ];
+          configModule =
+            { inputs, ... }:
+            {
+              flake.seen = {
+                extra = inputs.extra.outPath;
+                nixpkgs-lib = inputs.nixpkgs-lib.outPath;
+              };
+            };
+        }
+      );
+      child = flake.caisson.manifest.children.flake-parts.checks;
+    in
+    {
+      "test: a nested flake-parts configuration sees the added dependencies beside those of the caisson top" =
+        {
+          expr = child.outputs.flake.seen;
+          expected = {
+            extra = "/extra";
+            nixpkgs-lib = mockDependencies.nixpkgs-lib.outPath;
+          };
+        };
+
+      "test: an added dependency the caisson top already pins is recorded as shadowed" = {
+        expr = {
+          dependencies = builtins.attrNames child.dependencies;
+          shadowed = builtins.attrNames child.shadowedDependencies;
+          shadowedTree = child.shadowedDependencies.nixpkgs-lib.outPath;
+          kept = child.dependencies.nixpkgs-lib.outPath;
+        };
+        expected = {
+          dependencies = builtins.attrNames (mockDependencies // { extra = null; });
+          shadowed = [ "nixpkgs-lib" ];
+          shadowedTree = "/shadowed-nixpkgs-lib";
+          kept = mockDependencies.nixpkgs-lib.outPath;
+        };
+      };
+
+      "test: the manifest records the pin files of an added dependency relative to the root" = {
+        expr = {
+          added = child.dependencies.extra.pin;
+          shadowed = child.shadowedDependencies.nixpkgs-lib.pin.files;
+        };
+        expected = {
+          added = {
+            system = "flake";
+            files = {
+              refs = "tests/dependencies/flake.nix";
+              revisions = "tests/dependencies/flake.lock";
+            };
+            url = null;
+            follows = null;
+          };
+          shadowed = {
+            refs = "tests/dependencies/flake.nix";
+            revisions = "tests/dependencies/flake.lock";
+          };
+        };
+      };
+
+      "test: a configuration declared inside the nested configuration sees the added dependencies" = {
+        expr =
+          let
+            nested = topWith (
+              lib:
+              lib.caisson.flake-parts.mkConfiguration {
+                dependencies = added;
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.flake-parts.configurations.inner = lib.caisson.flake-parts.mkConfiguration {
+                      moduleImports = _modules: [ ];
+                      configModule =
+                        { inputs, ... }:
+                        {
+                          flake.seen = inputs.extra.outPath;
+                        };
+                    };
+                  };
+              }
+            );
+          in
+          nested.caisson.manifest.children.flake-parts.checks.children.flake-parts.inner.outputs.flake.seen;
+        expected = "/extra";
+      };
+
+      "test: reading the exports of the caisson top reads no dependency of a configuration its selector passes up to nothing" =
+        {
+          expr =
+            let
+              top = dependenciesLib.caisson.flake-parts.mkTopConfiguration {
+                moduleImports = _modules: [ ];
+                configModule =
+                  { lib, ... }:
+                  {
+                    caisson.flake-parts.configurations.checks = lib.caisson.flake-parts.mkConfiguration {
+                      dependencies = throw "the dependencies of the checks configuration were read";
+                      moduleImports = _modules: [ ];
+                    };
+                    caisson.flake-parts.exported = _: { };
+                  };
+              };
+              exports = top.caisson.manifest.outputs.exports;
+            in
+            {
+              exports = builtins.attrNames exports.libOverlays ++ builtins.attrNames exports.modules;
+              configurations = exports.configurations;
+              lib = top.lib.caisson-core.evalManifest._type;
+              # The `checks` output reads the configuration, so it reads
+              # the dependencies, which throw.
+              checks = (builtins.tryEval (builtins.attrNames top.checks.x86_64-linux)).success;
+            };
+          expected = {
+            # The lib overlays the test library registers.
+            exports = [
+              "flake-parts"
+              "structural"
+            ];
+            configurations = [ ];
+            lib = "caisson-manifest";
+            checks = false;
+          };
+        };
+
+      "test: dependencies given to the configuration at the caisson top are refused" = {
+        expr =
+          builtins.attrNames
+            (dependenciesLib.caisson.flake-parts.mkTopConfiguration {
+              dependencies = added;
+              moduleImports = _modules: [ ];
+            }).caisson.manifest.dependencies;
+        expectedError = {
+          type = "ThrownError";
+          msg = "is given `dependencies`\\. A configuration is given\\s+`dependencies` when it is declared inside another configuration";
         };
       };
     };

@@ -57,8 +57,11 @@ inject the same names beside `self`.
 The upstream world caisson is tested against (nixpkgs, home-manager,
 colmena, disko, nix-darwin, hjem, terranix, system-manager, microvm.nix, and the test
 tooling) is pinned in
-`tests/dependencies/flake.lock`, a lock only the checks and formatter
-partitions read, so caisson's `flake.nix` carries no churning pin. The
+`tests/dependencies/flake.lock`, a lock that only the checks
+configuration (`configs/flake/checks`) and the formatter partition read,
+so caisson's `flake.nix` carries no churning pin. Where that lock names a
+dependency that `flake.lock` pins as well (caisson-core, flake-parts,
+nixpkgs-lib), the checks use the pin of `flake.lock`. The
 pinned-world suite, `tests/pinned-world`, composes caisson with those
 pins and exercises it end to end; it is the `pinned-world` check, so a
 pull request is judged against the last known good world, and a
@@ -66,8 +69,10 @@ change to caisson lands with the probe changes it needs in the same
 commit.
 
 Drift is detected separately. The `drift` workflow runs daily on
-`main`, advances the pins in the working tree without committing, and
-builds the suite check against today's upstreams. A red run means an
+`main`, advances the pins of `tests/dependencies/flake.lock` and the pins
+of caisson-core, flake-parts and nixpkgs-lib in `flake.lock` in the
+working tree without committing, and builds the suite check against
+today's upstreams. A red run means an
 upstream moved and broke an expectation caisson holds; the committed
 pins are the last known good and move in the commit that fixes it.
 The README badge reports that run.

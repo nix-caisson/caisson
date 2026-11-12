@@ -1,8 +1,8 @@
 # caisson Testing
 
 If you need to modify the test infrastructure itself (e.g., adding a new test
-flake, changing how checks are wired, or debugging partition-level evaluation
-issues), see [testing-architecture.md](testing-architecture.md) for how the
+flake, changing how checks are wired, or debugging the evaluation of the
+checks configuration), see [testing-architecture.md](testing-architecture.md) for how the
 plumbing works.
 
 ## Unit Testing
@@ -41,7 +41,7 @@ plumbing works.
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in
   `tests/dependencies/flake.lock`.
-- **Mechanism:** The checks partition forces the suite's `summary` at
+- **Mechanism:** The checks configuration forces the suite's `summary` at
   evaluation time as the `pinned-world` check, so `nix flake check` runs it
   at the committed pins and a change to caisson is judged against the last
   known good world. The `drift` workflow runs daily on `main`, advances the
@@ -55,8 +55,9 @@ plumbing works.
 
   # Against today's upstreams, the way the drift workflow does:
   nix flake update --flake ./tests/dependencies
+  nix flake update caisson-core flake-parts nixpkgs-lib
   nix build .#checks.<system>.pinned-world -L
-  git checkout -- tests/dependencies/flake.lock
+  git checkout -- tests/dependencies/flake.lock flake.lock
   ```
 
 ## Argument Errors (Trace Shape)

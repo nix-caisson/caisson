@@ -32,16 +32,26 @@
         description = null;
         enable = true;
         code = integrations.definitionCodeOf options.checks name;
+        top = null;
       });
 
       # An entry of `caisson.checks` without a `derivation` annotates
       # the entry of `checks` of the same name. An annotation of a name
       # `checks` does not hold keeps a null `derivation`: the
       # integration refuses it unless it declares a default check of
-      # that name.
+      # that name. An entry with a `top` annotates nothing: it declares
+      # the checks of a test caisson top, and an entry of `checks` of
+      # the same name is refused beside it.
       annotated =
         name: declaration:
-        if declaration.derivation != null || !(plain ? ${name}) then
+        if declaration.top != null && plain ? ${name} then
+          throw ''
+            caisson: `perSystem.caisson.checks.${name}`, defined at ${integrations.showCode declaration.code},
+            sets a `top`, and `checks.${name}` is defined as well. An entry with a `top`
+            declares the checks of a test caisson top under `${name}-`, so it annotates
+            no entry of `checks`. Declare the test caisson top under another name.
+          ''
+        else if declaration.derivation != null || declaration.top != null || !(plain ? ${name}) then
           declaration
         else
           plain.${name}
