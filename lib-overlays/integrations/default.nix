@@ -2275,27 +2275,32 @@
           entryOf =
             node:
             let
-              files = unique (filesOf node);
-              inEntry = file: builtins.elem file files;
-              defined = builtins.filter (option: builtins.any inEntry option.files) caissonOptions;
-              registered = registryPartsOf node.key;
               # The registry wraps the module of an entry in modules that
-              # each import the next module alone. These wrappers carry the
-              # file of the code that evaluates the configuration. The
-              # file of the entry is the first file below the wrappers
-              # that differs from the file of the wrappers.
-              fileBelow =
+              # each import the next module alone. A wrapper has no file
+              # of its own, so the module system gives it the file of the
+              # module that imports the entry, such as the file of the
+              # configuration that selects it. The module of the entry is
+              # the first module below the wrappers whose file differs
+              # from the file of the wrappers, and the files of the entry
+              # are the files of that module and of every module it
+              # imports.
+              below =
                 wrapper:
                 let
                   imported = enabled wrapper.imports;
                 in
                 if builtins.length imported != 1 then
-                  wrapper.file
+                  wrapper
                 else if (builtins.head imported).file == node.file then
-                  fileBelow (builtins.head imported)
+                  below (builtins.head imported)
                 else
-                  (builtins.head imported).file;
-              file = fileBelow node;
+                  builtins.head imported;
+              module = below node;
+              inherit (module) file;
+              files = unique (filesOf module);
+              inEntry = file: builtins.elem file files;
+              defined = builtins.filter (option: builtins.any inEntry option.files) caissonOptions;
+              registered = registryPartsOf node.key;
             in
             {
               name = registered.key;

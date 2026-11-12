@@ -7150,6 +7150,36 @@ let
       &&
         builtins.map (position: position.file) record.code == [ "lib-overlays/integrations/default.nix" ];
 
+    # The module system gives a module with no file the file of the
+    # module that imports it. The registry wraps each entry in such
+    # modules, so the wrappers of `plain` carry the file of the
+    # configuration module that imports it, which defines an option
+    # under `caisson`. The check `registries` reads the files of the
+    # entry below the wrappers, and passes.
+    registriesIgnoresTheFileThatImportsAnEntry =
+      let
+        top = registriesLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule =
+            { lib, ... }:
+            {
+              caisson.nixos.configurations.nas-1 = lib.caisson.nixos.mkConfiguration {
+                ecosystemSrc = dependencies: dependencies.nixpkgs;
+                configModule =
+                  { lib, ... }:
+                  {
+                    imports = [
+                      minimalNixosBase
+                      lib.caisson.modules.nixos.plain
+                    ];
+                    caisson.structural.exportNote = "a note of the configuration module";
+                  };
+              };
+            };
+        };
+      in
+      top.checks.x86_64-linux.registries.message == "";
+
     # The check `registries` fails to build where a registry entry
     # defines an option under `caisson` and imports no module that
     # declares it, as the module `undeclared` does. Its message names
