@@ -84,6 +84,13 @@
           # class, the modules selected from the registry and the
           # configuration's module.
           modules = moduleList;
+          # The checks the configuration declares under `perSystem`, for
+          # each system its children are evaluated for, as the core
+          # module of the class reads them
+          # (modules/structural/core/perSystem.nix).
+          checkDeclarations = builtins.mapAttrs (
+            _: evaluation: evaluation.caisson.checkDeclarations
+          ) evaluated.config.allSystems;
         };
 
       configuration =
@@ -101,25 +108,34 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "structural";
         class = "structural";
-        # What a tool reads from a caisson top: the registries it exports and the
-        # configurations declared inside it, each published under the
-        # output attribute set its integration declares and named from
-        # its path (`nixosConfigurations.<name>`), with the manifest
-        # beside them for `manifestOf` and `topside --file`, carrying
-        # the export record of what the caisson top publishes. A caisson
-        # top has no parent to declare it under an attribute, so its name
-        # is the name
-        # the composition declares on mkLib.
+        # What a tool reads from a caisson top: the registries it
+        # exports, the checks it gathers as `caisson.exportedChecks`
+        # selects them (`checks.<system>.<name>`, which
+        # `nix-build -A checks` builds), and the configurations declared
+        # inside it, each published under the output attribute set its
+        # integration declares and named from its path
+        # (`nixosConfigurations.<name>`), with the manifest beside them
+        # for `manifestOf` and `topside --file`, carrying the export
+        # record of what the caisson top publishes and the check record
+        # of the checks it gathers. A caisson top has no parent to
+        # declare it under an attribute, so its name is the name the
+        # composition declares on mkLib.
         top =
           manifest:
           let
             exports = manifest.outputs.exports;
+            published = final.caisson.integrations.publish exports.configurations;
           in
           builtins.removeAttrs exports [ "configurations" ]
-          // final.caisson.integrations.publish exports.configurations
+          // published
           // {
+            checks = final.caisson.integrations.checksOutputOf {
+              gathered = exports.checks;
+              published = published.checks or { };
+            };
             caisson.manifest = manifest // {
               exportRecord = final.caisson.integrations.recordOf exports.configurations;
+              checkRecord = final.caisson.integrations.checkRecordOf manifest;
             };
           };
         # What these return is a configuration, a function of

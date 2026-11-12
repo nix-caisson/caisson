@@ -845,6 +845,35 @@
       # What the modules give the configurations declared inside is read from
       # `caisson.forChildren` and `caisson.forNearestChildren`
       # (`additionsOf`).
+      #
+      # `checks` are the default checks of the integration, which every
+      # evaluation result it builds carries, by name. Each is
+      # `{ derivation; category; description; }`: `derivation` is a
+      # function of `{ outputs, pkgs, pkgSets }` that returns the
+      # derivation of the check for the system of the evaluation result:
+      # `outputs` are the outputs of the evaluation result as its
+      # manifest holds them, `pkgSets` the package sets for that system
+      # by the name of the package config, and `pkgs` the set the
+      # selection of the configuration picks of them. `category` is the name of a category of
+      # checks, and `description` a sentence saying what the check
+      # checks. A nixos integration that declares `toplevel` writes
+      # `{ derivation = { outputs, ... }: outputs.toplevel; … }`. A
+      # configuration annotates a default check, or turns it off,
+      # with the entry of the same name in `caisson.checks`.
+      # `checkCategories` are the categories of checks the integration
+      # declares, by name, each `{ description; volatile ? false; }`,
+      # for the categories its default checks name beyond those caisson
+      # declares (`caisson.checkCategories`).
+      #
+      # The manifest records the checks of the configuration in
+      # `checks`, by system and then name (`checksOfConfiguration`):
+      # the default checks of the integration and the checks the modules
+      # of the configuration declare, each with its `derivation`,
+      # `category`, `description`, `enable` and `code`. It records the
+      # categories of checks the integration and the modules declare in
+      # `checkCategories`, and the stages the modules declare in
+      # `checkStages`. The checks gathered at and inside the
+      # configuration are `checks` of its outputs (`checksOf`).
       mkModuleConfiguration =
         args@{
           type,
@@ -853,14 +882,35 @@
           exportsTo ? null,
           activation ? null,
           selection ? null,
+          checks ? { },
+          checkCategories ? { },
           evaluate,
         }:
+        let
+          # Where the integration writes its default checks and its
+          # categories, for the `code` of each in the record.
+          codeOfArgument =
+            name:
+            let
+              position = positionOf (builtins.unsafeGetAttrPos name args);
+            in
+            if position == null then [ ] else [ (position // { file = inSource position.file; }) ];
+          defaultChecksCode = codeOfArgument "checks";
+          declaredCategories = builtins.mapAttrs (_: category: {
+            inherit (category) description;
+            volatile = category.volatile or false;
+            code = codeOfArgument "checkCategories";
+          }) checkCategories;
+        in
         final.caisson-core.mkConfiguration {
           inherit type perSystem;
           # The class of the configuration, where the additions for the
           # nearest children of that class connect.
           class = if selection == null then null else selection.class;
           recordFromEvaluation = [
+            "checkCategories"
+            "checks"
+            "checkStages"
             "ecosystems"
             "namespaces"
             "pkgSet"
@@ -887,12 +937,120 @@
               evaluated = evaluate given;
               config = evaluated.config or evaluated.value.config;
               options = evaluated.options or evaluated.value.options;
+              caissonOptions = options.caisson or { };
+
+              outputs = (evaluated.outputs or { }) // {
+                exports = config.caisson.exports;
+                checks = checksOf given.manifest;
+              };
+
+              what = "the ${type} configuration ${
+                if given.manifest ? name then "`${toString given.manifest.name}`" else "at the caisson top"
+              }";
+
+              # The checks of the configuration for a system, from the
+              # declarations of its modules. caisson calls the
+              # `derivation` of each default check with the outputs, the
+              # package sets for that system, by the name of the package
+              # config, as `pkgSets`, and the set the selection of the
+              # configuration picks of them as `pkgs`.
+              checksFor =
+                system:
+                let
+                  messages = {
+                    context = "caisson.checks";
+                    what = "the checks of ${what} for ${system}";
+                  };
+                  pkgSets = pkgSetsForSystem messages given.manifest system;
+                in
+                checksOfConfiguration {
+                  inherit
+                    what
+                    type
+                    outputs
+                    pkgSets
+                    ;
+                  pkgs = pkgSetOf messages given.manifest pkgSets;
+                  defaults = checks;
+                  defaultsCode = defaultChecksCode;
+                };
+
+              # The system of this evaluation result: the system it is
+              # evaluated for, or, for a configuration declared inside an
+              # evaluation result that has a system, the system of the
+              # nearest such evaluation result above it. A disko
+              # configuration declared inside a NixOS configuration
+              # evaluated for aarch64-linux has the system aarch64-linux.
+              # Null where neither has a system.
+              system =
+                let
+                  above = builtins.filter (ancestor: ancestor ? system) (given.manifest.ancestors or [ ]);
+                in
+                if given.manifest ? system then
+                  given.manifest.system
+                else if above == [ ] then
+                  null
+                else
+                  (last above).system;
+
+              declaredHere =
+                if caissonOptions ? checks then
+                  checkDeclarationsOf {
+                    option = caissonOptions.checks;
+                    value = config.caisson.checks;
+                  }
+                else
+                  { };
+
+              # The flake-parts and structural integrations return the
+              # declarations of each system as `checkDeclarations`, read
+              # from `perSystem`. In any other configuration the modules
+              # declare the checks in `caisson.checks`, for the system of
+              # the evaluation result.
+              recordedChecks =
+                if evaluated ? checkDeclarations then
+                  builtins.mapAttrs checksFor evaluated.checkDeclarations
+                else if checks == { } && declaredHere == { } then
+                  { }
+                else if system == null then
+                  throw ''
+                    caisson: ${what} has the checks ${
+                      builtins.concatStringsSep ", " (
+                        builtins.map (name: "`${name}`") (builtins.attrNames (checks // declaredHere))
+                      )
+                    }, and its evaluation result has no system: it is not evaluated for a
+                    system, and no configuration it is declared inside is. Declare the checks in
+                    a configuration evaluated for a system, such as a NixOS configuration, or
+                    under `perSystem` of a structural or flake-parts configuration.
+                  ''
+                else
+                  { ${system} = checksFor system declaredHere; };
+
+              recordedCategories = categoriesUnion [
+                declaredCategories
+                (
+                  if caissonOptions ? checkCategories then
+                    builtins.mapAttrs (name: category: {
+                      inherit (category) description volatile;
+                      code = definitionCodeOf caissonOptions.checkCategories name;
+                    }) config.caisson.checkCategories
+                  else
+                    { }
+                )
+              ];
+
+              recordedStages =
+                if caissonOptions ? checkStages then
+                  builtins.mapAttrs (name: stage: {
+                    inherit (stage) description select;
+                    code = definitionCodeOf caissonOptions.checkStages name;
+                  }) config.caisson.checkStages
+                else
+                  { };
             in
             {
               inherit (evaluated) value;
-              outputs = (evaluated.outputs or { }) // {
-                exports = config.caisson.exports;
-              };
+              inherit outputs;
               children =
                 evaluated.children or (given.lib.caisson.integrations.childrenOf { inherit options config; });
               # What the modules give the configurations declared inside
@@ -924,6 +1082,12 @@
                 modules = evaluated.modules or [ ];
               };
               record = {
+                # The checks of the configuration, by system and then
+                # name, the categories of checks and the stages it
+                # declares.
+                checks = recordedChecks;
+                checkCategories = recordedCategories;
+                checkStages = recordedStages;
                 # Where each part of the stack the configuration used came
                 # from (`ecosystemAccountOf`): the library of the lib it
                 # runs on, and each ecosystem the integration resolved,
@@ -1880,6 +2044,444 @@
       # when it returns none.
       positionOf = position: if position == null then null else { inherit (position) file line; };
 
+      # The positions of the definitions of the entry `name` of
+      # `option`, an option of a configuration whose value is an
+      # attribute set, as the record writes code: for each definition that defines
+      # the entry, the file and the line number where the definition
+      # writes the name. A definition that carries no position for the
+      # name, because a function built the attribute set, has the file
+      # the module system records for it and a `line` of null.
+      definitionCodeOf =
+        option: name:
+        builtins.concatMap (
+          definition:
+          if builtins.isAttrs definition.value && definition.value ? ${name} then
+            let
+              position = builtins.unsafeGetAttrPos name definition.value;
+            in
+            [
+              (
+                if position == null then
+                  {
+                    file = inSource definition.file;
+                    line = null;
+                  }
+                else
+                  {
+                    file = inSource position.file;
+                    inherit (position) line;
+                  }
+              )
+            ]
+          else
+            [ ]
+        ) option.definitionsWithLocations;
+
+      # Code positions as a message writes them.
+      showCode =
+        code:
+        builtins.concatStringsSep ", " (
+          builtins.map (
+            position:
+            if position.line == null then position.file else "${position.file}:${toString position.line}"
+          ) code
+        );
+
+      # The checks the modules of a configuration declare in `caisson.checks`, by name,
+      # from the option and its value: each entry with its
+      # `derivation`, null for an annotation, `category`,
+      # `description`, `enable` and `code`, the positions of the
+      # definitions of the entry (`definitionCodeOf`).
+      checkDeclarationsOf =
+        { option, value }:
+        builtins.mapAttrs (name: entry: {
+          inherit (entry)
+            derivation
+            category
+            description
+            enable
+            ;
+          code = definitionCodeOf option name;
+        }) value;
+
+      # The checks a configuration records for a system, by name: the
+      # default checks of its integration and the checks its modules
+      # declare for that system (`checkDeclarationsOf`). `what` names
+      # the configuration in the messages, `type` its integration,
+      # `outputs` are the outputs of the evaluation result, `pkgSets`
+      # are the package sets for the system by the name of the package
+      # config, `pkgs` is the set the selection of the configuration
+      # picks of them, and `defaultsCode` is where the integration
+      # declares its default checks. The `derivation` of a default check
+      # is called with `{ outputs, pkgs, pkgSets }`.
+      #
+      # A declaration with a `derivation` declares a check, and it
+      # names its category. A declaration without a `derivation`
+      # annotates the default check of the same name: its `category`
+      # and `description` replace those of the default where they are
+      # given, and its `enable` is the `enable` of the check. A
+      # declaration with a `derivation` under the name of a default
+      # check, a declaration without a `derivation` that has no default check to
+      # annotate, and a check with no category are refused, each when
+      # its entry is read.
+      checksOfConfiguration =
+        {
+          what,
+          type,
+          outputs,
+          pkgs,
+          pkgSets,
+          defaults,
+          defaultsCode,
+        }:
+        declarations:
+        let
+          ofDefault = default: default.derivation { inherit outputs pkgs pkgSets; };
+          entryOf =
+            name:
+            let
+              default = defaults.${name} or null;
+              declaration = declarations.${name} or null;
+              option = "`caisson.checks.${name}` of ${what}, defined at ${showCode declaration.code},";
+            in
+            if default == null then
+              if declaration.derivation == null then
+                throw ''
+                  caisson: ${option} annotates the check `${name}`, and the configuration
+                  has no check of that name: the ${type} integration declares no default
+                  check `${name}`${
+                    if type == "flake-parts" then ", and no module defines `checks.${name}` for the system" else ""
+                  }. Give the entry a `derivation` and a `category` to declare a check.
+                ''
+              else if declaration.category == null then
+                throw ''
+                  caisson: ${option} declares a check and names no `category`. Name a
+                  category declared in `caisson.checkCategories`, such as `build` or `eval`.
+                ''
+              else
+                declaration
+            else if declaration == null then
+              {
+                derivation = ofDefault default;
+                inherit (default) category description;
+                enable = true;
+                code = defaultsCode;
+              }
+            else if declaration.derivation != null then
+              throw ''
+                caisson: ${option} sets a `derivation`, and the ${type} integration declares a
+                default check named `${name}`. Declare the check under another name, or
+                leave `derivation` out to annotate the default check.
+              ''
+            else
+              {
+                derivation = ofDefault default;
+                category = if declaration.category != null then declaration.category else default.category;
+                description =
+                  if declaration.description != null then declaration.description else default.description;
+                inherit (declaration) enable;
+                code = defaultsCode ++ declaration.code;
+              };
+        in
+        genAttrs (unique (builtins.attrNames defaults ++ builtins.attrNames declarations)) entryOf;
+
+      # The categories of checks that `declarations` declare, a list of
+      # attribute sets of categories by name, each
+      # `{ description; volatile; code; }`, merged into a single
+      # attribute set. A name that several declarations declare has the same `description` and
+      # `volatile` in each declaration, and it carries the positions of
+      # all of them; a name declared with different properties is
+      # refused when its entry is read.
+      categoriesUnion = builtins.foldl' (
+        merged: declared:
+        merged
+        // builtins.mapAttrs (
+          name: category:
+          let
+            seen = merged.${name} or null;
+            show =
+              entry:
+              "description ${builtins.toJSON entry.description}, volatile ${
+                if entry.volatile then "true" else "false"
+              }, at ${showCode entry.code}";
+          in
+          if seen == null then
+            category
+          else if seen.description == category.description && seen.volatile == category.volatile then
+            seen // { code = unique (seen.code ++ category.code); }
+          else
+            throw ''
+              caisson: the check category `${name}` is declared with different properties:
+                ${show seen}
+                ${show category}
+              A category has the same description and volatility wherever it is declared.
+            ''
+        ) declared
+      ) { };
+
+      # A path by the names configurations are declared under, as an
+      # address under the `children` of the manifests from where it
+      # starts.
+      showNamePath =
+        namePath:
+        if namePath == [ ] then
+          "the caisson top"
+        else
+          builtins.concatStringsSep "." (
+            builtins.map (segment: "children.${segment.type}.${segment.name}") namePath
+          );
+
+      # The configurations declared directly inside the configuration
+      # of `manifest` whose checks are gathered: its children, those
+      # evaluated per system inside their systems included, each with
+      # the name it is declared under and its path from `manifest`. The
+      # entry of a deferred configuration is left out, since nothing
+      # inside it is evaluated before its args are given, and so is a
+      # package config, whose sets are not checks.
+      checkChildrenOf =
+        manifest:
+        let
+          children = manifest.children or { };
+          segment = type: name: { inherit type name; };
+          direct = builtins.concatMap (
+            integration:
+            builtins.map (name: {
+              inherit name;
+              manifest = children.${integration}.${name};
+              namePath = [ (segment integration name) ];
+            }) (builtins.attrNames children.${integration})
+          ) (builtins.filter (integration: integration != "system") (builtins.attrNames children));
+          bySystem = builtins.concatMap (
+            system:
+            let
+              node = children.system.${system};
+            in
+            builtins.concatMap (
+              integration:
+              builtins.map (name: {
+                inherit name;
+                manifest = node.children.${integration}.${name};
+                namePath = [
+                  (segment "system" system)
+                  (segment integration name)
+                ];
+              }) (builtins.attrNames node.children.${integration})
+            ) (builtins.attrNames (node.children or { }))
+          ) (builtins.attrNames (children.system or { }));
+        in
+        builtins.filter (child: isManifest child.manifest && child.manifest.type != "nixpkgs") (
+          direct ++ bySystem
+        );
+
+      # The configurations whose checks a configuration gathers: the
+      # configuration of `manifest` and every configuration declared
+      # inside it, at any depth, whatever the `exported` selectors pass
+      # up. Each comes with `namePath`, its path from `manifest` by the
+      # names it is declared under, and `parts`, the names its checks
+      # are published under: the names on that path, without the
+      # systems and without the names of flake-parts configurations,
+      # whose checks are keyed by name already.
+      checkNodesOf =
+        manifest:
+        [
+          {
+            inherit manifest;
+            namePath = [ ];
+            parts = [ ];
+          }
+        ]
+        ++ builtins.concatMap (
+          child:
+          builtins.map (
+            node:
+            node
+            // {
+              namePath = child.namePath ++ node.namePath;
+              parts = (if child.manifest.type == "flake-parts" then [ ] else [ child.name ]) ++ node.parts;
+            }
+          ) (checkNodesOf child.manifest)
+        ) (checkChildrenOf manifest);
+
+      # The checks gathered at the configuration of `manifest`, by
+      # system and then published name: the checks with `enable` that
+      # it and the configurations inside it record (`checkNodesOf`).
+      # The published name of a check is the names of the
+      # configurations from here down to the configuration that
+      # declares it, joined with `-`, then the name of the check: the
+      # check `toplevel` of the NixOS configuration `nas-1` declared
+      # here is `nas-1-toplevel`. The names of flake-parts
+      # configurations are left out of it. Each entry holds the check as
+      # the manifest records it, its name there as `checkName`, its
+      # `namePath`, and `volatile`, from its category.
+      #
+      # The categories are those the configurations declare, together
+      # (`categoriesUnion`). A check whose category none of them declares
+      # is refused when it is read, and so is a stage declared inside
+      # the configuration, and checks that share a published name for
+      # a system.
+      gatheredChecksOf =
+        manifest:
+        let
+          nodes = checkNodesOf manifest;
+          staged = builtins.filter (
+            node: node.namePath != [ ] && (node.manifest.checkStages or { }) != { }
+          ) nodes;
+          categories = categoriesUnion (builtins.map (node: node.manifest.checkCategories or { }) nodes);
+          systems = unique (
+            builtins.concatMap (node: builtins.attrNames (node.manifest.checks or { })) nodes
+          );
+          entries = builtins.concatMap (
+            node:
+            let
+              recorded = node.manifest.checks or { };
+            in
+            builtins.concatMap (
+              system:
+              builtins.concatMap (
+                checkName:
+                let
+                  check = recorded.${system}.${checkName};
+                in
+                if check.enable then
+                  [
+                    {
+                      inherit system check checkName;
+                      inherit (node) namePath;
+                      name = builtins.concatStringsSep "-" (node.parts ++ [ checkName ]);
+                    }
+                  ]
+                else
+                  [ ]
+              ) (builtins.attrNames recorded.${system})
+            ) (builtins.attrNames recorded)
+          ) nodes;
+          validated =
+            entry:
+            let
+              category = entry.check.category;
+            in
+            if categories ? ${category} then
+              entry // { inherit (categories.${category}) volatile; }
+            else
+              throw ''
+                caisson: the check `${entry.checkName}` of the configuration at ${showNamePath entry.namePath},
+                declared at ${showCode entry.check.code}, names the category `${category}`, which no
+                configuration declares. Declare it in `caisson.checkCategories.${category}`, or name
+                a declared category: ${builtins.concatStringsSep ", " (builtins.attrNames categories)}.
+              '';
+          publishFor =
+            system:
+            let
+              members = builtins.filter (entry: entry.system == system) entries;
+              names = builtins.map (entry: entry.name) members;
+              clashing = builtins.filter (
+                name: builtins.length (builtins.filter (other: other == name) names) > 1
+              ) (unique names);
+            in
+            if clashing != [ ] then
+              throw ''
+                caisson: checks.${system}: these checks would be gathered under the same
+                name, `${builtins.head clashing}`:
+                ${builtins.concatStringsSep "\n" (
+                  builtins.map (entry: "  the check `${entry.checkName}` of ${showNamePath entry.namePath}") (
+                    builtins.filter (entry: entry.name == builtins.head clashing) members
+                  )
+                )}
+                Rename a check or a configuration.
+              ''
+            else
+              builtins.listToAttrs (
+                builtins.map (entry: {
+                  inherit (entry) name;
+                  value = validated entry;
+                }) members
+              );
+        in
+        if staged != [ ] then
+          throw ''
+            caisson: ${
+              builtins.concatStringsSep ", " (builtins.map (node: showNamePath node.namePath) staged)
+            } declares stages of checks
+            (`caisson.checkStages`), and stages are declared at the caisson top, the
+            configuration the checks are gathered at. Declare them there.
+          ''
+        else
+          genAttrs systems publishFor;
+
+      # The checks gathered at the configuration of `manifest`
+      # (`gatheredChecksOf`), as derivations by system and then name:
+      # `checks` of the outputs of the configuration, which a caisson
+      # top publishes.
+      checksOf =
+        manifest:
+        builtins.mapAttrs (_: builtins.mapAttrs (_: entry: entry.check.derivation)) (
+          gatheredChecksOf manifest
+        );
+
+      # The `checks` output of a caisson top, by system and then name:
+      # the gathered checks `caisson.exportedChecks` selected
+      # (`gathered`) beside the checks the configurations inside the
+      # caisson top publish in
+      # `checks` through their `exportsTo` (`published`), as the treefmt
+      # integration publishes the check of its configuration named
+      # `formatter`. A name in both is refused.
+      checksOutputOf =
+        { gathered, published }:
+        genAttrs (unique (builtins.attrNames gathered ++ builtins.attrNames published)) (
+          system:
+          let
+            fromGathering = gathered.${system} or { };
+            fromExports = published.${system} or { };
+            both = builtins.attrNames (builtins.intersectAttrs fromGathering fromExports);
+          in
+          if both != [ ] then
+            throw ''
+              caisson: checks.${system}: ${
+                builtins.concatStringsSep ", " (builtins.map (name: "`${name}`") both)
+              } is both a gathered check
+              and a check a configuration publishes through its `exportsTo`. Rename the
+              check or the configuration.
+            ''
+          else
+            fromGathering // fromExports
+        );
+
+      # The system features a check demands of the machine that builds
+      # it: the `requiredSystemFeatures` of its derivation, or, for the
+      # driver of a NixOS test, whose derivation carries a fixed set of
+      # attributes, the `requiredFeatures` of the `config` it carries.
+      requiredFeaturesOf =
+        derivation:
+        if derivation ? requiredSystemFeatures then
+          derivation.requiredSystemFeatures
+        else if builtins.isAttrs (derivation.config or null) && derivation.config ? requiredFeatures then
+          derivation.config.requiredFeatures
+        else
+          [ ];
+
+      # The check record of a caisson top, keyed as `checks` of its
+      # outputs is, by system and then published name: for each check,
+      # `name` and `system`, `from.namePath`, the path from the caisson
+      # top to the
+      # configuration that declares the check by the names declared,
+      # `category`, `description`, `volatile`, from the category,
+      # `requiredFeatures` (`requiredFeaturesOf`) and `code`, the
+      # positions of the definitions that declare the check.
+      checkRecordOf =
+        manifest:
+        builtins.mapAttrs (
+          system:
+          builtins.mapAttrs (
+            name: entry: {
+              inherit name system;
+              from.namePath = entry.namePath;
+              inherit (entry.check) category description code;
+              inherit (entry) volatile;
+              requiredFeatures = requiredFeaturesOf entry.check.derivation;
+            }
+          )
+        ) (gatheredChecksOf manifest);
+
       # The entry of a configuration that is passed up under `prefix`,
       # whose last segment holds the name it is passed up under: the
       # output attribute set and the value its `exportsTo` gives, and
@@ -2235,7 +2837,12 @@
       caisson = (prev.caisson or { }) // {
         integrations = ((prev.caisson or { }).integrations or { }) // {
           inherit
+            checkDeclarationsOf
+            checkRecordOf
+            checksOf
+            checksOutputOf
             childrenOf
+            definitionCodeOf
             displayName
             declarationEventsOf
             ecosystemUnit

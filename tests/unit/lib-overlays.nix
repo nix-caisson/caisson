@@ -2877,6 +2877,7 @@ in
             "system"
           ];
           outputs = [
+            "checks"
             "exports"
             "images"
             "toplevel"
@@ -3519,6 +3520,394 @@ in
             };
           }).config.seenLib.marker;
         expected = "from-specialArgs";
+      };
+    };
+
+  # The checks of configurations: what a configuration declares in
+  # `caisson.checks`, what a caisson top gathers under `checks.<system>` of its
+  # outputs, and the check record. The NixOS configurations evaluate
+  # the stand-in nixos tree, and a check is a stand-in derivation: an
+  # attribute set of type `derivation` with a store path.
+  checks =
+    let
+      nixosStub = ./nixos-stub;
+      checksLib = caisson.mkLib {
+        dependencies = mockDependencies // {
+          inherit nixosStub;
+        };
+        defaultEcosystemSrc = dependencies: {
+          nixpkgs = dependencies.nixosStub;
+          nixos = dependencies.nixosStub;
+        };
+        systems = [ "x86_64-linux" ];
+        pkgSets = stubPkgSets { default = { }; };
+        libOverlays = _lib: {
+          nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+        };
+      };
+      check = name: {
+        type = "derivation";
+        inherit name;
+        outPath = "/nix/store/00000000000000000000000000000000-${name}";
+        drvPath = "/nix/store/00000000000000000000000000000000-${name}.drv";
+      };
+      nixosConfiguration =
+        lib: module:
+        lib.caisson.nixos.mkConfiguration {
+          configModule = module;
+        };
+      topWith =
+        module:
+        checksLib.caisson.structural.mkTopConfiguration {
+          moduleImports = _modules: [ ];
+          configModule = module;
+        };
+      # A structural caisson top with the NixOS configuration `nas-1`, which
+      # declares the checks `smoke` and `off`, and turns `off` off, and
+      # the structural configuration `lab` with the NixOS configuration
+      # `arm` inside it, which declares the check `smoke`.
+      gathering = topWith (
+        { lib, ... }:
+        {
+          caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+            caisson.checks.smoke = {
+              derivation = check "nas-1-smoke";
+              category = "eval";
+            };
+            caisson.checks.off = {
+              derivation = check "nas-1-off";
+              category = "eval";
+              enable = false;
+            };
+          };
+          caisson.structural.configurations.lab = lib.caisson.structural.mkConfiguration {
+            moduleImports = _modules: [ ];
+            configModule =
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.arm = nixosConfiguration lib {
+                  caisson.checks.smoke = {
+                    derivation = check "arm-smoke";
+                    category = "eval";
+                  };
+                };
+              };
+          };
+        }
+      );
+      names = top: builtins.mapAttrs (_: builtins.attrNames) top.checks;
+    in
+    {
+      "test: a caisson top gathers the checks inside it under the joined names of the configurations" = {
+        expr = {
+          published = names gathering;
+          inManifest = builtins.mapAttrs (_: builtins.attrNames) gathering.caisson.manifest.outputs.checks;
+          record = builtins.mapAttrs (_: builtins.attrNames) gathering.caisson.manifest.checkRecord;
+          smoke = gathering.checks.x86_64-linux.lab-arm-smoke.name;
+        };
+        expected = {
+          published.x86_64-linux = [
+            "lab-arm-smoke"
+            "nas-1-smoke"
+          ];
+          inManifest.x86_64-linux = [
+            "lab-arm-smoke"
+            "nas-1-smoke"
+          ];
+          record.x86_64-linux = [
+            "lab-arm-smoke"
+            "nas-1-smoke"
+          ];
+          smoke = "arm-smoke";
+        };
+      };
+
+      "test: a check turned off stays in the manifest and is not gathered" = {
+        expr =
+          let
+            recorded =
+              gathering.caisson.manifest.children.system.x86_64-linux.children.nixos.nas-1.checks.x86_64-linux;
+          in
+          {
+            names = builtins.attrNames recorded;
+            enable = recorded.off.enable;
+            gathered = gathering.checks.x86_64-linux ? nas-1-off;
+          };
+        expected = {
+          names = [
+            "off"
+            "smoke"
+          ];
+          enable = false;
+          gathered = false;
+        };
+      };
+
+      "test: a check record entry says where the check is declared" = {
+        expr = builtins.removeAttrs gathering.caisson.manifest.checkRecord.x86_64-linux.lab-arm-smoke [
+          "code"
+        ];
+        expected = {
+          name = "lab-arm-smoke";
+          system = "x86_64-linux";
+          from.namePath = [
+            {
+              type = "structural";
+              name = "lab";
+            }
+            {
+              type = "system";
+              name = "x86_64-linux";
+            }
+            {
+              type = "nixos";
+              name = "arm";
+            }
+          ];
+          category = "eval";
+          description = null;
+          volatile = false;
+          requiredFeatures = [ ];
+        };
+      };
+
+      "test: a category a configuration declares applies to every check the caisson top gathers" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.checkCategories.hardware = {
+                  description = "the machine boots on its hardware";
+                  volatile = true;
+                };
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.boots = {
+                    derivation = check "boots";
+                    category = "hardware";
+                  };
+                };
+              }
+            );
+          in
+          {
+            inherit (top.caisson.manifest.checkRecord.x86_64-linux.nas-1-boots) category volatile;
+            declared = builtins.attrNames top.caisson.manifest.checkCategories;
+          };
+        expected = {
+          category = "hardware";
+          volatile = true;
+          declared = [
+            "build"
+            "eval"
+            "format"
+            "hardware"
+            "unit"
+            "vm"
+          ];
+        };
+      };
+
+      "test: a check whose category nothing declares is refused with the check and its file" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.smoke = {
+                    derivation = check "smoke";
+                    category = "undeclared";
+                  };
+                };
+              }
+            );
+          in
+          top.checks.x86_64-linux.nas-1-smoke.drvPath;
+        expectedError = {
+          type = "ThrownError";
+          msg = "the check `smoke` of the configuration at children\\.system\\.x86_64-linux\\.children\\.nixos\\.nas-1,\\s+declared at [^ ]*lib-overlays\\.nix:[0-9]+, names the category `undeclared`, which no";
+        };
+      };
+
+      "test: checks gathered under the same name are refused" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.smoke = {
+                    derivation = check "smoke";
+                    category = "eval";
+                  };
+                };
+                caisson.nixos.configurations.nas = nixosConfiguration lib {
+                  caisson.checks."1-smoke" = {
+                    derivation = check "other-smoke";
+                    category = "eval";
+                  };
+                };
+              }
+            );
+          in
+          builtins.attrNames top.checks.x86_64-linux;
+        expectedError = {
+          type = "ThrownError";
+          msg = "checks\\.x86_64-linux: these checks would be gathered under the same\\s+name, `nas-1-smoke`";
+        };
+      };
+
+      "test: a check that names no category is refused" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.smoke.derivation = check "smoke";
+                };
+              }
+            );
+          in
+          builtins.attrNames top.checks.x86_64-linux;
+        expectedError = {
+          type = "ThrownError";
+          msg = "`caisson\\.checks\\.smoke` of the nixos configuration `nas-1`, defined at [^ ]*lib-overlays\\.nix:[0-9]+, declares a check and names no `category`";
+        };
+      };
+
+      "test: an annotation with no check to annotate is refused" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checks.toplevel.enable = false;
+                };
+              }
+            );
+          in
+          builtins.attrNames top.checks.x86_64-linux;
+        expectedError = {
+          type = "ThrownError";
+          msg = "annotates the check `toplevel`, and the configuration\\s+has no check of that name";
+        };
+      };
+
+      "test: the caisson top records its stages" = {
+        expr =
+          let
+            top = topWith {
+              caisson.checkStages.quick = {
+                description = "the checks that evaluate";
+                select = entry: entry.category == "eval";
+              };
+            };
+          in
+          {
+            inherit (top.caisson.manifest.checkStages.quick) description;
+            selects = top.caisson.manifest.checkStages.quick.select { category = "eval"; };
+          };
+        expected = {
+          description = "the checks that evaluate";
+          selects = true;
+        };
+      };
+
+      "test: a stage declared inside the caisson top is refused" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  caisson.checkStages.inner = {
+                    description = "a stage inside the caisson top";
+                    select = _: true;
+                  };
+                };
+              }
+            );
+          in
+          builtins.attrNames top.checks;
+        expectedError = {
+          type = "ThrownError";
+          msg = "children\\.system\\.x86_64-linux\\.children\\.nixos\\.nas-1 declares stages of checks";
+        };
+      };
+
+      "test: a flake annotates the entries of checks under perSystem" = {
+        expr =
+          let
+            flake = checksLib.caisson.flake-parts.mkTopConfiguration {
+              moduleImports = _modules: [ ];
+              configModule =
+                { lib, ... }:
+                {
+                  perSystem = {
+                    checks.treefmt = check "treefmt";
+                    checks.bare = check "bare";
+                    caisson.checks.treefmt.category = "format";
+                    caisson.checks.declared = {
+                      derivation = check "declared";
+                      category = "unit";
+                      description = "the unit tests pass";
+                    };
+                  };
+                  caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                    caisson.checks.smoke = {
+                      derivation = check "smoke";
+                      category = "eval";
+                    };
+                  };
+                };
+            };
+            record = flake.caisson.manifest.checkRecord.x86_64-linux;
+          in
+          {
+            published = names flake;
+            categories = builtins.mapAttrs (_: entry: entry.category) record;
+            treefmtPositions = builtins.length record.treefmt.code;
+            description = record.declared.description;
+          };
+        expected = {
+          published.x86_64-linux = [
+            "bare"
+            "declared"
+            "nas-1-smoke"
+            "treefmt"
+          ];
+          categories = {
+            bare = "build";
+            declared = "unit";
+            nas-1-smoke = "eval";
+            treefmt = "format";
+          };
+          treefmtPositions = 2;
+          description = "the unit tests pass";
+        };
+      };
+
+      "test: a caisson top whose configurations declare no checks gathers none" = {
+        expr =
+          let
+            top = topWith (
+              { lib, ... }:
+              {
+                caisson.nixos.configurations.nas-1 = nixosConfiguration lib { };
+              }
+            );
+          in
+          {
+            checks = top.checks;
+            record = top.caisson.manifest.checkRecord;
+          };
+        expected = {
+          checks.x86_64-linux = { };
+          record.x86_64-linux = { };
+        };
       };
     };
 

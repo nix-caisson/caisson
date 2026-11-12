@@ -264,6 +264,12 @@
           outputs = {
             flake = outputs;
           };
+          # The checks the flake declares for each system of its
+          # `systems`, as the core module of the flake class reads them
+          # under `perSystem` (modules/flake/core/perSystem.nix).
+          checkDeclarations = lib.genAttrs evaluated.config.systems (
+            system: evaluated.config.allSystems.${system}.caisson.checkDeclarations
+          );
         };
 
       configuration =
