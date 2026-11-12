@@ -122,6 +122,7 @@ source by.
 | `nixos` | `nixpkgs` | NixOS configurations |
 | `darwin` | `nix-darwin` | nix-darwin configurations of macOS systems, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the home-manager configurations and hjem configurations declared inside them |
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
+| `nixos-test` | `nixos` | NixOS VM tests, the test modules that `pkgs.testers.runNixOSTest` takes, evaluated with `evalTest` of nixpkgs for each system and published in no output: each test is the check `test`, the run of the test driver, of the category `vm`; a test declared inside a NixOS configuration reads that NixOS configuration through its manifest |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
 | `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS, nix-darwin or system-manager configuration they are declared inside, or applied with `hjem standalone` |

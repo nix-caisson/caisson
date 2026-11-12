@@ -61,6 +61,7 @@ let
       registered."caisson/nixpkgs"
       registered."caisson/nixos"
       registered."caisson/nixos-minimal"
+      registered."caisson/nixos-test"
       registered."caisson/home-manager"
       registered."caisson/hjem"
       registered."caisson/caisson-colmena"
@@ -137,6 +138,7 @@ let
     "nixops4"
     "nixos"
     "nixos-minimal"
+    "nixos-test"
     "nixpkgs"
     "nixvim"
     "nvf"
@@ -1137,6 +1139,74 @@ let
       }
     );
 
+  # A NixOS test as `pkgs.testers.runNixOSTest` takes it: the test
+  # `probe`, with the node `machine` that logs root in on the console.
+  nixosTestModule = {
+    name = "probe";
+    nodes.machine = {
+      services.getty.autologinUser = "root";
+    };
+    testScript = ''
+      machine.wait_for_unit("multi-user.target")
+    '';
+  };
+
+  # A structural caisson top that declares the test of
+  # `nixosTestModule` as the nixos-test configuration `probe`.
+  nixosTestTop = checksLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos-test.configurations.probe = lib.caisson.nixos-test.mkConfiguration {
+          configModule = nixosTestModule;
+        };
+      };
+  };
+
+  # A flake that declares the test of `nixosTestModule` as the
+  # nixos-test configuration `probe`, at the top of the flake.
+  nixosTestFlake = checksLib.caisson.flake-parts.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos-test.configurations.probe = lib.caisson.nixos-test.mkConfiguration {
+          configModule = nixosTestModule;
+        };
+      };
+  };
+
+  # A structural caisson top with the NixOS configuration `nas-1`, whose
+  # host name is `nas-one`, and the nixos-test configuration `smoke`
+  # declared inside it. The test names itself after the host name of
+  # the NixOS configuration it is declared inside, read from its
+  # manifest.
+  nixosTestInsideNixos = checksLib.caisson.structural.mkTopConfiguration {
+    moduleImports = _modules: [ ];
+    configModule =
+      { lib, ... }:
+      {
+        caisson.nixos.configurations.nas-1 = checksNixosConfiguration lib (
+          { lib, ... }:
+          {
+            networking.hostName = "nas-one";
+            caisson.nixos-test.configurations.smoke = lib.caisson.nixos-test.mkConfiguration {
+              configModule =
+                { lib, ... }:
+                {
+                  name = lib.caisson-core.evalManifest.nearest.nixos.value.config.networking.hostName;
+                  nodes.machine = { };
+                  testScript = ''
+                    machine.wait_for_unit("multi-user.target")
+                  '';
+                };
+            };
+          }
+        );
+      };
+  };
+
   results = {
 
     # Each NixOS module caisson registers evaluates with what it
@@ -1210,6 +1280,7 @@ let
           "caisson/nixpkgs"
           "caisson/nixos"
           "caisson/nixos-minimal"
+          "caisson/nixos-test"
           "caisson/home-manager"
           "caisson/hjem"
           "caisson/caisson-colmena"
@@ -1704,6 +1775,7 @@ let
             "topology"
             "kubenix"
             "nixidy"
+            "nixosTest"
           ]
         )
       # The configuration given the entry registered as `minimal`
@@ -6683,6 +6755,104 @@ let
       && (checksOf off) == { aarch64-linux = { }; }
       && off.aarch64-linux.checks.aarch64-linux.artifact.enable == false
       && checksFail (checksOf redefined);
+
+    # A test declared through the nixos-test integration builds the
+    # derivation that `pkgs.testers.runNixOSTest` builds for the same
+    # test module, and the manifest of the test records the module of
+    # its node as a `declaration` event that names the node. The test
+    # is published in no output attribute set.
+    nixosTestBuildsWhatRunNixOSTestBuilds =
+      let
+        manifest = nixosTestTop.caisson.manifest.children.system.x86_64-linux.children.nixos-test.probe;
+        nodeEvents = builtins.filter (event: event ? node) manifest.history;
+      in
+      nixosTestTop.checks.x86_64-linux.probe-test.drvPath == (pkgs.testers.runNixOSTest nixosTestModule)
+      .drvPath
+      && manifest.outputs.test.drvPath == nixosTestTop.checks.x86_64-linux.probe-test.drvPath
+      && manifest.outputs.driver.name == "nixos-test-driver-probe"
+      && builtins.isString manifest.outputs.driverInteractive.drvPath
+      &&
+        builtins.map (event: {
+          inherit (event)
+            operation
+            type
+            node
+            key
+            ;
+        }) nodeEvents == [
+          {
+            operation = "declaration";
+            type = "nixos-test";
+            node = "machine";
+            key = "nodes.machine/0";
+          }
+        ]
+      && builtins.attrNames nixosTestTop.caisson.manifest.exportRecord == [ ];
+
+    # A test declared with no module takes the module registered under
+    # its name, `configs/nixosTest/<name>`, and the event of its node
+    # names the file that declares the node.
+    nixosTestTakesTheModuleRegisteredUnderItsName =
+      let
+        manifest =
+          registeredWorld.caisson.manifest.children.system.x86_64-linux.children.nixos-test.registered;
+      in
+      builtins.map (event: { inherit (event) key origin; }) (
+        builtins.filter (event: event ? node) manifest.history
+      ) == [
+        {
+          key = "nodes.machine/0";
+          origin = {
+            project = "pinned-world";
+            file = "tests/pinned-world/configs/nixosTest/registered";
+          };
+        }
+      ]
+      && registeredWorld.checks.x86_64-linux.registered-test.name == "vm-test-run-registered";
+
+    # The default check of a test, `test`, is the run of the test
+    # driver, of the category `vm`, and the check record lists the
+    # system features the test framework demands of the machine that
+    # builds it.
+    nixosTestCheckIsAVmCheck =
+      let
+        entry = nixosTestTop.caisson.manifest.checkRecord.x86_64-linux.probe-test;
+      in
+      entry.category == "vm"
+      && !entry.volatile
+      && builtins.elem "kvm" entry.requiredFeatures
+      && builtins.elem "nixos-test" entry.requiredFeatures
+      &&
+        entry.from.namePath == [
+          {
+            type = "system";
+            name = "x86_64-linux";
+          }
+          {
+            type = "nixos-test";
+            name = "probe";
+          }
+        ]
+      && builtins.map (position: position.file) entry.code == [ "lib-overlays/nixos-test/default.nix" ];
+
+    # A test declared at the top of a flake is evaluated for each
+    # system the flake lists, and its check lands under each of them.
+    nixosTestAtTheTopOfAFlakeIsEvaluatedForEachSystem =
+      builtins.mapAttrs (_: builtins.attrNames) nixosTestFlake.checks == {
+        aarch64-linux = [ "probe-test" ];
+        x86_64-linux = [ "probe-test" ];
+      }
+      && nixosTestFlake.caisson.manifest.checkRecord.aarch64-linux.probe-test.system == "aarch64-linux";
+
+    # A test declared inside a NixOS configuration reads the result of
+    # the childless evaluation of that NixOS configuration as
+    # `nearest.nixos` of its manifest, and its check is published under
+    # the name of the NixOS configuration.
+    nixosTestInsideANixosConfigurationReadsNearest =
+      builtins.mapAttrs (_: builtins.mapAttrs (_: check: check.name)) nixosTestInsideNixos.checks == {
+        aarch64-linux.nas-1-smoke-test = "vm-test-run-nas-one";
+        x86_64-linux.nas-1-smoke-test = "vm-test-run-nas-one";
+      };
 
   };
 

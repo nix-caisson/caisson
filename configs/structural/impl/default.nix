@@ -23,6 +23,7 @@
         nixpkgs
         nixos
         nixos-minimal
+        nixos-test
         home-manager
         home-manager-minimal
         hjem
