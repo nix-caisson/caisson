@@ -3496,6 +3496,60 @@ in
         };
       };
 
+      # The entries of an output keyed by system are named from the
+      # paths of every system together, so an entry has the same name
+      # under each system. The treefmt configuration `a` inside the
+      # structural configuration `lab`, evaluated for both systems,
+      # collides under x86_64-linux with the treefmt configuration `a`
+      # declared at the caisson top, and is `lab/a` under both.
+      "test: an output keyed by system names an entry the same under every system" = {
+        expr =
+          let
+            entryFor = system: segments: {
+              attrset = "packages";
+              value = "${
+                builtins.concatStringsSep "." (builtins.map (segment: segment.name) segments)
+              } for ${system}";
+              manifest = { };
+              bySystem = true;
+              inherit system;
+              path = [
+                {
+                  type = "system";
+                  name = system;
+                }
+              ]
+              ++ segments;
+            };
+            lab = {
+              type = "structural";
+              name = "lab";
+            };
+            a = {
+              type = "treefmt";
+              name = "a";
+            };
+          in
+          myLib.caisson.integrations.publish [
+            (entryFor "x86_64-linux" [ a ])
+            (entryFor "x86_64-linux" [
+              lab
+              a
+            ])
+            (entryFor "aarch64-linux" [
+              lab
+              a
+            ])
+          ];
+        expected.packages = {
+          x86_64-linux = {
+            a = "a for x86_64-linux";
+            "lab/a" = "lab.a for x86_64-linux";
+          };
+          aarch64-linux."lab/a" = "lab.a for aarch64-linux";
+        };
+      };
+
       # A `lib` the caller passes in `specialArgs` takes precedence
       # over the `lib` the composition sets, the way every other special
       # argument does.
@@ -3601,33 +3655,33 @@ in
       names = top: builtins.mapAttrs (_: builtins.attrNames) top.checks;
     in
     {
-      "test: a caisson top gathers the checks inside it under the joined names of the configurations" = {
+      "test: a caisson top names the checks inside it by the segments that tell them apart" = {
         expr = {
           published = names gathering;
           inManifest = builtins.mapAttrs (_: builtins.attrNames) gathering.caisson.manifest.outputs.checks;
           record = builtins.mapAttrs (_: builtins.attrNames) gathering.caisson.manifest.checkRecord;
-          smoke = gathering.checks.x86_64-linux.lab-arm-smoke.name;
+          smoke = gathering.checks.x86_64-linux."lab/smoke".name;
         };
         expected = {
           published.x86_64-linux = [
-            "lab-arm-smoke"
-            "lab-arm-toplevel"
-            "nas-1-smoke"
-            "nas-1-toplevel"
+            "lab/smoke"
+            "lab/toplevel"
+            "nas-1/smoke"
+            "nas-1/toplevel"
             "registries"
           ];
           inManifest.x86_64-linux = [
-            "lab-arm-smoke"
-            "lab-arm-toplevel"
-            "nas-1-smoke"
-            "nas-1-toplevel"
+            "lab/smoke"
+            "lab/toplevel"
+            "nas-1/smoke"
+            "nas-1/toplevel"
             "registries"
           ];
           record.x86_64-linux = [
-            "lab-arm-smoke"
-            "lab-arm-toplevel"
-            "nas-1-smoke"
-            "nas-1-toplevel"
+            "lab/smoke"
+            "lab/toplevel"
+            "nas-1/smoke"
+            "nas-1/toplevel"
             "registries"
           ];
           smoke = "arm-smoke";
@@ -3643,7 +3697,7 @@ in
           {
             names = builtins.attrNames recorded;
             enable = recorded.off.enable;
-            gathered = gathering.checks.x86_64-linux ? nas-1-off;
+            gathered = gathering.checks.x86_64-linux ? off;
           };
         expected = {
           names = [
@@ -3657,12 +3711,13 @@ in
       };
 
       "test: a check record entry says where the check is declared" = {
-        expr = builtins.removeAttrs gathering.caisson.manifest.checkRecord.x86_64-linux.lab-arm-smoke [
+        expr = builtins.removeAttrs gathering.caisson.manifest.checkRecord.x86_64-linux."lab/smoke" [
           "code"
         ];
         expected = {
-          name = "lab-arm-smoke";
+          name = "lab/smoke";
           system = "x86_64-linux";
+          from.check = "smoke";
           from.namePath = [
             {
               type = "structural";
@@ -3709,7 +3764,7 @@ in
             );
           in
           {
-            inherit (top.caisson.manifest.checkRecord.x86_64-linux.nas-1-boots) category volatile;
+            inherit (top.caisson.manifest.checkRecord.x86_64-linux.boots) category volatile;
             declared = builtins.attrNames top.caisson.manifest.checkCategories;
           };
         expected = {
@@ -3741,27 +3796,31 @@ in
               }
             );
           in
-          top.checks.x86_64-linux.nas-1-smoke.drvPath;
+          top.checks.x86_64-linux.smoke.drvPath;
         expectedError = {
           type = "ThrownError";
           msg = "the check `smoke` of the configuration at children\\.system\\.x86_64-linux\\.children\\.nixos\\.nas-1,\\s+declared at [^ ]*lib-overlays\\.nix:[0-9]+, names the category `undeclared`, which no";
         };
       };
 
-      "test: checks gathered under the same name are refused" = {
+      "test: checks that still share a name are refused with their paths" = {
         expr =
           let
             top = topWith (
               { lib, ... }:
               {
+                perSystem.caisson.checks."nas-1/smoke" = {
+                  derivation = check "top-smoke";
+                  category = "eval";
+                };
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
                   caisson.checks.smoke = {
                     derivation = check "smoke";
                     category = "eval";
                   };
                 };
-                caisson.nixos.configurations.nas = nixosConfiguration lib {
-                  caisson.checks."1-smoke" = {
+                caisson.nixos.configurations.nas-2 = nixosConfiguration lib {
+                  caisson.checks.smoke = {
                     derivation = check "other-smoke";
                     category = "eval";
                   };
@@ -3772,7 +3831,7 @@ in
           builtins.attrNames top.checks.x86_64-linux;
         expectedError = {
           type = "ThrownError";
-          msg = "checks\\.x86_64-linux: these checks would be gathered under the same\\s+name, `nas-1-smoke`";
+          msg = "checks\\.x86_64-linux: these checks would be published under the same\\s+name, `nas-1/smoke`:\\s+check nas-1/smoke\\s+nixos nas-1 / check smoke";
         };
       };
 
@@ -3894,16 +3953,16 @@ in
           published.x86_64-linux = [
             "bare"
             "declared"
-            "nas-1-smoke"
-            "nas-1-toplevel"
             "registries"
+            "smoke"
+            "toplevel"
             "treefmt"
           ];
           categories = {
             bare = "build";
             declared = "unit";
-            nas-1-smoke = "eval";
-            nas-1-toplevel = "build";
+            smoke = "eval";
+            toplevel = "build";
             registries = "eval";
             treefmt = "format";
           };
@@ -3928,12 +3987,12 @@ in
           };
         expected = {
           checks.x86_64-linux = [
-            "nas-1-toplevel"
             "registries"
+            "toplevel"
           ];
           record.x86_64-linux = [
-            "nas-1-toplevel"
             "registries"
+            "toplevel"
           ];
         };
       };

@@ -6549,35 +6549,40 @@ let
 
     # A structural caisson top gathers the checks of the configurations inside
     # it under `checks.<system>` of its outputs and returns them as its
-    # `checks`. A check is published under the names of the
-    # configurations from the caisson top down to it and its name, joined with
-    # `-`, for each system its configuration is evaluated for: the
+    # `checks`, for each system its configuration is evaluated for: the
     # checks of `arm`, which `lab` evaluates for aarch64-linux, are
-    # under `checks.aarch64-linux` alone. A check turned off is not
-    # gathered.
-    checksGatheredUnderJoinedNames =
+    # under `checks.aarch64-linux` alone. A check is named as a
+    # configuration is in an output keyed by system, from the checks
+    # of every system together: the checks `smoke` and `toplevel` of
+    # `nas-1` and `arm` gain the segment where their paths fork,
+    # `nas-1` and `lab`, and the checks of `nas-1` have those names
+    # under both systems, although `arm` is gathered under
+    # aarch64-linux alone. `boots` is alone and keeps its name. A check
+    # turned off is not gathered.
+    checksGatheredUnderElidedNames =
       let
         names = builtins.mapAttrs (_: builtins.attrNames) checksTop.checks;
         drvPaths = builtins.mapAttrs (_: builtins.mapAttrs (_: check: check.drvPath));
       in
       names == {
         aarch64-linux = [
-          "lab-arm-smoke"
-          "lab-arm-toplevel"
-          "nas-1-boots"
-          "nas-1-smoke"
-          "nas-1-toplevel"
+          "boots"
+          "lab/smoke"
+          "lab/toplevel"
+          "nas-1/smoke"
+          "nas-1/toplevel"
           "registries"
         ];
         x86_64-linux = [
-          "nas-1-boots"
-          "nas-1-smoke"
-          "nas-1-toplevel"
+          "boots"
+          "nas-1/smoke"
+          "nas-1/toplevel"
           "registries"
         ];
       }
       && drvPaths checksTop.checks == drvPaths checksTop.caisson.manifest.outputs.checks
-      && checksTop.checks.x86_64-linux.nas-1-smoke.drvPath == (checkMarker "nas-1-smoke").drvPath;
+      && checksTop.checks.x86_64-linux."nas-1/smoke".drvPath == (checkMarker "nas-1-smoke").drvPath
+      && checksTop.checks.aarch64-linux."lab/smoke".drvPath == (checkMarker "arm-smoke").drvPath;
 
     # A structural configuration declares its checks under `perSystem`,
     # which is evaluated once for each system its children are evaluated
@@ -6638,24 +6643,24 @@ let
       in
       builtins.mapAttrs (_: builtins.attrNames) top.checks == {
         aarch64-linux = [
-          "lab-arm-smoke"
-          "lab-arm-toplevel"
-          "lab-wide"
-          "nas-1-smoke"
-          "nas-1-toplevel"
+          "lab/smoke"
+          "lab/toplevel"
+          "nas-1/smoke"
+          "nas-1/toplevel"
           "registries"
           "top"
+          "wide"
         ];
         x86_64-linux = [
-          "nas-1-smoke"
-          "nas-1-toplevel"
+          "nas-1/smoke"
+          "nas-1/toplevel"
           "registries"
           "top"
         ];
       }
       && top.checks.x86_64-linux.top.name == "top-x86_64-linux-default"
       && top.checks.aarch64-linux.top.name == "top-aarch64-linux-default"
-      && top.checks.aarch64-linux.lab-wide.name == "wide-aarch64-linux-default"
+      && top.checks.aarch64-linux.wide.name == "wide-aarch64-linux-default"
       && builtins.attrNames top.caisson.manifest.children.structural.lab.checks == [ "aarch64-linux" ]
       && builtins.attrNames (nas-1 "aarch64-linux").checks == [ "aarch64-linux" ]
       && builtins.attrNames (nas-1 "x86_64-linux").checks == [ "x86_64-linux" ]
@@ -6691,14 +6696,15 @@ let
     checkRecordOfTheCaissonTop =
       let
         record = checksTop.caisson.manifest.checkRecord;
-        boots = record.x86_64-linux.nas-1-boots;
+        boots = record.x86_64-linux.boots;
       in
       builtins.mapAttrs (_: builtins.attrNames) record
       == builtins.mapAttrs (_: builtins.attrNames) checksTop.checks
       &&
         builtins.removeAttrs boots [ "code" ] == {
-          name = "nas-1-boots";
+          name = "boots";
           system = "x86_64-linux";
+          from.check = "boots";
           from.namePath = [
             {
               type = "system";
@@ -6717,7 +6723,7 @@ let
         }
       && builtins.map (position: position.file) boots.code == [ "tests/pinned-world/default.nix" ]
       &&
-        record.aarch64-linux.lab-arm-smoke.from.namePath == [
+        record.aarch64-linux."lab/smoke".from.namePath == [
           {
             type = "structural";
             name = "lab";
@@ -6731,8 +6737,9 @@ let
             name = "arm";
           }
         ]
-      && record.x86_64-linux.nas-1-smoke.volatile == false
-      && record.x86_64-linux.nas-1-smoke.requiredFeatures == [ ];
+      && record.aarch64-linux."lab/smoke".from.check == "smoke"
+      && record.x86_64-linux."nas-1/smoke".volatile == false
+      && record.x86_64-linux."nas-1/smoke".requiredFeatures == [ ];
 
     # The caisson top records its stages, and the function of a stage selects
     # from the entries of the check record.
@@ -6749,12 +6756,12 @@ let
       &&
         selected == {
           aarch64-linux = [
-            "lab-arm-smoke"
-            "nas-1-smoke"
+            "lab/smoke"
+            "nas-1/smoke"
             "registries"
           ];
           x86_64-linux = [
-            "nas-1-smoke"
+            "nas-1/smoke"
             "registries"
           ];
         };
@@ -6762,7 +6769,9 @@ let
     # The categories caisson declares and those a configuration declares are
     # recorded on the manifests that declare them. A check whose
     # category nothing declares is refused, and so are checks that
-    # would be gathered under the same name.
+    # would still be published under the same name: the check `smoke`
+    # of `nas-1` is `nas-1/smoke`, the name of a check the caisson top
+    # declares.
     checksRefusedWhereTheTreeDoesNotHold =
       let
         categories = checksTop.caisson.manifest.checkCategories;
@@ -6777,17 +6786,12 @@ let
             };
           }
         );
-        clashing = checksTopWith (
-          { lib, ... }:
-          {
-            caisson.nixos.configurations.nas = checksNixosConfiguration lib {
-              caisson.checks."1-smoke" = {
-                derivation = checkMarker "nas-1-smoke-again";
-                category = "eval";
-              };
-            };
-          }
-        );
+        clashing = checksTopWith {
+          perSystem.caisson.checks."nas-1/smoke" = {
+            derivation = checkMarker "nas-1-smoke-again";
+            category = "eval";
+          };
+        };
       in
       builtins.attrNames categories == [
         "build"
@@ -6900,7 +6904,7 @@ let
             program = pkgs.writeShellScript "probe-reaches" "exit 0";
           }
         );
-        record = top: top.caisson.manifest.checkRecord.x86_64-linux.probe-reaches;
+        record = top: top.caisson.manifest.checkRecord.x86_64-linux.reaches;
       in
       !(builtins.tryEval (record hermetic).volatile).success
       && checksFail hermetic.caisson.manifest.checkRecord
@@ -6909,7 +6913,7 @@ let
       && !checksFail hermetic.checks
       && !checksFail fixedOutput.caisson.manifest.checkRecord
       && !checksFail fixedOutput.checks
-      && fixedOutput.checks.x86_64-linux.probe-reaches.drvAttrs ? outputHash
+      && fixedOutput.checks.x86_64-linux.reaches.drvAttrs ? outputHash
       && (record fixedOutput).volatile;
 
     # A stage declared inside the caisson top is refused.
@@ -6937,48 +6941,39 @@ let
     exportedChecksSelectsThePublishedChecks =
       let
         top = checksTopWith {
-          caisson.exportedChecks = builtins.mapAttrs (
-            _: checks: builtins.removeAttrs checks [ "nas-1-boots" ]
-          );
+          caisson.exportedChecks = builtins.mapAttrs (_: checks: builtins.removeAttrs checks [ "boots" ]);
         };
       in
-      !(top.checks.x86_64-linux ? nas-1-boots)
-      && top.checks.x86_64-linux ? nas-1-smoke
-      && top.caisson.manifest.outputs.checks.x86_64-linux ? nas-1-boots
-      && top.caisson.manifest.checkRecord.x86_64-linux ? nas-1-boots;
+      !(top.checks.x86_64-linux ? boots)
+      && top.checks.x86_64-linux ? "nas-1/smoke"
+      && top.caisson.manifest.outputs.checks.x86_64-linux ? boots
+      && top.caisson.manifest.checkRecord.x86_64-linux ? boots;
 
     # The flake-parts integration publishes the gathered checks as the
     # flake's `checks` output. Under `perSystem`, an entry of `checks`
     # that nothing annotates is a check of the category `build`, an
     # annotated entry carries the position of the entry and of the
     # annotation, and a check declared in `caisson.checks` is defined
-    # in `checks` as well. The checks of a NixOS configuration inside
-    # the flake are published under its name, and those of a
-    # flake-parts configuration inside it under their names alone.
+    # in `checks` as well. The checks of the NixOS configuration
+    # `nas-1` and of the flake-parts configuration `checks` inside the
+    # flake share no name with another check, so each keeps its name.
     flakePartsPublishesTheGatheredChecks =
       let
         record = checksFlake.caisson.manifest.checkRecord.x86_64-linux;
         perSystem = checksFlake.lib.caisson-core.evalManifest.value.config.allSystems.x86_64-linux;
+        names = [
+          "bare"
+          "declared"
+          "plain"
+          "registries"
+          "smoke"
+          "suite"
+          "toplevel"
+        ];
       in
       builtins.mapAttrs (_: builtins.attrNames) checksFlake.checks == {
-        aarch64-linux = [
-          "bare"
-          "declared"
-          "nas-1-smoke"
-          "nas-1-toplevel"
-          "plain"
-          "registries"
-          "suite"
-        ];
-        x86_64-linux = [
-          "bare"
-          "declared"
-          "nas-1-smoke"
-          "nas-1-toplevel"
-          "plain"
-          "registries"
-          "suite"
-        ];
+        aarch64-linux = names;
+        x86_64-linux = names;
       }
       && checksFlake.checks.x86_64-linux.bare.drvPath == (checkMarker "bare").drvPath
       && perSystem.checks ? declared
@@ -6991,7 +6986,7 @@ let
       && builtins.length record.plain.code == 2
       && record.declared.category == "unit"
       &&
-        record.nas-1-smoke.from.namePath == [
+        record.smoke.from.namePath == [
           {
             type = "system";
             name = "x86_64-linux";
@@ -7081,9 +7076,8 @@ let
         manifest = nixosTestTop.caisson.manifest.children.system.x86_64-linux.children.nixos-test.probe;
         nodeEvents = builtins.filter (event: event ? node) manifest.history;
       in
-      nixosTestTop.checks.x86_64-linux.probe-test.drvPath == (pkgs.testers.runNixOSTest nixosTestModule)
-      .drvPath
-      && manifest.outputs.test.drvPath == nixosTestTop.checks.x86_64-linux.probe-test.drvPath
+      nixosTestTop.checks.x86_64-linux.test.drvPath == (pkgs.testers.runNixOSTest nixosTestModule).drvPath
+      && manifest.outputs.test.drvPath == nixosTestTop.checks.x86_64-linux.test.drvPath
       && manifest.outputs.driver.name == "nixos-test-driver-probe"
       && builtins.isString manifest.outputs.driverInteractive.drvPath
       &&
@@ -7123,7 +7117,26 @@ let
           };
         }
       ]
-      && registeredWorld.checks.x86_64-linux.registered-test.name == "vm-test-run-registered";
+      && registeredWorld.checks.x86_64-linux.test.name == "vm-test-run-registered";
+
+    # The registered world declares a NixOS configuration and a
+    # system-manager configuration under the same name, `registered`,
+    # and both integrations declare the check `toplevel`. The paths of
+    # the checks fork at the configurations, whose names are the same,
+    # so each name gains the integration with the name of the
+    # configuration: `nixos/registered/toplevel` is the system closure
+    # of the NixOS configuration, and
+    # `system-manager/registered/toplevel` the system of the
+    # system-manager configuration.
+    sameNameInDifferentIntegrationsPublishesBothChecks =
+      let
+        checks = registeredWorld.checks.x86_64-linux;
+        children = registeredWorld.caisson.manifest.children.system.x86_64-linux.children;
+      in
+      checks."nixos/registered/toplevel".drvPath == children.nixos.registered.outputs.toplevel.drvPath
+      &&
+        checks."system-manager/registered/toplevel".drvPath
+        == children.system-manager.registered.outputs.toplevel.drvPath;
 
     # The default check of a test, `test`, is the run of the test
     # driver, of the category `vm`, and the check record lists the
@@ -7131,7 +7144,7 @@ let
     # builds it.
     nixosTestCheckIsAVmCheck =
       let
-        entry = nixosTestTop.caisson.manifest.checkRecord.x86_64-linux.probe-test;
+        entry = nixosTestTop.caisson.manifest.checkRecord.x86_64-linux.test;
       in
       entry.category == "vm"
       && !entry.volatile
@@ -7159,36 +7172,54 @@ let
     nixosTestAtTheTopOfAFlakeIsEvaluatedForEachSystem =
       builtins.mapAttrs (_: builtins.attrNames) nixosTestFlake.checks == {
         aarch64-linux = [
-          "probe-test"
           "registries"
+          "test"
         ];
         x86_64-linux = [
-          "probe-test"
           "registries"
+          "test"
         ];
       }
-      && nixosTestFlake.caisson.manifest.checkRecord.aarch64-linux.probe-test.system == "aarch64-linux";
+      && nixosTestFlake.caisson.manifest.checkRecord.aarch64-linux.test.system == "aarch64-linux";
 
     # A test declared inside a NixOS configuration reads the result of
     # the childless evaluation of that NixOS configuration as
-    # `nearest.nixos` of its manifest, and its check is published under
-    # the name of the NixOS configuration.
+    # `nearest.nixos` of its manifest. Its check `test` is the only
+    # check of that name, so it is published as `test`, and the check
+    # record holds its path.
     nixosTestInsideANixosConfigurationReadsNearest =
-      builtins.mapAttrs (
-        _: checks:
-        builtins.mapAttrs (_: check: check.name) (
-          pkgs.lib.filterAttrs (name: _: pkgs.lib.hasSuffix "-test" name) checks
-        )
-      ) nixosTestInsideNixos.checks == {
-        aarch64-linux.nas-1-smoke-test = "vm-test-run-nas-one";
-        x86_64-linux.nas-1-smoke-test = "vm-test-run-nas-one";
-      };
+      builtins.mapAttrs (_: checks: checks.test.name) nixosTestInsideNixos.checks == {
+        aarch64-linux = "vm-test-run-nas-one";
+        x86_64-linux = "vm-test-run-nas-one";
+      }
+      &&
+        nixosTestInsideNixos.caisson.manifest.checkRecord.x86_64-linux.test.from == {
+          check = "test";
+          namePath = [
+            {
+              type = "system";
+              name = "x86_64-linux";
+            }
+            {
+              type = "nixos";
+              name = "nas-1";
+            }
+            {
+              type = "system";
+              name = "x86_64-linux";
+            }
+            {
+              type = "nixos-test";
+              name = "smoke";
+            }
+          ];
+        };
 
     # The nixos integration declares the check `toplevel` for each
-    # evaluation result of a NixOS configuration: the NixOS
-    # configuration `nas-1`, evaluated for both systems, has
-    # `nas-1-toplevel` under both, and `arm`, which `lab` evaluates
-    # for aarch64-linux, has `lab-arm-toplevel` under aarch64-linux.
+    # evaluation result of a NixOS configuration. The NixOS
+    # configuration `nas-1` is evaluated for both systems and has
+    # `nas-1/toplevel` under both, and `arm`, which `lab` evaluates
+    # for aarch64-linux, has `lab/toplevel` under aarch64-linux alone.
     # The check is the system closure of the evaluation result. Its
     # record says where the nixos integration declares the check and
     # where the caisson top declares `nas-1`.
@@ -7196,16 +7227,17 @@ let
       let
         record = checksTop.caisson.manifest.checkRecord;
         evaluationOf = system: checksTop.caisson.manifest.children.system.${system}.children.nixos.nas-1;
-        toplevel = record.x86_64-linux.nas-1-toplevel;
+        toplevel = record.x86_64-linux."nas-1/toplevel";
       in
       builtins.all (
         system:
-        record.${system}.nas-1-toplevel.category == "build"
+        record.${system}."nas-1/toplevel".category == "build"
         &&
-          checksTop.checks.${system}.nas-1-toplevel.drvPath == (evaluationOf system).outputs.toplevel.drvPath
+          checksTop.checks.${system}."nas-1/toplevel".drvPath == (evaluationOf system)
+          .outputs.toplevel.drvPath
       ) checksSystems
-      && checksTop.checks.aarch64-linux ? lab-arm-toplevel
-      && !(checksTop.checks.x86_64-linux ? lab-arm-toplevel)
+      && checksTop.checks.aarch64-linux ? "lab/toplevel"
+      && !(checksTop.checks.x86_64-linux ? "lab/toplevel")
       && toplevel.description == "the system closure of the NixOS configuration builds"
       &&
         builtins.map (position: position.file) toplevel.code == [
@@ -7228,7 +7260,7 @@ let
         );
         evaluation = top.caisson.manifest.children.system.x86_64-linux.children.nixos.broken;
       in
-      top.checks.x86_64-linux.broken-toplevel.drvPath == evaluation.outputs.toplevel.drvPath
+      top.checks.x86_64-linux."broken/toplevel".drvPath == evaluation.outputs.toplevel.drvPath
       && pkgs.lib.hasInfix "exit 1" evaluation.outputs.toplevel.buildCommand;
 
     # A configuration turns a default check off with
@@ -7248,8 +7280,8 @@ let
         recorded =
           top.caisson.manifest.children.system.x86_64-linux.children.nixos.quiet.checks.x86_64-linux.toplevel;
       in
-      !(top.checks.x86_64-linux ? quiet-toplevel)
-      && top.checks.x86_64-linux ? nas-1-toplevel
+      !(top.checks.x86_64-linux ? "quiet/toplevel")
+      && top.checks.x86_64-linux ? "nas-1/toplevel"
       && recorded.enable == false
       &&
         builtins.map (position: position.file) recorded.code == [
@@ -7274,29 +7306,28 @@ let
         tools = defaultChecksTop.caisson.manifest.children.flake-parts.tools;
       in
       builtins.attrNames checks == [
-        "alice-activation"
-        "box-toplevel"
+        "activation"
+        "box/toplevel"
         "hello-package"
-        "infra-json"
-        "nas-1-toplevel"
+        "json"
+        "nas-1/toplevel"
         "registries"
       ]
-      && checks.alice-activation.drvPath == children.home-manager.alice.outputs.activationPackage.drvPath
-      && checks.box-toplevel.drvPath == children.system-manager.box.outputs.toplevel.drvPath
-      && checks.infra-json.drvPath == children.terranix.infra.outputs.json.drvPath
+      && checks.activation.drvPath == children.home-manager.alice.outputs.activationPackage.drvPath
+      && checks."box/toplevel".drvPath == children.system-manager.box.outputs.toplevel.drvPath
+      && checks.json.drvPath == children.terranix.infra.outputs.json.drvPath
       && checks.hello-package.drvPath == tools.outputs.flake.packages.x86_64-linux.hello.drvPath
       && builtins.all (name: record.${name}.category == "build") [
-        "alice-activation"
-        "box-toplevel"
+        "activation"
+        "box/toplevel"
         "hello-package"
-        "infra-json"
+        "json"
       ]
       &&
-        record.alice-activation.description
-        == "the activation package of the home-manager configuration builds"
+        record.activation.description == "the activation package of the home-manager configuration builds"
       && record.hello-package.description == "the package `hello` of the flake builds"
       &&
-        builtins.head (builtins.map (position: position.file) record.box-toplevel.code)
+        builtins.head (builtins.map (position: position.file) record."box/toplevel".code)
         == "lib-overlays/system-manager/default.nix";
 
     # The hjem integration declares `manifest`, of the category `eval`:
@@ -7337,9 +7368,9 @@ let
             };
         };
       in
-      top.checks.${probe.system}.family-toplevel.drvPath
+      top.checks.${probe.system}.toplevel.drvPath
       == top.darwinConfigurations.family.config.system.build.toplevel.drvPath
-      && top.caisson.manifest.checkRecord.${probe.system}.family-toplevel.category == "build";
+      && top.caisson.manifest.checkRecord.${probe.system}.toplevel.category == "build";
 
     # A caisson top carries the check `registries`, of the category
     # `eval`, for each system. It passes where every registry entry

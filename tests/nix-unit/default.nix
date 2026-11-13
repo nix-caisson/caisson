@@ -7,7 +7,9 @@
 #
 # The caisson top declares the nix-unit configurations `passing` and
 # `failing`. The check record holds the check `unit` of each, of the
-# category `unit`, for both systems. The check of `passing` builds for
+# category `unit`, for both systems, under `passing/unit` and
+# `failing/unit`, since the checks share their name. The check of
+# `passing` builds for
 # x86_64-linux: nix-unit runs its cases in the build sandbox over the
 # library composed again there. The check of `failing` fails to build,
 # and its log reports the failing case as failed and the passing case
@@ -49,11 +51,11 @@ let
   ) record;
 
   expectedCategories = {
-    failing-unit = "unit";
-    passing-unit = "unit";
+    "failing/unit" = "unit";
+    "passing/unit" = "unit";
   };
 
-  failing = pkgs.testers.testBuildFailure top.checks.${system}.failing-unit;
+  failing = pkgs.testers.testBuildFailure top.checks.${system}."failing/unit";
 in
 assert
   categories == {
@@ -63,7 +65,7 @@ assert
   || throw "the check record of the nix-unit test holds the categories ${builtins.toJSON categories}";
 pkgs.runCommand "nix-unit-integration"
   {
-    passing = top.checks.${system}.passing-unit;
+    passing = top.checks.${system}."passing/unit";
     inherit failing;
   }
   ''
