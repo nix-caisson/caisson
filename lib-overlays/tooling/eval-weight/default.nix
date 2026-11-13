@@ -33,8 +33,8 @@ let
   # group is deterministic; cpuSeconds/gcHeapBytes/wallMs are informational.
   #
   # The last three are semantic counters derived from NIX_COUNT_CALLS'
-  # per-position call counts, keyed by stable anchors rather than line
-  # numbers (which shift between nixpkgs revs):
+  # per-position call counts, keyed by stable anchors, since line
+  # numbers shift between nixpkgs revisions:
   # - nixpkgsEvals: calls of the top-level lambda of
   #   pkgs/top-level/default.nix, one per full nixpkgs instantiation.
   # - nixpkgsLibEvals: calls of makeExtensible' in lib/default.nix, one

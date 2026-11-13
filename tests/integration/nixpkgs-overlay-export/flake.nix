@@ -20,9 +20,10 @@
     inputs@{ parent, ... }:
     let
       lib = parent.lib.caisson.mkLib {
-        inherit (parent.lib.caisson.pins.flake inputs) sources root;
+        inherit (parent.lib.caisson.pins.flake inputs) dependencies root;
         name = "nixpkgs-overlay-export";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         projects = {
           caisson = parent;
         };

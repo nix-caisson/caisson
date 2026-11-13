@@ -87,12 +87,12 @@ listNames() {
 
 # Resolve targets into "kind<TAB>name" lines.
 resolveTargets() {
-  local nixosNames homeNames
+  local nixosNames homeManagerConfigurationNames
   nixosNames=$(listNames nixosConfigurations)
-  homeNames=$(listNames homeConfigurations)
+  homeManagerConfigurationNames=$(listNames homeConfigurations)
   if [ "${#rawTargets[@]}" -eq 0 ]; then
     jq -r '.[] | "nixos\t\(.)"' <<< "$nixosNames"
-    jq -r '.[] | "home\t\(.)"' <<< "$homeNames"
+    jq -r '.[] | "home-manager\t\(.)"' <<< "$homeManagerConfigurationNames"
     return
   fi
   local t
@@ -102,7 +102,7 @@ resolveTargets() {
         printf 'nixos\t%s\n' "${t#nixosConfigurations.}"
         ;;
       homeConfigurations.*)
-        printf 'home\t%s\n' "${t#homeConfigurations.}"
+        printf 'home-manager\t%s\n' "${t#homeConfigurations.}"
         ;;
       *)
         local found=0
@@ -110,8 +110,8 @@ resolveTargets() {
           printf 'nixos\t%s\n' "$t"
           found=1
         fi
-        if jq -e --arg n "$t" 'index($n) != null' <<< "$homeNames" > /dev/null; then
-          printf 'home\t%s\n' "$t"
+        if jq -e --arg n "$t" 'index($n) != null' <<< "$homeManagerConfigurationNames" > /dev/null; then
+          printf 'home-manager\t%s\n' "$t"
           found=1
         fi
         if [ "$found" -eq 0 ]; then
@@ -125,13 +125,13 @@ resolveTargets() {
 stageExpr() {
   # $1: kind, $2: stage
   case "$1.$2" in
-    nixos.shallow | home.shallow) echo 'c: "forced"' ;;
+    nixos.shallow | home-manager.shallow) echo 'c: "forced"' ;;
     nixos.config) echo 'c: c.config.system.stateVersion' ;;
     nixos.packages) echo 'c: builtins.length c.config.environment.systemPackages' ;;
     nixos.toplevel) echo 'c: c.config.system.build.toplevel.drvPath' ;;
-    home.config) echo 'c: c.config.home.stateVersion' ;;
-    home.packages) echo 'c: builtins.length c.config.home.packages' ;;
-    home.toplevel) echo 'c: c.activationPackage.drvPath' ;;
+    home-manager.config) echo 'c: c.config.home.stateVersion' ;;
+    home-manager.packages) echo 'c: builtins.length c.config.home.packages' ;;
+    home-manager.toplevel) echo 'c: c.activationPackage.drvPath' ;;
   esac
 }
 
@@ -139,7 +139,7 @@ attrPath() {
   # $1: kind, $2: name; leaf always quoted (names may contain @)
   case "$1" in
     nixos) printf 'nixosConfigurations."%s"' "$2" ;;
-    home) printf 'homeConfigurations."%s"' "$2" ;;
+    home-manager) printf 'homeConfigurations."%s"' "$2" ;;
   esac
 }
 

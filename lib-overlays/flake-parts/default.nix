@@ -3,17 +3,16 @@
 # The flake-parts integration: projecting a composition into
 # flake outputs. It owns the `flake` class and evaluates it with
 # flake-parts' `evalFlakeModule`, as `mkFlake` does. Beside the entry
-# points it carries the option types (option types are this
-# integration's medium), the export machinery (the core flake-parts
-# module reads the manifest of the evaluation, projects the
-# `libOverlays` and `modules` flake outputs from it, and defaults
-# flake-parts' `systems` from the `systems` the composition declared),
-# and the `flake-parts` library mirror.
+# points it carries the export machinery (the core flake-parts
+# module reads the manifest of the configuration, writes the `lib` and
+# `modules` flake outputs from it, and defaults flake-parts' `systems`
+# from the `systems` the composition declared), and the `flake-parts`
+# library, copied into the composed library.
 #
 # flake-parts itself comes from the composition, resolved like every
 # ecosystem (the explicit `ecosystemSrc`, `defaultEcosystemSrc.flake-parts`
 # in the mkLib call, the pinned source named `flake-parts` in the
-# `sources` passed to mkLib), and is taken as a source: its flake.nix is
+# `dependencies` passed to mkLib), and is taken as a source: its flake.nix is
 # called with the
 # composed library standing in for its `nixpkgs-lib` input, so the
 # module evaluation runs on the same library everything else in the
@@ -39,54 +38,63 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "flake-parts";
         context = "caisson.flake-parts";
       };
-      resolveSrc =
-        explicit:
-        resolveEcosystemSrc {
-          inherit explicit;
-          manifest = final.caisson-core.libManifest or { };
-        };
       resolveOutPath = value: if builtins.isAttrs value && value ? outPath then value.outPath else value;
 
-      # flake-parts instantiated over this composition: its flake.nix
-      # applied to the composed library as `nixpkgs-lib`. What comes
-      # out (`lib.evalFlakeModule`, `flakeModules`) is flake-parts'
-      # machinery on caisson's library, with no second nixpkgs lib
-      # inside it.
-      flakePartsFor =
-        explicit:
+      # flake-parts instantiated over this composition from the
+      # flake-parts source `src`: its flake.nix applied to the composed
+      # library as `nixpkgs-lib`. What comes out (`lib.evalFlakeModule`,
+      # `flakeModules`) is flake-parts' machinery on caisson's library,
+      # with no second nixpkgs lib inside it.
+      flakePartsOf =
+        src:
         final.caisson.callFlake {
-          src = resolveOutPath (resolveSrc explicit);
+          src = resolveOutPath src;
           inputs.nixpkgs-lib = {
             lib = final;
           };
         };
+      # The manifest the declared flake-parts is resolved from: the
+      # lib manifest of this composed library.
+      defaultManifest = final.caisson-core.libManifest or { };
       # The composition's declared flake-parts, instantiated per
-      # composed library and shared by every evaluation that passes
+      # composed library and shared by every configuration that passes
       # no `ecosystemSrc`.
-      flakePartsDefault = flakePartsFor null;
+      flakePartsDefault = flakePartsOf (resolveEcosystemSrc {
+        manifest = defaultManifest;
+      });
 
-      # The option types of the core module, re-exported under this
-      # namespace for the readers of that name.
-      types = import ../../modules/generic/core/types.nix { lib = final; };
-
-      # The evaluator's call, on the lib of the view being evaluated:
-      # the manifest's sources as the flake's `inputs`, the special
+      # The evaluator's call, on the lib the configuration is evaluated with:
+      # the flake's `inputs` from the manifest's dependencies, the special
       # arguments and the module location when the configuration is
       # named, beside the flake-parts it runs on and the module it
-      # evaluates. `ecosystemArgs`, which only the twin's pattern
-      # admits, is merged over the call last.
+      # evaluates. `ecosystemArgs`, which only the pattern of the
+      # `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
         let
           selection = lib.caisson.integrations;
 
+          # The flake-parts the configuration runs on. A configuration
+          # that selects a source with `ecosystemSrc` selects it from
+          # the dependencies of the lib manifest of the configuration. A
+          # configuration that selects none runs on the declared
+          # flake-parts.
+          explicit = args.ecosystemSrc or null;
           flakeParts =
-            if (args.ecosystemSrc or null) == null then flakePartsDefault else flakePartsFor args.ecosystemSrc;
+            if explicit == null then
+              flakePartsDefault
+            else
+              flakePartsOf (resolveEcosystemSrc {
+                inherit explicit;
+                manifest = lib.caisson-core.libManifest or { };
+              });
 
           # The flake class of the registry, the same source every
           # adapter selects from, so modules arriving by any channel
@@ -100,21 +108,18 @@
           moduleImports = selection.moduleImportsOf "flake" { inherit lib manifest; } args;
 
           # The name this configuration holds: the attribute its parent
-          # declares it under, or, at a top, the name the composition
+          # declares it under, or, at a caisson top, the name the composition
           # declares on mkLib.
           name = manifest.name or null;
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/flake/<name>`), else none.
-          registered = lib.caisson.configs.flake or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "flake";
+            configModule = args.configModule or null;
+          };
 
           # Exported modules are keyed by flake-parts' moduleLocation,
           # which defaults to self.outPath, a rev-sensitive identity, so
@@ -126,12 +131,15 @@
           # deduplicate. It comes from the manifest rather than the
           # module evaluation because moduleLocation is consumed before
           # that evaluation exists.
-          # flake-parts' `inputs` are the composition's pinned sources,
-          # with `self` added below.
+          # flake-parts' `inputs` are the dependencies the manifest of
+          # the configuration records: the dependencies of the caisson
+          # top, with those that this configuration or a configuration
+          # it is declared inside adds (`dependencies`), and `self`,
+          # added below.
           callArgs =
             (if name != null then { moduleLocation = name; } else { })
             // {
-              inputs = manifest.sources;
+              inputs = manifest.dependencies;
               specialArgs = {
                 inherit lib;
               }
@@ -140,61 +148,74 @@
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { });
 
-          # The package set `perSystem` runs on, its `pkgs`: the
-          # selection in force at the flake, applied to the package
+          # The package set `perSystem` runs on, its `pkgs`: the package
+          # set selection that applies to the flake, applied to the package
           # sets available for each system. A package config that builds
           # no set for a system is not among the sets there, and a
           # flake with no package sets for a system keeps the `pkgs`
           # flake-parts provides. Every available set stays reachable
           # by name, as the `pkgSets` argument of perSystem.
-          pkgSetModule = {
-            _file = "caisson-flake-parts:pkgSet";
-            perSystem =
-              { system, lib, ... }:
-              let
-                available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
-                  lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
-                    manifest.pkgSets or { }
-                  )
-                );
-              in
-              {
-                _module.args.pkgs = lib.mkIf (available != { }) (
-                  lib.mkDefault (
-                    selection.pkgSetOf {
-                      context = "lib.caisson.flake-parts.mkConfiguration";
-                      what = "the flake for ${system}";
-                    } manifest available
-                  )
-                );
-              };
+          pkgSetModule = selection.caissonModule {
+            key = "caisson.flake.pkgSet";
+            file = "caisson-flake-parts:pkgSet";
+            module = {
+              _file = "caisson-flake-parts:pkgSet";
+              perSystem =
+                { system, lib, ... }:
+                let
+                  available = builtins.mapAttrs (_: packageConfig: packageConfig.children.nixpkgs.${system}.value) (
+                    lib.filterAttrs (_: packageConfig: packageConfig.children.nixpkgs ? ${system}) (
+                      manifest.pkgSets or { }
+                    )
+                  );
+                in
+                {
+                  _module.args.pkgs = lib.mkIf (available != { }) (
+                    lib.mkDefault (
+                      selection.pkgSetOf {
+                        context = "lib.caisson.flake-parts.mkConfiguration";
+                        what = "the flake for ${system}";
+                      } manifest available
+                    )
+                  );
+                };
+            };
           };
 
+          # The modules of the composition: the framework module of the
+          # class, the module that hands perSystem its package set, the
+          # modules selected from the registry and the configuration's
+          # module.
+          compositionModules =
+            frameworkModules
+            ++ [ pkgSetModule ]
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
+          # `evalFlakeModule` takes a single module: flake-parts' core
+          # modules followed by the modules of the composition.
           module = {
             imports = [
               flakeParts.flakeModules.flakeModules
               flakeParts.flakeModules.modules
             ]
-            ++ frameworkModules
-            ++ [ pkgSetModule ]
-            ++ moduleImports registry
-            ++ (if configModule == null then [ ] else [ configModule ]);
+            ++ compositionModules;
           };
 
           # flake-parts reads the flake's `self` from `inputs.self`, and
           # its modules take `self` and `self'` as arguments. The
           # integration ties that knot the way Nix does for a flake:
-          # `self` is the evaluation's outputs with the root's source
+          # `self` is the outputs of the evaluation result with the root's source
           # info (out path, revision, last-modified) beside them, and
-          # `self.inputs` the pinned sources. A composition with no root
-          # names no tree, so its `self` has no out path. An `inputs`
-          # handed in through the WithEcosystemArgs twin that carries a
+          # `self.inputs` the dependencies. A composition with no root
+          # names no source tree, so its `self` has no out path. An `inputs`
+          # handed in through the `WithEcosystemArgs` variant that carries a
           # `self` is taken as it is.
           given = callArgs.inputs or { };
           root = manifest.root or null;
           # The root's source-info fields that name something: a flake's
-          # `self` carries only the fields its tree has, so a reader of
-          # `self.rev or …` sees a dirty tree as Nix hands it over.
+          # `self` carries only the fields its source tree has, so a reader of
+          # `self.rev or …` sees a dirty source tree as Nix hands it over.
           sourceInfo = if root == null then { } else lib.filterAttrs (_: value: value != null) root;
           inputs = if given ? self then given else given // { inherit self; };
           self =
@@ -208,8 +229,8 @@
                   throw ''
                     caisson.flake-parts.mkConfiguration: `self.outPath` was read, but the
                     composition names no root. Pass `root` to mkLib
-                    (`inherit (caisson.lib.caisson.pins.flake inputs) sources root;`
-                    at a flake top).
+                    (`inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;`
+                    in a flake).
                   ''
                 else
                   root.outPath;
@@ -221,31 +242,89 @@
         in
         {
           value = evaluated;
+          # Where flake-parts came from, as `flakeParts` was resolved.
+          ecosystems.flake-parts =
+            if explicit == null then
+              ecosystemAccountOf { manifest = defaultManifest; }
+            else
+              ecosystemAccountOf {
+                inherit explicit;
+                manifest = lib.caisson-core.libManifest or { };
+              };
+          # What `evalFlakeModule` received, element by element of the
+          # module it was handed: the modules of flake-parts, its module
+          # list and the two core modules imported here, as the single
+          # event of the flake-parts ecosystem, then each of the modules
+          # of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "flake-parts";
+              project = "flake-parts";
+              file = null;
+            })
+          ]
+          ++ compositionModules;
           outputs = {
             flake = outputs;
           };
+          # The checks the flake declares for each system of its
+          # `systems`, as the core module of the flake class reads them
+          # under `perSystem` (modules/flake/core/perSystem.nix).
+          checkDeclarations = lib.genAttrs evaluated.config.systems (
+            system: evaluated.config.allSystems.${system}.caisson.checkDeclarations
+          );
         };
 
       configuration =
         args:
-        final.caisson.integrations.mkModuleConfiguration {
-          type = "flake-parts";
-          defaultPkgs = args.defaultPkgs or null;
-          evaluate = evaluate args;
-        };
+        final.caisson.integrations.mkModuleConfiguration (
+          {
+            selection = {
+              class = "flake";
+              inherit args;
+            };
+            type = "flake-parts";
+            defaultPkgs = args.defaultPkgs or null;
+            # A flake-parts configuration checks that each package of its
+            # `packages` output builds, for each system: the check of the
+            # package `foo` is `foo-package`. `nix flake check` evaluates
+            # the packages of a flake and builds none of them, so a
+            # package that is published and never built is checked here.
+            checks =
+              { outputs, system, ... }:
+              let
+                packages = (outputs.flake.packages or { }).${system} or { };
+              in
+              builtins.listToAttrs (
+                builtins.map (name: {
+                  name = "${name}-package";
+                  value = {
+                    derivation = packages.${name};
+                    category = "build";
+                    description = "the package `${name}` of the flake builds";
+                  };
+                }) (builtins.attrNames packages)
+              );
+            evaluate = evaluate args;
+          }
+          # Passed only where the configuration is given them, since the
+          # argument being present decides the fields of the manifest.
+          // (if args ? dependencies then { inherit (args) dependencies; } else { })
+        );
 
       integration = final.caisson.integrations.mkIntegration {
         name = "flake-parts";
         class = "flake";
-        # What a flake returns from `outputs`, and what a flakeless top
-        # that keeps flake-parts returns from `default.nix`: the flake
-        # outputs of the configuration, finalized as a top is, under the
+        # What a flake returns from `outputs`, and what a flakeless
+        # caisson top that keeps flake-parts returns from `default.nix`:
+        # the flake outputs of the configuration, finalized as a caisson
+        # top is, under the
         # name the composition declares on mkLib.
         top = manifest: manifest.outputs.flake;
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.flake-parts.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. What the
+        # `mkTopConfiguration` finalizes it at a caisson top. What the
         # evaluator takes beyond these arguments comes from the
         # manifest: the flake's `inputs` (`self` among them) and its
         # `moduleLocation`, the name of the configuration.
@@ -266,9 +345,9 @@
             # The package set perSystem runs on, its `pkgs`: a function
             # that receives the package sets available for each system,
             # as an attribute set by package config name, and returns
-            # the set to run on. The
-            # selection holds for every configuration beneath the
-            # flake that selects none. When absent, the selection of
+            # the set to run on. A configuration declared inside the
+            # flake runs on it unless it or a configuration between them
+            # selects another. When absent, the selection of
             # the nearest configuration above, and the set named
             # `default` where none above selects.
             defaultPkgs ? null,
@@ -285,6 +364,21 @@
             # Extra module arguments, merged over those the framework
             # supplies.
             specialArgs ? null,
+            # Pinned dependencies added to those of the configuration
+            # this configuration is declared inside, as a pin reader
+            # returns them: `inherit (lib.caisson.pins.flake-compat
+            # ../../../tests/dependencies) dependencies;`. The flake's
+            # `inputs` are then both, for this configuration and the
+            # configurations declared inside it. A name the
+            # configuration above already pins keeps the dependency of
+            # that configuration, and the manifest records the added
+            # dependency of that name as shadowed. A configuration that
+            # holds the checks of a flake declares the pins only its
+            # checks need here, so the pin file of the caisson top, which
+            # every flake that uses the caisson top locks, does not hold
+            # them. Refused at the caisson top, whose dependencies are
+            # passed to mkLib.
+            dependencies ? null,
           }@args:
           configuration args;
         # The same arguments and `ecosystemArgs`, the evaluator's
@@ -298,12 +392,10 @@
             moduleImports ? null,
             extraModuleImports ? null,
             specialArgs ? null,
+            dependencies ? null,
             ecosystemArgs ? null,
           }@args:
           configuration args;
-        extra = {
-          inherit types;
-        };
       };
 
     in
@@ -313,7 +405,7 @@
         flake-parts = integration.namespace;
       };
 
-      # The flake-parts library mirrored into the composed library,
+      # The flake-parts library copied into the composed library,
       # from the composition's declared flake-parts; forced only when
       # read.
       flake-parts = (prev.flake-parts or { }) // flakePartsDefault.lib;

@@ -3,16 +3,18 @@
 # hjem configurations declared through caisson's hjem integration, for
 # the pinned-world suite and the hjem manifest check. `inputs` is the
 # dependency pool of the checks partition with `caisson` set to the
-# tree itself.
+# source of this repository.
 #
 # The composition is for x86_64-linux, with a package config whose set
-# there is nixpkgs, and with nixpkgs and hjem declared as its
-# ecosystems. `user` is a hjem module with a file and a package.
-# `standalone` is a hjem configuration that is a top, for the user
-# `probe` with the home directory it sets itself. `top` is a structural
-# top holding a NixOS machine `probe-machine`, which declares the
-# account of `probe` and a hjem configuration `probe` from
-# `machineUser`, which is `user` with a systemd user unit.
+# there is nixpkgs, and with nixpkgs, hjem, the library and the NixOS
+# module collection declared as its ecosystems, the library and the
+# module collection from the same nixpkgs pin. `user` is a hjem module
+# with a file and a package.
+# `standalone` is a hjem configuration that is a caisson top, for the
+# user `probe` with the home directory it sets itself. `top` is a
+# structural caisson top holding a NixOS configuration `probe-nixos` from `baseModule`,
+# which declares the account of `probe`, and a hjem configuration
+# `probe` from `unitUser`, which is `user` with a systemd user unit.
 { inputs }:
 let
   core = inputs.caisson.lib.caisson-core;
@@ -22,11 +24,19 @@ let
   pkgs = import inputs.nixpkgs { inherit system; };
 
   lib = core.mkLib {
-    sources = { };
+    dependencies = {
+      inherit (inputs)
+        nixpkgs
+        hjem
+        nvf
+        home-manager
+        ;
+    };
     systems = [ system ];
     projects.caisson = inputs.caisson;
-    defaultEcosystemSrc = {
-      inherit (inputs) nixpkgs hjem;
+    defaultEcosystemSrc = dependencies: {
+      nixpkgs-lib = dependencies.nixpkgs;
+      nixos = dependencies.nixpkgs;
     };
     pkgSets = _lib: {
       default =
@@ -51,9 +61,10 @@ let
     packages = [ pkgs.hello ];
   };
 
-  # The user inside the machine also declares a systemd user unit, which
-  # only a user inside a NixOS machine can declare.
-  machineUser = {
+  # The user inside the NixOS configuration also declares a systemd user
+  # unit, which only a hjem configuration inside a NixOS configuration
+  # can declare.
+  unitUser = {
     imports = [ user ];
     systemd.services.probe = {
       description = "probe";
@@ -70,7 +81,8 @@ let
     };
   };
 
-  machine = {
+  # The module of the NixOS configuration.
+  baseModule = {
     boot.loader.grub.enable = false;
     fileSystems."/" = {
       device = "none";
@@ -88,13 +100,13 @@ let
     configModule =
       { lib, ... }:
       {
-        caisson.nixos.configurations.probe-machine = lib.caisson.nixos.mkConfiguration {
+        caisson.nixos.configurations.probe-nixos = lib.caisson.nixos.mkConfiguration {
           configModule =
             { lib, ... }:
             {
-              imports = [ machine ];
+              imports = [ baseModule ];
               caisson.hjem.configurations.probe = lib.caisson.hjem.mkConfiguration {
-                configModule = machineUser;
+                configModule = unitUser;
               };
             };
         };
@@ -103,19 +115,20 @@ let
 in
 {
   inherit
+    baseModule
     lib
-    machine
-    machineUser
     pkgs
     standalone
     system
     top
+    unitUser
     user
     ;
-  # The machine and the hjem configuration `probe` inside it, as their
-  # manifests. Each evaluation of a configuration evaluated per system
-  # sits under its system in the manifest of its parent.
-  machineManifest = top.caisson.manifest.children.system.${system}.children.nixos.probe-machine;
+  # The NixOS configuration and the hjem configuration `probe` inside
+  # it, as their manifests. Each evaluation result of a configuration
+  # evaluated per system sits under its system in the manifest of its
+  # parent.
+  nixosManifest = top.caisson.manifest.children.system.${system}.children.nixos.probe-nixos;
   inner =
-    top.caisson.manifest.children.system.${system}.children.nixos.probe-machine.children.system.${system}.children.hjem.probe;
+    top.caisson.manifest.children.system.${system}.children.nixos.probe-nixos.children.system.${system}.children.hjem.probe;
 }

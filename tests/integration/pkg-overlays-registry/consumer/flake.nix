@@ -17,9 +17,10 @@
     let
       core = parent.lib.caisson;
       lib = core.mkLib {
-        inherit (core.pins.flake inputs) sources root;
+        inherit (core.pins.flake inputs) dependencies root;
         name = "consumer";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         projects = {
           caisson = parent;
           inherit producer;

@@ -6,8 +6,9 @@
 # It also imports colmena's modules that act on those settings: the
 # assertions on them and the services that install the keys.
 #
-# The default module of the colmena class adds this module to every
-# NixOS configuration declared inside a colmena configuration. A NixOS
+# The default module of the colmena class adds this module to the
+# nearest NixOS configurations declared inside a colmena configuration, its
+# nodes. A NixOS
 # configuration that is also deployed some other way, and sets these
 # options, imports this module itself.
 #
@@ -17,8 +18,8 @@
 # The colmena integration fills a `targetHost` left at `null` with the
 # node's name when it builds the hive, where the name is known.
 #
-# The colmena source is the one the composition declares or pins under
-# the name `colmena`, read from the library of the evaluation, so these
+# The colmena source is the source the composition declares or pins under
+# the name `colmena`, read from the library of the NixOS configuration, so these
 # options match the colmena whose command deploys the node.
 { ... }:
 { lib, ... }:
@@ -31,7 +32,7 @@ let
       throw ''
         caisson's `colmena-deployment` NixOS module needs the colmena source.
         Declare `defaultEcosystemSrc.colmena` in the mkLib call, or pin a
-        source named `colmena` in the `sources` passed to mkLib.
+        source named `colmena` in the `dependencies` passed to mkLib.
       ''
     else
       found;

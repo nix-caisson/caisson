@@ -16,15 +16,13 @@
     let
       core = parent.lib.caisson;
       lib = core.mkLib {
-        inherit (core.pins.flake inputs) sources root;
+        inherit (core.pins.flake inputs) dependencies root;
         name = "nixpkgs-pkg-sets";
         systems = [ "x86_64-linux" ];
         projects = {
           caisson = parent;
         };
-        defaultEcosystemSrc = {
-          inherit (inputs) nixpkgs;
-        };
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         modules = lib: lib.caisson.mkModules ./modules;
         pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
         # The package configs: `default` takes the default selections,

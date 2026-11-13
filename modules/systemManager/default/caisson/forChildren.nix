@@ -1,22 +1,26 @@
 # SPDX-License-Identifier: MIT
 #
-# What a system-manager configuration gives the homes and the hjem
-# configurations declared inside it.
+# What a system-manager configuration gives the home-manager
+# configurations and the hjem configurations declared inside it.
 #
 # A configuration gives things to the configurations declared inside
 # it through the options under `caisson.forChildren`. This file adds the
-# home-manager module `system-manager-parent` to the modules that a home
-# declared inside this system-manager configuration imports by default,
-# and the hjem module `system-manager-parent` to those of a hjem
-# configuration declared inside it. Each sets the options that come from
-# the machine: the home directory from the account of the user that the
-# machine declares in `users.users`, and for a home the user ID and the
-# Nix of the machine.
+# home-manager module `nixos-parent` to the modules that a
+# home-manager configuration declared inside this system-manager
+# configuration imports by default, and the hjem module
+# `nixos-parent` to those of a hjem configuration declared
+# inside it. Both modules read a NixOS or a system-manager
+# configuration. Each sets the options that come from the system-manager
+# configuration: the home directory from the account of the user that
+# the system-manager configuration declares in `users.users`, and for a
+# home-manager configuration the user ID and the Nix of the
+# system-manager configuration.
 #
 # A system-manager configuration that passes `moduleImports` selects
 # its modules itself, and then nothing inside it gets these modules from
-# here. A home or hjem configuration that passes `moduleImports`
-# selects its modules itself, and gets the module only if it lists it.
+# here. A home-manager configuration or hjem configuration that passes
+# `moduleImports` selects its modules itself, and gets the module only
+# if it lists it.
 #
 # `closure-lib` is the library of caisson, where the modules are
 # registered.
@@ -24,10 +28,10 @@
 { ... }:
 {
   caisson.forChildren.extraDefaultModuleImports.homeManager = _lib: [
-    closure-lib.caisson.modules.homeManager.system-manager-parent
+    closure-lib.caisson.modules.homeManager.nixos-parent
   ];
 
   caisson.forChildren.extraDefaultModuleImports.hjem = _lib: [
-    closure-lib.caisson.modules.hjem.system-manager-parent
+    closure-lib.caisson.modules.hjem.nixos-parent
   ];
 }

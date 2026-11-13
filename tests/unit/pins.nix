@@ -16,8 +16,8 @@ let
   throws = expr: !(builtins.tryEval (builtins.deepSeq expr true)).success;
 
   # The inputs a flake's `outputs` would receive, for the pins-flake
-  # fixture: `self` points at its tree (whose flake.lock is read), and
-  # each input carries what Nix puts on a resolved input.
+  # fixture: `self` points at its source tree, whose flake.lock is
+  # read, and each input has what Nix puts on a resolved input.
   pinsFlakeInputs = rec {
     self = {
       outPath = ./fixtures/pins-flake;
@@ -70,8 +70,8 @@ let
       && wired._type == "flake"
       && wired.inputs.greeting.text == "hello";
 
-    # A lockfile'd flake with no inputs has no sources.
-    pinsFlakeCompatNoInputs = (pins.flake-compat ./fixtures/deps-flake).sources == { };
+    # A lockfile'd flake with no inputs has no dependencies.
+    pinsFlakeCompatNoInputs = (pins.flake-compat ./fixtures/deps-flake).dependencies == { };
 
     # The pin readers. The suite fetches nothing: `pins.flake` reads a
     # fake inputs attrset and the fixture's lock; `pins.flake-compat` is
@@ -82,7 +82,7 @@ let
     pinsFlakeSourcesAndRoot =
       let
         read = pins.flake pinsFlakeInputs;
-        s = read.sources;
+        s = read.dependencies;
       in
       builtins.attrNames s == [
         "follower"
@@ -122,7 +122,7 @@ let
 
     pinsFlakeFollowsNonFlakeAndOverride =
       let
-        s = (pins.flake pinsFlakeInputs).sources;
+        s = (pins.flake pinsFlakeInputs).dependencies;
       in
       # A follows is the tree it lands on, with the path it follows.
       s.follower.pin.follows == [ "nixpkgs" ]
@@ -131,10 +131,10 @@ let
       && s.nixpkgs.pin.follows == null
       && s.nonflake.pin.url == "git+https://example.com/nonflake.git?ref=main"
       && !s.nonflake.pin.overridden
-      # The resolved tree differs from the lock: an override was in force.
+      # The resolved tree differs from the lock: an override was passed.
       && s.overridden.pin.overridden
       && s.overridden.pin.narHash == "sha256-OVERRIDE"
-      # An input the lock does not name carries no ref.
+      # An input the lock does not name has no ref.
       && s.unlocked.pin.url == null
       && !s.unlocked.pin.overridden;
 
@@ -147,7 +147,7 @@ let
         (pins.flake {
           self = throw "self forced";
           nixpkgs = pinsFlakeInputs.nixpkgs;
-        }).sources.nixpkgs.pin == [
+        }).dependencies.nixpkgs.pin == [
         "files"
         "follows"
         "lastModified"
@@ -165,7 +165,7 @@ let
           (pins.flake {
             self.outPath = ./fixtures/pins-plain-dir;
             bare = "/nix/store/44444444444444444444444444444444-source";
-          }).sources;
+          }).dependencies;
       in
       s.bare.outPath == "/nix/store/44444444444444444444444444444444-source"
       && s.bare.pin.system == "flake"
@@ -214,11 +214,11 @@ let
           (pins.flake {
             self.outPath = ./fixtures/pins-flake-v4;
             x.narHash = "sha256-X";
-          }).sources.x.pin;
+          }).dependencies.x.pin;
 
     pinsFlakeCompatRelativeInput =
       let
-        s = (pins.flake-compat ./fixtures/pins-flake-compat).sources;
+        s = (pins.flake-compat ./fixtures/pins-flake-compat).dependencies;
       in
       builtins.attrNames s == [
         "alias"
@@ -247,7 +247,7 @@ let
     # partition's `extraInputs` can read `inputs.<name>.flakeModule`.
     pinsFlakeCompatFlakeInputCarriesOutputs =
       let
-        s = (pins.flake-compat ./fixtures/pins-flake-compat).sources;
+        s = (pins.flake-compat ./fixtures/pins-flake-compat).dependencies;
       in
       s.localFlake.flakeModule == "the-module"
       && s.localFlake._type == "flake"
@@ -258,11 +258,11 @@ let
 
     pinsFlakeCompatRefusals =
       let
-        s = (pins.flake-compat ./fixtures/pins-flake-compat).sources;
+        s = (pins.flake-compat ./fixtures/pins-flake-compat).dependencies;
       in
       throws s.nested.outPath
-      && throws (pins.flake-compat ./fixtures/pins-plain-dir).sources
-      && throws (pins.flake-compat ./fixtures/pins-flake-v4).sources;
+      && throws (pins.flake-compat ./fixtures/pins-plain-dir).dependencies
+      && throws (pins.flake-compat ./fixtures/pins-flake-v4).dependencies;
 
     pinsFlakeLockDescriptors =
       let
@@ -392,7 +392,7 @@ let
 
     pinsNpinsSourceRecord =
       let
-        s = (pins.npins ./fixtures/pins-npins).sources;
+        s = (pins.npins ./fixtures/pins-npins).dependencies;
       in
       s.github.pin == {
         system = "npins";
@@ -408,9 +408,9 @@ let
       };
 
     pinsNpinsRefusals =
-      throws (pins.npins ./fixtures/pins-npins).sources.container.pin
-      && throws (pins.npins ./fixtures/pins-npins-v5).sources
-      && throws (pins.npins ./fixtures/pins-plain-dir).sources;
+      throws (pins.npins ./fixtures/pins-npins).dependencies.container.pin
+      && throws (pins.npins ./fixtures/pins-npins-v5).dependencies
+      && throws (pins.npins ./fixtures/pins-plain-dir).dependencies;
 
     # Every input, and every input of an input, under the path of
     # names `--override-input` takes. `self` is left out at each

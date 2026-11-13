@@ -3,17 +3,17 @@
 # The nixidy integration: it owns the `nixidy` class, the class of
 # nixidy's modules. A nixidy configuration is an environment of Argo CD
 # applications, written as nixidy modules (`applications.*`,
-# `nixidy.target`). It is evaluated per system, once for each system in force where it
-# is declared, on the package set selected for it.
+# `nixidy.target`). It is evaluated per system, once for each system its parent
+# evaluates its children for, on the package set selected for it.
 #
-# caisson evaluates it with nixidy's own `mkEnv`, the function the
+# caisson evaluates it with nixidy's `mkEnv`, the function the
 # nixidy flake publishes as `lib.mkEnv`. `mkEnv` runs the module system
 # of the library it is given, here the composed library, and gives the
 # modules nixidy's library extended by its `libOverlay`, here the
 # namespaces of the composed library that nixidy's library does not
 # have, such as `caisson`. nixidy returns the evaluated configuration
-# and its packages but not its options, so a nixidy configuration holds
-# no configurations beneath it.
+# and its packages but not its options, so no configurations can be
+# declared inside a nixidy configuration.
 #
 # The outputs are nixidy's packages: `environmentPackage`, the
 # rendered manifests, `activationPackage` and `bootstrapPackage`. A
@@ -40,7 +40,9 @@
     let
       context = "lib.caisson.nixidy.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixidy";
         context = "caisson.nixidy";
       };
@@ -81,22 +83,21 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nixidy/<name>`), else none.
-          registered = lib.caisson.configs.nixidy or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixidy";
+            configModule = args.configModule or null;
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
 
           value = src.lib.mkEnv (
             {
               inherit pkgs lib;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
               extraSpecialArgs = {
                 inherit pkgSets;
               }
@@ -110,6 +111,21 @@
         in
         {
           inherit value;
+          # Where nixidy came from, as `src` was resolved.
+          ecosystems.nixidy = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What `mkEnv` received: the modules of the composition,
+          # then nixidy's module list. `mkEnv` appends nixidy's module
+          # list after the modules it is given.
+          modules = moduleList ++ [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nixidy";
+              project = "nixidy";
+              file = "modules/modules.nix";
+            })
+          ];
           outputs = {
             inherit (value) environmentPackage activationPackage bootstrapPackage;
           };
@@ -128,9 +144,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixidy";
+            inherit args;
+          };
           type = "nixidy";
           # A nixidy configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -140,14 +161,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nixidy";
         class = "nixidy";
-        # A nixidy configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # A nixidy configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixidy.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -161,8 +182,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

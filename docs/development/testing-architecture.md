@@ -3,8 +3,9 @@
 This document explains how caisson's tests are wired into the flake's check
 infrastructure. The setup is non-obvious: test flakes live as independent
 `flake.nix` files in the source tree but are not evaluated by the Nix flake
-machinery. Instead, a flake-parts partition evaluates each test flake from source with
-`lib.caisson-core.callConsumerFlake`, which wires inputs explicitly.
+machinery. Instead, the checks configuration, a flake-parts configuration
+declared inside caisson's flake, evaluates each test flake from source with
+`lib.caisson.callConsumerFlake`, which wires inputs explicitly.
 
 > **Nix version note (2.31.3, March 2026):** The evaluate-from-source pattern
 > exists because the Nix flake machinery cannot natively evaluate nested flakes
@@ -17,70 +18,96 @@ For commands and test conventions, see [testing.md](./testing.md).
 
 ## Overview
 
-All checks are produced by the **checks partition**
-(`configs/flake/caisson/partitions/checks.nix`). This partition:
+All checks are declared in the **checks configuration**
+(`configs/flake/checks`), a flake-parts configuration that the caisson top in
+`configs/flake/caisson` declares under
+`caisson.flake-parts.configurations.checks`. The checks configuration:
 
-1. Pulls in development-time dependencies from `tests/dependencies` via
-   the flake-compat pin reader, `lib.caisson-core.pins.flake-compat`
+1. Adds the development-time dependencies of `tests/dependencies` to the
+   dependencies of the caisson top, read by the flake-compat pin reader,
+   `lib.caisson.pins.flake-compat`
 2. Evaluates each test and example flake from source with
    `callConsumerFlake`, resolving the flake's declared inputs from a shared
    pool
-3. Merges the resulting `checks.<system>` attrsets, plus a few inline checks
-   and the eval-weight gate, into caisson's top-level `checks` output
+3. Defines the resulting `checks.<system>` attrsets, plus a few inline checks
+   and the `eval-weight` check, as its `checks` under `perSystem`
 
-The partition mechanism (`partitionedAttrs.checks = "checks"`) causes flake-parts
-to replace the main evaluation's `checks` with the partition's `checks`, so
-`nix flake check` runs everything the partition defines.
+The caisson top gathers the checks of every configuration declared inside it
+into its `checks` output, so `nix flake check` runs everything the checks
+configuration defines.
 
-## The Checks Partition
+## The Checks Configuration
 
-### The reason for the partition
+### The reason for the checks configuration
 
-flake-parts partitions allow a flake to declare outputs that depend on inputs not
-listed in the main `flake.nix`. caisson's flake declares only the inputs
-its evaluation composes with (caisson-core, nixpkgs-lib, flake-parts), and
-it deliberately avoids depending on full `nixpkgs` or development tools like
-`nix-unit`. The checks partition brings in these heavier dependencies without
-polluting the main flake's input set or forcing consumers to fetch them.
+caisson's flake declares only the inputs its configurations are composed with
+(caisson-core, nixpkgs-lib, flake-parts), and it deliberately avoids depending on
+full `nixpkgs` or development tools like `nix-unit`. Every flake that uses caisson
+locks the inputs of caisson's `flake.nix`. The checks configuration brings in the
+heavier dependencies of the checks without adding them to caisson's `flake.nix`.
 
-### How the extra inputs load
+### How the extra dependencies load
 
-The partition declares:
+The caisson top declares the checks configuration with the dependencies of
+`tests/dependencies`:
 
 ```nix
-extraInputs = (lib.caisson-core.pins.flake-compat ../../../../tests/dependencies).sources;
+caisson.flake-parts.configurations.checks = lib.caisson.flake-parts.mkConfiguration {
+  inherit (lib.caisson.pins.flake-compat ../../../tests/dependencies) dependencies;
+};
+caisson.flake-parts.exported = _: { };
 ```
 
-`pins.flake-compat` (one of caisson-core's pin readers) resolves the lock of
-the dependencies flake the way flake-compat does and returns its inputs as
-pinned sources, each flake input with its outputs, without evaluating the
-dependencies flake itself. It does not go through `builtins.getFlake`, which
-cannot handle paths in pure evaluation mode, and it stays safe under
-read-only evaluation (`nix flake check --no-build`). The returned inputs are merged into
-the partition's `inputs` module argument; this is how `nixpkgs`, `nix-unit`,
-`treefmt-nix`, and the rest become available inside the partition module
-without being declared in the main `flake.nix`.
+`pins.flake-compat` resolves the lock of the dependencies flake the way
+flake-compat does and returns its inputs as pinned dependencies, each flake
+input with its outputs, without evaluating the dependencies flake itself. It
+does not go through `builtins.getFlake`, which cannot handle paths in pure
+evaluation mode, and it stays safe under read-only evaluation
+(`nix flake check --no-build`).
 
-### Partition module structure
+The flake-parts integration adds those dependencies to the dependencies of the
+caisson top, and the `inputs` of the checks configuration hold both. For a name
+that `flake.lock` pins as well (caisson-core, flake-parts, nixpkgs-lib),
+`inputs` hold the pin of `flake.lock`, and the manifest of the checks
+configuration records the entry of `tests/dependencies` under
+`shadowedDependencies`. The entry of `tests/dependencies` still serves the
+`follows` lines of `tests/dependencies/flake.nix`, which can name only the
+inputs of that file. So the checks evaluate caisson with the pins every flake
+that uses caisson gets.
 
-Inside the partition module, `inputs` contains the main flake's inputs and the
-extra inputs from the dependencies flake. `self` refers to caisson's outputs
-(as seen by the partition). The module has a full flake-parts evaluation context
-with its `perSystem`, `imports`, etc.
+The caisson top gathers the checks of the checks configuration whatever its
+`caisson.flake-parts.exported` selector passes up. The selector `_: { }` passes
+the checks configuration up to nothing, so a flake that lists caisson in
+`projects` reads the exports of caisson without evaluating the checks
+configuration or reading `tests/dependencies`. The `checks-evaluation-consumer`
+check shows it, with a producer whose checks configuration has dependencies
+that throw when they are read.
+
+### Checks configuration module structure
+
+Inside the checks configuration, `inputs` holds the dependencies of the caisson
+top and those of `tests/dependencies`. `self` is the flake of the checks
+configuration, and `self.outPath` is caisson's source tree. The checks read
+caisson itself as `caisson`, the flake of caisson evaluated from that source
+tree with `callConsumerFlake` over `inputs`, as a flake that lists caisson as
+an input reads it. The module has a full flake-parts evaluation context with
+its `perSystem`, `imports`, etc. Its `containerTests` and `nestedVmTests`
+outputs are not checks: the caisson top publishes them under the same names,
+and the workflows build them by name.
 
 ## Evaluating Consumer Flakes with `callConsumerFlake`
 
 ### The pattern
 
-For each test or example flake, `checks.nix` builds a call:
+For each test or example flake, `configs/flake/checks` builds a call:
 
 ```nix
 consumerPool = {
   inherit (inputs) flake-parts nixpkgs nixpkgs-lib nix-unit;
-  deps = inputs.self;
-  parent = self;
+  deps = self;
+  parent = caisson;
 };
-callConsumer = args: lib.caisson-core.callConsumerFlake ({ pool = consumerPool; } // args);
+callConsumer = args: lib.caisson.callConsumerFlake ({ pool = consumerPool; } // args);
 
 unitTestOutputs = callConsumer { path = self.outPath + "/tests/unit"; };
 ```
@@ -96,7 +123,7 @@ signature.
 The imported `flake.nix` is not a resolved flake: it has no resolved inputs, no
 `outPath`, no `self`. `callConsumerFlake` supplies each piece:
 
-- **`self`** becomes a lazy fixpoint over the outputs, mirroring normal flake
+- **`self`** becomes a lazy fixpoint over the outputs, as in normal flake
   evaluation, where `self` is always a lazy reference to the flake's
   outputs.
 - **`outPath`** is set to the evaluated directory. This matters because config
@@ -107,7 +134,7 @@ The imported `flake.nix` is not a resolved flake: it has no resolved inputs, no
 
 `overrides` carries per-flake injections. The lib-consumer-chain tests use it
 to thread markers and to hand the middle flake's evaluated outputs to the
-final consumer, and the example flakes use `overrides.caisson = self` so the
+final consumer, and the example flakes use `overrides.caisson = caisson` so the
 example consumes the current source tree.
 
 ### The `deps` mapping
@@ -117,36 +144,27 @@ and use `follows` to pull inputs through it (e.g., `nixpkgs.follows = "deps/nixp
 The `deps` input is the shared dependencies flake, and `follows` resolution means
 a test flake ends up with `deps.inputs.nixpkgs`, `deps.inputs.nix-unit`, etc.
 
-In the partition, the pool provides `deps = inputs.self`. Inside a partition
-module, `inputs.self` is not plain caisson; it is caisson with an augmented
-`.inputs` attrset. The partition machinery (in
-`flake-parts/extras/partitions.nix`) constructs:
-
-```nix
-inputs2 = inputs // config.extraInputs // { self = self2; };
-self2 = self // { inputs = inputs2; };
-```
-
-So `inputs.self` is `self2`: caisson's outputs merged with
-`{ inputs = <main inputs + extra inputs> }`. This means `inputs.self.inputs.nixpkgs`,
-`inputs.self.inputs.nix-unit`, etc. all resolve to the same values that
-`deps.inputs.nixpkgs`, `deps.inputs.nix-unit` would in standalone mode. The
-partition's augmented `self` is a valid stand-in for the dependencies flake because
-its `.inputs` is a superset of the dependencies flake's inputs.
+In the checks configuration, the pool provides `deps = self`, the flake of the
+checks configuration, whose `inputs` are the inputs of the checks configuration
+and whose out path is caisson's source tree. `callConsumerFlake` resolves
+`follows = "deps/nixpkgs"` to `deps.inputs.nixpkgs`, so `deps/nixpkgs`,
+`deps/nix-unit` and the rest resolve to the inputs of the checks
+configuration. Those are the inputs of the dependencies flake, except
+the names `flake.lock` pins as well, which resolve to the pins of `flake.lock`.
 
 ## Unit Testing with nix-unit
 
 ### A downstream composition
 
 The unit test flake (`tests/unit/flake.nix`) composes the way a downstream
-consumer that cares about its core revision does: with its own `caisson-core`
-input, registering caisson's overlay and module files from the parent's
+consumer that pins its caisson-core revision does: with a `caisson-core`
+input of the test flake, registering caisson's overlay and module files from the parent's
 source path with the directory readers.
 
 ```nix
 core = inputs.caisson-core.lib.caisson-core;
 lib = core.mkLib {
-  inherit (core.pins.flake inputs) sources root;
+  inherit (core.pins.flake inputs) dependencies root;
   defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
   modules = lib: lib.caisson-core.mkModules (parent.outPath + "/modules");
   libOverlays = lib: lib.caisson-core.mkLibOverlays (parent.outPath + "/lib-overlays");
@@ -225,7 +243,7 @@ module composition behave as expected from a consumer's perspective.
 Each integration test is a standalone flake under `tests/integration/<name>/` that:
 
 1. Takes `parent` (caisson's evaluated outputs, from the pool) as an input
-2. Calls `parent.lib.caisson-core.mkLib { inherit (parent.lib.caisson-core.pins.flake inputs) sources root; ... }` to bootstrap
+2. Calls `parent.lib.caisson-core.mkLib { inherit (parent.lib.caisson-core.pins.flake inputs) dependencies root; ... }` to bootstrap
 3. Uses `lib.caisson.flake-parts.mkTopConfiguration` to compose a flake
 4. Defines a `checks.<system>.<name>` derivation that succeeds if composition
    worked
@@ -250,9 +268,10 @@ module content suppressed. `lib-consumer-chain` evaluates a consumer
 chain (caisson, a middle flake, a final consumer) to verify that exported
 overlays and modules compose transitively.
 
-Integration flakes read caisson through `parent`, which in the partition is
-caisson's real evaluated outputs, so unlike the unit tests they exercise the
-export projections exactly as a published consumer would.
+Integration flakes read caisson through `parent`, which in the checks
+configuration is the flake of caisson evaluated from its source tree over the
+pins of `flake.lock`, so unlike the unit tests they exercise the exported
+outputs exactly as a published consumer would.
 
 ## Shared Dependencies Flake
 
@@ -269,9 +288,10 @@ inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 
 Its `outputs` is empty. It exists for these reasons:
 
-1. **Partition input source:** The checks and formatter partitions load it
-   through `pins.flake-compat` to pull these inputs into their evaluation
-   without adding them to caisson's main `flake.nix`.
+1. **Source of the extra dependencies:** The checks configuration and the
+   formatter partition read it through `pins.flake-compat` to bring these
+   inputs into their evaluation without adding them to caisson's main
+   `flake.nix`.
 
 2. **`follows` target for test flakes:** The standalone test flakes use
    `nixpkgs.follows = "deps/nixpkgs"` (etc.) to share the same locked versions
@@ -288,31 +308,42 @@ The dependencies flake uses `follows` internally to deduplicate transitive input
 
 ## Example Flakes
 
-The checks partition also wires in example flakes (e.g., `examples/literate-flake/`)
-through the same `callConsumer` calls, with `overrides.caisson = self`. These are
+The checks configuration also wires in example flakes (e.g., `examples/literate-flake/`)
+through the same `callConsumer` calls, with `overrides.caisson = caisson`. These are
 both documentation and regression tests: if the example stops evaluating,
 `nix flake check` fails.
 
 ## Complete Check Inventory
 
-The checks partition merges outputs from all test and example flakes into the
-`checks.<system>` attrset. As of this writing, `nix flake check` runs:
+The checks configuration defines the checks of all test and example flakes in
+its `checks.<system>` attrset, and the caisson top gathers them. As of this
+writing, `nix flake check` runs:
 
 | Check | Source | What it verifies |
 |---|---|---|
 | `nix-unit` | `tests/unit/` | Library function correctness |
 | `composition-success` | `tests/integration/basic-composition/` | Basic flake composition |
 | `minimal-consumer-success` | `tests/integration/minimal-consumer/` | Minimal consumption pattern |
-| `minimal-consumer-all-outputs` | `checks.nix` (inline) | Consumer exposes `flakeModule` and `lib` |
+| `minimal-consumer-all-outputs` | `configs/flake/checks` (inline) | Consumer exposes `flakeModule` and `lib` |
 | `module-class-export-success` | `tests/integration/module-class-export/` | Class-keyed module export and disable |
 | `lib-consumer-chain-success` | `tests/integration/lib-consumer-chain/` | Transitive consumption through a middle flake |
 | `pkg-overlays-registry-producer` | `tests/integration/pkg-overlays-registry/producer/` | A package set applies the project `default` package overlay and its imports once; the `pkgOverlays` and `overlays` outputs carry the local entries; entries caisson contributed through `projects` are not exported by default |
 | `pkg-overlays-registry-consumer` | `tests/integration/pkg-overlays-registry/consumer/` | The consumer package sets apply both defaults, a shared import once, and a named entry only where selected; a project entry leaves only when a selector names it |
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
-| `debug-disabled` | `checks.nix` (inline) | `self.debug` is not exposed in production |
-| `pinned-world` | `checks.nix` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
-| `hjem-system` | `checks.nix` + `tests/hjem-system/` | The manifest file of a hjem configuration inside a NixOS machine builds, which checks it against hjem's schema with `cue vet`, and so do the units that activate it, which runs shellcheck on their scripts |
-| `darwin-system` (aarch64-darwin) | `checks.nix` + `tests/darwin-system/` | The two macOS machines of the pinned-world suite, declared through the darwin integration, build: the bare machine, and the machine with a home and a hjem configuration inside it; the `darwin-build` job of the check workflow builds them on a macOS runner |
-| `argument-errors` | `checks.nix` + `tests/argument-errors/` | The argument error of every entry point comes from Nix itself, raised at the call site with no frame of caisson |
-| `eval-weight` | `checks.nix` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |
+| `debug-disabled` | `configs/flake/checks` (inline) | caisson's flake publishes no `debug` output |
+| `checks-evaluation-consumer` | `tests/integration/checks-evaluation/` | A consumer reads the exports of a producer whose checks configuration is declared with dependencies that throw when they are read, and the producer evaluates neither that configuration nor those dependencies; the `checks` output of the producer reads them and throws. The checks configuration declares the checks of the consumer with `caisson.checks.checks-evaluation.top` |
+| `pinned-world` | `configs/flake/checks` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
+| `hjem-system` | `configs/flake/checks` + `tests/hjem-system/` | The manifest file of a hjem configuration inside a NixOS configuration builds, which checks it against hjem's schema with `cue vet`, and so do the units that activate it, which runs shellcheck on their scripts |
+| `darwin-system` (aarch64-darwin) | `configs/flake/checks` + `tests/darwin-system/` | The nix-darwin configurations of the pinned-world suite, declared through the darwin integration, build: the bare nix-darwin configuration, and the nix-darwin configuration with a home-manager configuration and a hjem configuration inside it; the `darwin-build` job of the check workflow builds them on a macOS runner |
+| `drift-message` | `configs/flake/checks` + `tests/drift-message/` | The drift check of a configuration prints its warning, with the text quoted for the shell, when the marker of the configuration above differs |
+| `activation-vm` | `configs/flake/checks` + `tests/activation-vm/` | A NixOS VM switched between two versions and back activates the Nix profiles, the home-manager configurations and the hjem configurations declared inside it, through the units of each, and puts a profile changed by hand back |
+| `nixos-test-vm` | `configs/flake/checks` + `tests/nixos-test-vm/` | A NixOS test declared through the nixos-test integration inside a NixOS configuration runs in a VM. The test takes the module registered under its name, and its node writes the host name it reads from the NixOS configuration the test is declared inside |
+| `user-packages-vm` | `configs/flake/checks` + `tests/user-packages-vm/` | A NixOS VM installs the packages of the home-manager configurations that set `caisson.useUserPackages` in `/etc/profiles/per-user/<user>`. Each switch between two versions, and a boot, changes those packages, also for a user who has no home directory yet. The activation of each such home-manager configuration links its files and records the generations that `home-manager generations` lists. A home-manager configuration without the option installs its packages into `~/.nix-profile` |
+| `nestedVmTests.x86_64-linux.microvm-host-vm`, built by name | `configs/flake/checks` + `tests/microvm-host-vm/` | A guest of a caisson-microvm configuration on cloud-hypervisor, on nested KVM, which the host runs through caisson's `microvm-host` NixOS module and the units of microvm.nix's host module: after `systemctl start microvm@probe.service` the unit is active, and the guest answers on its vsock port through the socket of its hybrid vsock. On a CI runner, which is itself a VM, the guest is three levels deep and does not boot within the start timeout, so no workflow builds it. We recommend building it by name on a machine with KVM before merging a change to `microvm-host` or the microvm integrations: `nix build -L '.#nestedVmTests.x86_64-linux.microvm-host-vm'` |
+| `system-manager-vm-<distribution>` | `configs/flake/checks` + `tests/system-manager/vm.nix` | A system-manager configuration, activated through sequences of changes in a VM of Ubuntu 22.04 or Debian 12 booted from the cloud image of the distribution, applies its profiles, its home-manager configurations and its hjem configuration, and a home-manager configuration activated by hand for another version warns of the drift |
+| `containerTests.x86_64-linux.system-manager-<distribution>`, built by name | `configs/flake/checks` + `tests/system-manager/container.nix` | The same sequences in a container of each distribution of `tests/system-manager/container-distros.nix`; the container needs `auto-allocate-uids`, so the `system-manager-container` job of the check workflow builds each by name |
+| `argument-errors` | `configs/flake/checks` + `tests/argument-errors/` | The argument error of every entry point comes from Nix itself, raised at the call site with no frame of caisson |
+| `deferred-errors` | `configs/flake/checks` + `tests/deferred-errors/` | The errors of deferred configurations and the NixOps4 integrations carry their text: `caisson-deferred: needs <path>` with the member path from the root, and the errors that refuse members or outputs named from outputs, a name declared as composite and resource, and a second root |
+| `nixops4-discovery` | `configs/flake/checks` + `tests/nixops4-discovery/` | The discovery program of a NixOps4 root builds, with one state resource and with two, and prints, from recorded state dumps, the output values at the paths the root names in `argsNeeded` |
+| `eval-weight` | `configs/flake/checks` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |

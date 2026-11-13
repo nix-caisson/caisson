@@ -8,10 +8,10 @@
 # configuration declares NixOS configurations, under
 # `caisson.nixos.configurations`.
 #
-# The evaluation is caisson's own `evalModules` over the report
+# The evaluation is an `evalModules` call of caisson over the report
 # options, the assertions, the framework modules, the selection and the
 # configuration's module, on the composed library. A project extends
-# the class with options of its own about the hardware, beside the
+# the class with further options about the hardware, beside the
 # report. The outputs are the report, checked against the report
 # versions the integration knows, the report as the file nixos-facter
 # writes, the configuration as data and its hash. Every output fails
@@ -169,9 +169,9 @@
           hash = builtins.hashString "sha256" (builtins.toJSON serializableConfig);
         };
 
-      # The evaluator's call, on the lib of the view being evaluated.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # The evaluator's call, on the lib the configuration is evaluated with.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -185,14 +185,27 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-facter/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-facter or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-facter";
+            configModule = args.configModule or null;
+          };
+
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.caisson-facter.reportOptions";
+              file = "caisson-caisson-facter:reportOptions";
+              module = reportOptions;
+            })
+            (selection.caissonModule {
+              key = "caisson.caisson-facter.assertionsOptions";
+              file = "caisson-caisson-facter:assertionsOptions";
+              module = assertionsOptions;
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
@@ -201,25 +214,28 @@
                 inherit lib;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                reportOptions
-                assertionsOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the report options and the
+          # assertions, the framework module of the class, the modules
+          # selected from the registry and the configuration's
+          # module. The report is data, read from `facter.reportPath`.
+          modules = moduleList;
           outputs = hardwareOf evaluated.config;
         };
 
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "caisson-facter";
+            inherit args;
+          };
           type = "caisson-facter";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
@@ -241,8 +257,8 @@
             # if any. Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,

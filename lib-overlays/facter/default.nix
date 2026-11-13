@@ -2,7 +2,7 @@
 #
 # The facter integration, the upstream-compatible facter integration:
 # it owns the `facter` class. A facter configuration is a hardware
-# report as nixos-facter writes it, `facter.json`, named by the one
+# report as nixos-facter writes it, `facter.json`, named by the
 # option of the class, `reportPath`. It declares the NixOS
 # configurations that run on that hardware under
 # `caisson.nixos.configurations`.
@@ -10,7 +10,7 @@
 # The default module of the class adds caisson's NixOS module
 # `facter-hardware` to the NixOS configurations declared inside it.
 # That module sets nixpkgs' `hardware.facter.reportPath` to the report,
-# the line a NixOS configuration written for nixos-facter carries, so
+# the setting a NixOS configuration written for nixos-facter makes, so
 # nixpkgs' `hardware.facter` module reads the file as it does for any
 # NixOS configuration.
 #
@@ -40,19 +40,23 @@
       context = "lib.caisson.facter";
 
       # The option of the class: the report file.
-      reportOptions =
-        { lib, ... }:
-        {
-          options.reportPath = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = ''
-              The hardware report nixos-facter writes, `facter.json`, which
-              the NixOS configurations declared inside this configuration
-              get as `hardware.facter.reportPath`.
-            '';
+      reportOptions = final.caisson.integrations.caissonModule {
+        key = "caisson.facter.reportOptions";
+        file = "caisson-facter:reportOptions";
+        module =
+          { lib, ... }:
+          {
+            options.reportPath = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = ''
+                The hardware report nixos-facter writes, `facter.json`, which
+                the NixOS configurations declared inside this configuration
+                get as `hardware.facter.reportPath`.
+              '';
+            };
           };
-        };
+      };
 
       evaluate =
         args:
@@ -67,14 +71,18 @@
           # configuration registered under the configuration's name
           # (`configs/facter/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.facter or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "facter";
+            configModule = args.configModule or null;
+          };
+
+          moduleList = [
+            reportOptions
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
@@ -83,12 +91,7 @@
                 inherit lib;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                reportOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -96,6 +99,12 @@
         in
         {
           value = evaluated;
+          # What evalModules received: the report option, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. The report is
+          # data read from `reportPath`, not a module list, so there is
+          # no ecosystem module list here.
+          modules = moduleList;
           outputs = {
             inherit reportPath;
             report =
@@ -109,6 +118,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "facter";
+            inherit args;
+          };
           type = "facter";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
@@ -130,8 +143,8 @@
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,

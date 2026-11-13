@@ -4,25 +4,25 @@
 # owns the `caisson-colmena` class, prefixed because caisson defines
 # it, colmena's hive format being no module class. A colmena
 # configuration is a module of that class with
-# `meta`, the metadata colmena's command reads. It declares the
-# machines colmena deploys the way any configuration declares NixOS
-# configurations, under `caisson.nixos.configurations.<name>`.
+# `meta`, the metadata colmena's command reads. It declares the NixOS
+# configurations colmena deploys the way any configuration declares
+# NixOS configurations, under `caisson.nixos.configurations.<name>`.
 #
-# The nodes are the NixOS configurations passed up from beneath the
-# colmena configuration, each under the name it is published under.
+# The nodes are the NixOS configurations declared inside the colmena
+# configuration and passed up to it, each under the name it is published under.
 # The default module of the class adds caisson's `colmena-deployment`
 # NixOS module to those configurations, which declares colmena's
 # `deployment` options; the integration reads `deployment` back from
 # each node and builds the hive: the small versioned attribute set
-# (the hive schema) that colmena's command reads. The integration is
-# not compatible with colmena's hive modules (`makeHive`, `defaults`,
-# `meta.nixpkgs`): every node is an evaluated NixOS configuration.
+# (the hive schema) that colmena's command reads. Every node is an
+# evaluated NixOS configuration, so settings written for colmena's
+# `makeHive`, such as `defaults` and `meta.nixpkgs`, do not apply here.
 #
 # A colmena configuration is published as `colmenaHive`, an output that
-# holds a single value, so the configuration declared under the name
-# `default` fills it. The nodes are published as well, as the NixOS
+# holds a single value, so the configuration declared under the name of
+# that output, `colmenaHive`, fills it. The nodes are published as well, as the NixOS
 # configurations they are, so `nixos-rebuild` and `colmena apply` build
-# the same machine.
+# the same system.
 {
   mkLibOverlay,
   ...
@@ -43,7 +43,9 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "colmena";
         context = "caisson.caisson-colmena";
       };
@@ -105,16 +107,17 @@
       # could never be addressed, so the hive refuses it.
       unaddressable = name: name == "" || final.hasPrefix "@" name || final.hasInfix "," name;
 
-      # A machine colmena deploys is one evaluation. A NixOS
-      # configuration with several systems in force is evaluated per
-      # system, and publishing would make each evaluation a node. The
-      # machines evaluated more than once, each with its name and its
-      # systems: the NixOS entries grouped by their path without the
+      # A node colmena deploys is a single evaluation result of a NixOS
+      # configuration. A NixOS configuration whose parent evaluates its
+      # children for several systems is evaluated per system, and
+      # publishing would make each evaluation result a node. The NixOS
+      # configurations evaluated more than once, each with its name and
+      # its systems: the NixOS entries grouped by their path without the
       # system segments, where a group has more than one entry.
       evaluatedMoreThanOnce =
         entries:
         let
-          machines = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
+          nixosEntries = builtins.filter (entry: entry.attrset == "nixosConfigurations") entries;
           nameOf =
             entry:
             final.caisson.integrations.displayName (
@@ -122,7 +125,7 @@
                 builtins.filter (segment: segment.type != "system") entry.path
               )
             );
-          grouped = builtins.groupBy nameOf machines;
+          grouped = builtins.groupBy nameOf nixosEntries;
         in
         final.mapAttrsToList (name: group: {
           inherit name;
@@ -131,12 +134,21 @@
 
       # The nodes, by the name each is published under: the NixOS
       # configurations among the entries the colmena configuration
-      # passes up. A node is refused when it has more than one
-      # evaluation, when colmena could not select it, and when it does
-      # not declare the `deployment` options colmena reads.
+      # passes up that belong to it (`integrations.belongsHere`), those
+      # with no NixOS configuration between them and the colmena
+      # configuration. A NixOS configuration declared inside a disk layout or a structural
+      # group is a node. A NixOS configuration declared inside a node,
+      # such as an image, belongs to the node and is not a node. A node is
+      # refused when it has more than one evaluation result, when colmena could
+      # not select it, and when it does not declare the `deployment`
+      # options colmena reads.
       nodesOf =
-        entries:
+        allEntries:
         let
+          entries = builtins.filter (
+            entry:
+            entry.attrset == "nixosConfigurations" && final.caisson.integrations.belongsHere "nixos" entry
+          ) allEntries;
           repeated = evaluatedMoreThanOnce entries;
           published = (final.caisson.integrations.publish entries).nixosConfigurations or { };
           bad = builtins.filter unaddressable (builtins.attrNames published);
@@ -149,19 +161,19 @@
                 lib.caisson.caisson-colmena: the node `${name}` declares no `deployment` options,
                 which colmena reads. A NixOS configuration declared inside a colmena
                 configuration gets them from caisson's `colmena-deployment` module by
-                default; one that passes `moduleImports` lists that module itself.
+                default; a configuration that passes `moduleImports` lists that module itself.
               '';
         in
         if repeated != [ ] then
           throw ''
-            lib.caisson.caisson-colmena: a node is one evaluation of a NixOS configuration,
+            lib.caisson.caisson-colmena: a node is a single evaluation result of a NixOS configuration,
             and these NixOS configurations are evaluated per system, for more than one system:
             ${builtins.concatStringsSep "\n" (
               builtins.map (
-                machine: "  `${machine.name}`, for ${builtins.concatStringsSep ", " machine.systems}"
+                nixos: "  `${nixos.name}`, for ${builtins.concatStringsSep ", " nixos.systems}"
               ) repeated
             )}
-            Declare each machine where a single system is in force.
+            Declare each NixOS configuration inside a configuration that evaluates its children for a single system.
           ''
         else if bad == [ ] then
           builtins.mapAttrs checked published
@@ -218,12 +230,12 @@
               };
           };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the options of the class, the framework modules of the class, the
       # selection and the configuration's module, with the composition's
-      # pinned sources as the `inputs` special argument. `ecosystemArgs`,
-      # which only the twin's pattern admits, is merged over the call
-      # last.
+      # dependencies as the `inputs` special argument. `ecosystemArgs`,
+      # which only the pattern of the `WithEcosystemArgs` variant admits,
+      # is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -241,36 +253,50 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-colmena/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-colmena or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-colmena";
+            configModule = args.configModule or null;
+          };
+
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.caisson-colmena.colmenaOptions";
+              file = "caisson-caisson-colmena:colmenaOptions";
+              module = colmenaOptions;
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
               class = "caisson-colmena";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                colmenaOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # Where colmena came from, as `src` was resolved.
+          ecosystems.colmena = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
+          # What evalModules received: the options of the class, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. Each node is a
+          # separate NixOS configuration, and the history of the node
+          # records the modules NixOS received.
+          modules = moduleList;
           outputs.hive = hiveOf {
             inherit src;
             inherit (evaluated) config;
@@ -289,6 +315,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "caisson-colmena";
+            inherit args;
+          };
           type = "caisson-colmena";
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -304,7 +334,7 @@
         mkConfiguration =
           {
             # The colmena configuration's module: `meta`, and the
-            # machines under `caisson.nixos.configurations`. When
+            # NixOS configurations under `caisson.nixos.configurations`. When
             # absent, the configuration registered under the
             # configuration's name
             # (`lib.caisson.configs.caisson-colmena.<name>`), if any.
@@ -315,8 +345,8 @@
             # special argument; `colmena eval` needs `pkgSets.pkgs`
             # and reports the miss.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,
@@ -370,6 +400,10 @@
             assertColmenaEcosystemSrc (resolveEcosystemSrc {
               inherit explicit manifest;
             });
+          # Where that colmena source came from, from the same
+          # arguments, as a manifest records it under
+          # `ecosystems.colmena`.
+          ecosystemAccountOf = { explicit, manifest }: ecosystemAccountOf { inherit explicit manifest; };
         };
       };
     in

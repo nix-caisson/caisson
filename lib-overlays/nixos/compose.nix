@@ -4,13 +4,15 @@
 # nixos-minimal integration reads through `lib.caisson.nixos.compose`:
 # the definition of the library, the module list, the special
 # arguments, the system and the package set, so the evaluators of the
-# class cannot express different machines from the same arguments.
+# class cannot express different NixOS configurations from the same
+# arguments.
 #
-# It is a function of the view being evaluated: `lib`, the library the
-# evaluation runs on, and `manifest`, the manifest of the evaluation.
-# A NixOS configuration has an evaluation for every system in force
-# where it is declared, so the manifest is that of the evaluation for
-# one system: the name, the system and the package sets come from it.
+# It is a function of what the configuration is evaluated with: `lib`,
+# the library its modules run on, and `manifest`, the manifest of the
+# configuration. A NixOS configuration has an evaluation result for
+# each system its parent evaluates its children for, so the manifest is
+# that of the evaluation for one system: the name, the system and the
+# package sets come from it.
 {
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
@@ -21,10 +23,10 @@ args:
 let
   selection = lib.caisson.integrations;
 
-  # The name of the configuration this is an evaluation of.
+  # The name of the configuration being evaluated.
   name = manifest.name or null;
 
-  # The system of this evaluation.
+  # The system the configuration is evaluated for.
   inherit (manifest) system;
 
   what =
@@ -34,23 +36,28 @@ let
       "this NixOS configuration for ${system}";
 
   # The package sets available to the configuration, each for the
-  # system of the evaluation, by package config name.
+  # system it is evaluated for, by package config name.
   pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
 
-  # The set the configuration runs on: the selection in force at its
-  # manifest, applied to those.
+  # The set the configuration runs on: the package set selection that
+  # applies to its manifest, applied to those.
   pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
   # eval-config evaluations carry the nixpkgs module, so the set lands
-  # on `nixpkgs.pkgs`; an evaluation without that module takes it as
+  # on `nixpkgs.pkgs`; a configuration evaluated without that module takes it as
   # the `pkgs` module argument instead.
-  pkgSetModule =
-    { lib, ... }:
-    {
-      _file = "caisson-nixos:pkgSet";
-      config =
-        if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
-    };
+  # It is keyed, so the history of the evaluation names it.
+  pkgSetModule = selection.caissonModule {
+    key = "caisson.nixos.pkgSet";
+    file = "caisson-nixos:pkgSet";
+    module =
+      { lib, ... }:
+      {
+        _file = "caisson-nixos:pkgSet";
+        config =
+          if nixpkgsModule then { nixpkgs.pkgs = pkgs; } else { _module.args.pkgs = lib.mkDefault pkgs; };
+      };
+  };
 
   registry = lib.caisson.modules.nixos or { };
   # The framework module of the class, forced.
@@ -60,14 +67,11 @@ let
   # The configuration's module: the module passed, else the
   # configuration registered under the configuration's name
   # (`configs/nixos/<name>`), else none.
-  registered = lib.caisson.configs.nixos or { };
-  configModule =
-    if (args.configModule or null) != null then
-      args.configModule
-    else if name != null then
-      registered.${name} or null
-    else
-      null;
+  configModule = selection.configModuleOf {
+    inherit lib name;
+    class = "nixos";
+    configModule = args.configModule or null;
+  };
 in
 {
   inherit system pkgSets;

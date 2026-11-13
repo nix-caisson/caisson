@@ -4,7 +4,7 @@
 # kubenix's modules. A kubenix configuration is a set of Kubernetes
 # resources written as kubenix modules, which import the kubenix modules
 # they use from the `kubenix` argument (`kubenix.modules.k8s`). It is
-# evaluated per system, once for each system in force where it is declared, on the
+# evaluated per system, once for each system its parent evaluates its children for, on the
 # package set selected for it.
 #
 # kubenix evaluates its modules with its `evalModules`: `evalModules` on
@@ -17,7 +17,7 @@
 # `kubectl apply -f` reads; it is the `kubernetes.result` of kubenix's
 # `k8s` module, so a configuration that imports that module has it. A
 # configuration is published as `kubenixConfigurations.<system>.<name>`,
-# the evaluation, whose `config.kubernetes.result` is the result.
+# the evaluation result, whose `config.kubernetes.result` is the result.
 {
   mkLibOverlay,
   ...
@@ -39,7 +39,9 @@
     let
       context = "lib.caisson.kubenix.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "kubenix";
         context = "caisson.kubenix";
       };
@@ -106,14 +108,29 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/kubenix/<name>`), else none.
-          registered = lib.caisson.configs.kubenix or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "kubenix";
+            configModule = args.configModule or null;
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [
+              (selection.caissonModule {
+                key = "caisson.kubenix.pkgSet";
+                file = "caisson-kubenix:args";
+                module = {
+                  _file = "caisson-kubenix:args";
+                  config._module.args = {
+                    inherit pkgs;
+                    name = "default";
+                  };
+                };
+              })
+            ];
 
           value = kubenixLib.evalModules (
             {
@@ -131,33 +148,34 @@
                 };
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [
-                  {
-                    _file = "caisson-kubenix:args";
-                    config._module.args = {
-                      inherit pkgs;
-                      name = "default";
-                    };
-                  }
-                ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           inherit value;
+          # Where kubenix came from, as `src` was resolved.
+          ecosystems.kubenix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry, the
+          # configuration's module and the module that hands the
+          # modules their arguments. The modules of kubenix reach the
+          # configuration's module through the `kubenix` special
+          # argument, imported only where a module selects them, so
+          # none of kubenix's modules are declared here.
+          modules = moduleList;
           outputs.result =
             value.config.kubernetes.result
               or (throw "${what} has no `kubernetes.result`; it imports kubenix's `k8s` module from `kubenix.modules.k8s` to have one.");
         };
 
       # A kubenix configuration is published as
-      # `kubenixConfigurations.<system>.<name>`, the evaluation kubenix's
-      # `evalModules` returns, whose `config.kubernetes.result` is its
+      # `kubenixConfigurations.<system>.<name>`, the evaluation result
+      # kubenix's `evalModules` returns, whose `config.kubernetes.result` is its
       # result.
       exportsTo = {
         attrset = "kubenixConfigurations";
@@ -168,9 +186,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "kubenix";
+            inherit args;
+          };
           type = "kubenix";
           # A kubenix configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -180,14 +203,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "kubenix";
         class = "kubenix";
-        # A kubenix configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # A kubenix configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.kubenix.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -201,8 +224,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

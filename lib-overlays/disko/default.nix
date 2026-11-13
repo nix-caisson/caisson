@@ -35,7 +35,7 @@
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
     # The native disko integration, whose type library, devices option,
-    # layout product and publishing this one builds on.
+    # layout product and publishing this integration builds on.
     ((mkLibOverlay ../caisson-disko) // { key = "caisson-disko"; })
   ];
 
@@ -44,12 +44,12 @@
     let
       native = final.caisson.caisson-disko;
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the devices option, the framework modules of the class, the
       # selection and the configuration's module, with the
-      # composition's pinned sources as the `inputs` special argument.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # composition's dependencies as the `inputs` special argument.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -69,36 +69,50 @@
           # configuration registered under the configuration's name
           # (`configs/disko/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.disko or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "disko";
+            configModule = args.configModule or null;
+          };
+
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.disko.devicesOptions";
+              file = "caisson-disko:devicesOptions";
+              module = native.devicesOptions diskoLib;
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
               class = "disko";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                (native.devicesOptions diskoLib)
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # Where disko came from, as `src` was resolved.
+          ecosystems.disko = native.ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
+          # What evalModules received: the devices option, the
+          # framework module of the class, the modules selected from
+          # the registry and the configuration's module. disko's type
+          # library builds the devices option; it reads no module
+          # list of disko.
+          modules = moduleList;
           outputs = native.layoutOf {
             context = "lib.caisson.disko";
             assertions = [ ];
@@ -111,6 +125,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "disko";
+            inherit args;
+          };
           type = "disko";
           defaultPkgs = args.defaultPkgs or null;
           inherit (native) exportsTo;
@@ -136,7 +154,7 @@
             # special argument.
             pkgSets ? null,
             # The package set the layout's scripts are built with, and
-            # the one the configurations beneath this one run on: a
+            # the set the configurations declared inside this configuration run on: a
             # function that receives the package sets available, by
             # package config name, and returns the set to run on.
             defaultPkgs ? null,

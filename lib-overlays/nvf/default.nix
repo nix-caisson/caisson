@@ -2,11 +2,11 @@
 #
 # The nvf integration: it owns the `nvf` class, the class of nvf's
 # modules. An nvf configuration is a Neovim, written as nvf modules
-# (`vim.*`), evaluated per system, once for each system in force where it is declared,
+# (`vim.*`), evaluated per system, once for each system its parent evaluates its children for,
 # on the package set selected for it.
 #
 # nvf evaluates its modules with `neovimConfiguration`, on nixpkgs'
-# library extended with nvf's own, `lib.nvim`. caisson evaluates the
+# library extended with the library of nvf, `lib.nvim`. caisson evaluates the
 # same modules, nvf's `modules/modules.nix`, with the special arguments
 # `neovimConfiguration` passes (`self` and `inputs`, the nvf flake, and
 # `modulesPath`), on the composed library extended with `lib.nvim`
@@ -18,11 +18,13 @@
 # `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration`
 # returns: `neovim`, `config` and `options`.
 #
-# An nvf configuration is kept in a Nix profile of its own, the way a
-# home keeps its generations (`lib.caisson.integrations.profileOf`):
-# its output `activationPackage` holds `activate`, which points the
-# profile at the Neovim, and `profile` says where the profile is. A
-# machine, a home or a hjem configuration activates the nvf
+# An nvf configuration is kept in a separate Nix profile, the way a
+# home-manager configuration keeps its generations
+# (`lib.caisson.integrations.profileOf`): its output
+# `activationPackage` holds `activate`, which points the profile at the
+# Neovim, and `profile` says where the profile is. A NixOS, nix-darwin
+# or system-manager configuration, a home-manager configuration or a
+# hjem configuration activates the nvf
 # configurations declared inside it each time it is activated itself,
 # with the module `profile-activation` of its class.
 {
@@ -46,7 +48,9 @@
     let
       context = "lib.caisson.nvf.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nvf";
         context = "caisson.nvf";
       };
@@ -119,14 +123,27 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nvf/<name>`), else none.
-          registered = lib.caisson.configs.nvf or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nvf";
+            configModule = args.configModule or null;
+          };
+
+          # The modules of the composition: the modules selected from
+          # the registry, the configuration's module and the framework
+          # module of the class. The module list of nvf is imported
+          # separately, below, and goes first.
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
+
+          nvfModuleList =
+            import "${src}/modules/modules.nix" {
+              inherit pkgs;
+              lib = nvfLib;
+            }
+            ++ moduleList;
 
           value = nvfLib.evalModules (
             {
@@ -138,14 +155,7 @@
                 lib = nvfLib;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                import "${src}/modules/modules.nix" {
-                  inherit pkgs;
-                  lib = nvfLib;
-                }
-                ++ frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = nvfModuleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -167,6 +177,21 @@
         in
         {
           inherit value;
+          # Where nvf came from, as `src` was resolved.
+          ecosystems.nvf = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What evalModules received: nvf's module list, then the
+          # modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nvf";
+              project = "nvf";
+              file = "modules/modules.nix";
+            })
+          ]
+          ++ moduleList;
           outputs = {
             inherit neovim;
             inherit (kept) activationPackage profile;
@@ -188,9 +213,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nvf";
+            inherit args;
+          };
           type = "nvf";
           # An nvf configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -206,14 +236,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nvf";
         class = "nvf";
-        # An nvf configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # An nvf configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nvf.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -227,8 +257,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

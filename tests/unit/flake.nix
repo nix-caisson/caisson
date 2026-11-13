@@ -27,8 +27,11 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.flake-parts.follows = "flake-parts";
 
-    # The tests compose with the deps world's caisson-core, not the
-    # caisson-core the parent's lock names.
+    # The tests compose with the caisson-core of `deps`. In the checks
+    # of caisson, `deps` holds the inputs of the checks configuration,
+    # whose caisson-core is the caisson-core that the lock of caisson
+    # names. A standalone evaluation of this flake takes the
+    # caisson-core of tests/dependencies.
     caisson-core.follows = "deps/caisson-core";
 
   };
@@ -47,8 +50,7 @@
       # The pin readers of the parent, read by path like its overlays.
       pins = import (parent.outPath + "/lib-overlays/framework/pins");
       lib = core.mkLib {
-        inherit (pins.flake inputs) sources root;
-        defaultEcosystemSrc.nixpkgs-lib = inputs.nixpkgs-lib.outPath;
+        inherit (pins.flake inputs) dependencies root;
         # Registered from the parent's source path: a flake cannot
         # reference files outside its tree, and reading the
         # source forces none of the parent's outputs. The overlays

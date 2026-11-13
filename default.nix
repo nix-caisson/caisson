@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: MIT
 #
-# caisson's structural top: what a reader that indexes attributes of
+# The structural caisson top of caisson: what a reader that indexes attributes of
 # this file's value gets (`nix-build -A`, `nix eval -f`, a project
 # reader): the exports of the structural configuration in
 # configs/structural/caisson, with `caisson.manifest` beside them.
-# flake.nix is the flake top over the same configuration.
+# flake.nix is the flake-parts caisson top over the same
+# configuration.
 #
 # The pins are those in flake.lock, read without the flake evaluator
-# by caisson-core's flake-compat reader, so this top and the flake top
-# build from the same trees and a pin advance moves both. caisson-core
+# by caisson-core's flake-compat reader, so this caisson top and the
+# flake-parts caisson top build from the same source trees and a pin advance moves both. caisson-core
 # itself is fetched from its node in the lock first, since the reader
 # is one of its functions. The root is the working tree, named by its
-# revision when clean (an impure read, as a flakeless top's is).
+# revision when clean (an impure read, as the read of a flakeless caisson top is).
 let
 
   lock = builtins.fromJSON (builtins.readFile ./flake.lock);
@@ -22,7 +23,7 @@ let
   pins = import ./lib-overlays/framework/pins;
 
   lib = core.mkLib {
-    inherit (pins.flake-compat ./.) sources;
+    inherit (pins.flake-compat ./.) dependencies;
     root = pins.gitRoot ./.;
     name = "caisson";
     systems = import ./systems.nix;

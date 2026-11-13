@@ -3,7 +3,7 @@
 # The nixvim integration: it owns the `nixvim` class, the class of
 # nixvim's modules. A nixvim configuration is a Neovim, written as
 # nixvim modules (`plugins.*`, `opts`, `keymaps`), evaluated per
-# system, once for each system in force where it is declared, on the package set selected for
+# system, once for each system its parent evaluates its children for, on the package set selected for
 # it.
 #
 # nixvim evaluates its modules with `evalNixvim`: `evalModules` over
@@ -16,10 +16,10 @@
 #
 # The output is `package`, the Neovim, `config.build.package`. A
 # configuration is published as `nixvimConfigurations.<system>.<name>`,
-# the evaluated configuration, under the name nixvim's flake publishes
-# its own configurations under.
+# the evaluated configuration, under the output name the nixvim flake
+# uses for nixvim configurations.
 #
-# A nixvim configuration is kept in a Nix profile of its own, as an nvf
+# A nixvim configuration is kept in a separate Nix profile, as an nvf
 # configuration is (`lib.caisson.integrations.profileOf`): its output
 # `activationPackage` holds `activate`, and the configuration it is
 # declared inside activates it with the module `profile-activation` of
@@ -45,7 +45,9 @@
     let
       context = "lib.caisson.nixvim.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixvim";
         context = "caisson.nixvim";
       };
@@ -105,14 +107,28 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nixvim/<name>`), else none.
-          registered = lib.caisson.configs.nixvim or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixvim";
+            configModule = args.configModule or null;
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [
+              "${src}/modules/top-level"
+              (selection.caissonModule {
+                key = "caisson.nixvim.pkgSet";
+                file = "caisson-nixvim:evalNixvim";
+                module = {
+                  _file = "caisson-nixvim:evalNixvim";
+                  flake = nixvimLib.mkOptionDefault src;
+                  nixpkgs.pkgs = pkgs;
+                };
+              })
+            ];
 
           value = nixvimLib.evalModules (
             {
@@ -123,18 +139,7 @@
                 modulesPath = "${src}/modules";
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [
-                  "${src}/modules/top-level"
-                  {
-                    _file = "caisson-nixvim:evalNixvim";
-                    flake = nixvimLib.mkOptionDefault src;
-                    nixpkgs.pkgs = pkgs;
-                  }
-                ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -155,6 +160,20 @@
         in
         {
           inherit value;
+          # Where nixvim came from, as `src` was resolved.
+          ecosystems.nixvim = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry, the
+          # configuration's module, the top-level module tree of nixvim,
+          # recorded as a module of the nixvim source, and the module
+          # that sets `flake` and `nixpkgs.pkgs`.
+          modules = final.caisson.integrations.inEcosystem {
+            name = "nixvim";
+            inherit src;
+          } moduleList;
           outputs = {
             inherit package;
             inherit (kept) activationPackage profile;
@@ -173,9 +192,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixvim";
+            inherit args;
+          };
           type = "nixvim";
           # A nixvim configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -191,14 +215,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "nixvim";
         class = "nixvim";
-        # A nixvim configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # A nixvim configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixvim.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -212,8 +236,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

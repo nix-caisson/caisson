@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# The structural top's configuration: the shared configuration of
-# what caisson exports, declared beneath this top under the name it
-# is registered by (configs/structural/impl). What it exports is
-# passed up into this top's exports.
+# The configuration of the structural caisson top: the shared
+# configuration of what caisson exports, declared inside this caisson
+# top under the name it is registered by (configs/structural/impl).
+# What it exports is passed up into the exports of this caisson top.
 { ... }:
 { lib, ... }:
 {

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # What caisson exports: every registered overlay and module, and the
-# composed library's framework namespaces. The flake top and the
-# structural top evaluate this configuration beneath themselves and
+# composed library's framework namespaces. The flake-parts caisson top
+# and the structural caisson top declare this configuration inside
+# themselves and
 # merge in what it exports.
 { ... }:
 { ... }:
@@ -22,6 +23,7 @@
         nixpkgs
         nixos
         nixos-minimal
+        nixos-test
         home-manager
         home-manager-minimal
         hjem
@@ -55,7 +57,6 @@
           nixpkgs
           ;
       };
-      generic.exported = modules: { inherit (modules) core; };
       structural.exported = modules: { inherit (modules) core; };
     };
 

@@ -2,12 +2,12 @@
 #
 # The treefmt integration: it owns the `treefmt` class, the class of
 # treefmt-nix's modules. A treefmt configuration is the formatters of a
-# tree: `programs.<name>.enable` and `settings`, as treefmt-nix writes
-# them. It is evaluated per system, once for each system in force where it is declared,
-# on the package set selected for it.
+# source tree: `programs.<name>.enable` and `settings`, as treefmt-nix writes
+# them. It is evaluated per system, once for each system its parent evaluates
+# its children for, on the package set selected for it.
 #
 # treefmt-nix evaluates its modules with `evalModules` on the library of
-# a nixpkgs. caisson evaluates them with its own `evalModules`, on the
+# a nixpkgs. caisson evaluates them with an `evalModules` call of caisson, on the
 # composed library, over the modules treefmt-nix publishes for a
 # configuration embedded in another, `submodule-modules`, with `pkgs`
 # set to the selected package set. Those modules need treefmt-nix's
@@ -18,10 +18,10 @@
 # configuration, which `nix fmt` runs; `configFile`, the `treefmt.toml`;
 # `programs`, the formatters by name; and `check`, the function that
 # takes a source tree and builds a derivation that fails when the tree
-# is not formatted. The configuration declared under the name `default`
+# is not formatted. The configuration declared under the name `formatter`
 # is published as `formatter.<system>`, its wrapper, which `nix fmt`
 # reads, and as `checks.<system>.treefmt`, its check over the root of
-# the tree (`mkLib`'s `root`), which `nix flake check` builds.
+# the flake (`mkLib`'s `root`), which `nix flake check` builds.
 {
   mkLibOverlay,
   ...
@@ -43,7 +43,9 @@
     let
       context = "lib.caisson.treefmt.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "treefmt-nix";
         context = "caisson.treefmt";
       };
@@ -89,18 +91,29 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/treefmt/<name>`), else none.
-          registered = lib.caisson.configs.treefmt or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "treefmt";
+            configModule = args.configModule or null;
+          };
 
           # treefmt-nix's special arguments, from the type its
           # `submoduleWith` returns.
           upstreamSpecialArgs = (treefmt.submoduleWith lib { }).functor.payload.specialArgs;
+
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.treefmt.pkgSet";
+              file = "caisson-treefmt:pkgs";
+              module = {
+                _file = "caisson-treefmt:pkgs";
+                inherit pkgs;
+              };
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           value = lib.evalModules (
             {
@@ -111,17 +124,7 @@
                   inherit lib pkgSets;
                 }
                 // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                treefmt.submodule-modules
-                ++ [
-                  {
-                    _file = "caisson-treefmt:pkgs";
-                    inherit pkgs;
-                  }
-                ]
-                ++ frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = treefmt.submodule-modules ++ moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -129,6 +132,21 @@
         in
         {
           inherit value;
+          # Where treefmt-nix came from, as `treefmt` was resolved.
+          ecosystems.treefmt-nix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What evalModules received: treefmt-nix's module list, then
+          # the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "treefmt-nix";
+              project = "treefmt-nix";
+              file = null;
+            })
+          ]
+          ++ moduleList;
           outputs = {
             inherit (build)
               wrapper
@@ -139,27 +157,28 @@
           };
         };
 
-      # Only the configuration named `default` is published: as
-      # `formatter.<system>`, its wrapper, which `nix fmt` reads, and,
-      # in a tree that knows its root, as `checks.<system>.treefmt`,
-      # its check over that tree, which fails `nix flake check` when
-      # the tree is not formatted.
-      isDefault = manifest: (manifest.name or null) == "default";
+      # Only the configuration named `formatter`, for the output it
+      # fills, is published: as `formatter.<system>`, its wrapper,
+      # which `nix fmt` reads, and, in a flake that knows its root, as
+      # `checks.<system>.treefmt`, its check over the source tree of the
+      # flake, which fails `nix flake check` when that source tree is not
+      # formatted.
+      isFormatter = manifest: (manifest.name or null) == "formatter";
       exportsTo = [
         {
           attrset = "formatter";
           single = true;
           bySystem = true;
-          only = isDefault;
+          only = isFormatter;
           value = manifest: manifest.outputs.wrapper;
         }
         {
           attrset = "checks";
           bySystem = true;
-          only = manifest: isDefault manifest && (manifest.root or null) != null;
+          only = manifest: isFormatter manifest && (manifest.root or null) != null;
           name = _: {
             value = "treefmt";
-            description = "named `treefmt`, the check of the configuration named `default`";
+            description = "named `treefmt`, the check of the configuration named `formatter`";
           };
           value = manifest: manifest.outputs.check manifest.root;
         }
@@ -168,9 +187,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "treefmt";
+            inherit args;
+          };
           type = "treefmt";
           # A treefmt configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -180,14 +204,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "treefmt";
         class = "treefmt";
-        # A treefmt configuration that is a top, as a tool reads it: the
-        # evaluation, or the evaluations by system where several are in
-        # force.
+        # A treefmt configuration that is a caisson top, as a tool reads it: the
+        # evaluation result, or the evaluation results by system where
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.treefmt.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -202,8 +226,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

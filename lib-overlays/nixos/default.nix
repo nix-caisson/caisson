@@ -24,14 +24,21 @@
   overlay =
     final: prev:
     let
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
-        name = "nixpkgs";
+      # The source of the NixOS module collection: `nixos/modules` and
+      # `nixos/lib/eval-config.nix`, of the composition's `nixos` key.
+      # The library the modules run on is the composed lib, from the
+      # `nixpkgs-lib` key, and the package set is a package config,
+      # from the `nixpkgs` key: three parts, each from a separate key.
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
+        name = "nixos";
         context = "caisson.nixos";
       };
 
       composeNixos = import ./compose.nix;
 
-      # The composition of the class, on the view being evaluated: the
+      # The composition of the class, on the lib and manifest the configuration is evaluated with: the
       # module list, the special arguments, the system, the package
       # sets and the resolved nixpkgs source, from the caisson
       # arguments. Every entry point here builds on it, and so does an
@@ -45,31 +52,37 @@
           # set is the `pkgs` module argument.
           nixpkgsModule ? true,
         }:
-        view: args:
-        composeNixos { inherit context nixpkgsModule; } view args
+        given: args:
+        composeNixos { inherit context nixpkgsModule; } given args
         // {
           src = resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;
-            manifest = view.lib.caisson-core.libManifest or { };
+            manifest = given.lib.caisson-core.libManifest or { };
+          };
+          # Where the module collection came from, as `src` was
+          # resolved, which the manifest records as `ecosystems.nixos`.
+          srcAccount = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = given.lib.caisson-core.libManifest or { };
           };
         };
 
-      # The evaluator's call, on the view being evaluated: eval-config
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with: eval-config
       # over the composition, for the configuration's system.
       # `baseModules` is passed where the entry point names NixOS'
-      # module list itself. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last.
+      # module list itself. `ecosystemArgs`, which only the pattern of
+      # the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         { explicitBaseModules }:
-        args: view:
+        args: given:
         let
-          common = compose { } view args;
+          common = compose { } given args;
           callArgs = {
             modules = common.modules;
             specialArgs = common.specialArgs;
             # `nixos/lib/eval-config.nix` of the nixpkgs source
             # defaults `lib` to `import ../../lib`, the library of the
-            # tree it lives in. Naming it makes the composed library
+            # source tree it lives in. Naming it makes the composed library
             # what the evaluation runs on: its `evalModules`, its
             # merging and its type checking, and the library the
             # result publishes as `.lib`.
@@ -87,6 +100,18 @@
         in
         {
           inherit value;
+          # Where the module collection came from, as `src` was resolved.
+          ecosystems.nixos = common.srcAccount;
+          # What eval-config received: NixOS' module list, then the
+          # modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nixos";
+              project = "nixpkgs";
+              file = "nixos/modules/module-list.nix";
+            })
+          ]
+          ++ common.modules;
           # What `nixos-rebuild` reads from a configuration, each a
           # reference into `config.system.build`.
           outputs = {
@@ -108,39 +133,56 @@
       configuration =
         variant: args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nixos";
+            inherit args;
+          };
           type = "nixos";
           # A NixOS configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A NixOS configuration is activated on a machine; the
+          # A NixOS configuration is activated on a computer; the
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a NixOS configuration checks that
+          # its system closure builds, the closure `nixos-rebuild`
+          # builds and switches to.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system closure of the NixOS configuration builds";
+              };
+            };
           evaluate = evaluate variant args;
         };
 
       integration = final.caisson.integrations.mkIntegration {
         name = "nixos";
-        # A NixOS configuration that is a top, as a tool reads it: the
+        # A NixOS configuration that is a caisson top, as a tool reads it: the
         # evaluated configuration, which is what `nixos-rebuild --file`
         # reads and what a test or the REPL evaluates with no
-        # configuration above it. Where the composition has several
-        # systems in force, it is the evaluated configurations by
-        # system, and where it has none, the empty set: the evaluations
-        # are named as anything published is (`integrations.topValue`).
+        # configuration above it. Where the composition declares several
+        # systems, it is the evaluated configurations by
+        # system, and where it has none, the empty set: the evaluation
+        # results are named as anything published is (`integrations.topValue`).
         # Its name is the name the composition declares on mkLib.
         top = final.caisson.integrations.topValue;
         class = "nixos";
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.nixos.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. The colmena node
+        # `mkTopConfiguration` finalizes it at a caisson top. The colmena node
         # constructors take the same arguments, and
         # `lib.caisson.nixos-minimal` these plus `prefix`. The
-        # configuration is evaluated per system, once for each system in force where it
-        # is declared, and its package sets come from the composition,
+        # configuration is evaluated per system, once for each system its
+        # parent evaluates its children for, and its package sets come from the composition,
         # through the manifest; `defaultPkgs` selects the set it runs
         # on.
         mkConfiguration =
@@ -160,11 +202,12 @@
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
             # declared, as an attribute set by package config name,
-            # each for the system of the evaluation, and returns the
+            # each for the system it is evaluated for, and returns the
             # set to run on. `defaultPkgs = pkgSets: pkgSets.stable;`
             # selects the set of the package config named `stable`.
-            # The selection holds for every configuration beneath this
-            # one that selects none. When absent, the selection of the
+            # A configuration declared inside this configuration runs on
+            # it unless it or a configuration between them selects
+            # another. When absent, the selection of the
             # nearest configuration above, and the set named `default`
             # where none above selects.
             defaultPkgs ? null,

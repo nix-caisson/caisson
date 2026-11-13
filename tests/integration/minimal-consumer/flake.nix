@@ -23,7 +23,8 @@
       # modules are in the registry of this composition. This flake
       # registers one lib overlay and no modules.
       lib = parent.lib.caisson.mkLib {
-        inherit (parent.lib.caisson.pins.flake inputs) sources root;
+        inherit (parent.lib.caisson.pins.flake inputs) dependencies root;
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
 
         projects = {
           caisson = parent;

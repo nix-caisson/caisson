@@ -17,7 +17,6 @@
 # `stage.nix` the composed lib with `pkgsManifest` filled in, so
 # `pkgs.lib` carries the set's manifest.
 {
-  closure-inputs,
   mkLibOverlay,
   ...
 }:
@@ -39,7 +38,9 @@
       prevNs = (prev.caisson or { }).nixpkgs or { };
       selection = final.caisson.integrations;
 
-      resolveEcosystemSrc = selection.resolveEcosystemSrc {
+      resolveEcosystemSrc = selection.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = selection.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nixpkgs";
         context = "lib.caisson.nixpkgs.mkConfiguration";
       };
@@ -53,6 +54,105 @@
         builtins.attrValues (
           final.filterAttrs (name: _: name == "default" || final.hasSuffix "/default" name) registry
         );
+
+      # nixpkgs' library holds two kinds of library. The general
+      # utilities and the module system serve every evaluation, and the
+      # composition supplies them from the `nixpkgs-lib` key. The
+      # package-set libraries describe and build packages: the platform
+      # model, the package metadata and its tables, the `callPackage`
+      # machinery, the fetchers and version comparison. The packages of
+      # a set are written against the package-set libraries of the
+      # revision of the set, so a package set's lib takes them from the
+      # source of the set.
+      #
+      # `packageSetLibraries` are sublibraries whose functions nixpkgs
+      # also publishes at the top level of its library. `packageSetData`
+      # are tables taken whole. `generalLibraries` are the general
+      # sublibraries. A top-level name that belongs to a package-set
+      # library and to a general library stays with the general
+      # library: `compareVersions` is one, defined in `versions` and in
+      # `strings` as the same builtin.
+      packageSetLibraries = [
+        "systems"
+        "meta"
+        "customisation"
+        "derivations"
+        "fetchers"
+        "versions"
+      ];
+      packageSetData = [
+        "licenses"
+        "sourceTypes"
+        "maintainers"
+        "teams"
+        "platforms"
+      ];
+      generalLibraries = [
+        "trivial"
+        "fixedPoints"
+        "attrsets"
+        "lists"
+        "strings"
+        "stringsWithDeps"
+        "modules"
+        "options"
+        "types"
+        "cli"
+        "gvariant"
+        "generators"
+        "asserts"
+        "debug"
+        "services"
+        "path"
+        "filesystem"
+        "fileset"
+        "sources"
+        "kernel"
+        "network"
+        "flakes"
+      ];
+
+      # The lib a package set at `src` runs on: `base`, the composed lib
+      # with the set's manifest, with the package-set libraries of the
+      # library at `src`. The top-level names taken are the
+      # package-set libraries, the tables, and every top-level name of
+      # the library at `src` that is also a function of a package-set
+      # library and of no general library, which is how nixpkgs
+      # publishes `callPackageWith`,
+      # `getExe` and the rest. Each value is the value at `src`, and a
+      # function taken from there runs on the fixpoint of the library at
+      # `src`. The lib is an attribute merge over `base`: nixpkgs hands
+      # it to the packages as `pkgs.lib` and builds no fixpoint over it.
+      packageSetLib =
+        src: base:
+        let
+          sourceLib = builtins.import "${src}/lib";
+        in
+        base
+        // builtins.listToAttrs (
+          builtins.map (name: {
+            inherit name;
+            value = sourceLib.${name};
+          }) (packageSetNames src)
+        );
+
+      # The top-level names of the library at `src` that the lib of a
+      # package set takes from there, in the order `packageSetLib` takes
+      # them: the package-set libraries, the tables, then the top-level
+      # names of the functions of the package-set libraries.
+      packageSetNames =
+        src:
+        let
+          sourceLib = builtins.import "${src}/lib";
+          present = builtins.filter (name: sourceLib ? ${name});
+          libraries = present packageSetLibraries;
+          general = present generalLibraries;
+          memberOf = group: name: builtins.any (library: sourceLib.${library} ? ${name}) group;
+          reExports = builtins.filter (
+            name: !(builtins.elem name libraries) && memberOf libraries name && !(memberOf general name)
+          ) (builtins.attrNames sourceLib);
+        in
+        libraries ++ present packageSetData ++ reExports;
 
       # The package set of nixpkgs at `src`, instantiated as
       # `pkgs/top-level/default.nix` instantiates it, from arguments
@@ -144,7 +244,7 @@
         else
           pkgs;
 
-      # A nixpkgs config evaluated over `config.nix` of the tree at
+      # A nixpkgs config evaluated over `config.nix` of the source tree at
       # `src`, with its assertions and warnings applied, the way
       # upstream evaluates the `config` argument.
       checkedConfig =
@@ -193,14 +293,14 @@
               default =
                 if (parent.systems or null) == null then
                   throw ''
-                    The nixpkgs package config builds a set per system in force where it is
-                    declared, but none are declared. Declare `systems` in the mkLib call
+                    The nixpkgs package config builds a set for each system of the level it is
+                    declared at, but that level declares none. Declare `systems` in the mkLib call
                     (e.g. `systems = [ "x86_64-linux" ];`), or set `caisson.nixpkgs.systems`
                     in the config's module.
                   ''
                 else
                   parent.systems;
-              defaultText = lib.literalMD "the systems in force at the level the config is declared at";
+              defaultText = lib.literalMD "the systems of the level the config is declared at";
             };
             overlays = lib.mkOption {
               description = "The package overlay registry entries this package config's sets apply, each after the entries it imports and each key once.";
@@ -209,7 +309,7 @@
               defaultText = lib.literalMD "every registry entry named `default` or `<project>/default`";
             };
             extraOverlays = lib.mkOption {
-              description = "Package overlay registry entries applied in addition to `overlays`. A definition of `overlays` replaces its default, and a definition here adds to whichever selection is in force.";
+              description = "Package overlay registry entries applied in addition to `overlays`. A definition of `overlays` replaces its default, and a definition here adds to the selection `overlays` holds, its default or its definition.";
               type = lib.types.listOf lib.types.raw;
               default = [ ];
             };
@@ -234,11 +334,11 @@
           # The config's module: the module passed, else the configuration
           # registered under the config's name
           # (`configs/nixpkgsConfig/<name>`), else none.
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else
-              (lib.caisson.configs.nixpkgsConfig or { }).${name} or null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nixpkgsConfig";
+            configModule = args.configModule or null;
+          };
           configEval = lib.evalModules {
             class = "nixpkgsConfig";
             # The composed lib, so a config module reads
@@ -267,9 +367,24 @@
             ++ lib.caisson-core.pkgOverlaysFor (caissonConfig.overlays ++ caissonConfig.extraOverlays);
           ecosystemArgs = args.ecosystemArgs or { };
 
+          # The set of this package config for `system`, as a manifest.
+          # With `trace`, the set is built on its lib with
+          # `callPackageWith` replaced by the tracing version of
+          # trace.nix.
           setFor =
+            { trace }:
             system:
             let
+              traceOf =
+                if trace then
+                  import ./trace.nix {
+                    set = {
+                      config = name;
+                      inherit system;
+                    };
+                  }
+                else
+                  setLib: setLib;
               setManifest = {
                 _type = "caisson-manifest";
                 type = "nixpkgs";
@@ -288,7 +403,7 @@
               };
               pkgs = instantiate src (
                 {
-                  lib = lib.caisson-core.withManifests { pkgsManifest = setManifest; };
+                  lib = traceOf (packageSetLib src (lib.caisson-core.withManifests { pkgsManifest = setManifest; }));
                   localSystem = { inherit system; };
                   inherit config overlays;
                 }
@@ -304,18 +419,40 @@
             ancestors = (parent.ancestors or [ ]) ++ [ parent ];
             nearest = parent.nearest or { };
             inputs = [ ];
-            # A package config declares no configurations beneath it
-            # (its sets are built, not declared), so its
-            # childless and full manifests coincide.
+            # No configurations are declared inside a package config:
+            # its sets are built from the config. So its childless and
+            # full manifests coincide.
             childless = false;
             inherit (caissonConfig) systems;
             ecosystemSrc = src;
+            # Where each part of the stack the sets use came from. The
+            # general utilities and the module system come from the
+            # library of the composition. The package set comes from
+            # `nixpkgs`, and so do the package-set libraries of its lib,
+            # which `libraries` lists by their top-level names.
+            ecosystems = {
+              nixpkgs-lib = selection.ecosystemAccountOf {
+                name = "nixpkgs-lib";
+                context = "the nixpkgs-lib entry";
+              } { };
+              nixpkgs = ecosystemAccountOf { explicit = args.ecosystemSrc or null; } // {
+                libraries = packageSetNames src;
+              };
+            };
             pkgOverlays = builtins.map (entry: entry.key) (
               caissonConfig.overlays ++ caissonConfig.extraOverlays
             );
             value = configEval;
             inherit config;
-            children.nixpkgs = final.genAttrs caissonConfig.systems setFor;
+            children.nixpkgs = final.genAttrs caissonConfig.systems (setFor {
+              trace = false;
+            });
+            # The same sets, traced: each package carries how it was
+            # made (trace.nix). Only an inspection reads it, so an
+            # ordinary evaluation builds no traced set.
+            traced.children.nixpkgs = final.genAttrs caissonConfig.systems (setFor {
+              trace = true;
+            });
           };
         in
         manifest;
@@ -420,6 +557,32 @@
             in
             current // { __functor = _self: call; };
 
+          # The trace of a package of a traced set (`traced` on a
+          # package config manifest) as plain data: the steps from the
+          # last down to the `callPackage`, each with the `drvPath` it
+          # made, and `from` as the `drvPath` of the derivation it was
+          # applied to. Null for a value that carries no trace.
+          traceChainOf =
+            value:
+            let
+              chain =
+                current:
+                let
+                  record = current.caissonTrace;
+                in
+                [
+                  (
+                    record
+                    // {
+                      inherit (current) drvPath;
+                      from = if record.from == null then null else record.from.drvPath;
+                    }
+                  )
+                ]
+                ++ (if record.from == null then [ ] else chain record.from);
+            in
+            if builtins.isAttrs value && value ? caissonTrace then chain value else null;
+
           mkScope = (
             pkgs: scopeFunction: final.makeScope pkgs.newScope (scope: scopeFunction scope.callPackage)
           );
@@ -428,7 +591,6 @@
             pkgs:
             let
               finalLib = final;
-              closedInputs = closure-inputs;
               reifiedPkgs = if builtins.isFunction pkgs then pkgs else import pkgs;
               reifiedPkgsArgs =
                 if builtins.isFunction reifiedPkgs then builtins.functionArgs reifiedPkgs else { };
@@ -442,7 +604,6 @@
                   if pkgsExpectsContext then
                     reifiedPkgs {
                       inherit callPackage;
-                      inputs = closedInputs;
                       lib = finalLib;
                     }
                   else
@@ -455,19 +616,12 @@
             overlayFn:
             let
               finalLib = final;
-              closedInputs = closure-inputs;
               reifiedOverlayFn = if builtins.isFunction overlayFn then overlayFn else import overlayFn;
               reifiedOverlayFnArgs =
                 if builtins.isFunction reifiedOverlayFn then builtins.functionArgs reifiedOverlayFn else { };
               overlayExpectsContext = reifiedOverlayFnArgs != { };
               resolvedOverlayFn =
-                if overlayExpectsContext then
-                  reifiedOverlayFn {
-                    inputs = closedInputs;
-                    lib = finalLib;
-                  }
-                else
-                  reifiedOverlayFn;
+                if overlayExpectsContext then reifiedOverlayFn { lib = finalLib; } else reifiedOverlayFn;
             in
             _name: pkgsFinal: pkgsPrev:
             resolvedOverlayFn pkgsFinal pkgsPrev

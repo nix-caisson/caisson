@@ -20,11 +20,12 @@
     inputs@{ parent, ... }:
     let
       lib = parent.lib.caisson.mkLib {
-        inherit (parent.lib.caisson.pins.flake inputs) sources root;
+        inherit (parent.lib.caisson.pins.flake inputs) dependencies root;
         # The name this flake holds: its package scope lands at
         # `pkgs.nixpkgs-consumer` because of this declaration.
         name = "nixpkgs-consumer";
         systems = [ "x86_64-linux" ];
+        defaultEcosystemSrc = dependencies: { nixpkgs-lib = dependencies.nixpkgs; };
         projects = {
           caisson = parent;
         };
@@ -44,8 +45,9 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      # The default default applies caisson/default, which carries the
-      # nixpkgs machinery, so it arrives through the projects channel.
+      # The default default applies caisson/default, which imports the
+      # nixpkgs machinery, so the machinery comes from the `projects`
+      # entry `caisson`.
       configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-consumer;
     };
 }

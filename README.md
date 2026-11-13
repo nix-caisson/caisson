@@ -62,9 +62,9 @@ and `lib-overlays/<name>`.
       # mkModules, the registries, the manifest) and one namespace
       # per integration (lib.caisson.flake-parts, lib.caisson.nixos).
       lib = caisson.lib.caisson.mkLib {
-        # The flake pin reader: your inputs as the pinned sources the
-        # composition closes over, and the root from `self`.
-        inherit (caisson.lib.caisson.pins.flake inputs) sources root;
+        # The flake pin reader: your inputs as the pinned dependencies
+        # of the composition, and the root from `self`.
+        inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;
 
         # The project's name: the name of the configuration below,
         # which no parent declares, and the namespace this flake
@@ -76,7 +76,7 @@ and `lib-overlays/<name>`.
         projects = { inherit caisson; };
 
         # The class-keyed modules this flake defines, read from
-        # modules/<class>/<name>/default.nix: closed over your pinned sources,
+        # modules/<class>/<name>/default.nix: closed over your dependencies,
         # importable here, exportable to downstream consumers. A flake
         # with another layout writes the registration by hand
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
@@ -120,44 +120,50 @@ source by.
 | `flake-parts` | `flake-parts` | flake outputs |
 | `nixpkgs` | `nixpkgs` | package sets and overlays |
 | `nixos` | `nixpkgs` | NixOS configurations |
-| `darwin` | `nix-darwin` | macOS machines, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the homes and hjem configurations declared inside them |
+| `darwin` | `nix-darwin` | nix-darwin configurations of macOS systems, evaluated with nix-darwin and published as the `darwinConfigurations` that `darwin-rebuild` reads; they activate the home-manager configurations and hjem configurations declared inside them |
 | `nixos-minimal` | `nixpkgs` | the `nixos` class under the minimal evaluator (no NixOS base modules); a second integration over the class `nixos` owns |
+| `nixos-test` | `nixos` | NixOS VM tests, the test modules that `pkgs.testers.runNixOSTest` takes, evaluated with `evalTest` of nixpkgs for each system and published in no output: each test is the check `test`, the run of the test driver, of the category `vm`; a test declared inside a NixOS configuration reads that NixOS configuration through its manifest |
 | `home-manager` | `home-manager` | Home Manager configurations |
 | `home-manager-minimal` | `home-manager` | the `homeManager` class with Home Manager's necessary modules alone, the configuration importing what it uses from `modulesPath`; a second integration over the class `home-manager` owns |
-| `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS, darwin or system-manager configuration they are declared inside, or applied with `hjem standalone` |
+| `hjem` | `hjem` | the files and packages of a user, as hjem manifests; activated by the NixOS, nix-darwin or system-manager configuration they are declared inside, or applied with `hjem standalone` |
 | `terranix` | `terranix` | Terraform configurations written as terranix modules, published as `terranixConfigurations` of the `config.tf.json` files Terraform reads |
-| `caisson-colmena` | `colmena` | colmena configurations whose machines are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
+| `caisson-colmena` | `colmena` | colmena configurations whose nodes are NixOS configurations declared inside them, published as the hive colmena's command reads; the colmena integration we recommend for new configurations |
 | `colmena` | `colmena` | a hive written for colmena, taken as it is, with each node a NixOS configuration; for porting an existing hive and the modules written for it |
-| `caisson-disko` | `disko` | disk layouts, with the NixOS configurations installed onto each declared inside it; a machine gets the layout's file systems and no disko scripts; the disko integration we recommend for new configurations |
-| `disko` | `disko` | a standalone disk layout, written as disko reads it and published as the `diskoConfigurations.<name>` that disko's command formats and mounts; a machine that carries its layout, as `disko-install` and disko's image builder expect, is a NixOS configuration that selects caisson's `disko` NixOS module |
-| `caisson-facter` | none | the hardware of a machine, a nixos-facter report checked against the report versions caisson knows and extended with a project's options, with the NixOS configurations that run on it declared inside it; a machine gets the report through nixpkgs' `hardware.facter` |
-| `facter` | none | a `facter.json` as nixos-facter writes it, with the NixOS configurations that run on it declared inside it; a machine gets it as `hardware.facter.reportPath` |
-| `treefmt` | `treefmt-nix` | the formatters of a tree, as treefmt-nix modules; the configuration named `default` is published as the `formatter.<system>` that `nix fmt` runs |
-| `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns, kept in a separate Nix profile that the machine, home or hjem configuration it is declared inside activates |
+| `caisson-disko` | `disko` | disk layouts, with the NixOS configurations installed onto each declared inside it; such a NixOS configuration gets the layout's file systems and no disko scripts; the disko integration we recommend for new configurations |
+| `disko` | `disko` | a standalone disk layout, written as disko reads it and published as the `diskoConfigurations.<name>` that disko's command formats and mounts; a NixOS configuration that carries its layout, as `disko-install` and disko's image builder expect, is a NixOS configuration that selects caisson's `disko` NixOS module |
+| `caisson-facter` | none | the hardware of a machine, a nixos-facter report checked against the report versions caisson knows and extended with a project's options, with the NixOS configurations that run on it declared inside it; such a NixOS configuration gets the report through nixpkgs' `hardware.facter` |
+| `facter` | none | a `facter.json` as nixos-facter writes it, with the NixOS configurations that run on it declared inside it; such a NixOS configuration gets it as `hardware.facter.reportPath` |
+| `caisson-microvm` | `microvm` | microvm.nix guests declared inside the NixOS host that runs them, each guest a NixOS configuration declared inside it that sets its `microvm.*` options and gets microvm.nix's guest module by default; the host selects caisson's `microvm-host` NixOS module, which defines microvm.nix's `microvm.vms.<guest>` from them; the microvm integration we recommend for new configurations |
+| `microvm` | `microvm` | a microvm.nix guest written as microvm.nix reads it, a NixOS configuration that sets its `microvm.*` options itself, declared inside the NixOS host that runs it; for porting an existing guest |
+| `caisson-nixops4-composite` | `nixops4` | a composite of a NixOps4 deployment, evaluated when NixOps4 deploys, with its members, composites and resources declared inside it; it declares providers and reads the outputs of its members; the composite declared under the name `nixops4` where no composite holds it is the root, published as the `nixops4` output the NixOps4 command reads; the NixOps4 integration we recommend for new configurations |
+| `caisson-nixops4-resource` | `nixops4` | a resource of a NixOps4 deployment, evaluated when NixOps4 deploys, holding the caisson configurations it deploys; a NixOS configuration declared inside it is deployed over SSH as nixops4-nixos deploys one |
+| `nixops4` | `nixops4` | the root modules of a NixOps4 deployment, written as NixOps4 users write them for `mkRoot`, each component evaluated by caisson and each NixOS configuration that nixops4-nixos deploys a caisson NixOS configuration; the configuration named `nixops4` is published as the `nixops4` output; for porting an existing deployment |
+| `treefmt` | `treefmt-nix` | the formatters of a source tree, as treefmt-nix modules; the configuration named `formatter` is published as the `formatter.<system>` that `nix fmt` runs |
+| `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns, kept in a separate Nix profile that the NixOS configuration, home-manager configuration or hjem configuration it is declared inside activates |
 | `nixvim` | `nixvim` | a Neovim written as nixvim modules, published as `nixvimConfigurations.<system>.<name>`, kept in a profile as an nvf configuration is |
 | `nemacs` | none | an Emacs written as nemacs modules, whose `core` module the flake of nemacs registers; published as `nemacsConfigurations.<system>.<name>` with its `package` and its `activationPackage`, kept in a profile as an nvf configuration is |
-| `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `default` is published as `topology.<system>` |
-| `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `kubenixConfigurations.<system>.<name>`, the evaluation, whose `config.kubernetes.result` is the JSON `kubectl apply -f` reads |
+| `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `topology` is published as `topology.<system>` |
+| `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `kubenixConfigurations.<system>.<name>`, the evaluation result, whose `config.kubernetes.result` is the JSON `kubectl apply -f` reads |
 | `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |
-| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the homes and hjem configurations declared inside them, and the profiles of the nvf and nixvim configurations declared inside them |
-| `structural` | none | a configuration that only exports and holds configurations beneath it: the top of a repository whose point is what it exports, such as caisson itself, or a layer at any depth |
+| `system-manager` | `system-manager` | the systems of machines running another Linux distribution, published as the `systemConfigs` that `system-manager switch` reads; they activate the home-manager configurations and hjem configurations declared inside them, and the profiles of the nvf and nixvim configurations declared inside them |
+| `structural` | none | a configuration that only exports and holds the configurations declared inside it: the caisson top of a repository whose point is what it exports, such as caisson itself, or a layer declared inside another configuration |
 
 Each integration finds its ecosystem in this order: the `ecosystemSrc`
 argument, then `defaultEcosystemSrc.<name>` in your `mkLib` call, then
-the entry named exactly `<name>` in the `inputs` you passed to `mkLib`.
+the entry named exactly `<name>` in the `dependencies` you passed to `mkLib`.
 caisson pins none of these ecosystems. caisson's flake inputs are
 caisson-core, nixpkgs-lib and flake-parts, used when caisson itself is
 evaluated.
 
 ## Going deeper
 
-- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-inputs.html):
-  closed inputs, module classes, library overlays, and ecosystem sources,
+- [Concepts](https://nix-caisson.github.io/docs/concepts/closed-over-dependencies.html):
+  closed-over dependencies, module classes, library overlays, and ecosystem sources,
   each explained with the reasoning behind the design.
 - [Reference](https://nix-caisson.github.io/docs/reference/lib.html):
   the `lib.caisson` API and module options.
 - [Deep dives](https://nix-caisson.github.io/docs/deep-dives/how-lib-is-composed.html):
-  how `lib` is composed and how inputs are closed over.
+  how `lib` is composed and how dependencies are closed over.
 - [`examples/literate-flake/`](examples/literate-flake/): a working,
   annotated flake demonstrating the whole structure end to end.
 

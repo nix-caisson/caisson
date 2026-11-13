@@ -1,8 +1,8 @@
 # caisson Testing
 
 If you need to modify the test infrastructure itself (e.g., adding a new test
-flake, changing how checks are wired, or debugging partition-level evaluation
-issues), see [testing-architecture.md](testing-architecture.md) for how the
+flake, changing how checks are wired, or debugging the evaluation of the
+checks configuration), see [testing-architecture.md](testing-architecture.md) for how the
 plumbing works.
 
 ## Unit Testing
@@ -24,22 +24,24 @@ plumbing works.
 
 - **Scope:** caisson composed with concrete pinned versions of the upstream
   world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem,
-  terranix, system-manager) and exercised end to end: a home
-  configuration, a NixOS system with homes declared inside it, a
-  colmena hive, disk layouts with the machines installed onto them, a
-  darwin machine evaluated for aarch64-darwin with and without a home
-  and a hjem configuration inside it, hjem configurations on
-  their own and inside a NixOS machine, a terranix and a system-manager
-  configuration, and the composition guarantees of the real exported
-  overlays. The `hjem-system` check builds the manifest file of the hjem
-  configuration inside the machine, which checks it against hjem's
-  schema, and the units that activate it, which runs shellcheck on
-  their scripts. The two darwin machines of the suite are also the one
+  terranix, system-manager) and exercised end to end: a home-manager
+  configuration, a NixOS configuration with home-manager configurations
+  declared inside it, a colmena hive, disk layouts with the NixOS
+  configurations installed onto them, a nix-darwin configuration
+  evaluated for aarch64-darwin with and without a home-manager
+  configuration and a hjem configuration inside it, hjem configurations
+  declared at the top of the flake and inside a NixOS configuration, a
+  terranix and a system-manager configuration, and the composition
+  guarantees of the real exported overlays. The `hjem-system` check
+  builds the manifest file of the hjem configuration inside the NixOS
+  configuration, which checks it against hjem's schema, and the units
+  that activate it, which runs shellcheck on their scripts. The
+  nix-darwin configurations of the suite are also the
   check for aarch64-darwin, `checks.aarch64-darwin.darwin-system`, which the
   `darwin-build` job of the check workflow builds on a macOS runner. Every upstream expectation caisson relies on is a probe here.
 - **Location:** `tests/pinned-world/default.nix`; the pins in
   `tests/dependencies/flake.lock`.
-- **Mechanism:** The checks partition forces the suite's `summary` at
+- **Mechanism:** The checks configuration forces the suite's `summary` at
   evaluation time as the `pinned-world` check, so `nix flake check` runs it
   at the committed pins and a change to caisson is judged against the last
   known good world. The `drift` workflow runs daily on `main`, advances the
@@ -53,14 +55,15 @@ plumbing works.
 
   # Against today's upstreams, the way the drift workflow does:
   nix flake update --flake ./tests/dependencies
+  nix flake update caisson-core flake-parts nixpkgs-lib
   nix build .#checks.<system>.pinned-world -L
-  git checkout -- tests/dependencies/flake.lock
+  git checkout -- tests/dependencies/flake.lock flake.lock
   ```
 
 ## Argument Errors (Trace Shape)
 
 - **Scope:** The argument error of every entry point (`mkConfiguration`,
-  its `WithEcosystemArgs` twin, `nixos.mkConfigurationFull`, the colmena
+  its `WithEcosystemArgs` variant, `nixos.mkConfigurationFull`, the colmena
   node constructors) is Nix's function-argument error, raised at the
   call site: between `error:` and the message stands the call site and
   no frame of caisson.
@@ -73,6 +76,25 @@ plumbing works.
   ```bash
   tests/argument-errors/check.sh \
     'let f = builtins.getFlake "path:'"$PWD"'"; in f.lib' --impure
+  ```
+
+## Deferred Configuration Errors (Message Text)
+
+- **Scope:** The text of the errors of deferred configurations and the
+  NixOps4 integrations. A tool tells an arg it lacks from a failure by
+  `caisson-deferred: needs <path>`, and `builtins.tryEval` in the
+  pinned-world suite sees only that the evaluation failed.
+- **Location:** `tests/deferred-errors/check.sh` and its cases in
+  `tests/deferred-errors/cases.nix`.
+- **Mechanism:** the script runs `nix eval` on each case and looks for
+  the line of text in the message that the case names. The `deferred-errors` check
+  runs it in the sandbox over the library of the `argument-errors`
+  check and the NixOps4 source.
+- **Execution against the flake's library, from a checkout:**
+  ```bash
+  tests/deferred-errors/check.sh \
+    'let f = builtins.getFlake "path:'"$PWD"'"; in f.lib' \
+    <path of the NixOps4 source> --impure
   ```
 
 ## Integration Testing (Test Flakes)

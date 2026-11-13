@@ -2,17 +2,18 @@
 #
 # The darwin integration: it owns the `darwin` class and evaluates it
 # with nix-darwin's `eval-config.nix`, over the composed library. A
-# darwin configuration is a macOS machine, evaluated per system,
-# once for each system in force where it is declared, as a NixOS configuration is, and
-# published as `darwinConfigurations.<name>`, the value `darwin-rebuild`
-# reads: the evaluated configuration with its `system` beside it.
+# nix-darwin configuration describes a macOS system, evaluated per
+# system, once for each system its parent evaluates its children for,
+# as a NixOS configuration is, and published as
+# `darwinConfigurations.<name>`, the value `darwin-rebuild` reads: the
+# evaluated configuration with its `system` beside it.
 #
-# The evaluation is the one nix-darwin's `darwinSystem` makes: the
+# caisson evaluates it as nix-darwin's `darwinSystem` does: the
 # configuration's modules with nix-darwin's module list, and the
 # settings `darwinSystem` adds to them, `nixpkgs.source` from the
 # nixpkgs the composition declares, no check of `NIX_PATH`, and the
 # revision of the nix-darwin source in the version of the system. The
-# package set is the one caisson selects for the configuration, as for
+# package set is the set caisson selects for the configuration, as for
 # a NixOS configuration, handed to nix-darwin's `nixpkgs.pkgs`.
 {
   mkLibOverlay,
@@ -35,12 +36,16 @@
     let
       context = "lib.caisson.darwin.mkConfiguration";
 
-      resolveDarwinSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveDarwinSrc = final.caisson.integrations.resolveEcosystemSrc darwinEcosystem;
+      darwinAccountOf = final.caisson.integrations.ecosystemAccountOf darwinEcosystem;
+      darwinEcosystem = {
         name = "nix-darwin";
         context = "caisson.darwin";
       };
 
-      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc nixpkgsEcosystem;
+      nixpkgsAccountOf = final.caisson.integrations.ecosystemAccountOf nixpkgsEcosystem;
+      nixpkgsEcosystem = {
         name = "nixpkgs";
         context = "caisson.darwin";
       };
@@ -57,11 +62,11 @@
         else
           throw "${context} requires `ecosystemSrc` to be a nix-darwin flake or source tree (holding eval-config.nix).";
 
-      # The evaluator's call, on the view being evaluated: eval-config
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with: eval-config
       # over the framework modules, the selection, the configuration's
       # module and the settings of `darwinSystem`, for the
-      # configuration's system. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last.
+      # configuration's system. `ecosystemArgs`, which only the pattern
+      # of the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -83,7 +88,7 @@
               "this darwin configuration for ${system}";
 
           # The package sets available to the configuration, each for the
-          # system of the evaluation, and the one it runs on.
+          # system it is evaluated for, and the set it runs on.
           pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
@@ -94,42 +99,45 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/darwin/<name>`), else none.
-          registered = lib.caisson.configs.darwin or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "darwin";
+            configModule = args.configModule or null;
+          };
 
           # What `darwinSystem` adds to the modules of a configuration,
           # with the package set caisson selects.
-          darwinSystemModule =
-            { lib, ... }:
-            {
-              _file = "caisson-darwin:darwinSystem";
-              nixpkgs.pkgs = pkgs;
-              nixpkgs.hostPlatform = lib.mkDefault system;
-              nixpkgs.source = lib.mkDefault nixpkgsSrc;
-              nixpkgs.flake.source = lib.mkDefault (nixpkgsSrc.outPath or (toString nixpkgsSrc));
-              system.checks.verifyNixPath = lib.mkDefault false;
-              system.darwinVersionSuffix = ".${src.shortRev or src.dirtyShortRev or "dirty"}";
-              system.darwinRevision =
-                let
-                  rev = src.rev or src.dirtyRev or null;
-                in
-                lib.mkIf (rev != null) rev;
-            };
+          darwinSystemModule = selection.caissonModule {
+            key = "caisson.darwin.pkgSet";
+            file = "caisson-darwin:darwinSystem";
+            module =
+              { lib, ... }:
+              {
+                _file = "caisson-darwin:darwinSystem";
+                nixpkgs.pkgs = pkgs;
+                nixpkgs.hostPlatform = lib.mkDefault system;
+                nixpkgs.source = lib.mkDefault nixpkgsSrc;
+                nixpkgs.flake.source = lib.mkDefault (nixpkgsSrc.outPath or (toString nixpkgsSrc));
+                system.checks.verifyNixPath = lib.mkDefault false;
+                system.darwinVersionSuffix = ".${src.shortRev or src.dirtyShortRev or "dirty"}";
+                system.darwinRevision =
+                  let
+                    rev = src.rev or src.dirtyRev or null;
+                  in
+                  lib.mkIf (rev != null) rev;
+              };
+          };
+
+          darwinModules =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ darwinSystemModule ];
 
           value = import "${src}/eval-config.nix" (
             {
               inherit lib;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [ darwinSystemModule ];
+              modules = darwinModules;
               # The package sets for the configuration's system, by
               # config name, and the composed library, which is what
               # the modules receive as `lib`.
@@ -143,6 +151,25 @@
         in
         {
           inherit value;
+          # Where nix-darwin came from, as `src` was resolved, and where
+          # the nixpkgs of `nixpkgs.source` came from, as `nixpkgsSrc`
+          # was resolved.
+          ecosystems = {
+            nix-darwin = darwinAccountOf {
+              explicit = args.ecosystemSrc or null;
+              manifest = libManifest;
+            };
+            nixpkgs = nixpkgsAccountOf { manifest = libManifest; };
+          };
+          # What eval-config received: the modules of the
+          # composition, then nix-darwin's module list.
+          modules = darwinModules ++ [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "nix-darwin";
+              project = "nix-darwin";
+              file = "modules/module-list.nix";
+            })
+          ];
           # What `darwin-rebuild` builds: the closure of the system.
           outputs.toplevel = value.config.system.build.toplevel;
         };
@@ -158,30 +185,47 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "darwin";
+            inherit args;
+          };
           type = "darwin";
-          # A darwin configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # A nix-darwin configuration is evaluated per system: it has an
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A darwin configuration is activated on a machine; the
+          # A nix-darwin configuration is activated on a computer; the
           # configurations with an activation declared inside it check
           # its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a nix-darwin configuration checks
+          # that its system closure builds, the closure `darwin-rebuild`
+          # builds and switches to.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system closure that `darwin-rebuild` builds for the nix-darwin configuration builds";
+              };
+            };
           evaluate = evaluate args;
         };
 
       integration = final.caisson.integrations.mkIntegration {
         name = "darwin";
         class = "darwin";
-        # A darwin configuration that is a top, as a tool reads it: the
+        # A darwin configuration that is a caisson top, as a tool reads it: the
         # evaluated configuration, or the evaluated configurations by
-        # system where several are in force, as for NixOS.
+        # system where the composition declares several systems, as for NixOS.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.darwin.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -195,8 +239,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

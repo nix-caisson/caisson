@@ -8,7 +8,7 @@
 # declares NixOS configurations, under `caisson.nixos.configurations`,
 # and it may declare none: a data array, a removable disk.
 #
-# The evaluation is caisson's own `evalModules` over that option, the
+# The evaluation is an `evalModules` call of caisson over that option, the
 # framework modules, the selection and the configuration's module. It
 # runs on the composed library, with the type library built from the
 # disko source the composition declares. Its outputs are the layout
@@ -23,7 +23,7 @@
 # NixOS module to the NixOS configurations declared inside the layout.
 # That module gives a NixOS configuration the layout's `fileSystems`,
 # `boot` and `swapDevices`, and nothing of disko itself: a NixOS
-# configuration beneath a caisson-disko configuration carries no disko
+# configuration declared inside a caisson-disko configuration carries no disko
 # module, so the scripts that format and destroy the disks are not
 # reachable from it. They are outputs of the layout alone.
 #
@@ -50,7 +50,8 @@
     final: prev:
     let
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystem = {
         name = "disko";
         context = "caisson.caisson-disko";
       };
@@ -76,6 +77,12 @@
         assertDiskoEcosystemSrc (resolveEcosystemSrc {
           inherit explicit manifest;
         });
+
+      # Where that disko source came from, from the same arguments, as
+      # a manifest records it under `ecosystems.disko`.
+      ecosystemAccountOf =
+        { explicit, manifest }:
+        final.caisson.integrations.ecosystemAccountOf ecosystem { inherit explicit manifest; };
 
       # disko's type library, from the disko source, over `lib`. The
       # types are built from `rootMountPoint`, the directory the mount
@@ -195,12 +202,12 @@
           scripts = pkgs: accepted._scripts { inherit pkgs checked; };
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the devices option and the assertions, the framework modules of
       # the class, the selection and the configuration's module, with
-      # the composition's pinned sources as the `inputs` special
-      # argument. `ecosystemArgs`, which only the twin's pattern admits,
-      # is merged over the call last.
+      # the composition's dependencies as the `inputs` special
+      # argument. `ecosystemArgs`, which only the pattern of the
+      # `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -220,37 +227,55 @@
           # configuration registered under the configuration's name
           # (`configs/caisson-disko/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.caisson-disko or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "caisson-disko";
+            configModule = args.configModule or null;
+          };
+
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.caisson-disko.devicesOptions";
+              file = "caisson-caisson-disko:devicesOptions";
+              module = devicesOptions diskoLib;
+            })
+            (selection.caissonModule {
+              key = "caisson.caisson-disko.assertionsOptions";
+              file = "caisson-caisson-disko:assertionsOptions";
+              module = assertionsOptions;
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
               class = "caisson-disko";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                (devicesOptions diskoLib)
-                assertionsOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # Where disko came from, as `src` was resolved.
+          ecosystems.disko = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
+          # What evalModules received: the devices option and the
+          # assertions, the framework module of the class, the modules
+          # selected from the registry and the configuration's module.
+          # disko's type library builds the devices option; it reads
+          # no module list of disko.
+          modules = moduleList;
           outputs = layoutOf {
             context = "lib.caisson.caisson-disko";
             inherit (evaluated.config) assertions;
@@ -261,8 +286,8 @@
         };
 
       # A disko configuration is published as
-      # `diskoConfigurations.<name>`, which disko's command reads with
-      # its own evaluator: `disko.devices`, the device tree as data.
+      # `diskoConfigurations.<name>`, which the disko command evaluates
+      # itself: `disko.devices`, the device tree as data.
       exportsTo = {
         attrset = "diskoConfigurations";
         value = manifest: { disko.devices = manifest.outputs.serializableLayout; };
@@ -271,6 +296,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "caisson-disko";
+            inherit args;
+          };
           type = "caisson-disko";
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -296,8 +325,8 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package sets available
             # to each, by package config name, and returns the set to
             # run on.
             defaultPkgs ? null,
@@ -347,6 +376,8 @@
           # `disko`, as recorded on `manifest`; refused when it is no
           # disko source.
           inherit ecosystemSrcOf;
+          # Where that disko source came from, from the same arguments.
+          inherit ecosystemAccountOf;
           # disko's type library from `{ lib, src, rootMountPoint }`.
           inherit diskoLibOf;
           # The module declaring `disko.devices`, for a type library.

@@ -12,7 +12,9 @@
 # The registries are the exception: caisson-core keeps them in the
 # manifest of the library, and `lib.caisson.modules`,
 # `lib.caisson.configs`, `lib.caisson.libOverlays` and
-# `lib.caisson.pkgOverlays` read them from there. The rest of
+# `lib.caisson.pkgOverlays` read them from there. So does
+# `lib.caisson.dependencies`, the pinned source trees the library was built
+# from, which a registered file reads through its `closure-lib`. The rest of
 # `lib.caisson-core` is what integrations and caisson itself are
 # written on.
 #
@@ -25,7 +27,7 @@
 # argument is written the same way:
 #
 #   lib = caisson.lib.caisson.mkLib {
-#     inherit (caisson.lib.caisson.pins.flake inputs) sources root;
+#     inherit (caisson.lib.caisson.pins.flake inputs) dependencies root;
 #     projects = { inherit caisson; };
 #     modules = lib: lib.caisson.mkModules ./modules;
 #     libOverlays = lib: lib.caisson.mkLibOverlays ./lib-overlays;
@@ -36,7 +38,7 @@
 let
 
   # What caisson holds itself, bound to no library: the readers of pin
-  # files, which hand `mkLib` its `sources` and `root`, the functions
+  # files, which hand `mkLib` its `dependencies` and `root`, the functions
   # that evaluate a flake from source over inputs supplied by hand,
   # which a flake uses to check consumer-style flakes, and the
   # function that realizes resolved inputs, for a tool that
@@ -77,12 +79,119 @@ let
       ecosystemSrc
       ;
     mkLib = mkLibIn lib;
+    # the pinned source trees the library was built from
+    dependencies = lib.caisson-core.libManifest.dependencies;
     # the registries
-    modules = registryIn lib "modules";
-    configs = registryIn lib "configs";
+    modules = keyedModules lib (registryIn lib "modules");
+    configs = keyedConfigs lib (registryIn lib "configs");
     libOverlays = registryIn lib "libOverlays";
     pkgOverlays = registryIn lib "pkgOverlays";
   };
+
+  # The module registry as a selection reads it: each module wrapped
+  # in two modules, one inside the other, the inner one importing the
+  # module.
+  #
+  # The outer module is keyed `modules.<class>.<name>@<project>`: the
+  # name of the entry in the registry being read and the project that
+  # registered it. A registry names an entry of a listed project
+  # `<project>/<name>`, and the registry of that project names the
+  # same entry `<name>`. The outer key tells which registry entry a
+  # module of a configuration is, as the registry it was read from
+  # names it, for the `declaration` events of the configuration and its
+  # selection record (`lib.caisson.integrations.declarationEventsOf`,
+  # `lib.caisson.integrations.selectionAccountOf`).
+  #
+  # The inner module is keyed `registered.modules.<class>.<name>@<project>`,
+  # with the name the entry has in the registry of the project that
+  # registered it. That name is the registry name with the leading
+  # `<project>/` removed, when the manifest records the entry as
+  # contributed by `<project>` (`moduleProjects`). An entry the flake
+  # registers itself keeps its registry name, whatever it holds, and
+  # its project is the name of the flake. So the inner key is the same
+  # whichever registry a configuration reads the entry from. The entries
+  # of caisson are an example: caisson registers `default`, a flake that
+  # lists caisson reads it as `caisson/default`, and an integration
+  # reads it as `default` from the library of caisson.
+  #
+  # The module system imports the modules that share a key once. An
+  # entry that a configuration selects twice, from one registry or from
+  # two, is therefore imported once. Entries of the same name that
+  # different projects register stay apart, since their projects
+  # differ.
+  keyedModules =
+    lib:
+    let
+      manifest = lib.caisson-core.libManifest or { };
+      local = manifest.name or null;
+      registeredBy = class: name: (manifest.moduleProjects or { }).${class}.${name} or null;
+      projectOf =
+        class: name:
+        let
+          registered = registeredBy class name;
+        in
+        if registered != null then
+          registered
+        else if local != null then
+          local
+        else
+          "";
+      nameInProjectOf =
+        class: name:
+        let
+          registered = registeredBy class name;
+          prefix = "${registered}/";
+          length = builtins.stringLength prefix;
+        in
+        if registered != null && builtins.substring 0 length name == prefix then
+          builtins.substring length (builtins.stringLength name - length) name
+        else
+          name;
+    in
+    builtins.mapAttrs (
+      class:
+      builtins.mapAttrs (
+        name: module:
+        let
+          project = projectOf class name;
+        in
+        {
+          key = "modules.${class}.${name}@${project}";
+          imports = [
+            {
+              key = "registered.modules.${class}.${nameInProjectOf class name}@${project}";
+              imports = [ module ];
+            }
+          ];
+        }
+      )
+    );
+
+  # The configuration registry as an integration reads it: each
+  # configuration module wrapped in a module that imports it, keyed
+  # `configs.<class>.<name>@<project>`. The configurations of a registry
+  # are those of the flake that registered them: mkLib takes no
+  # configuration from a listed project, so a registry name is the name
+  # in the registering flake, and the project is the name of the flake.
+  # The key is therefore the same in every library that holds the
+  # entry, and a single module keys it. The key names the registry entry in the
+  # `declaration` events of a configuration, whether the configuration
+  # was taken by its name or a configuration was given the entry as its
+  # `configModule`.
+  keyedConfigs =
+    lib:
+    let
+      project = (lib.caisson-core.libManifest or { }).name or "";
+    in
+    builtins.mapAttrs (
+      class:
+      builtins.mapAttrs (
+        name: module: {
+          key = "configs.${class}.${name}@${project}";
+          imports = [ module ];
+        }
+      )
+    );
 
   # A registry, read from the manifest of the library. A registry is
   # empty in a library that no mkLib built, and in a stage of the

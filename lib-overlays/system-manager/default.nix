@@ -3,8 +3,8 @@
 # The system-manager integration: it owns the `systemManager`
 # class and evaluates it with `makeSystemConfig` from the
 # system-manager flake. A system-manager configuration is the system
-# of a machine running another Linux distribution, evaluated per
-# system, once for each system in force where it is declared, and
+# of a computer running another Linux distribution, evaluated per
+# system, once for each system its parent evaluates its children for, and
 # published as
 # `systemConfigs.<name>`, the system `system-manager switch --flake`
 # reads.
@@ -53,15 +53,20 @@
     let
       context = "lib.caisson.system-manager.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "system-manager";
         context = "caisson.system-manager";
       };
 
-      # The nixpkgs the evaluation runs on: the one the composition
-      # declares, as for a NixOS configuration.
-      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc {
-        name = "nixpkgs";
+      # The source of the NixOS module collection the evaluation reads
+      # modules from: the composition's `nixos` key, as for a NixOS
+      # configuration.
+      resolveNixpkgsSrc = final.caisson.integrations.resolveEcosystemSrc nixosEcosystem;
+      nixosAccountOf = final.caisson.integrations.ecosystemAccountOf nixosEcosystem;
+      nixosEcosystem = {
+        name = "nixos";
         context = "caisson.system-manager";
       };
 
@@ -102,20 +107,18 @@
           # else surfaces as a duplicate declaration at that pin's gate.
           smIgnoredOptionsText = builtins.readFile "${src}/nix/modules/upstream/nixpkgs/default.nix";
           smDeclaresDisplayManager = final.hasInfix "displayManager" smIgnoredOptionsText;
-          displayManagerSinkModule = {
-            _file = "caisson-system-manager:nixpkgs-compat-sink";
-            imports = [
-              (
-                { lib, ... }:
-                {
-                  options.services.displayManager.hiddenUsers = lib.mkOption {
-                    type = lib.types.listOf lib.types.str;
-                    default = [ ];
-                    description = "Compatibility sink; system-manager configs have no display manager.";
-                  };
-                }
-              )
-            ];
+          displayManagerSinkModule = final.caisson.integrations.caissonModule {
+            key = "caisson.systemManager.nixpkgsCompatSink";
+            file = "caisson-system-manager:nixpkgs-compat-sink";
+            module =
+              { lib, ... }:
+              {
+                options.services.displayManager.hiddenUsers = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Compatibility sink; system-manager configs have no display manager.";
+                };
+              };
           };
 
           # (2) That module now also declares `nix.enable`/`nix.package`
@@ -123,42 +126,45 @@
           # the same options (nix/modules/upstream/nixpkgs/nix.nix, which
           # predates them landing in the NixOS module). When the NixOS
           # module owns the options, disable the stub and re-provide the
-          # config facts it carried: nix.conf must replace a foreign
+          # config facts it held: nix.conf must replace a foreign
           # distro's existing file, flakes stay on by default, and
-          # `nix.enable` keeps the stub's off-by-default (the NixOS
-          # declaration defaults it on, which would materialize nixbld
-          # users on hosts whose configs did not ask for nix management).
+          # `nix.enable` keeps the stub's off-by-default. The NixOS
+          # declaration defaults it on, which would create nixbld users
+          # for system-manager configurations that did not ask for nix management.
           nixosNixOwnsDaemonOptions = final.hasInfix "services.displayManager" nixosNixModuleText;
-          nixStubReplacementModule = {
-            _file = "caisson-system-manager:nixpkgs-compat-nix-stub";
-            disabledModules = [ "${src}/nix/modules/upstream/nixpkgs/nix.nix" ];
-            imports = [
-              (
-                { config, lib, ... }:
-                {
-                  config = lib.mkMerge [
-                    { nix.enable = lib.mkDefault false; }
-                    (lib.mkIf config.nix.enable {
-                      environment.etc."nix/nix.conf".replaceExisting = true;
-                      nix.settings.experimental-features = lib.mkDefault [
-                        "nix-command"
-                        "flakes"
-                      ];
-                    })
-                  ];
-                }
-              )
-            ];
+          nixStubReplacementModule = final.caisson.integrations.caissonModule {
+            key = "caisson.systemManager.nixpkgsCompatNixStub";
+            file = "caisson-system-manager:nixpkgs-compat-nix-stub";
+            module = {
+              disabledModules = [ "${src}/nix/modules/upstream/nixpkgs/nix.nix" ];
+              imports = [
+                (
+                  { config, lib, ... }:
+                  {
+                    config = lib.mkMerge [
+                      { nix.enable = lib.mkDefault false; }
+                      (lib.mkIf config.nix.enable {
+                        environment.etc."nix/nix.conf".replaceExisting = true;
+                        nix.settings.experimental-features = lib.mkDefault [
+                          "nix-command"
+                          "flakes"
+                        ];
+                      })
+                    ];
+                  }
+                )
+              ];
+            };
           };
         in
         final.optional (!smDeclaresDisplayManager) displayManagerSinkModule
         ++ final.optional nixosNixOwnsDaemonOptions nixStubReplacementModule;
 
-      # The evaluator's call, on the view being evaluated:
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with:
       # `makeSystemConfig` over the framework modules, the selection,
       # the configuration's module and the bridge, for the
-      # configuration's system. `ecosystemArgs`, which only the twin's
-      # pattern admits, is merged over the call last; `modules`,
+      # configuration's system. `ecosystemArgs`, which only the pattern
+      # of the `WithEcosystemArgs` variant admits, is merged over the call last; `modules`,
       # `specialArgs` and `allowUnsupportedNixpkgs` can be set or
       # replaced there. `overlays` is refused: the selected set is the
       # package set, so an overlay passed there would change nothing.
@@ -181,8 +187,8 @@
               "this system-manager configuration for ${system}";
 
           # The package sets available to the configuration, each for the
-          # system of the evaluation, and the set it runs on: the
-          # selection in force at its manifest, applied to those.
+          # system it is evaluated for, and the set it runs on: the
+          # package set selection that applies to its manifest, applied to those.
           pkgSets = selection.pkgSetsForSystem { inherit context what; } manifest system;
           pkgs = selection.pkgSetOf { inherit context what; } manifest pkgSets;
 
@@ -193,7 +199,8 @@
 
           # `makeSystemConfig` from system-manager's `nix/lib.nix`, called
           # as system-manager's flake calls it, with the composition's
-          # nixpkgs and the composed library in place of its own.
+          # nixpkgs and the composed library in place of the nixpkgs and
+          # library system-manager pins.
           systemManagerLib = import "${src}/nix/lib.nix" {
             nixpkgs = nixpkgsSrc;
             inherit lib;
@@ -212,39 +219,47 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/systemManager/<name>`), else none.
-          registered = lib.caisson.configs.systemManager or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "systemManager";
+            configModule = args.configModule or null;
+          };
 
           # The platform of the selected set, and the refusals of what
           # the selected set makes ineffective.
-          systemModule =
-            { config, lib, ... }:
-            {
-              _file = "caisson-system-manager:system";
-              nixpkgs.hostPlatform = lib.mkDefault pkgs.stdenv.hostPlatform.system;
-              assertions = [
-                {
-                  assertion = config.nixpkgs.overlays == [ ] && config.nixpkgs.config == { };
-                  message = "caisson: ${what} sets `nixpkgs.overlays` or `nixpkgs.config`, which have no effect: it runs on the package set caisson selects. Declare package configs and package overlays on `mkLib`, and select a set with `defaultPkgs`.";
-                }
-                {
-                  assertion =
-                    (
-                      if builtins.isString config.nixpkgs.hostPlatform then
-                        config.nixpkgs.hostPlatform
-                      else
-                        config.nixpkgs.hostPlatform.system or null
-                    ) == pkgs.stdenv.hostPlatform.system;
-                  message = "caisson: ${what} sets `nixpkgs.hostPlatform` to a platform other than that of the package set it runs on, ${pkgs.stdenv.hostPlatform.system}.";
-                }
-              ];
-            };
+          systemModule = selection.caissonModule {
+            key = "caisson.systemManager.pkgSet";
+            file = "caisson-system-manager:system";
+            module =
+              { config, lib, ... }:
+              {
+                _file = "caisson-system-manager:system";
+                nixpkgs.hostPlatform = lib.mkDefault pkgs.stdenv.hostPlatform.system;
+                assertions = [
+                  {
+                    assertion = config.nixpkgs.overlays == [ ] && config.nixpkgs.config == { };
+                    message = "caisson: ${what} sets `nixpkgs.overlays` or `nixpkgs.config`, which have no effect: it runs on the package set caisson selects. Declare package configs and package overlays on `mkLib`, and select a set with `defaultPkgs`.";
+                  }
+                  {
+                    assertion =
+                      (
+                        if builtins.isString config.nixpkgs.hostPlatform then
+                          config.nixpkgs.hostPlatform
+                        else
+                          config.nixpkgs.hostPlatform.system or null
+                      ) == pkgs.stdenv.hostPlatform.system;
+                    message = "caisson: ${what} sets `nixpkgs.hostPlatform` to a platform other than that of the package set it runs on, ${pkgs.stdenv.hostPlatform.system}.";
+                  }
+                ];
+              };
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ systemModule ]
+            ++ compatModulesFor { inherit src nixpkgsSrc; };
 
           value =
             if (ecosystemArgs.overlays or [ ]) != [ ] then
@@ -252,15 +267,10 @@
             else
               systemManagerLib.makeSystemConfig (
                 {
-                  modules =
-                    frameworkModules
-                    ++ moduleImports registry
-                    ++ (if configModule == null then [ ] else [ configModule ])
-                    ++ [ systemModule ]
-                    ++ compatModulesFor { inherit src nixpkgsSrc; };
+                  modules = moduleList;
                   # The module system takes a special argument before an
                   # entry of `_module.args`, so `pkgs` and `userborn`
-                  # here are the ones every module receives, and the
+                  # here are the values every module receives, and the
                   # default of the read-only `nixpkgs.pkgs`.
                   specialArgs = {
                     inherit
@@ -277,6 +287,29 @@
         in
         {
           inherit value;
+          # Where system-manager came from, as `src` was resolved, and
+          # where the NixOS module collection came from, as `nixpkgsSrc`
+          # was resolved.
+          ecosystems = {
+            system-manager = ecosystemAccountOf {
+              explicit = args.ecosystemSrc or null;
+              manifest = lib.caisson-core.libManifest or { };
+            };
+            nixos = nixosAccountOf {
+              explicit = null;
+              manifest = lib.caisson-core.libManifest or { };
+            };
+          };
+          # What `makeSystemConfig` received: system-manager's module
+          # list, then the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "system-manager";
+              project = "system-manager";
+              file = "nix/modules";
+            })
+          ]
+          ++ moduleList;
           # What `system-manager switch` activates: the system itself.
           outputs.toplevel = value;
         };
@@ -292,31 +325,47 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "systemManager";
+            inherit args;
+          };
           type = "system-manager";
           # A system-manager configuration is evaluated per system: it
-          # has an evaluation for every system in force where it is
-          # declared.
+          # has an evaluation result for each system its parent evaluates
+          # its children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
-          # A system-manager configuration is activated on a machine;
+          # A system-manager configuration is activated on a computer;
           # the configurations with an activation declared inside it
           # check its marker.
           activation = final.caisson.integrations.machineActivation;
+          # Each evaluation result of a system-manager configuration
+          # checks that the system `system-manager switch` activates
+          # builds.
+          checks =
+            { outputs, ... }:
+            {
+              toplevel = {
+                derivation = outputs.toplevel;
+                category = "build";
+                description = "the system that `system-manager switch` activates for the system-manager configuration builds";
+              };
+            };
           evaluate = evaluate args;
         };
 
       integration = final.caisson.integrations.mkIntegration {
         name = "system-manager";
         class = "systemManager";
-        # A system-manager configuration that is a top, as a tool reads
+        # A system-manager configuration that is a caisson top, as a tool reads
         # it: the system, or the systems by system where several are in
         # force.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.system-manager.configurations.<name>` finalizes it,
-        # and `mkTopConfiguration` finalizes it at a top.
+        # and `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -330,8 +379,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

@@ -3,7 +3,7 @@
 # The terranix integration: it owns the `terranix` class and
 # evaluates it with `terranixConfiguration` from the terranix flake. A
 # terranix configuration is a Terraform configuration written as
-# modules, evaluated per system, once for each system in force where it is declared,
+# modules, evaluated per system, once for each system its parent evaluates its children for,
 # on the package set selected for it.
 #
 # Its output is `json`, the `config.tf.json` file Terraform reads,
@@ -12,12 +12,13 @@
 # published as `terranixConfigurations.<name>`, the name terranix's
 # flake-parts module gives its configurations.
 #
-# terranix runs its own module system on the library of its package
-# set, so the composed library reaches the modules as the `lib`
-# argument while terranix merges and checks the options with its own.
-# terranix returns only the configuration Terraform reads and its
-# `_meta`, so caisson reads its own options through `_meta.caisson`,
-# and a terranix configuration holds no configurations beneath it.
+# terranix runs a separate module system on the library of its package
+# set, so the modules receive the composed library as the `lib`
+# argument while terranix merges and checks the options with the
+# library of that package set. terranix returns only the configuration
+# Terraform reads and its `_meta`, so caisson reads the `caisson`
+# options through `_meta.caisson`, and no configurations can be
+# declared inside a terranix configuration.
 {
   mkLibOverlay,
   ...
@@ -39,7 +40,9 @@
     let
       context = "lib.caisson.terranix.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "terranix";
         context = "caisson.terranix";
       };
@@ -51,11 +54,11 @@
         else
           throw "${context} requires `ecosystemSrc.lib.terranixConfiguration`.";
 
-      # The evaluator's call, on the view being evaluated:
+      # The evaluator's call, on the lib and manifest the configuration is evaluated with:
       # `terranixConfiguration` over the framework modules, the
       # selection and the configuration's module, on the package set
       # selected for the configuration. `ecosystemArgs`, which only the
-      # twin's pattern admits, is merged over the call last; everything
+      # pattern of the `WithEcosystemArgs` variant admits, is merged over the call last; everything
       # `terranixConfiguration` takes (`pkgs`, `modules`, `extraArgs`,
       # `strip_nulls`) can be set or replaced there.
       evaluate =
@@ -86,34 +89,37 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/terranix/<name>`), else none.
-          registered = lib.caisson.configs.terranix or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "terranix";
+            configModule = args.configModule or null;
+          };
 
           # terranix returns the configuration with the keys Terraform
           # reads alone, and `_meta`, the metadata it passes through
           # without rendering it. caisson's options reach the result
           # there.
-          metaModule =
-            { config, ... }:
-            {
-              _file = "caisson-terranix:meta";
-              _meta.caisson = config.caisson;
-            };
+          metaModule = selection.caissonModule {
+            key = "caisson.terranix.meta";
+            file = "caisson-terranix:meta";
+            module =
+              { config, ... }:
+              {
+                _file = "caisson-terranix:meta";
+                _meta.caisson = config.caisson;
+              };
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ])
+            ++ [ metaModule ];
 
           value = src.lib.terranixConfiguration (
             {
               inherit pkgs;
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ])
-                ++ [ metaModule ];
+              modules = moduleList;
               # terranix names the special arguments `extraArgs`.
               extraArgs = {
                 inherit lib pkgSets;
@@ -125,11 +131,26 @@
         in
         {
           inherit value;
+          # Where terranix came from, as `src` was resolved.
+          ecosystems.terranix = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What `terranixConfiguration` received: terranix's module
+          # list, then the modules of the composition.
+          modules = [
+            (final.caisson.integrations.ecosystemUnit {
+              key = "terranix";
+              project = "terranix";
+              file = null;
+            })
+          ]
+          ++ moduleList;
           # What Terraform reads: the `config.tf.json` file.
           outputs.json = value;
-          # caisson's options, from `_meta`. terranix keeps the options
-          # of the evaluation to itself, so a terranix configuration
-          # holds no configurations beneath it.
+          # caisson's options, from `_meta`. terranix keeps the evaluated
+          # options to itself, so no configurations can be
+          # declared inside a terranix configuration.
           config.caisson = value._meta.caisson;
           options = { };
         };
@@ -144,26 +165,43 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "terranix";
+            inherit args;
+          };
           type = "terranix";
           # A terranix configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
+          # Each evaluation result of a terranix configuration checks
+          # that its `config.tf.json` file, the file Terraform reads,
+          # builds.
+          checks =
+            { outputs, ... }:
+            {
+              json = {
+                derivation = outputs.json;
+                category = "build";
+                description = "the `config.tf.json` file of the terranix configuration, which Terraform reads, builds";
+              };
+            };
           evaluate = evaluate args;
         };
 
       integration = final.caisson.integrations.mkIntegration {
         name = "terranix";
         class = "terranix";
-        # A terranix configuration that is a top, as a tool reads it:
+        # A terranix configuration that is a caisson top, as a tool reads it:
         # the `config.tf.json` file, or the files by system where
-        # several systems are in force.
+        # the composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.terranix.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module. When absent, the configuration
@@ -177,8 +215,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

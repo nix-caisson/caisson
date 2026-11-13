@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# The colmena integration, the upstream-compatible one: it takes a hive
-# in the format colmena reads, `meta`, `defaults` and a module or list
-# of modules per node, and turns each node into a caisson NixOS
-# configuration declared beneath the colmena configuration. The native
+# The colmena integration, the upstream-compatible colmena integration:
+# it takes a hive in the format colmena reads, `meta`, `defaults` and a
+# module or list of modules per node, and turns each node into a caisson
+# NixOS configuration declared inside the colmena configuration. The native
 # integration, caisson-colmena, takes caisson's form instead.
 #
 # A node is built as colmena builds it, from colmena's deployment,
@@ -16,10 +16,12 @@
 # configuration the node also gets what caisson's NixOS evaluator gives
 # any configuration: the framework modules and the default selection.
 #
-# `nodes` is what colmena hands its nodes: every node, evaluated again
-# with type checking off, for one node to read another. A configuration
-# never reads a sibling in the tree, so these evaluations are tops of
-# their own, made only when a module reads them.
+# `nodes` is what colmena hands its nodes: every node, for one node to
+# read another. The colmena configuration sets
+# `unsafeCrossChildReferences` for its nearest NixOS configurations, so
+# each node reads the full evaluation of the colmena configuration and
+# `nodes` is the nodes themselves. A loop among nodes that read each
+# other is a Nix infinite recursion, as it is in colmena.
 #
 # The colmena configuration builds the hive from the NixOS
 # configurations it passes up, as caisson-colmena does, and is
@@ -39,7 +41,7 @@
     # composed wherever this integration is.
     ((mkLibOverlay ../integrations) // { key = "integrations"; })
     # The native colmena integration, whose `meta` options, hive and
-    # publishing this one builds on.
+    # publishing this integration builds on.
     ((mkLibOverlay ../caisson-colmena) // { key = "caisson-colmena"; })
   ];
 
@@ -142,8 +144,14 @@
           pkgs = nodePkgsOf hive name;
         in
         {
-          configModule = {
-            imports = nodeModules src hive hive.nodes.${name} ++ extraModules;
+          # Keyed as a module of the integration, so the history of the
+          # node names it.
+          configModule = final.caisson.integrations.caissonModule {
+            key = "caisson.colmena.node";
+            file = "caisson-colmena:node";
+            module = {
+              imports = nodeModules src hive hive.nodes.${name} ++ extraModules;
+            };
           };
           specialArgs = {
             inherit name nodes;
@@ -154,34 +162,46 @@
         // (if pkgs == null then { } else { defaultPkgs = _pkgSets: pkgs; });
 
       # The module of the colmena configuration: the keys of `meta` the
-      # class declares, and a NixOS configuration beneath it for each
-      # node.
+      # class declares, and a NixOS configuration declared inside it for
+      # each node.
       hiveModule =
         src: hive:
         { lib, ... }:
         let
-          # Every node again, with type checking off, for the `nodes`
-          # special argument.
-          uncheckedNodes = builtins.mapAttrs (
-            name: _:
-            lib.caisson.nixos.mkTopConfiguration (
-              nodeArgs src hive uncheckedNodes name [ { _module.check = false; } ]
-            )
-          ) hive.nodes;
+          # The nodes as the `nodes` special argument: the NixOS
+          # configurations declared inside this colmena configuration,
+          # each evaluated, from the result of the full evaluation of
+          # this configuration. A node reads that evaluation result through
+          # `unsafeCrossChildReferences`, set below, which records the
+          # read on each node; it is the configuration this module runs
+          # in, so its manifest here holds the same children.
+          full = lib.caisson-core.evalManifest;
+          nodes =
+            builtins.foldl'
+              (
+                found: system:
+                found
+                // builtins.mapAttrs (_: node: node.value) (full.children.system.${system}.children.nixos or { })
+              )
+              (builtins.mapAttrs (_: node: node.value) (full.children.nixos or { }))
+              (builtins.attrNames (full.children.system or { }));
         in
         {
           meta = builtins.removeAttrs hive.meta evaluationMetaKeys;
+          # Colmena hands every node the other nodes, so the nodes read
+          # the full evaluation of this configuration.
+          caisson.forNearestChildren.unsafeCrossChildReferences.nixos = true;
           caisson.nixos.configurations = builtins.mapAttrs (
-            name: _: lib.caisson.nixos.mkConfiguration (nodeArgs src hive uncheckedNodes name [ ])
+            name: _: lib.caisson.nixos.mkConfiguration (nodeArgs src hive nodes name [ ])
           ) hive.nodes;
         };
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the `meta` options, the framework modules of the class, the
       # selection and the module made from the hive, with the
-      # composition's pinned sources as the `inputs` special argument.
-      # `ecosystemArgs`, which only the twin's pattern admits, is merged
-      # over the call last.
+      # composition's dependencies as the `inputs` special argument.
+      # `ecosystemArgs`, which only the pattern of the `WithEcosystemArgs`
+      # variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -195,27 +215,50 @@
           registry = lib.caisson.modules.colmena or { };
           frameworkModules = selection.frameworkModules "colmena" registry;
           moduleImports = selection.moduleImportsOf "colmena" { inherit lib manifest; } args;
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.colmena.metaOptions";
+              file = "caisson-colmena:metaOptions";
+              module = native.metaOptions;
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ [
+            (selection.caissonModule {
+              key = "caisson.colmena.hive";
+              file = "caisson-colmena:hive";
+              module = hiveModule src hive;
+            })
+          ];
+
           evaluated = lib.evalModules (
             {
               class = "colmena";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                native.metaOptions
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ [ (hiveModule src hive) ];
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # Where colmena came from, as `src` was resolved.
+          ecosystems.colmena = native.ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            inherit manifest;
+          };
+          # What evalModules received: the options of the class, the
+          # framework module of the class, the modules selected from
+          # the registry and the module made from the hive. Each node is
+          # a separate NixOS configuration, and the history of the node
+          # records the modules NixOS received.
+          modules = moduleList;
           outputs.hive = native.hiveOf {
             inherit src;
             inherit (evaluated) config;
@@ -230,6 +273,10 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "colmena";
+            inherit args;
+          };
           type = "colmena";
           defaultPkgs = args.defaultPkgs or null;
           inherit (native) exportsTo;

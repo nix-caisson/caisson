@@ -1,0 +1,384 @@
+# SPDX-License-Identifier: MIT
+#
+# A NixOS module with which a NixOS configuration activates the hjem
+# configurations declared inside it.
+#
+# Activating a hjem configuration means applying its manifest with
+# hjem's CLI: `hjem internal activate` links the user's files and
+# replaces those of the previous generation, whose manifest is kept in
+# `/var/lib/hjem/manifest-<user>.json`. hjem has a NixOS module that
+# does this for the users it embeds. caisson does not use that NixOS
+# module. A hjem configuration declared inside a NixOS configuration
+# is a caisson configuration, and this module writes the units hjem's
+# NixOS module writes, under the same names. Each template unit has an
+# instance for each user:
+#
+#   - `hjem-activate@<user>` runs as the user and links the files of the
+#     new manifest, given the stored manifest of the previous one;
+#   - `hjem-reload@<user>` runs as the user after it and reloads the
+#     user's systemd units the change touched;
+#   - `hjem-update-state@<user>` stores the new manifest as the state;
+#
+# and `hjem-cleanup` removes the stored manifests of users that are no
+# longer activated. The target `hjem` requires them all, and starts at
+# boot and at each switch to a new generation of the NixOS configuration. The units
+# link with the CLI of hjem and the backup prefix of hjem's NixOS
+# module; hjem's options for another linker are not offered here.
+#
+# The module also installs each user's `packages` for that user and
+# keeps each user's `extraDependencies` in the closure of the system,
+# as hjem's NixOS module does.
+#
+# Which configurations: the hjem configurations this NixOS
+# configuration passes up, leaving out those declared inside a NixOS
+# configuration that is itself inside this configuration, and those evaluated for
+# another system. caisson's `default` NixOS module imports this module.
+# A NixOS configuration that passes `moduleImports` activates its hjem
+# configurations only if it lists it.
+#
+# The module reads the hjem configurations from the result of the full
+# evaluation of the NixOS configuration; in the childless evaluation,
+# and in a configuration without systemd options, it defines nothing.
+#
+# The same module is registered for the `systemManager` class, under
+# the same name, and a system-manager configuration activates the hjem
+# configurations declared inside it the same way, with the units
+# written for each user rather than as templates (`perUser` below). system-manager has no
+# `system.extraDependencies`, so there the module keeps no extra
+# dependencies in the system. The module reads
+# `config.caisson.exports.configurations`, which the core module
+# declares; it imports the core module of the class of the
+# configuration, read from its manifest.
+{ closure-lib, ... }:
+{
+  config,
+  lib,
+  options,
+  pkgs,
+  ...
+}:
+let
+  inherit (lib.caisson) evalManifest;
+
+  # True when this configuration declares the options the module defines.
+  hasUnits =
+    options ? systemd && options.systemd ? services && options.systemd ? targets && options ? users;
+
+  # True when the configuration keeps extra dependencies in the system.
+  hasExtraDependencies = options ? system && options.system ? extraDependencies;
+
+  # The core module of the class of this configuration: of the
+  # `systemManager` class in a system-manager configuration, else of the
+  # `nixos` class. The registered core modules of the two classes are
+  # the same file under two names, so a module imports the name its
+  # configuration already holds.
+  coreModule =
+    if (lib.caisson-core.evalManifest.type or null) == "system-manager" then
+      closure-lib.caisson.modules.systemManager.core
+    else
+      closure-lib.caisson.modules.nixos.core;
+
+  # The integrations of the NixOS, nix-darwin and system-manager
+  # configurations, which activate the hjem configurations declared
+  # inside them.
+  systemConfigurationTypes = [
+    "nixos"
+    "darwin"
+    "system-manager"
+  ];
+
+  isActivatedHere =
+    entry:
+    entry.manifest.type == "hjem"
+    && !(builtins.any (segment: builtins.elem segment.type systemConfigurationTypes) (
+      lib.lists.init entry.path
+    ))
+    && entry.manifest.system == evalManifest.system;
+
+  # What the units need of each enabled hjem configuration.
+  users =
+    builtins.map
+      (entry: {
+        inherit (entry.manifest.value.config)
+          user
+          directory
+          packages
+          extraDependencies
+          ;
+        inherit (entry.manifest.outputs) manifestFile cli;
+        # The profiles declared inside the hjem configuration, which the
+        # unit of the user activates on system-manager.
+        profiles = lib.caisson.integrations.profilesActivatedBy entry.manifest config.caisson.exports.configurations;
+      })
+      (
+        builtins.filter (entry: isActivatedHere entry && entry.manifest.value.config.enable) (
+          config.caisson.exports.configurations
+        )
+      );
+
+  # The manifests of the previous generations, which the units read and
+  # write, and the manifests of this generation, one file per user.
+  oldManifests = "/var/lib/hjem";
+  newManifests = pkgs.linkFarm "hjem-manifests" (
+    builtins.map (user: {
+      name = "manifest-${user.user}.json";
+      path = user.manifestFile;
+    }) users
+  );
+  homeDirectories = builtins.map (user: user.directory) users;
+
+  # The prefix hjem's CLI gives the backup of a file it replaces, the
+  # default of hjem's NixOS module.
+  prefix = ".backup-";
+
+  # The start of each template unit: it stops for a user no hjem
+  # configuration here names, and sets `hjem` to the CLI of the
+  # configuration of the user. Each hjem configuration builds the CLI
+  # from the hjem source it is evaluated with.
+  selectUser = ''
+    case "$1" in
+      ${lib.concatMapStrings (user: ''
+        ${lib.escapeShellArg user.user}) hjem=${lib.getExe user.cli} ;;
+      '') users}
+      *) echo "User '$1' is not configured for hjem" >&2; exit 0 ;;
+    esac
+  '';
+
+  # The steps of applying the files of a user, each a script that takes
+  # the user: linking the files of the new manifest, given the stored
+  # manifest of the previous generation, as the user; reloading the
+  # systemd units of the user the change touched, as the user; and
+  # storing the new manifest as the state, as root.
+  activateStep = pkgs.writeShellScript "hjem-activate-step" ''
+    set -euo pipefail
+    ${selectUser}
+    "$hjem" internal activate \
+      --manifest "${newManifests}/manifest-$1.json" \
+      --state "${oldManifests}/manifest-$1.json" \
+      --skip-state-update \
+      --prefix "${prefix}" \
+      --json
+  '';
+
+  reloadStep = pkgs.writeShellScript "hjem-reload-step" ''
+    set -euo pipefail
+    export PATH=${
+      lib.makeBinPath [
+        config.systemd.package
+        pkgs.coreutils-full
+      ]
+    }:$PATH
+    ${selectUser}
+    XDG_RUNTIME_DIR=$(loginctl show-user "$1" --property=RuntimePath --value 2>/dev/null || true)
+    if [ -z "$XDG_RUNTIME_DIR" ]; then
+      echo "Could not determine XDG runtime directory for $1. Skipping."
+      exit 0
+    fi
+    export XDG_RUNTIME_DIR
+
+    systemd_status=$(systemctl --user is-system-running 2>&1 || true)
+    if [ "$systemd_status" != "running" ] && [ "$systemd_status" != "degraded" ]; then
+      echo "User systemd for $1 is not running (status: $systemd_status). Skipping."
+      exit 0
+    fi
+
+    "$hjem" internal reload-actions \
+      --old-manifest "${oldManifests}/manifest-$1.json" \
+      --new-manifest "${newManifests}/manifest-$1.json" \
+      --user "$1" \
+      --require-running-systemd
+  '';
+
+  updateStateStep = pkgs.writeShellScript "hjem-update-state-step" ''
+    set -euo pipefail
+    ${selectUser}
+    "$hjem" internal update-state \
+      --manifest "${newManifests}/manifest-$1.json" \
+      --state "${oldManifests}/manifest-$1.json"
+  '';
+
+  # On NixOS the steps are the template units of hjem, `hjem-activate@`,
+  # `hjem-reload@` and `hjem-update-state@`, with an instance for each
+  # user, which `hjem.target` requires and starts in order. A switch
+  # stops and starts `hjem.target` (`X-StopOnReconfiguration`), which
+  # runs the instances again.
+  #
+  # system-manager does neither: it reloads a changed unit by its name,
+  # which fails for a template, it restarts each changed unit apart, so
+  # the order between the instances does not hold, and it does not stop
+  # `hjem.target` but restarts it when what it wants changes, which
+  # stops what is part of it. So on system-manager the module writes a
+  # single unit for each user, `hjem-activate@<user>`, which runs the
+  # steps in order and then activates the profiles declared inside the
+  # hjem configuration, as the user. Its script names the manifests and
+  # the profiles of this generation, so the unit changes when either
+  # changes, and system-manager restarts it. It runs a step as the user
+  # with `setpriv --reset-env`, which sets the environment of the user
+  # from the account and, unlike `runuser`, goes through no PAM
+  # configuration, which each distribution writes differently.
+  onSystemManager = (lib.caisson-core.evalManifest.type or null) == "system-manager";
+
+  # The units `hjem.target` requires for a user.
+  unitsOf =
+    user:
+    if onSystemManager then
+      [ "hjem-activate@${user.user}.service" ]
+    else
+      [
+        "hjem-activate@${user.user}.service"
+        "hjem-reload@${user.user}.service"
+        "hjem-update-state@${user.user}.service"
+      ];
+
+  # The users that more than one hjem configuration names, which would
+  # both write the files of that user.
+  names = builtins.map (user: user.user) users;
+  repeated = lib.lists.unique (
+    builtins.filter (name: lib.lists.count (other: other == name) names > 1) names
+  );
+in
+{
+  # The core module of the class of this configuration, which declares
+  # `config.caisson.exports.configurations`.
+  imports = [ coreModule ];
+
+  # `optionalAttrs` and not `mkIf` decides whether the options are
+  # defined at all: NixOS refuses a definition, even under `mkIf false`,
+  # of an option that no module declares.
+  config = lib.optionalAttrs hasUnits (
+    lib.mkIf (!evalManifest.childless && users != [ ]) {
+      assertions = [
+        {
+          assertion = repeated == [ ];
+          message = "caisson: this ${
+            if onSystemManager then "system-manager" else "NixOS"
+          } configuration activates more than one hjem configuration for ${lib.concatStringsSep ", " repeated}.";
+        }
+      ];
+
+      users.users = builtins.listToAttrs (
+        builtins.map (user: {
+          name = user.user;
+          value.packages = user.packages;
+        }) users
+      );
+
+      system = lib.optionalAttrs hasExtraDependencies {
+        extraDependencies = builtins.concatMap (user: user.extraDependencies) users;
+      };
+
+      # On system-manager the units of the users depend on nothing that
+      # system-manager could start or stop apart from them: no target and
+      # no unit that prepares the directory of the state.
+      systemd.targets = lib.optionalAttrs (!onSystemManager) {
+        hjem = {
+          description = "hjem file management";
+          unitConfig.X-StopOnReconfiguration = true;
+          after = [ "local-fs.target" ];
+          wantedBy = [
+            "sysinit-reactivation.target"
+            "multi-user.target"
+          ];
+          before = [ "sysinit-reactivation.target" ];
+          requires = builtins.concatMap unitsOf users ++ [ "hjem-cleanup.service" ];
+        };
+      };
+
+      systemd.services =
+        lib.optionalAttrs (!onSystemManager) {
+          hjem-prepare = {
+            description = "Prepare Hjem manifests directory";
+            enableStrictShellChecks = true;
+            script = "mkdir -p ${oldManifests}";
+            serviceConfig.Type = "oneshot";
+            unitConfig.RefuseManualStart = true;
+          };
+        }
+        // (
+          if onSystemManager then
+            builtins.listToAttrs (
+              builtins.map (user: {
+                name = "hjem-activate@${user.user}";
+                value = {
+                  description = "Apply the files of %i from their manifest";
+                  enableStrictShellChecks = true;
+                  unitConfig.RequiresMountsFor = homeDirectories;
+                  serviceConfig.Type = "oneshot";
+                  wantedBy = [ "multi-user.target" ];
+                  scriptArgs = "%i";
+                  script =
+                    let
+                      asUser = ''${pkgs.util-linux}/bin/setpriv --reuid "$1" --regid "$(${pkgs.coreutils}/bin/id -g "$1")" --init-groups --reset-env --'';
+                    in
+                    ''
+                      mkdir -p ${oldManifests}
+                      ${asUser} ${activateStep} "$1"
+                      ${asUser} ${reloadStep} "$1"
+                      ${updateStateStep} "$1"
+                    ''
+                    + lib.concatMapStrings (entry: ''
+                      ${asUser} ${entry.manifest.outputs.activationPackage}/activate
+                    '') user.profiles;
+                };
+              }) users
+            )
+          else
+            {
+              "hjem-activate@" = {
+                description = "Link files for %i from their manifest";
+                enableStrictShellChecks = true;
+                unitConfig.RequiresMountsFor = homeDirectories;
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
+                requires = [ "hjem-prepare.service" ];
+                after = [ "hjem-prepare.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${activateStep} "$1"'';
+              };
+
+              "hjem-reload@" = {
+                description = "Reload systemd user units for %i after Hjem file activation";
+                enableStrictShellChecks = true;
+                serviceConfig = {
+                  User = "%i";
+                  Type = "oneshot";
+                };
+                unitConfig.RequiresMountsFor = homeDirectories;
+                requires = [ "hjem-activate@%i.service" ];
+                after = [ "hjem-activate@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${reloadStep} "$1"'';
+              };
+
+              "hjem-update-state@" = {
+                description = "Update Hjem state manifest for %i";
+                enableStrictShellChecks = true;
+                serviceConfig.Type = "oneshot";
+                requires = [ "hjem-reload@%i.service" ];
+                unitConfig.RequiresMountsFor = homeDirectories;
+                after = [ "hjem-reload@%i.service" ];
+                scriptArgs = "%i";
+                script = ''exec ${updateStateStep} "$1"'';
+              };
+            }
+        )
+        // {
+          hjem-cleanup = {
+            description = "Cleanup disabled users' manifests";
+            enableStrictShellChecks = true;
+            serviceConfig.Type = "oneshot";
+            after = if onSystemManager then builtins.concatMap unitsOf users else [ "hjem.target" ];
+            wantedBy = lib.optionals onSystemManager [ "multi-user.target" ];
+            unitConfig.RefuseManualStart = false;
+            script = ''
+              ${lib.getExe (builtins.head users).cli} internal cleanup-state \
+                --state-dir ${oldManifests} \
+                ${lib.concatMapStringsSep " " (user: "--enabled-user ${lib.escapeShellArg user.user}") users}
+            '';
+          };
+        };
+    }
+  );
+}

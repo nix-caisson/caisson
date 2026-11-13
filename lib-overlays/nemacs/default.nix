@@ -3,8 +3,8 @@
 # The nemacs integration: it owns the `nemacs` class, the class of the
 # modules of nemacs. A nemacs configuration is an Emacs, written as
 # nemacs modules (`bundles`, `init`, `packages`, `overrides`),
-# evaluated per system, once for each system in force where it is
-# declared, on the package set selected for it.
+# evaluated per system, once for each system its parent evaluates its
+# children for, on the package set selected for it.
 #
 # The integration needs no ecosystem source. The core module of nemacs
 # is the module named `core` that the flake of nemacs registers for the
@@ -18,14 +18,16 @@
 # `config` and `options`, where `activationPackage` holds the `activate`
 # of the profile described next.
 #
-# A nemacs configuration is kept in a Nix profile of its own, the way a
-# home keeps its generations (`lib.caisson.integrations.profileOf`):
-# its output `activationPackage` holds `activate`, which points the
-# profile at the editor, and `profile` says where the profile is. A
-# machine, a home or a hjem configuration activates the nemacs
-# configurations declared inside it each time it is activated itself,
-# with the module `profile-activation` of its class, and `activate`
-# switches the editor alone.
+# A nemacs configuration is kept in a separate Nix profile, the way a
+# home-manager configuration keeps its generations
+# (`lib.caisson.integrations.profileOf`): its output
+# `activationPackage` holds `activate`, which points the profile at the
+# editor, and `profile` says where the profile is. A NixOS, nix-darwin
+# or system-manager configuration, a home-manager configuration or a
+# hjem configuration activates the nemacs configurations declared
+# inside it each time it is activated itself, with the module
+# `profile-activation` of its class, and `activate` switches the
+# editor alone.
 {
   mkLibOverlay,
   ...
@@ -71,14 +73,28 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/nemacs/<name>`), else none.
-          registered = lib.caisson.configs.nemacs or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "nemacs";
+            configModule = args.configModule or null;
+          };
+
+          # The modules of the composition: the module that supplies
+          # `pkgs`, the framework module of the class, the modules
+          # selected from the registry, which include the core module of
+          # nemacs, and the configuration's module.
+          moduleList = [
+            (selection.caissonModule {
+              key = "caisson.nemacs.pkgs";
+              file = "caisson-nemacs:pkgs";
+              module = {
+                _module.args.pkgs = pkgs;
+              };
+            })
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           value = lib.evalModules (
             {
@@ -87,15 +103,7 @@
                 inherit lib pkgSets;
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                {
-                  key = "caisson.nemacs.pkgs";
-                  _module.args.pkgs = pkgs;
-                }
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
@@ -115,6 +123,8 @@
         in
         {
           inherit value;
+          # What evalModules received, in that order.
+          modules = moduleList;
           outputs = {
             inherit package;
             inherit (kept) activationPackage profile;
@@ -135,9 +145,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "nemacs";
+            inherit args;
+          };
           type = "nemacs";
           # A nemacs configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;

@@ -2,24 +2,25 @@
 #
 # The topology integration: it owns the `topology` class, the class of
 # nix-topology's modules. A topology configuration is the diagram of a
-# network of machines: the NixOS configurations declared inside it,
+# network of computers: the NixOS configurations declared inside it,
 # whose `topology` options nix-topology reads, and the modules of the
-# class, which add nodes and networks of their own. It is evaluated per
-# system, for every system in force where it is declared, on the package set
+# class, which add further nodes and networks. It is evaluated per
+# system, for each system its parent evaluates its children for, on the package set
 # selected for it.
 #
 # nix-topology evaluates its modules with `evalModules` over its
 # `topology` directory, given the NixOS configurations to read as the
-# option `nixosConfigurations`. caisson makes that evaluation on the
+# option `nixosConfigurations`. caisson runs that evaluation on the
 # composed library, on the selected package set extended with the
 # package overlay of nix-topology, and sets `nixosConfigurations` to
 # the NixOS configurations declared inside the topology configuration,
 # evaluated for its system. Those NixOS configurations get the NixOS
-# module of nix-topology by default, through `caisson.forChildren`.
+# module of nix-topology by default, through
+# `caisson.forNearestChildren`.
 #
 # The output is `output`, the rendered diagram. The configuration
 # declared under the name `default` is published as `topology.<system>`,
-# the evaluation, where nix-topology's flake module publishes it, so
+# the evaluation result, where nix-topology's flake module publishes it, so
 # `nix build .#topology.<system>.config.output` builds the diagram.
 {
   mkLibOverlay,
@@ -42,7 +43,9 @@
     let
       context = "lib.caisson.topology.mkConfiguration";
 
-      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc {
+      resolveEcosystemSrc = final.caisson.integrations.resolveEcosystemSrc ecosystem;
+      ecosystemAccountOf = final.caisson.integrations.ecosystemAccountOf ecosystem;
+      ecosystem = {
         name = "nix-topology";
         context = "caisson.topology";
       };
@@ -95,34 +98,50 @@
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
           # (`configs/topology/<name>`), else none.
-          registered = lib.caisson.configs.topology or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "topology";
+            configModule = args.configModule or null;
+          };
 
           # The NixOS configurations declared inside, for this system, as
           # the configurations nix-topology reads. They are read in the
           # full evaluation; the childless evaluation reads none.
-          machinesModule =
-            { config, lib, ... }:
-            {
-              _file = "caisson-topology:machines";
-              nixosConfigurations =
-                if lib.caisson-core.evalManifest.childless then
-                  { }
-                else
-                  builtins.mapAttrs (_: evaluations: evaluations.${system}.value) (
-                    lib.filterAttrs (_: evaluations: evaluations ? ${system}) config.caisson.nixos.configurations
-                  );
-              # The NixOS configurations declared inside get the NixOS
-              # module of nix-topology, which declares the options
-              # nix-topology reads.
-              caisson.forChildren.extraDefaultModuleImports.nixos = _lib: [ "${src}/nixos/module.nix" ];
-            };
+          nixosConfigurationsModule = selection.caissonModule {
+            key = "caisson.topology.nixosConfigurations";
+            file = "caisson-topology:nixosConfigurations";
+            module =
+              { config, lib, ... }:
+              {
+                _file = "caisson-topology:nixosConfigurations";
+                nixosConfigurations =
+                  if lib.caisson-core.evalManifest.childless then
+                    { }
+                  else
+                    builtins.mapAttrs (_: results: results.${system}.value) (
+                      lib.filterAttrs (_: results: results ? ${system}) config.caisson.nixos.configurations
+                    );
+                # The NixOS configurations declared inside get the NixOS
+                # module of nix-topology, which declares the options
+                # nix-topology reads. A NixOS configuration declared
+                # inside one of them is not read and does not get it.
+                caisson.forNearestChildren.extraDefaultModuleImports.nixos = _lib: [
+                  (selection.caissonModule {
+                    key = "caisson.topology.nixosModule";
+                    file = "caisson-topology:nixosModule";
+                    module = "${src}/nixos/module.nix";
+                  })
+                ];
+              };
+          };
+
+          moduleList = [
+            "${src}/topology"
+            nixosConfigurationsModule
+          ]
+          ++ frameworkModules
+          ++ moduleImports registry
+          ++ (if configModule == null then [ ] else [ configModule ]);
 
           value = lib.evalModules (
             {
@@ -133,24 +152,33 @@
                 modulesPath = toString "${src}/topology";
               }
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules = [
-                "${src}/topology"
-                machinesModule
-              ]
-              ++ frameworkModules
-              ++ moduleImports registry
-              ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           inherit value;
+          # Where nix-topology came from, as `src` was resolved.
+          ecosystems.nix-topology = ecosystemAccountOf {
+            explicit = args.ecosystemSrc or null;
+            manifest = lib.caisson-core.libManifest or { };
+          };
+          # What evalModules received: the topology module tree of
+          # nix-topology, recorded as a module of the nix-topology
+          # source, the module that hands it the NixOS configurations
+          # declared inside, the framework module of the class, the
+          # modules selected from the registry and the configuration's
+          # module.
+          modules = final.caisson.integrations.inEcosystem {
+            name = "nix-topology";
+            inherit src;
+          } moduleList;
           outputs.output = value.config.output;
         };
 
-      # The configuration named `default` is published as
-      # `topology.<system>`, the evaluation.
+      # The configuration named `topology`, for the output it fills, is
+      # published as `topology.<system>`, the evaluation result.
       exportsTo = {
         attrset = "topology";
         single = true;
@@ -161,9 +189,14 @@
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "topology";
+            inherit args;
+          };
           type = "topology";
           # A topology configuration is evaluated per system: it has an
-          # evaluation for every system in force where it is declared.
+          # evaluation result for each system its parent evaluates its
+          # children for.
           perSystem = true;
           defaultPkgs = args.defaultPkgs or null;
           inherit exportsTo;
@@ -173,14 +206,14 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "topology";
         class = "topology";
-        # A topology configuration that is a top, as a tool reads it:
-        # the evaluation, or the evaluations by system where several
-        # are in force.
+        # A topology configuration that is a caisson top, as a tool reads it:
+        # the evaluation result, or the evaluation results by system where the
+        # composition declares several systems.
         top = final.caisson.integrations.topValue;
         # What these return is a configuration, a function of
         # `{ name, parent }`: a parent that declares it under
         # `caisson.topology.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top.
+        # `mkTopConfiguration` finalizes it at a caisson top.
         mkConfiguration =
           {
             # The configuration's module: the nodes and networks of the
@@ -197,8 +230,8 @@
             ecosystemSrc ? null,
             # The package set the configuration runs on: a function
             # that receives the package sets available where it is
-            # declared, by package config name, each for the system of
-            # the evaluation, and returns the set to run on. When
+            # declared, by package config name, each for the system the
+            # configuration is evaluated for, and returns the set to run on. When
             # absent, the selection of the nearest configuration above,
             # and the set named `default` where none above selects.
             defaultPkgs ? null,

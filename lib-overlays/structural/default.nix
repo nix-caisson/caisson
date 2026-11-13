@@ -4,12 +4,12 @@
 # no ecosystem. Its class, `structural`, is defined by caisson itself,
 # since no ecosystem owns a plain tree of configurations, and it
 # carries nothing but caisson's core module: the manifest, the
-# configurations declared beneath, the registry selectors and
+# configurations declared inside it, the registry selectors and
 # `caisson.exports`. Its evaluator is the module system of the composed
-# library, `evalModules`. A structural configuration is the top of a
+# library, `evalModules`. A structural configuration is the caisson top of a
 # repository whose point is what it exports, and `default.nix` returns
-# what `mkTopConfiguration` returns from it; it is also a layer at any
-# depth, declared beneath another configuration under
+# what `mkTopConfiguration` returns from it. It can also be a layer
+# declared inside another configuration under
 # `caisson.structural.configurations`.
 {
   mkLibOverlay,
@@ -32,11 +32,11 @@
     final: prev:
     let
 
-      # The evaluator's call, on the lib of the view being evaluated:
+      # The evaluator's call, on the lib the configuration is evaluated with:
       # the framework modules of the class, the selection and the
-      # configuration's module, with the composition's pinned sources
+      # configuration's module, with the composition's dependencies
       # as the `inputs` special argument. `ecosystemArgs`, which only
-      # the twin's pattern admits, is merged over the call last.
+      # the pattern of the `WithEcosystemArgs` variant admits, is merged over the call last.
       evaluate =
         args:
         { lib, manifest }:
@@ -53,39 +53,53 @@
           # configuration registered under the configuration's name
           # (`configs/structural/<name>`), else none.
           name = manifest.name or null;
-          registered = lib.caisson.configs.structural or { };
-          configModule =
-            if (args.configModule or null) != null then
-              args.configModule
-            else if name != null then
-              registered.${name} or null
-            else
-              null;
+          configModule = selection.configModuleOf {
+            inherit lib name;
+            class = "structural";
+            configModule = args.configModule or null;
+          };
+
+          moduleList =
+            frameworkModules
+            ++ moduleImports registry
+            ++ (if configModule == null then [ ] else [ configModule ]);
 
           evaluated = lib.evalModules (
             {
               class = "structural";
               specialArgs = {
                 inherit lib;
-                inputs = manifest.sources;
+                inputs = manifest.dependencies;
               }
               // (if (args.pkgSets or null) != null then { inherit (args) pkgSets; } else { })
               // (if (args.specialArgs or null) != null then args.specialArgs else { });
-              modules =
-                frameworkModules
-                ++ moduleImports registry
-                ++ (if configModule == null then [ ] else [ configModule ]);
+              modules = moduleList;
             }
             // (if (args.ecosystemArgs or null) != null then args.ecosystemArgs else { })
           );
         in
         {
           value = evaluated;
+          # What evalModules received: the framework module of the
+          # class, the modules selected from the registry and the
+          # configuration's module.
+          modules = moduleList;
+          # The checks the configuration declares under `perSystem`, for
+          # each system its children are evaluated for, as the core
+          # module of the class reads them
+          # (modules/structural/core/perSystem.nix).
+          checkDeclarations = builtins.mapAttrs (
+            _: evaluation: evaluation.caisson.checkDeclarations
+          ) evaluated.config.allSystems;
         };
 
       configuration =
         args:
         final.caisson.integrations.mkModuleConfiguration {
+          selection = {
+            class = "structural";
+            inherit args;
+          };
           type = "structural";
           defaultPkgs = args.defaultPkgs or null;
           evaluate = evaluate args;
@@ -94,27 +108,40 @@
       integration = final.caisson.integrations.mkIntegration {
         name = "structural";
         class = "structural";
-        # What a tool reads from a top: the registries it exports and the
-        # configurations declared beneath it, each published under the
-        # output attribute set its integration declares and named from
-        # its path (`nixosConfigurations.<name>`), with the manifest
-        # beside them for `manifestOf` and `topside --file`. A top has no
-        # parent to declare it under an attribute, so its name is the name
-        # the composition declares on mkLib.
+        # What a tool reads from a caisson top: the registries it
+        # exports, the checks it gathers as `caisson.exportedChecks`
+        # selects them (`checks.<system>.<name>`, which
+        # `nix-build -A checks` builds), and the configurations declared
+        # inside it, each published under the output attribute set its
+        # integration declares and named from its path
+        # (`nixosConfigurations.<name>`), with the manifest beside them
+        # for `manifestOf` and `topside --file`, carrying the export
+        # record of what the caisson top publishes and the check record
+        # of the checks it gathers. A caisson top has no parent to
+        # declare it under an attribute, so its name is the name the
+        # composition declares on mkLib.
         top =
           manifest:
           let
             exports = manifest.outputs.exports;
+            published = final.caisson.integrations.publish exports.configurations;
           in
           builtins.removeAttrs exports [ "configurations" ]
-          // final.caisson.integrations.publish exports.configurations
+          // published
           // {
-            caisson.manifest = manifest;
+            checks = final.caisson.integrations.checksOutputOf {
+              gathered = exports.checks;
+              published = published.checks or { };
+            };
+            caisson.manifest = manifest // {
+              exportRecord = final.caisson.integrations.recordOf exports.configurations;
+              checkRecord = final.caisson.integrations.checkRecordOf manifest;
+            };
           };
         # What these return is a configuration, a function of
         # `{ name, parent }`: the parent that declares it under
         # `caisson.structural.configurations.<name>` finalizes it, and
-        # `mkTopConfiguration` finalizes it at a top. The integration
+        # `mkTopConfiguration` finalizes it at a caisson top. The integration
         # wraps no ecosystem, so there is no `ecosystemSrc` here.
         mkConfiguration =
           {
@@ -127,11 +154,11 @@
             # The package sets, handed to the modules as the `pkgSets`
             # special argument.
             pkgSets ? null,
-            # The package set the configurations beneath this one run
-            # on: a function that receives the package sets available
-            # to each, by package config name, and returns the set to
-            # run on. It holds for every configuration beneath that
-            # selects none.
+            # The package set the configurations declared inside this
+            # configuration run on: a function that receives the package
+            # sets available to each, by package config name, and returns
+            # the set to run on. A configuration declared inside runs on
+            # it unless it or a configuration between them selects another.
             defaultPkgs ? null,
             # The selection over the structural class of the registry.
             # It replaces the default of the class, which is every

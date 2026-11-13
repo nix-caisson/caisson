@@ -1,0 +1,147 @@
+# SPDX-License-Identifier: MIT
+#
+# A NixOS module for a host that runs microvm.nix guests declared
+# inside it. A host selects it by name, as `microvm-host`, or as
+# `caisson/microvm-host` in a flake that lists caisson in `projects`.
+#
+# It imports microvm.nix's host module and defines
+# `microvm.vms.<guest>` for every guest that belongs to the host. The
+# guests are the NixOS configurations declared inside the host's
+# caisson-microvm configurations and the host's microvm
+# configurations. A guest belongs to the host when no other NixOS
+# configuration or microvm configuration sits between the two
+# (`lib.caisson.integrations.belongsHere`), so a guest declared inside
+# a guest belongs to that guest. Each guest is read from the
+# configurations the host passes up, so the host's
+# `caisson.<integration>.exported` selectors decide which guests it
+# runs. A guest is named in `microvm.vms` after the name it is
+# declared under.
+#
+# For each guest, `evaluatedConfig` is caisson's evaluation of the
+# guest, the configuration published as `nixosConfigurations.<guest>`.
+# A guest of a caisson-microvm configuration gets `autostart` and
+# `restartIfChanged` from that configuration. A microvm configuration
+# keeps the default `autostart` of microvm.nix and gets
+# `restartIfChanged` true. These are at `mkDefault` priority, so a host
+# module that sets them replaces them. The host refuses microvm.nix's
+# `config` and `flake` forms for these names, since each evaluates the
+# guest a second way. microvm.nix's host module turns `microvm.vms`
+# into the units `microvm@<guest>.service` and the working directories
+# of the guests under `microvm.stateDir`.
+#
+# The module reads the guests in the full evaluation of the host. The
+# guests read the result of the childless evaluation of the host, and
+# there the host has no guests.
+{ ... }:
+{
+  config,
+  lib,
+  ...
+}:
+let
+  manifest = lib.caisson-core.evalManifest;
+  integrations = lib.caisson.integrations;
+
+  src =
+    let
+      found = lib.caisson-core.ecosystemSrc "microvm";
+    in
+    if found == null then
+      throw ''
+        caisson's `microvm-host` NixOS module needs the microvm.nix source.
+        Declare `defaultEcosystemSrc.microvm` in the mkLib call, or pin a
+        source named `microvm` in the `dependencies` passed to mkLib.
+      ''
+    else
+      lib.caisson.caisson-microvm.assertMicrovmEcosystemSrc "caisson's `microvm-host` NixOS module" found;
+
+  # Whether a configuration passed up through the host is a guest of
+  # the host, evaluated for the system of the host.
+  isGuest =
+    entry:
+    let
+      type = entry.manifest.type or null;
+    in
+    entry.attrset == "nixosConfigurations"
+    && (entry.system or null) == (manifest.system or null)
+    && integrations.belongsHere "nixos" entry
+    && integrations.belongsHere "microvm" entry
+    && (
+      type == "microvm"
+      || (
+        type == "nixos" && builtins.any (segment: segment.type == "caisson-microvm") (lib.init entry.path)
+      )
+    );
+
+  # How the host starts a guest.
+  startOf =
+    entry:
+    if entry.manifest.type == "microvm" then
+      {
+        autostart = null;
+        restartIfChanged = true;
+      }
+    else
+      entry.manifest.nearest.caisson-microvm.outputs.start;
+
+  entries =
+    if manifest == null || manifest.childless then
+      [ ]
+    else
+      builtins.filter isGuest config.caisson.exports.configurations;
+
+  nameOf = entry: (lib.last entry.namePath).name;
+
+  names = builtins.map nameOf entries;
+
+  repeated = builtins.filter (
+    name: builtins.length (builtins.filter (other: other == name) names) > 1
+  ) (lib.unique names);
+
+  # The guests of the host, by name.
+  guests =
+    if repeated != [ ] then
+      throw ''
+        caisson's `microvm-host` NixOS module names each guest after the name it is
+        declared under, and several guests of this host are declared as
+        ${lib.concatMapStringsSep ", " (name: "`${name}`") repeated}.
+      ''
+    else
+      builtins.listToAttrs (
+        builtins.map (entry: {
+          name = nameOf entry;
+          value = {
+            inherit (entry.manifest) value;
+            start = startOf entry;
+          };
+        }) entries
+      );
+in
+{
+  _file = "caisson:microvm-host";
+
+  imports = [ "${src}/nixos-modules/host" ];
+
+  config = {
+    microvm.vms = builtins.mapAttrs (
+      _name: guest:
+      {
+        evaluatedConfig = guest.value;
+        restartIfChanged = lib.mkDefault guest.start.restartIfChanged;
+      }
+      // (
+        if guest.start.autostart == null then { } else { autostart = lib.mkDefault guest.start.autostart; }
+      )
+    ) guests;
+
+    assertions = builtins.map (name: {
+      assertion = config.microvm.vms.${name}.config == null && config.microvm.vms.${name}.flake == null;
+      message = ''
+        The guest `${name}` of this host is a configuration declared inside it, and
+        caisson's `microvm-host` NixOS module gives microvm.nix its evaluation result as
+        `microvm.vms.${name}.evaluatedConfig`. Leave `microvm.vms.${name}.config`
+        and `microvm.vms.${name}.flake` unset.
+      '';
+    }) (builtins.attrNames guests);
+  };
+}

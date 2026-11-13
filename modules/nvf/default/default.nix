@@ -1,26 +1,10 @@
 # SPDX-License-Identifier: MIT
 #
-# The `default` module caisson registers for the `nvf` class, and, for
-# the same file, for the `nixvim` and `nemacs` classes. A configuration
-# of any of the three classes imports every registered module named
-# `default` unless it passes `moduleImports`.
-#
-# It declares `caisson.drift.warn`. The configuration is kept in a Nix
-# profile of its own, and its `activate` checks for drift against the
-# configuration it is declared inside, as a home does
-# (`lib.caisson.integrations.profileOf`). The option turns the warning
-# off.
+# The `default` module of the `nvf` class, imported by every
+# configuration of the class unless it passes `moduleImports`: the
+# `generic` registry entry `drift-warning`, reached through the closure.
+{ closure-lib, ... }:
 { ... }:
-{ lib, ... }:
 {
-  options.caisson.drift.warn = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-    description = ''
-      Whether `activate` of this configuration prints a warning when the
-      configuration was built for a version of the configuration it is
-      declared inside, such as a home or a machine, that differs from
-      the version that is applied.
-    '';
-  };
+  imports = [ closure-lib.caisson.modules.generic.drift-warning ];
 }

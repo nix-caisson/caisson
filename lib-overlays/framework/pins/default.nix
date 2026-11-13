@@ -1,25 +1,25 @@
 # SPDX-License-Identifier: MIT
 #
 # The pin readers: a function per pin system that reads its files into
-# `sources`, the pinned source trees a project is built from, each carrying the
-# identity its pin files record. Everything caisson does with a source
+# `dependencies`, the pinned source trees a project is built from, each carrying the
+# identity its pin files record. Everything caisson does with a dependency
 # is the same under every pin system; a reader is the whole of what a
 # pin system contributes.
 #
 #   pins.flake inputs            the inputs Nix's flake evaluator resolved
 #                                for the flake being evaluated (the
 #                                `inputs` its `outputs` receives), with
-#                                any `--override-input` in force; returns
-#                                { sources; root; }, `root` from `self`
+#                                any `--override-input` passed; returns
+#                                { dependencies; root; }, `root` from `self`
 #   pins.flake-compat ./dir      the flake.lock beside a flake.nix in
 #                                `dir`, resolved the way flake-compat
 #                                does, stopping before the flake's
 #                                `outputs`; nothing overrides it and it
-#                                has no `self`; returns { sources; }
+#                                has no `self`; returns { dependencies; }
 #   pins.npins ./npins           npins' sources.json in `dir`, each pin
 #                                fetched as npins' generated default.nix
-#                                fetches it; returns { sources; }
-#   pins.gitRoot ./.             the `root` of a flakeless top in a git
+#                                fetches it; returns { dependencies; }
+#   pins.gitRoot ./.             the `root` of a flakeless caisson top in a git
 #                                working tree: its revision when clean,
 #                                marked dirty otherwise
 #
@@ -31,7 +31,7 @@
 #                  writer that moves the source follows from it
 #   pin.files      { refs; revisions; }: the file holding the ref and
 #                  the file holding the revision, relative to `pin.dir`
-#                  when present and to the tree's root otherwise
+#                  when present and to the root of the source tree otherwise
 #   pin.dir        the directory holding the pin files, as a path, for
 #                  a reader given a directory; the root is not known to
 #                  the reader, so relativizing happens where both are
@@ -50,7 +50,7 @@
 # with the fields of a root (below), since `pins.flake` reads the lock
 # from `self`.
 #   pin.overridden `pins.flake` only: the resolved tree differs from
-#                  the lock (an `--override-input` was in force), so
+#                  the lock (an `--override-input` was passed), so
 #                  `pin.url` describes the lock, not the tree
 #
 # A root is { outPath; dirty; rev; shortRev; dirtyRev; dirtyShortRev;
@@ -167,7 +167,7 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (builtins.removeAttrs inputs [ "self" ]);
+      dependencies = builtins.mapAttrs sourceOf (builtins.removeAttrs inputs [ "self" ]);
       root = mkRoot self.outPath (self ? dirtyRev) self;
     };
 
@@ -259,7 +259,7 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (flakeLock.descriptors lock);
+      dependencies = builtins.mapAttrs sourceOf (flakeLock.descriptors lock);
     };
 
   npinsReader =
@@ -291,10 +291,10 @@ let
         };
     in
     {
-      sources = builtins.mapAttrs sourceOf (npins.describe "pins.npins" data);
+      dependencies = builtins.mapAttrs sourceOf (npins.describe "pins.npins" data);
     };
 
-  # The root of a flakeless top whose tree is a git working tree. It
+  # The root of a flakeless caisson top whose tree is a git working tree. It
   # needs an impure evaluation, as `nix-build` of a default.nix is,
   # since the working tree is not locked. A directory that is not a git
   # working tree has no revision to name, and its root is the directory.

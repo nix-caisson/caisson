@@ -2,8 +2,8 @@
 #
 # A NixOS module that imports the NixOS module of disko, for a NixOS
 # configuration that writes its disk layout itself, as `disko.devices`,
-# the way disko's NixOS form has it. The machine and its layout are then
-# one configuration, and disko's tools read it as they read any NixOS
+# the way disko's NixOS form has it. The system and its layout are then
+# a single NixOS configuration, and disko's tools read it as they read any NixOS
 # configuration that imports disko's module: disko's command finds
 # `config.disko.devices` and the scripts under `system.build`,
 # `disko-install` replaces the disks with `extendModules`, and disko's
@@ -12,8 +12,8 @@
 # A NixOS configuration selects this module by name, as `disko`, or as
 # `caisson/disko` in a flake that lists caisson in `projects`.
 #
-# The disko source is the one the composition declares or pins under
-# the name `disko`, read from the library of the evaluation.
+# The disko source is the source the composition declares or pins under
+# the name `disko`, read from the library of the NixOS configuration.
 { ... }:
 { lib, ... }:
 let
@@ -25,7 +25,7 @@ let
       throw ''
         caisson's `disko` NixOS module needs the disko source.
         Declare `defaultEcosystemSrc.disko` in the mkLib call, or pin a
-        source named `disko` in the `sources` passed to mkLib.
+        source named `disko` in the `dependencies` passed to mkLib.
       ''
     else
       found;
