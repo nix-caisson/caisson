@@ -31,6 +31,8 @@
   inputs.nixvim.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nvf.url = "github:NotAShelf/nvf";
   inputs.nvf.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.nemacs.url = "github:clhodapp/nemacs";
+  inputs.nemacs.inputs.nixpkgs.follows = "nixpkgs";
   inputs.hjem.url = "github:feel-co/hjem";
   inputs.hjem.inputs.nixpkgs.follows = "nixpkgs";
   inputs.nix-darwin.url = "github:nix-darwin/nix-darwin";

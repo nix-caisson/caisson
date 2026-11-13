@@ -53,6 +53,7 @@
           "home-manager"
           "kubenix"
           "microvm"
+          "nemacs"
           "nixidy"
           "nixops4"
           "nixos"

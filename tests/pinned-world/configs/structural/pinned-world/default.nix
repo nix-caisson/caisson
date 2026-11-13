@@ -30,6 +30,7 @@
   caisson.treefmt.configurations.registered = lib.caisson.treefmt.mkConfiguration { };
   caisson.nvf.configurations.registered = lib.caisson.nvf.mkConfiguration { };
   caisson.nixvim.configurations.registered = lib.caisson.nixvim.mkConfiguration { };
+  caisson.nemacs.configurations.registered = lib.caisson.nemacs.mkConfiguration { };
   caisson.topology.configurations.registered = lib.caisson.topology.mkConfiguration { };
   caisson.kubenix.configurations.registered = lib.caisson.kubenix.mkConfiguration { };
   caisson.nixidy.configurations.registered = lib.caisson.nixidy.mkConfiguration { };

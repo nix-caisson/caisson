@@ -31,7 +31,7 @@ The layer users reach for: the integrations (`structural`,
 `caisson-microvm`, `microvm`, `caisson-nixops4-composite`,
 `caisson-nixops4-resource`, `nixops4`,
 `terranix`, `system-manager`, `treefmt`,
-`nvf`, `nixvim`, `topology`, `kubenix`, `nixidy`), each
+`nvf`, `nixvim`, `nemacs`, `topology`, `kubenix`, `nixidy`), each
 a library overlay
 contributing its `lib.caisson` namespace, registering its module
 class where it has a class (`nixos-minimal` and `home-manager-minimal`

@@ -141,6 +141,7 @@ source by.
 | `treefmt` | `treefmt-nix` | the formatters of a source tree, as treefmt-nix modules; the configuration named `formatter` is published as the `formatter.<system>` that `nix fmt` runs |
 | `nvf` | `nvf` | a Neovim written as nvf modules, published as `nvfConfigurations.<system>.<name>`, in the shape `neovimConfiguration` returns, kept in a separate Nix profile that the NixOS configuration, home-manager configuration or hjem configuration it is declared inside activates |
 | `nixvim` | `nixvim` | a Neovim written as nixvim modules, published as `nixvimConfigurations.<system>.<name>`, kept in a profile as an nvf configuration is |
+| `nemacs` | none | an Emacs written as nemacs modules, whose `core` module the flake of nemacs registers; published as `nemacsConfigurations.<system>.<name>` with its `package` and its `activationPackage`, kept in a profile as an nvf configuration is |
 | `topology` | `nix-topology` | the diagram of the NixOS configurations declared inside it, as nix-topology renders it; the configuration named `topology` is published as `topology.<system>` |
 | `kubenix` | `kubenix` | Kubernetes resources written as kubenix modules, published as `kubenixConfigurations.<system>.<name>`, the evaluation result, whose `config.kubernetes.result` is the JSON `kubectl apply -f` reads |
 | `nixidy` | `nixidy` | an Argo CD environment written as nixidy modules, evaluated with nixidy's `mkEnv` and published as the `nixidyEnvs.<system>.<name>` the nixidy CLI reads |

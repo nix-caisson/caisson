@@ -39,6 +39,7 @@
         treefmt
         nvf
         nixvim
+        nemacs
         topology
         kubenix
         nixidy
