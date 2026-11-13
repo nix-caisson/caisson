@@ -3109,6 +3109,35 @@
         else
           [ ];
 
+      # Whether a gathered check (`gatheredChecksOf`) is of a volatile
+      # category. A check of a volatile category runs in a fixed-output
+      # derivation (`lib.caisson.mkVolatileCheck`), and one whose
+      # derivation has `drvAttrs` that declare no `outputHash` is
+      # refused. The tools that act on volatility, such as `topside
+      # check`, read it here, in the check record. The `checks` output
+      # reads no property of a category, so it does not refuse such a
+      # check: reading `volatile` evaluates the declarations of the
+      # category, which `nix flake check` has no use for.
+      volatileOf =
+        entry:
+        let
+          derivation = entry.check.derivation;
+        in
+        if !entry.volatile then
+          false
+        else if builtins.isAttrs (derivation.drvAttrs or null) && derivation.drvAttrs ? outputHash then
+          true
+        else
+          throw ''
+            caisson: the check `${entry.checkName}` of the configuration at ${showNamePath entry.namePath},
+            declared at ${showCode entry.check.code}, is of the volatile category
+            `${entry.check.category}`, and its derivation is not a fixed-output derivation:
+            its `drvAttrs` declare no `outputHash`. A check of a volatile category runs in a
+            fixed-output derivation, which Nix lets reach the network, and its output is a
+            pass marker. Build the derivation with `lib.caisson.mkVolatileCheck`, or name a
+            category that is not volatile.
+          '';
+
       # The check record of a caisson top, keyed as `checks` of its
       # outputs is, by system and then published name: for each check,
       # `name` and `system`, `from.namePath`, the path from the caisson
@@ -3123,6 +3152,10 @@
       # top as `check`, and the entry of the check record of the test
       # caisson top as `record`, null when the test caisson top publishes
       # no check record. For every other check `top` is null.
+      #
+      # The `volatile` field of a check of a volatile category is
+      # refused when the derivation of the check is not a fixed-output
+      # derivation (`volatileOf`).
       checkRecordOf =
         manifest:
         builtins.mapAttrs (
@@ -3137,7 +3170,7 @@
                 code
                 top
                 ;
-              inherit (entry) volatile;
+              volatile = volatileOf entry;
               requiredFeatures = requiredFeaturesOf entry.check.derivation;
             }
           )

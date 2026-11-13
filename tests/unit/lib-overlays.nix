@@ -3695,8 +3695,12 @@ in
                   volatile = true;
                 };
                 caisson.nixos.configurations.nas-1 = nixosConfiguration lib {
+                  # A check of a volatile category is a fixed-output
+                  # derivation.
                   caisson.checks.boots = {
-                    derivation = check "boots";
+                    derivation = check "boots" // {
+                      drvAttrs.outputHash = builtins.hashString "sha256" "pass\n";
+                    };
                     category = "hardware";
                   };
                 };

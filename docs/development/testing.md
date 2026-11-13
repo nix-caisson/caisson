@@ -97,6 +97,25 @@ plumbing works.
     <path of the NixOps4 source> --impure
   ```
 
+## Volatile Checks (Builds in the Local Store)
+
+- **Scope:** The derivation `lib.caisson.mkVolatileCheck` returns, built:
+  a check whose program passes writes its pass marker at the output
+  path its derivation declares, building it again with `--rebuild`
+  keeps the marker, and a check whose program fails leaves no marker in
+  the store. The pinned-world suite holds what evaluation shows of the
+  derivation: its name, its fixed output and its `drvAttrs`.
+- **Location:** `tests/volatile-checks/check.sh` and the checks it
+  builds in `tests/volatile-checks/default.nix`.
+- **Mechanism:** the script runs `nix build` on each check and reads the
+  store afterwards with `nix path-info`. A check of `nix flake check` is
+  a build and cannot do either, so the `volatile-checks` job of the
+  check workflow runs the script on the runner.
+- **Execution, from a checkout:**
+  ```bash
+  tests/volatile-checks/check.sh
+  ```
+
 ## Integration Testing (Test Flakes)
 
 - **Scope:** Module composition, end-to-end evaluation, and build success.

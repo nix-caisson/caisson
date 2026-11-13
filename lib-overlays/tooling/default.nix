@@ -21,6 +21,8 @@
 
       mkMemoizedDerivationRead = import ./mk-memoized-derivation-read.nix { lib = final; };
 
+      mkVolatileCheck = import ./mk-volatile-check.nix;
+
     };
 
   };

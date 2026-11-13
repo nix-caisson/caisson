@@ -97,7 +97,10 @@ in
           The derivation that is the check, for the system of the
           evaluation result that declares it: the check passes when the
           derivation builds. Null for an entry that annotates a check the
-          configuration already has, and for an entry with a `top`.
+          configuration already has, and for an entry with a `top`. A
+          check of a volatile category (`caisson.checkCategories`) has a
+          fixed-output derivation, such as the derivation
+          `lib.caisson.mkVolatileCheck` returns.
         '';
       };
       top = lib.mkOption {
@@ -166,7 +169,14 @@ in
         description = ''
           Whether the result of a check of the category depends on
           something outside the build, such as a network, a service or a
-          piece of hardware.
+          piece of hardware. The derivation of a check of a volatile
+          category is a fixed-output derivation, the kind of derivation
+          Nix lets reach the network, and its output is a pass marker.
+          `lib.caisson.mkVolatileCheck` builds it from the program the
+          check runs. The check record of a caisson top refuses a
+          check of a volatile category, when its `volatile` field is
+          read, if the `drvAttrs` of its derivation declare no
+          `outputHash`.
         '';
       };
     };
