@@ -15,7 +15,7 @@ in
     default = checks: checks;
     defaultText = lib.literalExpression "checks: checks";
     example = lib.literalExpression ''
-      checks: builtins.mapAttrs (_: lib.filterAttrs (name: _: name != "lab-1-toplevel")) checks
+      checks: builtins.mapAttrs (_: lib.filterAttrs (name: _: name != "lab-1/toplevel")) checks
     '';
     description = ''
       Function that selects which of the gathered checks this
