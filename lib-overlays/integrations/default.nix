@@ -2376,8 +2376,9 @@
       # modules it imports. `options` are the options of the evaluation.
       # A registry entry is a module whose key is
       # `modules.<class>.<name>@<project>` (`keyedModules`). The files
-      # of an entry are the files of the entry and of every module it
-      # imports, at any depth. The result holds each entry by registry
+      # of an entry are the files that the modules the entry imports,
+      # at any depth, name, where a module stands for every module of
+      # the graph with its key. The result holds each entry by registry
       # key, with `project`, `file`, and `defines`: for each option
       # under `caisson` that a file of the entry defines, the option
       # as `option`, the files of the entry that define it as `files`,
@@ -2399,41 +2400,118 @@
               [ ];
           caissonOptions = optionsUnder (options.caisson or { });
           enabled = builtins.filter (node: !(node.disabled or false));
-          filesOf = node: [ node.file ] ++ builtins.concatMap filesOf (enabled node.imports);
-          entriesIn =
-            nodes:
+          # The modules that a module imports, at any depth, that name
+          # their file, each as `file` and `wraps`. The module system
+          # gives a module that names no file the file of the module
+          # that imports it. A module therefore names its file when its
+          # file differs from the file of the module that imports it.
+          # `wraps` is true when the module imports a single module and
+          # that module names its file, as the module that
+          # `lib.types.deferredModule` makes of each definition does.
+          namedBelow =
+            node:
             builtins.concatMap (
-              node:
-              (if builtins.substring 0 8 (toString (node.key or "")) == "modules." then [ node ] else [ ])
-              ++ entriesIn (enabled node.imports)
+              imported:
+              let
+                importedByIt = enabled imported.imports;
+              in
+              (
+                if imported.file != node.file then
+                  [
+                    {
+                      inherit (imported) file;
+                      wraps = builtins.length importedByIt == 1 && (builtins.head importedByIt).file != imported.file;
+                    }
+                  ]
+                else
+                  [ ]
+              )
+              ++ namedBelow imported
+            ) (enabled node.imports);
+          # Every module of the graph, depth first, as `node`, with the
+          # file of the module that imports it as `importer`, null for
+          # a module that `lib.evalModules` was given.
+          occurrencesIn =
+            importer: nodes:
+            builtins.concatMap (
+              node: [ { inherit node importer; } ] ++ occurrencesIn node.file (enabled node.imports)
             ) (enabled nodes);
+          occurrences = occurrencesIn null graph;
+          # The key of a module as an attribute name. The key of a
+          # module read from a file is the path of the file, a string
+          # that refers to a store path, and an attribute name may not
+          # refer to one.
+          keyOf = node: builtins.unsafeDiscardStringContext (toString node.key);
+          # The modules of the graph by key, each with `files`, the
+          # files that the modules of the key name, and `imports`, the
+          # keys of the modules they import, over every place the graph
+          # holds a module of the key.
+          #
+          # The module system evaluates the modules that share a key
+          # once, at the first place it reaches one of them, and the
+          # graph holds each of them where it is imported. The copies
+          # of a project in different store paths give a module the
+          # same key and different files: a flake that pins a revision
+          # of caisson and lists a project that pins another revision
+          # imports the core module of caisson from each copy. The
+          # declarations of the options of the
+          # core module are then in the files of the copy the module
+          # system reached first. A module that imports the other copy
+          # imports those declarations through the key they share.
+          byKey = builtins.mapAttrs (_: found: {
+            files = unique (
+              builtins.concatMap (
+                occurrence: if occurrence.node.file != occurrence.importer then [ occurrence.node.file ] else [ ]
+              ) found
+            );
+            imports = unique (
+              builtins.concatMap (occurrence: builtins.map keyOf (enabled occurrence.node.imports)) found
+            );
+          }) (builtins.groupBy (occurrence: keyOf occurrence.node) occurrences);
+          entries = builtins.filter (node: builtins.substring 0 8 (toString (node.key or "")) == "modules.") (
+            builtins.map (occurrence: occurrence.node) occurrences
+          );
           entryOf =
             node:
             let
-              # The registry wraps the module of an entry in modules that
-              # each import the next module alone. A wrapper names no
-              # file, so the module system gives it the file of the
-              # module that imports the entry, such as the file of the
-              # configuration that selects it. The module of the entry is
-              # the first module below the wrappers whose file differs
-              # from the file of the wrappers, and the files of the entry
-              # are the files of that module and of every module it
-              # imports.
-              below =
-                wrapper:
-                let
-                  imported = enabled wrapper.imports;
-                in
-                if builtins.length imported != 1 then
-                  wrapper
-                else if (builtins.head imported).file == node.file then
-                  below (builtins.head imported)
+              # The registry wraps the module of an entry in modules
+              # that name no file, and the module system gives each
+              # wrapper the file of the module that imports the entry.
+              # When a configuration module imports the entry, the
+              # wrappers carry the file of that configuration module,
+              # and the definitions that the configuration module makes
+              # carry the same file. The files of the entry are therefore
+              # the files that the modules below the entry name, and a
+              # definition belongs to the entry only when one of these
+              # files makes it. The modules below the entry are those of
+              # the keys the entry reaches through the imports of each
+              # key (`byKey`). The file shown for the entry is the first
+              # file named below the entry (`namedBelow`) whose module
+              # does more than wrap a single module that names its file.
+              reached = builtins.genericClosure {
+                startSet = [ { key = keyOf node; } ];
+                operator = found: builtins.map (key: { inherit key; }) byKey.${found.key}.imports;
+              };
+              named = namedBelow node;
+              shown = builtins.filter (module: !module.wraps) named;
+              file =
+                if shown != [ ] then
+                  (builtins.head shown).file
+                else if named != [ ] then
+                  (builtins.head named).file
                 else
-                  builtins.head imported;
-              module = below node;
-              inherit (module) file;
-              files = unique (filesOf module);
-              inEntry = file: builtins.elem file files;
+                  node.file;
+              # The files of the entry as attribute names.
+              files = builtins.listToAttrs (
+                builtins.concatMap (
+                  found:
+                  builtins.map (file: {
+                    name = builtins.unsafeDiscardStringContext (toString file);
+                    value = true;
+                  }) byKey.${found.key}.files
+                ) reached
+              );
+              inEntry = file: files ? ${builtins.unsafeDiscardStringContext (toString file)};
               defined = builtins.filter (option: builtins.any inEntry option.files) caissonOptions;
               registered = registryPartsOf node.key;
             in
@@ -2451,7 +2529,7 @@
               };
             };
         in
-        builtins.listToAttrs (builtins.map entryOf (entriesIn graph));
+        builtins.listToAttrs (builtins.map entryOf entries);
 
       # The check `registries` of a caisson top for `system`, by name,
       # the default check every caisson top carries.
