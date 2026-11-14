@@ -5624,6 +5624,7 @@ let
       && published.config.bundles.hello.enable
       && published.options ? build
       && builtins.isString published.activationPackage.drvPath
+      && published.profile.path == "$HOME/.local/state/caisson/profiles/nemacs/editor"
       &&
         builtins.attrNames top.nemacsConfigurations.x86_64-linux == [
           "editor"

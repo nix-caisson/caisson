@@ -15,8 +15,9 @@
 # The output is `package`, the editor, the `config.build.package` of
 # the evaluation. A configuration is published as
 # `nemacsConfigurations.<system>.<name>`: `package`, `activationPackage`,
-# `config` and `options`, where `activationPackage` holds the `activate`
-# of the profile described next.
+# `profile`, `config` and `options`, where `activationPackage` holds the
+# `activate` of the profile described next, and `profile` says where
+# that profile is.
 #
 # A nemacs configuration is kept in a separate Nix profile, the way a
 # home-manager configuration keeps its generations
@@ -137,7 +138,7 @@
         attrset = "nemacsConfigurations";
         bySystem = true;
         value = manifest: {
-          inherit (manifest.outputs) package activationPackage;
+          inherit (manifest.outputs) package activationPackage profile;
           inherit (manifest.value) config options;
         };
       };
