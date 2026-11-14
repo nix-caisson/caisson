@@ -24,6 +24,7 @@
         nixos
         nixos-minimal
         nixos-test
+        nix-unit
         home-manager
         home-manager-minimal
         hjem
