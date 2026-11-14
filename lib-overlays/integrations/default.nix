@@ -2073,7 +2073,7 @@
       # `activationPackage` holds `activate`, which checks for drift
       # against the nearest configuration above with an activation
       # (`driftCheckOf`, when `warn`), and points the profile at
-      # `package` with `nix-env --profile`, which also makes the
+      # `package` with `nix build --profile`, which also makes the
       # profile a garbage-collector root. When the profile already
       # points at `package`, it changes nothing, so activating the same
       # generation again adds no generation to the profile.
@@ -2138,7 +2138,7 @@
               profile="${path}"
               ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$profile")"
               if [ "$(${pkgs.coreutils}/bin/readlink -f "$profile" 2>/dev/null || true)" != '${package}' ]; then
-                ${pkgs.nix}/bin/nix-env --profile "$profile" --set '${package}'
+                ${pkgs.nix}/bin/nix --extra-experimental-features nix-command build --no-link --profile "$profile" '${package}'
               fi
             '';
           };
