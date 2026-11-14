@@ -2919,48 +2919,50 @@
       # configuration of `manifest` and every configuration declared
       # inside it, at any depth, whatever the `exported` selectors pass
       # up. Each comes with `namePath`, its path from `manifest` by the
-      # names it is declared under, and `parts`, the names its checks
-      # are published under: the names on that path, without the
-      # systems and without the names of flake-parts configurations,
-      # whose checks are keyed by name already.
+      # names it is declared under, a list of `{ type, name }` segments
+      # whose `type` is the integration, with the system of an
+      # evaluation result above its name.
       checkNodesOf =
         manifest:
         [
           {
             inherit manifest;
             namePath = [ ];
-            parts = [ ];
           }
         ]
         ++ builtins.concatMap (
           child:
-          builtins.map (
-            node:
-            node
-            // {
-              namePath = child.namePath ++ node.namePath;
-              parts = (if child.manifest.type == "flake-parts" then [ ] else [ child.name ]) ++ node.parts;
-            }
-          ) (checkNodesOf child.manifest)
+          builtins.map (node: node // { namePath = child.namePath ++ node.namePath; }) (
+            checkNodesOf child.manifest
+          )
         ) (checkChildrenOf manifest);
 
       # The checks gathered at the configuration of `manifest`, by
       # system and then published name: the checks with `enable` that
       # it and the configurations inside it record (`checkNodesOf`).
-      # The published name of a check is the names of the
-      # configurations from here down to the configuration that
-      # declares it, joined with `-`, then the name of the check: the
-      # check `toplevel` of the NixOS configuration `nas-1` declared
-      # here is `nas-1-toplevel`. The names of flake-parts
-      # configurations are left out of it. Each entry holds the check as
-      # the manifest records it, its name there as `checkName`, its
-      # `namePath`, and `volatile`, from its category.
+      # A check is named as a configuration is in an output keyed by
+      # system (`namedByPath`): its path is the `namePath` of the
+      # configuration that declares it without the systems, then
+      # `{ type = "check"; name; }` for the check, and the names are
+      # `caisson-core.elide` over the paths of the checks gathered for
+      # every system, so a check has the same name under each system it
+      # is gathered for. A check whose name
+      # is alone keeps it: the check `toplevel` of the only NixOS
+      # configuration is `toplevel`. Checks of the same name gain the
+      # segments that tell them apart: the check `toplevel` of the
+      # NixOS configurations `nas-1` and `nas-2` are `nas-1/toplevel`
+      # and `nas-2/toplevel`, and those of a NixOS configuration and a
+      # system-manager configuration both named `box` are
+      # `nixos/box/toplevel` and `system-manager/box/toplevel`. Each
+      # entry holds the check as the manifest records it, its name
+      # there as `checkName`, its `namePath`, its `path`, and
+      # `volatile`, from its category.
       #
       # The categories are those the configurations declare, together
       # (`categoriesUnion`). A check whose category none of them declares
       # is refused when it is read, and so is a stage declared inside
-      # the configuration, and checks that share a published name for
-      # a system.
+      # the configuration, and checks that still share a published name
+      # for a system.
       gatheredChecksOf =
         manifest:
         let
@@ -2989,7 +2991,12 @@
                     {
                       inherit system check checkName;
                       inherit (node) namePath;
-                      name = builtins.concatStringsSep "-" (node.parts ++ [ checkName ]);
+                      path = builtins.filter (segment: segment.type != "system") node.namePath ++ [
+                        {
+                          type = "check";
+                          name = checkName;
+                        }
+                      ];
                     }
                   ]
                 else
@@ -3011,33 +3018,19 @@
                 configuration declares. Declare it in `caisson.checkCategories.${category}`, or name
                 a declared category: ${builtins.concatStringsSep ", " (builtins.attrNames categories)}.
               '';
+          named = namedByPath entries;
           publishFor =
             system:
-            let
-              members = builtins.filter (entry: entry.system == system) entries;
-              names = builtins.map (entry: entry.name) members;
-              clashing = builtins.filter (
-                name: builtins.length (builtins.filter (other: other == name) names) > 1
-              ) (unique names);
-            in
-            if clashing != [ ] then
-              throw ''
-                caisson: checks.${system}: these checks would be gathered under the same
-                name, `${builtins.head clashing}`:
-                ${builtins.concatStringsSep "\n" (
-                  builtins.map (entry: "  the check `${entry.checkName}` of ${showNamePath entry.namePath}") (
-                    builtins.filter (entry: entry.name == builtins.head clashing) members
-                  )
-                )}
-                Rename a check or a configuration.
-              ''
-            else
-              builtins.listToAttrs (
-                builtins.map (entry: {
-                  inherit (entry) name;
-                  value = validated entry;
-                }) members
-              );
+            builtins.listToAttrs (
+              builtins.map
+                (item: {
+                  inherit (item) name;
+                  value = validated item.entry;
+                })
+                (
+                  refuseShared "checks" "checks.${system}" (builtins.filter (item: item.entry.system == system) named)
+                )
+            );
         in
         if staged != [ ] then
           throw ''
@@ -3141,9 +3134,9 @@
       # The check record of a caisson top, keyed as `checks` of its
       # outputs is, by system and then published name: for each check,
       # `name` and `system`, `from.namePath`, the path from the caisson
-      # top to the
-      # configuration that declares the check by the names declared,
-      # `category`, `description`, `volatile`, from the category,
+      # top to the configuration that declares the check by the names
+      # declared, `from.check`, the name of the check in that
+      # configuration, `category`, `description`, `volatile`, from the category,
       # `requiredFeatures` (`requiredFeaturesOf`), `code`, the
       # positions of the definitions that declare the check, and `top`.
       # For a check of a test caisson top that an entry of
@@ -3163,7 +3156,10 @@
           builtins.mapAttrs (
             name: entry: {
               inherit name system;
-              from.namePath = entry.namePath;
+              from = {
+                inherit (entry) namePath;
+                check = entry.checkName;
+              };
               inherit (entry.check)
                 category
                 description
@@ -3353,8 +3349,10 @@
       # An output whose entries' `exportsTo` says `bySystem` is keyed by
       # the system of each evaluation result first, as flakes key `packages`
       # and `formatter`: `<attrset>.<system>`, holding the entries
-      # evaluated for that system, named by the rules above over their
-      # paths without the systems on them, or the single value there.
+      # evaluated for that system, or the single value there. The
+      # entries are named by the rules above over their paths without
+      # the systems on them, from the entries of every system together,
+      # so an entry has the same name under each system.
       publish = entries: publicationOf (entry: entry.value) entries;
 
       # The export record of a caisson top, keyed as `publish` keys the
@@ -3388,7 +3386,7 @@
                 entry: entry // { path = builtins.filter (segment: segment.type != "system") entry.path; };
             in
             if keyed == [ ] then
-              publishMembers attrset members
+              publishMembers attrset (namedByPath members)
             else if builtins.length keyed != builtins.length members || builtins.elem null systems then
               throw ''
                 ${attrset}: this output is keyed by system, and these configurations
@@ -3400,22 +3398,19 @@
                 )}
               ''
             else
+              let
+                named = namedByPath (builtins.map withoutSystems keyed);
+              in
               genAttrs systems (
                 system:
-                publishMembers "${attrset}.${system}" (
-                  builtins.map withoutSystems (builtins.filter (entry: entry.system == system) keyed)
-                )
+                publishMembers "${attrset}.${system}" (builtins.filter (item: item.entry.system == system) named)
               );
+          # The output attribute set `attrset` from `items`, its members
+          # paired with their names (`namedByPath`).
           publishMembers =
-            attrset: members:
+            attrset: items:
             let
-              names = builtins.map displayName (
-                final.caisson-core.elide (builtins.map (entry: entry.path) members)
-              );
-              named = zipListsWith (name: entry: { inherit name entry; }) names members;
-              clashing = builtins.filter (
-                name: builtins.length (builtins.filter (other: other == name) names) > 1
-              ) (unique names);
+              members = builtins.map (item: item.entry) items;
               single = builtins.any (entry: entry.single or false) members;
               # A configuration with a single output is named for that
               # output.
@@ -3432,25 +3427,67 @@
                   be published there:
                   ${builtins.concatStringsSep "\n" (builtins.map (entry: "  ${showPath entry.path}") members)}
                 ''
-            else if clashing != [ ] then
-              throw ''
-                ${attrset}: these configurations would be published under the same
-                name, `${builtins.head clashing}`:
-                ${builtins.concatStringsSep "\n" (
-                  builtins.map (item: "  ${showPath item.entry.path}") (
-                    builtins.filter (item: item.name == builtins.head clashing) named
-                  )
-                )}
-              ''
             else
               builtins.listToAttrs (
                 builtins.map (item: {
                   inherit (item) name;
                   value = of item.entry;
-                }) named
+                }) (refuseShared "configurations" attrset items)
               );
         in
         genAttrs attrsets publishIn;
+
+      # Members paired with the names they are published under, as
+      # `{ name, entry }`. Each member has a `path` of `{ type, name }`
+      # segments without systems, and the names are
+      # `caisson-core.elide` over the paths, written by `displayName`: a
+      # name that is alone stays bare, and names that collide gain the
+      # segments that tell them apart. For an output keyed by system the
+      # members are those of every system, and `elide` runs once over
+      # their paths with each path counted once, so a member evaluated
+      # for several systems has the same name under each, and its name
+      # gains a segment wherever a collision exists on any system.
+      namedByPath =
+        members:
+        let
+          keyOf = path: builtins.toJSON path;
+          paths = unique (builtins.map (entry: entry.path) members);
+          names = builtins.listToAttrs (
+            zipListsWith (path: kept: {
+              name = keyOf path;
+              value = displayName kept;
+            }) paths (final.caisson-core.elide paths)
+          );
+        in
+        builtins.map (entry: {
+          name = names.${keyOf entry.path};
+          inherit entry;
+        }) members;
+
+      # `items`, the members of the output attribute set `attrset` paired
+      # with their names (`namedByPath`), refused where members still
+      # share a name, with their paths; `noun` says what the members are
+      # in that error.
+      refuseShared =
+        noun: attrset: items:
+        let
+          names = builtins.map (item: item.name) items;
+          clashing = builtins.filter (
+            name: builtins.length (builtins.filter (other: other == name) names) > 1
+          ) (unique names);
+        in
+        if clashing != [ ] then
+          throw ''
+            ${attrset}: these ${noun} would be published under the same
+            name, `${builtins.head clashing}`:
+            ${builtins.concatStringsSep "\n" (
+              builtins.map (item: "  ${showPath item.entry.path}") (
+                builtins.filter (item: item.name == builtins.head clashing) items
+              )
+            )}
+          ''
+        else
+          items;
 
       # What a tool reads from a caisson top that is a configuration
       # evaluated per system, given its evaluation results by system. They

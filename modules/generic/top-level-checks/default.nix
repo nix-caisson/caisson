@@ -39,9 +39,13 @@ in
       declares: it can turn the check off with `enable = false`, give it
       another `description` or put it in another `category`. A check is
       gathered under `checks.<system>` of the outputs of the caisson
-      top, under the names of the configurations from the caisson top
-      down to this
-      configuration and the name of the check, joined with `-`.
+      top, under its name where no other check gathered for any system
+      has that name, and otherwise under the names of the
+      configurations that tell the checks apart and its name, separated
+      by `/`, as configurations are named in an output keyed by system:
+      the check `toplevel` of the NixOS configurations `nas-1` and
+      `nas-2` is `nas-1/toplevel` and `nas-2/toplevel`. The name is
+      the same under every system.
     '';
   };
 }

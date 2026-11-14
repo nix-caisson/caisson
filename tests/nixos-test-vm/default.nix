@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # A NixOS test declared through the nixos-test integration, run in a
-# VM: the check `nas-1-smoke-test` that a structural caisson top
+# VM: the check `test` that a structural caisson top
 # gathers. `inputs` is the dependency pool of the checks partition with
 # `caisson` set to the source of this repository.
 #
@@ -70,4 +70,4 @@ let
       };
   };
 in
-top.checks.${system}.nas-1-smoke-test
+top.checks.${system}.test
