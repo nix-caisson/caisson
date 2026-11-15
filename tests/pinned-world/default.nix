@@ -5074,18 +5074,17 @@ let
           builtins.elem outputs.activationPackage.drvPath (
             builtins.attrNames (builtins.getContext postActivation)
           );
-        names = packages: builtins.map (package: package.name or "") packages;
       in
       runs ofSystem
       && runs ofHjem
       && hasInfix "launchctl asuser" postActivation
       && hasInfix "sudo -u probe --set-home" postActivation
-      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
-        names config.environment.systemPackages
-      )
+      && builtins.elem "/nix/var/nix/profiles/caisson/nvf/editor" config.environment.profiles
       &&
-        inside.hjem.probe.value.config.environment.sessionVariables.CAISSON_NVIM_PROFILE
-        == "/Users/probe/.local/state/caisson/profiles/nvf/hjem-editor";
+        inside.hjem.probe.value.config.environment.sessionVariables.PATH == [
+          "/Users/probe/.local/state/caisson/profiles/nvf/hjem-editor/bin"
+          "$PATH"
+        ];
 
     # A hjem configuration that is a caisson top gives what hjem's standalone
     # CLI reads from a file: the version 3 manifest of the user's files,
@@ -5488,7 +5487,6 @@ let
         nixosConfig = top.nixosConfigurations.workstation.config;
         homeManagerConfig = top.homeConfigurations.alice.config;
         unit = nixosConfig.systemd.services.caisson-profile-nvf-system-editor;
-        names = packages: builtins.map (package: package.name or "") packages;
         topProfile = top.caisson.manifest.children.system.x86_64-linux.children.nvf.editor.outputs.profile;
         published = top.nvfConfigurations.x86_64-linux.editor;
       in
@@ -5504,18 +5502,17 @@ let
           "system-editor"
         ]
       # The NixOS configuration activates the profile of the system as root, at boot
-      # and at a switch, and lets a shell choose it with `nvim`.
+      # and at a switch, and puts its `bin` directory on the `PATH` of every shell.
       && unit.wantedBy == [ "multi-user.target" ]
       && !(unit.serviceConfig ? User)
-      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
-        names nixosConfig.environment.systemPackages
-      )
+      && builtins.elem "/nix/var/nix/profiles/caisson/nvf/system-editor" nixosConfig.environment.profiles
       # The home-manager configuration activates its profile, after its
-      # files are linked, and chooses it for its shells.
+      # files are linked, and puts its `bin` directory on the `PATH` of its shells.
       && pkgs.lib.hasInfix "/activate" homeManagerConfig.home.activation.caissonProfiles.data
       &&
-        homeManagerConfig.home.sessionVariables.CAISSON_NVIM_PROFILE
-        == "$HOME/.local/state/caisson/profiles/nvf/home-editor"
+        homeManagerConfig.home.sessionPath == [
+          "$HOME/.local/state/caisson/profiles/nvf/home-editor/bin"
+        ]
       # The profile of `editor`, declared at the caisson top, is a profile of
       # the user, and it points at the Neovim nvf builds.
       && topProfile.scope == "user"
@@ -5615,7 +5612,6 @@ let
         };
         machine = top.nixosConfigurations.workstation.config;
         unit = machine.systemd.services.caisson-profile-nemacs-machine-editor;
-        names = packages: builtins.map (package: package.name or "") packages;
         topProfile =
           top.caisson.manifest.children.system.x86_64-linux.children.nemacs.editor.outputs.profile;
         published = top.nemacsConfigurations.x86_64-linux.editor;
@@ -5632,9 +5628,7 @@ let
         ]
       && unit.wantedBy == [ "multi-user.target" ]
       && !(unit.serviceConfig ? User)
-      && builtins.elem "caisson-profile-shims-CAISSON_NEMACS_PROFILE" (
-        names machine.environment.systemPackages
-      )
+      && builtins.elem "/nix/var/nix/profiles/caisson/nemacs/machine-editor" machine.environment.profiles
       && topProfile.scope == "user"
       && topProfile.path == "$HOME/.local/state/caisson/profiles/nemacs/editor"
       && topProfile.package.drvPath == upstream.config.build.package.drvPath;
@@ -5678,7 +5672,6 @@ let
         unit = nixosConfig.systemd.services.caisson-profile-nixvim-system-editor;
         profile =
           top.caisson.manifest.children.system.x86_64-linux.children.nixos.workstation.children.system.x86_64-linux.children.nixvim.system-editor.outputs;
-        names = packages: builtins.map (package: package.name or "") packages;
       in
       builtins.attrNames top.nixvimConfigurations.x86_64-linux == [ "system-editor" ]
       && profile.package.drvPath == upstream.config.build.package.drvPath
@@ -5688,9 +5681,7 @@ let
       && builtins.elem profile.activationPackage.drvPath (
         builtins.attrNames (builtins.getContext unit.serviceConfig.ExecStart)
       )
-      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (
-        names nixosConfig.environment.systemPackages
-      );
+      && builtins.elem "/nix/var/nix/profiles/caisson/nixvim/system-editor" nixosConfig.environment.profiles;
 
     # A topology configuration with NixOS configurations declared inside
     # it reads them as nix-topology reads NixOS configurations evaluated
@@ -5884,7 +5875,6 @@ let
                     users.users.alice.isNormalUser = true;
                     users.users.bob.isNormalUser = true;
                     users.users.carol.isNormalUser = true;
-                    caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/system-editor";
                     caisson.nvf.configurations.system-editor = editor lib;
                     caisson.hjem.configurations = {
                       alice = lib.caisson.hjem.mkConfiguration { configModule = withEditor "alice-editor"; };
@@ -6041,13 +6031,15 @@ let
       && !(box.systemd.services ? caisson-profile-probe-nvf-hjem-editor)
       && builtins.elem hjemProfile.drvPath (builtins.attrNames (builtins.getContext hjemUnit.script))
       # The system-manager configuration activates its profile of the system as root; hjem
-      # chooses the profile of the user.
+      # puts the profile of the user on the `PATH` of the user.
       && systemUnit.wantedBy == [ "multi-user.target" ]
       && !(systemUnit.serviceConfig ? User)
-      && builtins.elem "caisson-profile-shims-CAISSON_NVIM_PROFILE" (names box.environment.systemPackages)
+      && builtins.elem "/nix/var/nix/profiles/caisson/nvf/editor" box.environment.profiles
       &&
-        hjem.environment.sessionVariables.CAISSON_NVIM_PROFILE
-        == "/home/probe/.local/state/caisson/profiles/nvf/hjem-editor"
+        hjem.environment.sessionVariables.PATH == [
+          "/home/probe/.local/state/caisson/profiles/nvf/hjem-editor/bin"
+          "$PATH"
+        ]
       && builtins.elem pkgs.hello.name (names box.users.users.probe.packages)
       && builtins.attrNames top.homeConfigurations == [ "probe@box" ];
 

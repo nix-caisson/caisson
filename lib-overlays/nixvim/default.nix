@@ -147,14 +147,6 @@
           kept = selection.profileOf {
             inherit pkgs manifest package;
             kind = "nixvim";
-            # The programs the Neovim has in `bin`: `nvim`, and `vi`
-            # and `vim` when nixvim adds them.
-            programs = [
-              "nvim"
-            ]
-            ++ (if value.config.viAlias or false then [ "vi" ] else [ ])
-            ++ (if value.config.vimAlias or false then [ "vim" ] else [ ]);
-            variable = "CAISSON_NVIM_PROFILE";
             warn = value.config.caisson.drift.warn or true;
           };
         in

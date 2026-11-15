@@ -2093,19 +2093,16 @@
       #
       # `profile` is what the configuration above reads from the
       # manifest: the shell text of the path of the profile, whether it
-      # is a profile of the system or of the user, the `package` the
-      # profile points at, the `programs` the
-      # package has in `bin`, and `variable`, the name of the variable a
-      # shell sets to choose which profile of this sort it runs
-      # (`profileShimsOf`).
+      # is a profile of the system or of the user, and the `package` the
+      # profile points at. The configuration above adds the `bin`
+      # directory of the profile to the `PATH` of its shells, so every
+      # program of the package is there.
       profileOf =
         {
           pkgs,
           manifest,
           kind,
           package,
-          programs,
-          variable,
           warn ? true,
         }:
         let
@@ -2145,8 +2142,6 @@
           profile = {
             inherit
               path
-              programs
-              variable
               kind
               name
               package
@@ -2170,71 +2165,6 @@
           && (entry.manifest.system or null) == (manifest.system or null)
           && checksMarkerOf manifest entry
         ) configurations;
-
-      # For each variable the profiles in `entries` are chosen with, the
-      # profile a configuration runs when a shell sets no other, and the
-      # programs of all of them. The profile is the profile `selected` names
-      # for the variable, as `<kind>/<name>`, or the only profile for it. `what`
-      # names the configuration, for the message when several profiles
-      # share a variable and `selected` names none of them.
-      profileChoicesOf =
-        { selected, what }:
-        entries:
-        let
-          variables = unique (builtins.map (entry: entry.manifest.outputs.profile.variable) entries);
-          choiceOf =
-            variable:
-            let
-              sharing = builtins.filter (entry: entry.manifest.outputs.profile.variable == variable) entries;
-              nameOf = entry: "${entry.manifest.outputs.profile.kind}/${entry.manifest.outputs.profile.name}";
-              named = builtins.filter (entry: nameOf entry == selected.${variable}) sharing;
-              chosen =
-                if selected ? ${variable} then
-                  if named != [ ] then
-                    builtins.head named
-                  else
-                    throw "caisson: ${what} selects `${selected.${variable}}` with `caisson.profiles.selected.${variable}`, and its profiles for that variable are ${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}."
-                else if builtins.length sharing == 1 then
-                  builtins.head sharing
-                else
-                  throw "caisson: ${what} activates several profiles chosen with `${variable}` (${builtins.concatStringsSep ", " (builtins.map nameOf sharing)}). Set `caisson.profiles.selected.${variable}` to the profile a shell runs when it sets no other.";
-            in
-            {
-              inherit chosen;
-              programs = unique (builtins.concatMap (entry: entry.manifest.outputs.profile.programs) sharing);
-            };
-        in
-        genAttrs variables choiceOf;
-
-      # The programs with which a configuration that activates profiles
-      # (`profileOf`) lets a shell choose among them: for each program,
-      # an executable of that name that runs the program of the profile
-      # the variable names, read each time it runs, and of `fallback`
-      # when the variable is unset. A configuration sets the variable to
-      # its default, a configuration declared inside it sets it to its
-      # own, and a shell can `export` another. `fallback` is shell text,
-      # which may name variables such as `$HOME`.
-      profileShimsOf =
-        {
-          pkgs,
-          variable,
-          programs,
-          fallback,
-        }:
-        pkgs.runCommand "caisson-profile-shims-${variable}" { } (
-          ''
-            mkdir -p "$out/bin"
-          ''
-          + builtins.concatStringsSep "" (
-            builtins.map (program: ''
-              cat > "$out/bin/${program}" <<'EOF'
-              #!${pkgs.runtimeShell}
-              exec "''${${variable}:-${fallback}}/bin/${program}" "$@"
-              EOF
-              chmod +x "$out/bin/${program}"
-            '') programs
-          )
-        );
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
@@ -3596,9 +3526,7 @@
             driftCheckOf
             safeName
             profileOf
-            profileShimsOf
             profilesActivatedBy
-            profileChoicesOf
             mkEvaluation
             publish
             topValue

@@ -119,7 +119,6 @@ let
                   createHome = true;
                 }) accounts;
                 environment.etc."probe/version".text = version;
-                caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/editor";
                 caisson.nvf.configurations = {
                   editor = lib.caisson.nvf.mkConfiguration { configModule = editorOf version; };
                 }

@@ -164,14 +164,6 @@
             inherit pkgs manifest;
             kind = "nvf";
             package = neovim;
-            # The programs the Neovim has in `bin`: `nvim`, and `vi`
-            # and `vim` when nvf adds them.
-            programs = [
-              "nvim"
-            ]
-            ++ (if value.config.vim.viAlias then [ "vi" ] else [ ])
-            ++ (if value.config.vim.vimAlias then [ "vim" ] else [ ]);
-            variable = "CAISSON_NVIM_PROFILE";
             warn = value.config.caisson.drift.warn or true;
           };
         in

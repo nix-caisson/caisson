@@ -6,9 +6,9 @@
 # configuration gets from caisson when it does not select its modules
 # itself:
 #
-# - `profile-activation`, which activates the profile of each nvf or
-#   nixvim configuration declared inside the home-manager
-#   configuration, and lets a shell choose among them;
+# - `profile-activation`, which activates the profile of each nvf,
+#   nixvim or nemacs configuration declared inside the home-manager
+#   configuration, and puts the `bin` directory of each on `PATH`;
 # - `activation-drift`, with which the activation of the home-manager
 #   configuration warns when the home-manager configuration was built
 #   for a different version of the configuration it is declared inside,
