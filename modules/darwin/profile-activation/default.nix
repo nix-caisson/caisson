@@ -10,9 +10,8 @@
 # configuration as its user, through `launchctl asuser` and `sudo`,
 # after the hjem agents are restarted. A profile inside a home-manager
 # configuration is activated by the home-manager configuration. The
-# nix-darwin configuration installs the programs that
-# choose among the profiles of the system in
-# `environment.systemPackages`.
+# `bin` directory of each profile of the system is put on the `PATH` of
+# every shell, in `environment.profiles`.
 #
 # caisson's `default` darwin module imports this module. It defines
 # nothing in the childless evaluation.
@@ -20,7 +19,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -51,20 +49,6 @@ let
     launchctl asuser "$(id -u ${lib.escapeShellArg user})" sudo -u ${lib.escapeShellArg user} --set-home ${entry.manifest.outputs.activationPackage}/activate
   '';
 
-  choices = selection.profileChoicesOf {
-    selected = config.caisson.profiles.selected;
-    what = "this nix-darwin configuration";
-  } ofSystem;
-
-  shims = lib.mapAttrsToList (
-    variable: choice:
-    selection.profileShimsOf {
-      inherit pkgs variable;
-      inherit (choice) programs;
-      fallback = choice.chosen.manifest.outputs.profile.path;
-    }
-  ) choices;
-
   steps =
     builtins.map asRoot ofSystem
     ++ builtins.concatMap (hjem: builtins.map (asUser hjem.user) hjem.profiles) hjemUsers;
@@ -72,22 +56,8 @@ in
 {
   imports = [ closure-lib.caisson.modules.darwin.core ];
 
-  options.caisson.profiles.selected = lib.mkOption {
-    type = lib.types.attrsOf lib.types.str;
-    default = { };
-    example = {
-      CAISSON_NVIM_PROFILE = "nvf/editor";
-    };
-    description = ''
-      By the variable that chooses among them, the profile a shell runs
-      when it sets no other, as `<kind>/<name>`: `nvf/editor` is the nvf
-      configuration declared as `editor`. Needed only where several
-      profiles declared inside this configuration share a variable.
-    '';
-  };
-
   config = lib.mkIf (!evalManifest.childless && steps != [ ]) {
     system.activationScripts.postActivation.text = lib.mkAfter (lib.concatStrings steps);
-    environment.systemPackages = shims;
+    environment.profiles = builtins.map (entry: entry.manifest.outputs.profile.path) ofSystem;
   };
 }

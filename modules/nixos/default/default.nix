@@ -25,9 +25,8 @@
 #   systemd units that activate those home-manager configurations.
 #
 # The registered module `profile-activation` activates the profile of
-# each nvf or nixvim configuration declared inside the NixOS
-# configuration, and installs the programs with which a shell chooses
-# among them.
+# each nvf, nixvim or nemacs configuration declared inside the NixOS
+# configuration, and puts the `bin` directory of each on `PATH`.
 #
 # The registered module `activation-marker` writes a file under `/etc`
 # that names what the NixOS configuration applied. Every configuration

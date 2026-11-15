@@ -25,13 +25,10 @@
 # profile inside a home-manager configuration is activated by the
 # home-manager configuration.
 #
-# The NixOS configuration also installs, in
-# `environment.systemPackages`, the programs with which a shell chooses
-# among the profiles of the system
-# (`lib.caisson.integrations.profileShimsOf`): `nvim` runs the Neovim of
-# the profile `$CAISSON_NVIM_PROFILE` names, and of the default profile
-# of the NixOS configuration when it is unset. A home-manager configuration or a
-# hjem configuration sets the variable to a profile declared inside it.
+# The `bin` directory of each profile of the system is put on the
+# `PATH` of every shell, by the path of the profile, in
+# `environment.profiles`. A switch of the profile therefore changes the
+# programs of every shell that starts afterwards.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
 # under the same name, and the `default` module of each imports it.
@@ -43,7 +40,6 @@
   config,
   lib,
   options,
-  pkgs,
   ...
 }:
 let
@@ -51,7 +47,7 @@ let
   selection = lib.caisson.integrations;
 
   hasUnits = options ? systemd && options.systemd ? services;
-  hasPackages = options ? environment && options.environment ? systemPackages;
+  hasProfiles = options ? environment && options.environment ? profiles;
 
   coreModule =
     if (evalManifest.type or null) == "system-manager" then
@@ -125,38 +121,12 @@ let
       };
     };
 
-  choices = selection.profileChoicesOf {
-    selected = config.caisson.profiles.selected;
-    what = "this ${
-      if (evalManifest.type or null) == "system-manager" then "system-manager" else "NixOS"
-    } configuration";
-  } ofSystem;
-
-  shims = lib.mapAttrsToList (
-    variable: choice:
-    selection.profileShimsOf {
-      inherit pkgs variable;
-      inherit (choice) programs;
-      fallback = choice.chosen.manifest.outputs.profile.path;
-    }
-  ) choices;
+  # The paths of the profiles of the system, whose `bin` directories a
+  # shell has on `PATH`.
+  paths = builtins.map (entry: entry.manifest.outputs.profile.path) ofSystem;
 in
 {
   imports = [ coreModule ];
-
-  options.caisson.profiles.selected = lib.mkOption {
-    type = lib.types.attrsOf lib.types.str;
-    default = { };
-    example = {
-      CAISSON_NVIM_PROFILE = "nvf/editor";
-    };
-    description = ''
-      By the variable that chooses among them, the profile a shell runs
-      when it sets no other, as `<kind>/<name>`: `nvf/editor` is the nvf
-      configuration declared as `editor`. Needed only where several
-      profiles declared inside this configuration share a variable.
-    '';
-  };
 
   # `optionalAttrs` and not `mkIf` decides whether each option is
   # defined at all: NixOS refuses a definition, even under `mkIf false`,
@@ -178,8 +148,8 @@ in
         ) hjemUsers
       );
     }
-    // lib.optionalAttrs hasPackages {
-      environment.systemPackages = shims;
+    // lib.optionalAttrs hasProfiles {
+      environment.profiles = paths;
     }
   );
 }

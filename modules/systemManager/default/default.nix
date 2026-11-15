@@ -20,9 +20,9 @@
 #   configurations and the hjem configurations when the system-manager
 #   configuration is activated.
 # - The registered module `profile-activation`, the same module a NixOS
-#   configuration uses, activates the profile of each nvf or nixvim
-#   configuration declared inside the system-manager configuration, and
-#   lets a shell choose among them.
+#   configuration uses, activates the profile of each nvf, nixvim or
+#   nemacs configuration declared inside the system-manager
+#   configuration, and puts the `bin` directory of each on `PATH`.
 # - The registered module `activation-marker` records what the
 #   system-manager configuration applied, for the configurations
 #   declared inside it to check for drift.

@@ -10,12 +10,9 @@
 # nix-darwin or system-manager configuration the hjem configuration is
 # declared inside activates the profiles, as the user, after the hjem
 # configuration is applied (the module `profile-activation` of the
-# class of that configuration). This module adds to the packages of the
-# user the programs with which a shell chooses among profiles
-# (`lib.caisson.integrations.profileShimsOf`), and sets the variable
-# that chooses, `CAISSON_NVIM_PROFILE` for a Neovim, to the profile of
-# the user, so that the programs that configuration installs choose the
-# same.
+# class of that configuration). This module puts the `bin` directory of
+# each profile in front of the `PATH` of the user, by the path of the
+# profile, in `environment.sessionVariables`.
 #
 # A hjem configuration with no such configuration above it is applied
 # with `hjem standalone switch`, and no configuration above activates
@@ -65,17 +62,10 @@ let
 
   profiles = selection.profilesActivatedBy evalManifest config.caisson.exports.configurations;
 
-  choices = selection.profileChoicesOf {
-    selected = config.caisson.profiles.selected;
-    what = "this hjem configuration";
-  } profiles;
-
   # The path of a profile, with `$HOME` written out as the directory of
   # the user, for a variable hjem writes as given.
   pathOf =
-    choice:
-    builtins.replaceStrings [ "$HOME" ] [ config.directory ]
-      choice.chosen.manifest.outputs.profile.path;
+    entry: builtins.replaceStrings [ "$HOME" ] [ config.directory ] entry.manifest.outputs.profile.path;
 
   # True when no configuration above applies this hjem configuration: there is no
   # configuration above it with an activation.
@@ -146,20 +136,6 @@ let
   );
 in
 {
-  options.caisson.profiles.selected = lib.mkOption {
-    type = lib.types.attrsOf lib.types.str;
-    default = { };
-    example = {
-      CAISSON_NVIM_PROFILE = "nvf/editor";
-    };
-    description = ''
-      By the variable that chooses among them, the profile a shell runs
-      when it sets no other, as `<kind>/<name>`: `nvf/editor` is the nvf
-      configuration declared as `editor`. Needed only where several
-      profiles declared inside this hjem configuration share a variable.
-    '';
-  };
-
   config = lib.mkIf (!evalManifest.childless && profiles != [ ]) {
     files = lib.mkMerge [
       (lib.mkIf (standalone && (onLinux || onDarwin)) {
@@ -176,15 +152,8 @@ in
       })
     ];
 
-    packages = lib.mapAttrsToList (
-      variable: choice:
-      selection.profileShimsOf {
-        inherit pkgs variable;
-        inherit (choice) programs;
-        fallback = pathOf choice;
-      }
-    ) choices;
-
-    environment.sessionVariables = builtins.mapAttrs (_variable: pathOf) choices;
+    environment.sessionVariables.PATH = builtins.map (entry: "${pathOf entry}/bin") profiles ++ [
+      "$PATH"
+    ];
   };
 }

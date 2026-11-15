@@ -112,13 +112,6 @@
           kept = selection.profileOf {
             inherit pkgs manifest package;
             kind = "nemacs";
-            # The programs of the editor that a shell chooses among
-            # profiles for.
-            programs = [
-              "emacs"
-              "emacsclient"
-            ];
-            variable = "CAISSON_NEMACS_PROFILE";
             warn = value.config.caisson.drift.warn or true;
           };
         in

@@ -182,7 +182,6 @@ let
           home.homeDirectory = "/home/frank";
           home.stateVersion = "25.05";
           home.file.".config/probe/version".text = version;
-          caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/home-editor";
           caisson.nvf.configurations.home-editor = lib.caisson.nvf.mkConfiguration {
             configModule = editorOf version;
           };
@@ -270,7 +269,6 @@ let
             uid = 1005;
           };
           caisson.home-manager.activation.usersDeclaredElsewhere = [ "dave" ];
-          caisson.profiles.selected.CAISSON_NVIM_PROFILE = "nvf/editor";
           environment.systemPackages = [ (bobOf "v1").outputs.cli ];
           environment.etc = {
             "caisson/manifest-bob-v1.json".source = bobManifest "v1";
