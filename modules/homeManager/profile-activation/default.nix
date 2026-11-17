@@ -17,7 +17,10 @@
 #
 # The `bin` directory of each profile is added to `home.sessionPath`,
 # by the path of the profile, so a switch of the profile changes the
-# programs of every shell that starts afterwards.
+# programs of every shell that starts afterwards. The `share/fonts`
+# directory of each profile is a fontconfig directory, by the path of
+# the profile, in a file of `~/.config/fontconfig/conf.d`, so the fonts
+# of a profile are the fonts of the programs that start afterwards.
 #
 # caisson's `default` home-manager module imports this module. It
 # defines nothing in the childless evaluation.
@@ -44,5 +47,9 @@ in
         );
 
     home.sessionPath = builtins.map (entry: "${entry.manifest.outputs.profile.path}/bin") profiles;
+
+    xdg.configFile."fontconfig/conf.d/60-caisson-profiles.conf".text = selection.profileFontsConfOf (
+      builtins.map (entry: entry.manifest.outputs.profile.path) profiles
+    );
   };
 }

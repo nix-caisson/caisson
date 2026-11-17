@@ -2076,7 +2076,12 @@
       # `package` with `nix build --profile`, which also makes the
       # profile a garbage-collector root. When the profile already
       # points at `package`, it changes nothing, so activating the same
-      # generation again adds no generation to the profile.
+      # generation again adds no generation to the profile. When the
+      # profile has a `share/fonts` directory, `activate` refreshes the
+      # fontconfig cache of it after a switch: every store directory has
+      # the same modification time, so fontconfig keeps trusting the cache
+      # of the directory that the profile held before, and lists no font
+      # of the new one.
       #
       # Where the profile is depends on the configuration above. Inside
       # a NixOS, nix-darwin or system-manager configuration it is a
@@ -2136,6 +2141,9 @@
               ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$profile")"
               if [ "$(${pkgs.coreutils}/bin/readlink -f "$profile" 2>/dev/null || true)" != '${package}' ]; then
                 ${pkgs.nix}/bin/nix --extra-experimental-features nix-command build --no-link --profile "$profile" '${package}'
+                if [ -d "$profile/share/fonts" ]; then
+                  ${pkgs.fontconfig}/bin/fc-cache -f "$profile/share/fonts" || true
+                fi
               fi
             '';
           };
@@ -2165,6 +2173,28 @@
           && (entry.manifest.system or null) == (manifest.system or null)
           && checksMarkerOf manifest entry
         ) configurations;
+
+      # The fontconfig directory entries for the profiles in `paths`, the
+      # paths of the profiles as shell text that may name `$HOME`: an
+      # entry for the `share/fonts` directory of each, with `~` written
+      # for `$HOME`, which fontconfig expands. A profile with no such
+      # directory adds no font, and fontconfig ignores the entry.
+      profileFontDirsOf =
+        paths:
+        builtins.concatStringsSep "" (
+          builtins.map (
+            path: "<dir>${builtins.replaceStrings [ "$HOME" ] [ "~" ] path}/share/fonts</dir>\n"
+          ) paths
+        );
+
+      # The same entries as a fontconfig file, for a configuration that
+      # has no option for them.
+      profileFontsConfOf = paths: ''
+        <?xml version="1.0"?>
+        <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+        <fontconfig>
+        ${profileFontDirsOf paths}</fontconfig>
+      '';
 
       isManifest = value: builtins.isAttrs value && (value._type or null) == "caisson-manifest";
 
@@ -3527,6 +3557,8 @@
             safeName
             profileOf
             profilesActivatedBy
+            profileFontDirsOf
+            profileFontsConfOf
             mkEvaluation
             publish
             topValue

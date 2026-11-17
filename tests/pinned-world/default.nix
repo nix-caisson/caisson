@@ -5513,6 +5513,10 @@ let
         homeManagerConfig.home.sessionPath == [
           "$HOME/.local/state/caisson/profiles/nvf/home-editor/bin"
         ]
+      # Its `share/fonts` directory is a fontconfig directory of the user.
+      &&
+        pkgs.lib.hasInfix "<dir>~/.local/state/caisson/profiles/nvf/home-editor/share/fonts</dir>"
+          homeManagerConfig.xdg.configFile."fontconfig/conf.d/60-caisson-profiles.conf".text
       # The profile of `editor`, declared at the caisson top, is a profile of
       # the user, and it points at the Neovim nvf builds.
       && topProfile.scope == "user"
@@ -5629,6 +5633,7 @@ let
       && unit.wantedBy == [ "multi-user.target" ]
       && !(unit.serviceConfig ? User)
       && builtins.elem "/nix/var/nix/profiles/caisson/nemacs/machine-editor" machine.environment.profiles
+      && pkgs.lib.hasInfix "<dir>/nix/var/nix/profiles/caisson/nemacs/machine-editor/share/fonts</dir>" machine.fonts.fontconfig.localConf
       && topProfile.scope == "user"
       && topProfile.path == "$HOME/.local/state/caisson/profiles/nemacs/editor"
       && topProfile.package.drvPath == upstream.config.build.package.drvPath;
