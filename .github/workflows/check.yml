@@ -11,6 +11,13 @@ jobs:
       # there and the check still runs.
       HAVE_CACHIX: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
     steps:
+      # The VM tests write disk images and fill the store of the
+      # runner, so the job starts by removing software of the runner
+      # image that the checks do not use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v7
       - uses: DeterminateSystems/nix-installer-action@v22
         with:
@@ -26,8 +33,14 @@ jobs:
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       # One build at a time: the checks include a QEMU guest for each
       # VM test, and a hosted runner has been shut down while several
-      # guests booted at once.
-      - run: nix flake check -L --max-jobs 1
+      # guests booted at once. A line every 30 seconds records the
+      # memory and disk in use, so that the log of a shut down run shows
+      # which of the two ran out.
+      - run: |
+          (while sleep 30; do
+            echo "resources: $(free -m | awk 'NR==2 {print $3 "/" $2 " MB memory"}'), $(df -h / | awk 'NR==2 {print $4 " free on /"}')"
+          done) &
+          nix flake check -L --max-jobs 1
   # The checks `lib.caisson.mkVolatileCheck` returns, built into the
   # store of the runner (tests/volatile-checks/check.sh): a pass writes
   # its marker and a failure leaves none. A check of `nix flake check`
