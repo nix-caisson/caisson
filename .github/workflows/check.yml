@@ -24,7 +24,10 @@ jobs:
           name: caisson
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-      - run: nix flake check -L
+      # One build at a time: the checks include a QEMU guest for each
+      # VM test, and a hosted runner has been shut down while several
+      # guests booted at once.
+      - run: nix flake check -L --max-jobs 1
   # The checks `lib.caisson.mkVolatileCheck` returns, built into the
   # store of the runner (tests/volatile-checks/check.sh): a pass writes
   # its marker and a failure leaves none. A check of `nix flake check`
