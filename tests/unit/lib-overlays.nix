@@ -733,6 +733,67 @@ in
     # The registries under `lib.caisson` are read from the manifest of
     # the library, and a lib overlay that writes a registry attribute
     # into the library adds nothing to them.
+    # A group of the registry of configurations that names the class of
+    # an integration rather than the integration is refused, with the
+    # directory it should move to, whether the configurations are read
+    # from the registry or found by name by a caisson top.
+    "test: configurations registered under a class name are refused with the integration directory" = {
+      expr =
+        (mkTestLib {
+          name = "class-keyed";
+          configs = testLib: {
+            flake.class-keyed = testLib.caisson.flake-parts.mkModule ({ ... }: { ... }: { });
+          };
+        }).caisson.configs;
+      expectedError = {
+        type = "ThrownError";
+        msg = "`configs/flake` names the class `flake` rather than an integration; move it to `configs/flake-parts`";
+      };
+    };
+
+    "test: a caisson top refuses configurations registered under a class name" = {
+      expr =
+        (mkTestLib {
+          name = "class-keyed";
+          configs = testLib: {
+            flake.class-keyed = testLib.caisson.flake-parts.mkModule ({ ... }: { ... }: { });
+          };
+        }).caisson.flake-parts.mkTopConfiguration
+          { };
+      expectedError = {
+        type = "ThrownError";
+        msg = "move it to `configs/flake-parts`";
+      };
+    };
+
+    "test: configurations registered under a name that is no integration are refused" = {
+      expr =
+        (mkTestLib {
+          configs = testLib: {
+            not-an-integration.probe = testLib.caisson.structural.mkModule ({ ... }: { ... }: { });
+          };
+        }).caisson.configs;
+      expectedError = {
+        type = "ThrownError";
+        msg = "`configs/not-an-integration` names no integration of this library";
+      };
+    };
+
+    "test: configurations registered under integration names are taken" = {
+      expr = builtins.attrNames (
+        (mkTestLib {
+          configs = testLib: {
+            flake-parts.probe = testLib.caisson.flake-parts.mkModule ({ ... }: { ... }: { });
+            structural.probe = testLib.caisson.structural.mkModule ({ ... }: { ... }: { });
+          };
+        }).caisson.configs
+      );
+      expected = [
+        "flake-parts"
+        "structural"
+      ];
+    };
+
     "test: the registries are read from the manifest" = {
       expr =
         let
