@@ -28,7 +28,7 @@ in
       declares is declared for every check the caisson top gathers. A name that several
       configurations declare has the same `description` and `volatile`
       in each.
-      caisson declares `build`, `eval`, `unit`, `vm` and `format`.
+      caisson declares `build`, `eval`, `unit`, `vm`, `qemu` and `format`.
     '';
   };
 
@@ -37,6 +37,7 @@ in
     eval.description = "An assertion on evaluation, as a derivation that builds nothing and fails when the assertion does.";
     unit.description = "The unit tests of Nix code pass, run with nix-unit.";
     vm.description = "A test that runs virtual machines with the NixOS test driver passes.";
+    qemu.description = "A test that boots firmware, a kernel or a disk image in a QEMU process it starts in the build, without the NixOS test driver, passes.";
     format.description = "The source files are formatted as the formatter configuration says.";
   };
 }

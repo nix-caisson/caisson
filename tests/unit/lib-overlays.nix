@@ -3775,6 +3775,7 @@ in
             "eval"
             "format"
             "hardware"
+            "qemu"
             "unit"
             "vm"
           ];
