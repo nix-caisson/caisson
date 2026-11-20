@@ -189,7 +189,7 @@ let
   # The home-manager configurations whose packages this NixOS
   # configuration installs (`caisson.useUserPackages`).
   installedHere = builtins.filter (
-    homeManagerConfiguration: homeManagerConfiguration.packages.setBy == "machine"
+    homeManagerConfiguration: homeManagerConfiguration.packages.setBy == "systemConfiguration"
   ) homeManagerConfigurations;
 
   # The accounts in the result of the childless evaluation of this

@@ -30,7 +30,7 @@
 let
   manifest = lib.caisson-core.evalManifest;
   usesNixos = options ? nixos && options.nixos ? module;
-  nixos = lib.caisson.caisson-nixops4-resource.machineOf {
+  nixos = lib.caisson.caisson-nixops4-resource.nixosConfigurationOf {
     context = "caisson's `nixos` module of the nixops4Component class";
     resource = manifest.name;
     declared = config.caisson.nixos.configurations;

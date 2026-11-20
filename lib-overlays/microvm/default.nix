@@ -128,7 +128,7 @@
           inherit (nixos) exportsTo;
           # A guest runs as a separate virtual computer. A configuration
           # with an activation declared inside it checks its marker.
-          activation = final.caisson.integrations.machineActivation;
+          activation = final.caisson.integrations.systemConfigurationActivation;
           evaluate = evaluate args;
         };
 

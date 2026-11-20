@@ -131,7 +131,7 @@
       # the NixOS configurations declared inside it (`declared`): the
       # only such configuration, evaluated for one system. `context` names the module
       # that asks, for the errors.
-      machineOf =
+      nixosConfigurationOf =
         {
           context,
           resource,
@@ -441,7 +441,7 @@
             pkgsFor
             showPath
             absoluteMemberPathOf
-            machineOf
+            nixosConfigurationOf
             discoverArgsOf
             systemArg
             ;

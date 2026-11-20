@@ -34,7 +34,7 @@
 # sets `caisson.useUserPackages`, the file also holds `profiles`: for
 # each such configuration, by the name of the marker file of that
 # configuration, the digest of what each profile holds
-# (`lib.caisson.integrations.machineProfilesOf`). The identity leaves
+# (`lib.caisson.integrations.profilesSetBySystemConfiguration`). The identity leaves
 # those configurations out, so these digests are what tells a
 # configuration built from another version that the switch set its
 # profile to something else.
@@ -83,13 +83,13 @@ let
   marker = selection.markerOf evalManifest;
 
   # The profiles this configuration sets for the configurations that check its
-  # marker (`machineProfilesOf`), by the name of the marker file of each
+  # marker (`profilesSetBySystemConfiguration`), by the name of the marker file of each
   # configuration.
   profiles = builtins.listToAttrs (
     builtins.concatMap (
       entry:
       let
-        digests = selection.machineProfilesOf entry.manifest;
+        digests = selection.profilesSetBySystemConfiguration entry.manifest;
       in
       if digests == { } then
         [ ]

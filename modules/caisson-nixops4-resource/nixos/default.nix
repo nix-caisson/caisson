@@ -42,7 +42,7 @@ let
   # The NixOS configuration the resource deploys: the NixOS
   # configuration declared inside it, evaluated for one system.
   nixos =
-    (lib.caisson.caisson-nixops4-resource.machineOf {
+    (lib.caisson.caisson-nixops4-resource.nixosConfigurationOf {
       inherit context declared;
       resource = manifest.name;
     }).value;

@@ -1877,7 +1877,7 @@
       # is applied on a different computer than the configuration above,
       # and the marker under `/etc` that it finds there is the marker it
       # wrote, so it checks nothing above it: `standsAlone`.
-      machineActivation = {
+      systemConfigurationActivation = {
         standsAlone = true;
         identity =
           manifest: if (manifest.outputs or { }) ? toplevel then manifest.outputs.toplevel.outPath else null;
@@ -1926,7 +1926,7 @@
 
       # The profiles of the configuration of `manifest` that a switch of
       # the NixOS or nix-darwin configuration above sets,
-      # `setBy = "machine"` in its profile adapter (`profileAdapter` of
+      # `setBy = "systemConfiguration"` in its profile adapter (`profileAdapter` of
       # `activation`), by profile name. Each is the digest of the store
       # path the profile holds once the configuration is applied
       # (`digestOf`). The marker of the configuration above records
@@ -1934,14 +1934,14 @@
       # the drift check of the configuration compares them
       # (`driftCheckOf`). Empty for a configuration without a profile
       # adapter, or whose profiles the configuration above does not set.
-      machineProfilesOf =
+      profilesSetBySystemConfiguration =
         manifest:
         let
           adapter = (manifest.activation or { }).profileAdapter or null;
           profiles = if adapter == null then { } else (adapter manifest).profiles;
         in
         builtins.mapAttrs (_: profile: digestOf (toString profile.holds)) (
-          final.filterAttrs (_: profile: profile.setBy == "machine") profiles
+          final.filterAttrs (_: profile: profile.setBy == "systemConfiguration") profiles
         );
 
       # True when `entry`, an entry of `caisson.exports.configurations`
@@ -1986,7 +1986,7 @@
       # warning off, for the message.
       #
       # `profiles` are the profiles of this configuration that a switch
-      # of the configuration above sets (`machineProfilesOf`). The
+      # of the configuration above sets (`profilesSetBySystemConfiguration`). The
       # identity of the configuration above leaves out the
       # configurations declared inside it, so it is the same when this
       # configuration changes. For each such profile, the check also
@@ -3555,8 +3555,8 @@
             belongsHere
             recordOf
             activatingAncestorOf
-            machineProfilesOf
-            machineActivation
+            profilesSetBySystemConfiguration
+            systemConfigurationActivation
             markerFileName
             markerOf
             checksMarkerOf

@@ -592,7 +592,7 @@
       # `holds`, the store path it holds once the home-manager
       # configuration is applied, and `setBy`, what sets it:
       # `activation`, the `activate` script run as the user, or
-      # `machine`, a switch of the NixOS or nix-darwin configuration the
+      # `systemConfiguration`, a switch of the NixOS or nix-darwin configuration the
       # home-manager configuration is declared inside, which builds the profile as
       # part of the system.
       #
@@ -635,7 +635,7 @@
             packages = {
               path = home.profileDirectory;
               holds = home.path;
-              setBy = if externalPackageInstall then "machine" else "activation";
+              setBy = if externalPackageInstall then "systemConfiguration" else "activation";
             };
           };
         };
