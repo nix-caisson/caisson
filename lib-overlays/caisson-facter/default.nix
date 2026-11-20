@@ -187,7 +187,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "caisson-facter";
+            integration = "caisson-facter";
             configModule = args.configModule or null;
           };
 

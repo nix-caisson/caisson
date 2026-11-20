@@ -42,6 +42,6 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/minimal-consumer;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/minimal-consumer;
     };
 }

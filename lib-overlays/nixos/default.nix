@@ -51,9 +51,13 @@
           # the package set lands on `nixpkgs.pkgs`; without it, the
           # set is the `pkgs` module argument.
           nixpkgsModule ? true,
+          # The integration whose registered configurations the
+          # configuration is found among by name: `nixos-minimal` for
+          # the minimal evaluator, `microvm` for a microvm guest.
+          integration ? "nixos",
         }:
         given: args:
-        composeNixos { inherit context nixpkgsModule; } given args
+        composeNixos { inherit context nixpkgsModule integration; } given args
         // {
           src = resolveEcosystemSrc {
             explicit = args.ecosystemSrc or null;

@@ -2107,6 +2107,25 @@ in
             // extraOverlays;
         };
       myLib = mkComposition { };
+      # A composition that registers a home-manager configuration
+      # `chris`, beside the nixos integrations, and that entry of its
+      # registry of configurations.
+      otherClassLib = caisson.mkLib {
+        dependencies = dependenciesWithNixos;
+        name = "other-class";
+        defaultEcosystemSrc = nixosEcosystemSrc;
+        systems = [ "x86_64-linux" ];
+        pkgSets = stubPkgSets { default = { }; };
+        libOverlays = _lib: {
+          nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+          nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
+          home-manager = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/home-manager");
+        };
+        configs = callbackLib: {
+          home-manager.chris = callbackLib.caisson.home-manager.mkModule ({ ... }: { ... }: { });
+        };
+      };
+      otherClassEntry = otherClassLib.caisson.configs.home-manager.chris;
       # A composition that declares a single system, a stand-in package
       # config, and a NixOS configuration registered under the name
       # `probe`, which records the name and the system of its
@@ -2827,6 +2846,138 @@ in
           type = "nixos";
           published = [ "small" ];
           minimal = true;
+        };
+      };
+
+      # The registry of configurations is keyed by integration. A NixOS
+      # configuration of the nixos integration takes the module
+      # registered as `configs/nixos/<name>`, and a NixOS configuration
+      # of the nixos-minimal integration takes the module registered as
+      # `configs/nixos-minimal/<name>`, though both are of the class
+      # `nixos`. Neither takes the module registered for the other: the
+      # registry holds `shared` for both integrations, `full-only` for
+      # nixos alone and `minimal-only` for nixos-minimal alone, and each
+      # registered module declares and sets `registeredAs`.
+      "test: a configuration takes only the module registered for its integration" = {
+        expr =
+          let
+            registeredAs =
+              value:
+              { ... }:
+              { lib, ... }:
+              {
+                options.registeredAs = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                };
+                config.registeredAs = value;
+              };
+            registeringLib = caisson.mkLib {
+              dependencies = dependenciesWithNixos;
+              name = "registering";
+              defaultEcosystemSrc = nixosEcosystemSrc;
+              systems = [ "x86_64-linux" ];
+              pkgSets = stubPkgSets { default = { }; };
+              libOverlays = _lib: {
+                nixos = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos");
+                nixos-minimal = mkLibOverlay (inputs.parent.outPath + "/lib-overlays/nixos-minimal");
+              };
+              configs = callbackLib: {
+                nixos = {
+                  shared = callbackLib.caisson.nixos.mkModule (registeredAs "nixos");
+                  full-only = callbackLib.caisson.nixos.mkModule (registeredAs "nixos");
+                };
+                nixos-minimal = {
+                  shared = callbackLib.caisson.nixos.mkModule (registeredAs "nixos-minimal");
+                  minimal-only = callbackLib.caisson.nixos.mkModule (registeredAs "nixos-minimal");
+                };
+              };
+            };
+            # The NixOS configurations a structural caisson top declares
+            # with `configurations`, with no module given, by name.
+            evaluatedFrom =
+              configurations:
+              let
+                top = registeringLib.caisson.structural.mkTopConfiguration {
+                  moduleImports = _modules: [ ];
+                  configModule =
+                    { lib, ... }:
+                    {
+                      caisson.nixos.configurations = configurations lib;
+                    };
+                };
+              in
+              builtins.mapAttrs (_: value: value.config.registeredAs or null) top.nixosConfigurations;
+          in
+          {
+            nixos = evaluatedFrom (lib: {
+              shared = lib.caisson.nixos.mkConfiguration { };
+              minimal-only = lib.caisson.nixos.mkConfiguration { };
+            });
+            nixos-minimal = evaluatedFrom (lib: {
+              shared = lib.caisson.nixos-minimal.mkConfiguration { };
+              full-only = lib.caisson.nixos-minimal.mkConfiguration { };
+            });
+            classes = builtins.mapAttrs (
+              _: builtins.mapAttrs (_: entry: entry._class)
+            ) registeringLib.caisson.configs;
+          };
+        expected = {
+          nixos = {
+            shared = "nixos";
+            minimal-only = null;
+          };
+          nixos-minimal = {
+            shared = "nixos-minimal";
+            full-only = null;
+          };
+          # Each entry states the class of its integration, and the
+          # class of nixos-minimal is the class of nixos.
+          classes = {
+            nixos = {
+              shared = "nixos";
+              full-only = "nixos";
+            };
+            nixos-minimal = {
+              shared = "nixos";
+              minimal-only = "nixos";
+            };
+          };
+        };
+      };
+
+      # A configuration registered for the home-manager integration
+      # states the class `homeManager`. Given as the module of a NixOS
+      # configuration, it is refused by the module system, and given as
+      # the definition of an option of the module type of the class
+      # `nixos`, it is refused by that type.
+      "test: a registered configuration states the class of its integration" = {
+        expr = {
+          class = otherClassEntry._class;
+          takenByItsClass = builtins.isAttrs (
+            moduleOption otherClassLib.caisson.home-manager.types.module otherClassEntry
+          );
+        };
+        expected = {
+          class = "homeManager";
+          takenByItsClass = true;
+        };
+      };
+
+      "test: a NixOS configuration refuses a registered configuration of another class as its module" = {
+        expr =
+          (otherClassLib.caisson.nixos-minimal.mkTopConfiguration { configModule = otherClassEntry; }).config;
+        expectedError = {
+          type = "ThrownError";
+          msg = "\\(class: \"homeManager\"\\) cannot be imported into a module evaluation that expects class \"nixos\"";
+        };
+      };
+
+      "test: the module type refuses a registered configuration of another class" = {
+        expr = moduleOption otherClassLib.caisson.nixos.types.module otherClassEntry;
+        expectedError = {
+          type = "ThrownError";
+          msg = "is a module of[[:space:]]+the class `homeManager`, and the option takes a module of the class `nixos`";
         };
       };
 
@@ -4461,7 +4612,7 @@ in
             tools.overlay = _final: _prev: { };
           };
           configs = callbackLib: {
-            homeManager.chris = callbackLib.caisson.home-manager.mkModule (
+            home-manager.chris = callbackLib.caisson.home-manager.mkModule (
               { ... }:
               { ... }:
               {
@@ -6554,13 +6705,14 @@ in
         expectedError = unexpectedArgument "mkConfiguration" "ecosystemArgs";
       };
 
-      "test: an alt has entry points and the types of the owner" = {
+      "test: an alt has entry points and the class and the types of the owner" = {
         expr = {
           names = builtins.attrNames declaringLib.caisson.probe-alt;
           alt = (declaringLib.caisson.probe-alt.mkConfiguration { configModule = { }; }).alt;
         };
         expected = {
           names = [
+            "class"
             "mkConfiguration"
             "mkConfigurationWithEcosystemArgs"
             "types"
@@ -6908,12 +7060,13 @@ in
         expected = true;
       };
 
-      # The alt has constructors only: the class, its registration
-      # form and its composition belong to the integration that owns
-      # the class.
-      "test: the alt has entry points and the types of the owner" = {
+      # The alt has constructors only, beside the class and the types of
+      # the owner: the registration form of the class and its
+      # composition belong to the integration that owns the class.
+      "test: the alt has entry points and the class and the types of the owner" = {
         expr = builtins.attrNames myLib.caisson.home-manager-minimal;
         expected = [
+          "class"
           "mkConfiguration"
           "mkConfigurationWithEcosystemArgs"
           "mkTopConfiguration"

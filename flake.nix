@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
 # The flake-parts caisson top of caisson: the flake-parts configuration
-# in configs/flake/caisson, which declares the configuration of what
+# in configs/flake-parts/caisson, which declares the configuration of what
 # caisson exports (configs/structural/impl) and the configuration that
-# holds the checks (configs/flake/checks). default.nix is the
+# holds the checks (configs/flake-parts/checks). default.nix is the
 # structural caisson top over the configuration of what caisson exports,
 # for a reader that is not a flake.
 {
@@ -48,7 +48,7 @@
 
     in
     # The configuration registered under the name the composition
-    # declares, configs/flake/caisson.
+    # declares, configs/flake-parts/caisson.
     lib.caisson.flake-parts.mkTopConfiguration { };
 
 }

@@ -30,6 +30,6 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.configs.flake.producer;
+      configModule = lib.caisson.configs.flake-parts.producer;
     };
 }

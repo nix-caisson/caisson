@@ -188,6 +188,7 @@
         {
           context,
           minimal,
+          integration,
         }:
         { lib, manifest }:
         args:
@@ -221,11 +222,12 @@
           moduleImports = integrations.moduleImportsOf "homeManager" { inherit lib manifest; } args;
 
           # The configuration's module: the module passed, else the
-          # configuration registered under the name of the home-manager
-          # configuration (`configs/homeManager/<name>`), else none.
+          # configuration registered for the integration under the name
+          # of the home-manager configuration
+          # (`configs/home-manager/<name>`,
+          # `configs/home-manager-minimal/<name>`), else none.
           configModule = integrations.configModuleOf {
-            inherit lib name;
-            class = "homeManager";
+            inherit lib name integration;
             configModule = args.configModule or null;
           };
 
@@ -355,10 +357,13 @@
           # Whether the evaluation imports home-manager's necessary
           # modules alone instead of its whole module tree.
           minimal ? false,
+          # The integration whose registered configurations the
+          # configuration is found among by name.
+          integration ? "home-manager",
         }:
         given: args:
         let
-          common = mkCommonArgs { inherit context minimal; } given args;
+          common = mkCommonArgs { inherit context minimal integration; } given args;
         in
         common
         // {
@@ -701,7 +706,7 @@
           {
             # The module of the home-manager configuration. When
             # absent, the configuration registered under its name
-            # (`lib.caisson.configs.homeManager.<name>`), if any.
+            # (`lib.caisson.configs.home-manager.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry. home-manager's module
             # list belongs to the entry point: mkConfiguration

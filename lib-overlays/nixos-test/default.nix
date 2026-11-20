@@ -95,10 +95,10 @@
 
           # The configuration's module: the module passed, else the
           # configuration registered under the name of the test
-          # (`configs/nixosTest/<name>`), else none.
+          # (`configs/nixos-test/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nixosTest";
+            integration = "nixos-test";
             configModule = args.configModule or null;
           };
 
@@ -297,7 +297,7 @@
           {
             # The test module. When absent, the configuration registered
             # under the name of the test
-            # (`lib.caisson.configs.nixosTest.<name>`), if any. Further
+            # (`lib.caisson.configs.nixos-test.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,

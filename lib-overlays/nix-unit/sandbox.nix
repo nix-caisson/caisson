@@ -85,7 +85,7 @@ let
       configs =
         lib:
         builtins.mapAttrs (
-          class: builtins.mapAttrs (_: lib.caisson-core.mkModule class)
+          integration: builtins.mapAttrs (_: lib.caisson-core.mkModule integration)
         ) composition.configs;
       pkgOverlays = lib: builtins.mapAttrs (_: lib.caisson-core.mkPkgOverlay) composition.pkgOverlays;
       # The lib overlays the library applied, by registry name, in the

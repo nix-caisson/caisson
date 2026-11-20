@@ -3,7 +3,7 @@
 # The flake-parts caisson top of the nix-unit test, evaluated for
 # x86_64-linux and aarch64-linux. It declares the nix-unit
 # configurations `passing` and `failing`, which take the modules
-# registered under their names (configs/nixUnit).
+# registered under their names (configs/nix-unit).
 { ... }:
 { lib, ... }:
 {

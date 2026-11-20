@@ -37,7 +37,7 @@
 
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      # Convention: config lives in configs/<class>/<name>
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/basic-composition;
+      # Convention: config lives in configs/<integration>/<name>
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/basic-composition;
     };
 }

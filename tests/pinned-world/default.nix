@@ -9,7 +9,7 @@
 # that moves and breaks an expectation fails at evaluation, in this
 # suite, rather than in a consumer.
 #
-# The checks configuration (configs/flake/checks) runs it as the
+# The checks configuration (configs/flake-parts/checks) runs it as the
 # `pinned-world` check, so `nix flake check` evaluates the suite at the
 # committed pins and a change to caisson is judged against the last
 # known good world. The drift workflow advances the pins in the working
@@ -1740,8 +1740,8 @@ let
     #
     # The registered world declares a configuration of each
     # integration and gives none of them a module. Each records the
-    # module registered under its name as `configs.<class>.<name>`,
-    # with the project of the composition and the file of the
+    # module registered for its integration under its name as
+    # `configs.<integration>.<name>`, with the project of the composition and the file of the
     # registered configuration, and none records an `inline/<index>`
     # event.
     everyModuleCaissonAddsIsNamed =
@@ -1844,11 +1844,11 @@ let
             builtins.filter (event: pkgs.lib.hasPrefix "configs." event.key) (declarationsOf registeredWorld)
           )
         );
-        registeredAs = class: name: {
-          key = "configs.${class}.${name}";
+        registeredAs = integration: name: {
+          key = "configs.${integration}.${name}";
           origin = {
             project = "pinned-world";
-            file = "tests/pinned-world/configs/${class}/${name}";
+            file = "tests/pinned-world/configs/${integration}/${name}";
           };
         };
         sortByKey = builtins.sort (a: b: a.key < b.key);
@@ -1858,21 +1858,21 @@ let
         sortByKey fromRegistry == sortByKey (
           [
             (registeredAs "structural" "pinned-world")
-            (registeredAs "nixos" "minimal")
+            (registeredAs "nixos-minimal" "minimal")
           ]
-          ++ builtins.map (class: registeredAs class "registered") [
+          ++ builtins.map (integration: registeredAs integration "registered") [
             "nixos"
-            "homeManager"
+            "home-manager"
             "hjem"
             "structural"
-            "flake"
+            "flake-parts"
             "caisson-colmena"
             "caisson-disko"
             "disko"
             "caisson-facter"
             "facter"
             "terranix"
-            "systemManager"
+            "system-manager"
             "treefmt"
             "nvf"
             "nixvim"
@@ -1880,7 +1880,7 @@ let
             "topology"
             "kubenix"
             "nixidy"
-            "nixosTest"
+            "nixos-test"
           ]
         )
       # The configuration given the entry registered as `minimal`
@@ -1894,7 +1894,7 @@ let
               && placeOf event == "system x86_64-linux / nixos given-an-entry"
             ) (declarationsOf registeredWorld)
           )
-        ) == [ "configs.nixos.minimal" ];
+        ) == [ "configs.nixos-minimal.minimal" ];
 
     # Each configuration records how it selected its modules. The caisson top
     # above the NixOS configuration gives `moduleImports`, which
@@ -7097,7 +7097,7 @@ let
       && builtins.attrNames nixosTestTop.caisson.manifest.exportRecord == [ ];
 
     # A test declared with no module takes the module registered under
-    # its name, `configs/nixosTest/<name>`, and the event of its node
+    # its name, `configs/nixos-test/<name>`, and the event of its node
     # names the file that declares the node.
     nixosTestTakesTheModuleRegisteredUnderItsName =
       let
@@ -7111,7 +7111,7 @@ let
           key = "nodes.machine/0";
           origin = {
             project = "pinned-world";
-            file = "tests/pinned-world/configs/nixosTest/registered";
+            file = "tests/pinned-world/configs/nixos-test/registered";
           };
         }
       ]

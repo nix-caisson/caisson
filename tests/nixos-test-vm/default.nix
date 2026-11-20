@@ -7,7 +7,7 @@
 #
 # The NixOS configuration `nas-1` declares the test `smoke` and gives
 # it no module, so the test takes the module registered under its name,
-# configs/nixosTest/smoke. The node of the test writes the host name of
+# configs/nixos-test/smoke. The node of the test writes the host name of
 # `nas-1`, which the test reads from the result of the childless
 # evaluation of `nas-1`, to a file, and the test script reads the file
 # in the VM.

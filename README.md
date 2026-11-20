@@ -38,9 +38,12 @@ fit together instead of colliding.
 
 Use `lib.caisson.mkLib` to compose your library, then
 `lib.caisson.flake-parts.mkTopConfiguration` to produce the flake outputs. By convention, your primary configuration
-lives in `configs/flake/<flake-name>`, and the registrations are read
-from the directories: `modules/<class>/<name>`, `configs/<class>/<name>`
-and `lib-overlays/<name>`.
+lives in `configs/flake-parts/<flake-name>`, and the registrations are read
+from the directories: `modules/<class>/<name>`, `configs/<integration>/<name>`
+and `lib-overlays/<name>`. Modules are named by class, because
+integrations share classes; configurations are named by integration,
+because a configuration for nixos-minimal is not a configuration for
+nixos, though both are of the class `nixos`.
 
 ```nix
 {
@@ -82,7 +85,7 @@ and `lib-overlays/<name>`.
         # (`modules = lib: { flake.default = lib.caisson.flake-parts.mkModule ./some/path; }`).
         modules = lib: lib.caisson.mkModules ./modules;
 
-        # The configurations, read from configs/<class>/<name>/default.nix.
+        # The configurations, read from configs/<integration>/<name>/default.nix.
         configs = lib: lib.caisson.mkModules ./configs;
 
         # The library overlays this flake registers, read from
@@ -95,7 +98,7 @@ and `lib-overlays/<name>`.
     in lib.caisson.flake-parts.mkTopConfiguration {
 
       # Your primary config is the configuration registered under the name declared
-      # above, configs/flake/my-flake. Pass `configModule` to evaluate
+      # above, configs/flake-parts/my-flake. Pass `configModule` to evaluate
       # another.
 
       # Which registered flake modules apply. Omitted, every entry named

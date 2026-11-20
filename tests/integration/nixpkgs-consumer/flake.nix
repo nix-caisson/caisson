@@ -31,7 +31,7 @@
         };
         pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
         configs = lib: lib.caisson.mkModules ./configs;
-        # `default` finds its module by name, configs/nixpkgsConfig/default;
+        # `default` finds its module by name, configs/nixpkgs/default;
         # `slim` has none registered and applies the default selection
         # alone; `explicit` names the `default` configuration as its
         # module.
@@ -39,7 +39,7 @@
           default = lib.caisson.nixpkgs.mkConfiguration { };
           slim = lib.caisson.nixpkgs.mkConfiguration { };
           explicit = lib.caisson.nixpkgs.mkConfiguration {
-            configModule = lib.caisson.configs.nixpkgsConfig.default;
+            configModule = lib.caisson.configs.nixpkgs.default;
           };
         };
       };
@@ -48,6 +48,6 @@
       # The default default applies caisson/default, which imports the
       # nixpkgs machinery, so the machinery comes from the `projects`
       # entry `caisson`.
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-consumer;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-consumer;
     };
 }

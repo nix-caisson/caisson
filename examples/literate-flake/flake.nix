@@ -68,8 +68,9 @@
           mkModule takes the closure attrset ({ closure-lib,
           mkModule, ... }) as its first arg list; files
           that don't need it take `{ ... }:`.
-        - `configs` is the same registration for `configs/<class>/<name>`,
-          the configurations a caisson top evaluates.
+        - `configs` is the same registration for `configs/<integration>/<name>`,
+          the configurations a caisson top evaluates, keyed by the
+          integration that evaluates them rather than by class.
         - `libOverlays` is a function from the `mkLibOverlay`
           helper returning the registered library overlays; `mkLibOverlays`
           derives it from `lib-overlays/<name>/default.nix`. Registering
@@ -111,7 +112,7 @@
 
       - The flake's top-level configuration (systems, caisson settings,
         per-system packages, etc.) is the configuration registered under the name
-        declared above, `configs/flake/literate-flake`. `configModule`
+        declared above, `configs/flake-parts/literate-flake`. `configModule`
         names another.
       - `moduleImports` returns the list of registered flake-class modules
         to activate, like `libOverlayImports` for overlays; the consumed

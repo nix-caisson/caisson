@@ -58,7 +58,7 @@ The upstream world caisson is tested against (nixpkgs, home-manager,
 colmena, disko, nix-darwin, hjem, terranix, system-manager, microvm.nix, and the test
 tooling) is pinned in
 `tests/dependencies/flake.lock`, a lock that only the checks
-configuration (`configs/flake/checks`) and the formatter partition read,
+configuration (`configs/flake-parts/checks`) and the formatter partition read,
 so caisson's `flake.nix` carries no churning pin. Where that lock names a
 dependency that `flake.lock` pins as well (caisson-core, flake-parts,
 nixpkgs-lib), the checks use the pin of `flake.lock`. The

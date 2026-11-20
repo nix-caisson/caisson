@@ -194,8 +194,8 @@
           classEntries =
             kind: registry:
             builtins.mapAttrs (
-              class: entries:
-              builtins.mapAttrs (name: fileOf "the ${kind} `${kind}s.${class}.${name}`" "_file") (local entries)
+              group: entries:
+              builtins.mapAttrs (name: fileOf "the ${kind} `${kind}s.${group}.${name}`" "_file") (local entries)
             ) registry;
 
           libOverlays = final.filterAttrs (_: entry: (entry.project or null) == null) (
@@ -300,10 +300,10 @@
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
-          # (`configs/nixUnit/<name>`), else none.
+          # (`configs/nix-unit/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nixUnit";
+            integration = "nix-unit";
             configModule = args.configModule or null;
           };
 
@@ -431,7 +431,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson.configs.nixUnit.<name>`), if any. Further
+            # (`lib.caisson.configs.nix-unit.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,

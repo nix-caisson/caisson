@@ -76,7 +76,7 @@
           # (`configs/nemacs/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nemacs";
+            integration = "nemacs";
             configModule = args.configModule or null;
           };
 

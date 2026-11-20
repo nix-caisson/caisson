@@ -73,7 +73,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "facter";
+            integration = "facter";
             configModule = args.configModule or null;
           };
 

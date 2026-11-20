@@ -91,7 +91,7 @@
           # (`configs/terranix/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "terranix";
+            integration = "terranix";
             configModule = args.configModule or null;
           };
 

@@ -190,7 +190,8 @@
               moduleImports = selection.moduleImportsOf class { inherit lib manifest; } settings;
               name = manifest.name or null;
               configModule = selection.configModuleOf {
-                inherit lib name class;
+                inherit lib name;
+                integration = type;
                 configModule = settings.configModule or null;
               };
               # The members, by name. The names come from `naming`, and

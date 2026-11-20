@@ -27,12 +27,12 @@
         };
         pkgOverlays = lib: lib.caisson.mkPkgOverlays ./pkg-overlays;
         configs = lib: lib.caisson.mkModules ./configs;
-        # A package config per configuration in configs/nixpkgsConfig:
+        # A package config per configuration in configs/nixpkgs:
         # `default`, `withExtra` and `withAdded`.
         pkgSets = lib: lib.caisson.nixpkgs.mkConfigurations { };
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.configs.flake.consumer;
+      configModule = lib.caisson.configs.flake-parts.consumer;
     };
 }

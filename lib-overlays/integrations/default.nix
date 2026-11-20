@@ -225,24 +225,27 @@
         ]
         ++ select "core" registry;
 
-      # The module of a configuration of `class` named `name`, in the
-      # evaluation whose lib is `lib`: `configModule` when the
-      # configuration was given one, else the configuration registered
-      # under its name (`lib.caisson.configs.<class>.<name>`), else
-      # null. A module given is returned as it was given. Every entry of
-      # the registry is keyed `configs.<class>.<name>@<project>`
+      # The module of a configuration of the integration `integration`
+      # named `name`, in the evaluation whose lib is `lib`:
+      # `configModule` when the configuration was given one, else the
+      # configuration registered under its name for that integration
+      # (`lib.caisson.configs.<integration>.<name>`), else null. A
+      # nixos-minimal configuration named `small` takes
+      # `configs/nixos-minimal/small` and never `configs/nixos/small`. A
+      # module given is returned as it was given. Every entry of the
+      # registry is keyed `configs.<integration>.<name>@<project>`
       # (`lib.caisson.configs`), so the `declaration` event of a module
       # from the registry names its entry, whether it was taken here or
       # given (`declarationEventsOf`).
       configModuleOf =
         {
           lib,
-          class,
+          integration,
           name,
           configModule ? null,
         }:
         let
-          registered = lib.caisson.configs.${class} or { };
+          registered = lib.caisson.configs.${integration} or { };
         in
         if configModule != null then
           configModule
@@ -360,7 +363,7 @@
       # `modules.<class>.<project>/<name>`, and the same entry read from
       # the library of that project is `modules.<class>.<name>`. A
       # configuration module taken from the registry of configurations
-      # is keyed `configs.<class>.<name>` (`configModuleOf`): the event
+      # is keyed `configs.<integration>.<name>` (`configModuleOf`): the event
       # carries that key, and its origin is the project of the lib and
       # the file of the registered configuration. A module of caisson
       # itself is keyed `caisson.<…>`, and its project is caisson. A
@@ -1386,21 +1389,21 @@
 
       # The class a module states it belongs to, or null where it
       # states none. A module states its class in one of two ways. A
-      # module with `_class` states it as the module system reads it.
-      # A module read from the registry (`lib.caisson.modules.<class>.<name>`)
-      # carries the class in its key, `modules.<class>.<name>@<project>`,
-      # and a registered configuration carries it in
-      # `configs.<class>.<name>@<project>` (`keyedModules` and
-      # `keyedConfigs` in lib-overlays/framework). A function or a path
-      # states no class, because reading one would call the function or
-      # import the file.
+      # module with `_class` states it as the module system reads it,
+      # and a registered configuration (`lib.caisson.configs.<integration>.<name>`)
+      # has the class of its integration as its `_class` (`keyedConfigs`
+      # in lib-overlays/framework). A module read from the registry
+      # (`lib.caisson.modules.<class>.<name>`) carries the class in its
+      # key, `modules.<class>.<name>@<project>` (`keyedModules` in
+      # lib-overlays/framework). A function or a path states no class,
+      # because reading one would call the function or import the file.
       classOfModule =
         module:
         let
           key = module.key or null;
           registered =
             if builtins.isString key then
-              builtins.match "(registered\\.)?(modules|configs)\\.([^.]+)\\..*@.*" key
+              builtins.match "(registered\\.)?modules\\.([^.]+)\\..*@.*" key
             else
               null;
         in
@@ -1409,7 +1412,7 @@
         else if (module._class or null) != null then
           module._class
         else if registered != null then
-          builtins.elemAt registered 2
+          builtins.elemAt registered 1
         else
           null;
 
@@ -1563,7 +1566,7 @@
       # declaration carries the entry points as pattern functions,
       # `mkConfiguration` and its `WithEcosystemArgs` variant, and the
       # result holds `namespace`, the value of `lib.caisson.<name>`: the
-      # entry points, the registration form `mkModule` bound to the
+      # entry points, the class, the registration form `mkModule` bound to the
       # class, the option types `types` (`typesOf`) built from the
       # name and the class, `configurationsModule`, and whatever
       # `extra` adds beside them (variants, and the composition an alt
@@ -1595,8 +1598,8 @@
 
           mkTopConfiguration = topConfiguration top mkConfiguration;
 
-          # A configuration for every configuration registered in the
-          # class (`configs/<class>/<name>`), by its name, each as
+          # A configuration for every configuration registered for the
+          # integration (`configs/<integration>/<name>`), by its name, each as
           # `mkConfiguration` builds it without `configModule`. The
           # arguments apply to all of them; a flake that wants only some,
           # or a configuration that differs, declares them with
@@ -1615,7 +1618,7 @@
                 another.
               ''
             else
-              builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson.configs.${class} or { })
+              builtins.mapAttrs (_: _: mkConfiguration args) (final.caisson.configs.${name} or { })
           ) (builtins.removeAttrs (functionArgs mkConfiguration) [ "configModule" ]);
         in
         {
@@ -1624,6 +1627,10 @@
               mkConfiguration
               mkConfigurationWithEcosystemArgs
               mkModule
+              # The class of the modules of its configurations, which
+              # the registry of configurations states as the `_class` of
+              # each configuration registered for the integration.
+              class
               ;
             types = typesOf final { inherit name class; };
             configurationsModule = configurationsModuleOf name;
@@ -3508,7 +3515,7 @@
           inherit mkConfiguration mkConfigurationWithEcosystemArgs;
           # Its modules are of the class of the owner, and its
           # configurations are configurations of the owner.
-          inherit (over) types;
+          inherit (over) class types;
         }
         // (if top == null then { } else { mkTopConfiguration = topConfiguration top mkConfiguration; })
         // extra;

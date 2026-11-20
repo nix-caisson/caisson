@@ -218,10 +218,10 @@
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
-          # (`configs/systemManager/<name>`), else none.
+          # (`configs/system-manager/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "systemManager";
+            integration = "system-manager";
             configModule = args.configModule or null;
           };
 
@@ -370,7 +370,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson.configs.systemManager.<name>`), if any.
+            # (`lib.caisson.configs.system-manager.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,

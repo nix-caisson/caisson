@@ -14,7 +14,7 @@
     expected = true;
   };
   testTheLibraryHoldsTheRegisteredConfigurations = {
-    expr = builtins.attrNames lib.caisson.configs.nixUnit;
+    expr = builtins.attrNames lib.caisson.configs.nix-unit;
     expected = [
       "failing"
       "passing"

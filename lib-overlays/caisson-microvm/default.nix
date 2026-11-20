@@ -135,7 +135,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "caisson-microvm";
+            integration = "caisson-microvm";
             configModule = args.configModule or null;
           };
 

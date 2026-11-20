@@ -85,7 +85,7 @@
           # (`configs/nixidy/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nixidy";
+            integration = "nixidy";
             configModule = args.configModule or null;
           };
 

@@ -167,27 +167,40 @@ let
       )
     );
 
-  # The configuration registry as an integration reads it: each
-  # configuration module wrapped in a module that imports it, keyed
-  # `configs.<class>.<name>@<project>`. The configurations of a registry
-  # are those of the flake that registered them: mkLib takes no
-  # configuration from a listed project, so a registry name is the name
-  # in the registering flake, and the project is the name of the flake.
-  # The key is therefore the same in every library that holds the
-  # entry, and a single module keys it. The key names the registry entry in the
-  # `declaration` events of a configuration, whether the configuration
-  # was taken by its name or a configuration was given the entry as its
-  # `configModule`.
+  # The configuration registry as an integration reads it. The registry
+  # is keyed by integration and then name (`configs/<integration>/<name>`
+  # on disk), because integrations share classes: nixos and nixos-minimal
+  # both evaluate the class `nixos`, and a configuration written for
+  # nixos-minimal declares the options that the base modules of nixos
+  # would declare. Each configuration module is wrapped in a module that
+  # imports it, keyed `configs.<integration>.<name>@<project>`, with the
+  # class of the integration as its `_class`. The class is the `class`
+  # of `lib.caisson.<integration>`, and the `_class` is null where the
+  # library composes no integration of that name. The module system
+  # refuses the wrapper in an evaluation of another class, and the
+  # module type of a class refuses it as a definition
+  # (`lib.caisson.integrations.classOfModule`).
+  #
+  # The configurations of a registry are those of the flake that
+  # registered them: mkLib takes no configuration from a listed project,
+  # so a registry name is the name in the registering flake, and the
+  # project is the name of the flake. The key is therefore the same in
+  # every library that holds the entry, and a single module keys it. The
+  # key names the registry entry in the `declaration` events of a
+  # configuration, whether the configuration was taken by its name or a
+  # configuration was given the entry as its `configModule`.
   keyedConfigs =
     lib:
     let
       project = (lib.caisson-core.libManifest or { }).name or "";
+      classOf = integration: ((lib.caisson or { }).${integration} or { }).class or null;
     in
     builtins.mapAttrs (
-      class:
+      integration:
       builtins.mapAttrs (
         name: module: {
-          key = "configs.${class}.${name}@${project}";
+          key = "configs.${integration}.${name}@${project}";
+          _class = classOf integration;
           imports = [ module ];
         }
       )

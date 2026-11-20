@@ -36,6 +36,6 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-pkg-sets;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-pkg-sets;
     };
 }
