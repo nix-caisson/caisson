@@ -255,7 +255,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "caisson-colmena";
+            integration = "caisson-colmena";
             configModule = args.configModule or null;
           };
 

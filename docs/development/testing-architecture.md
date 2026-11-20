@@ -19,8 +19,8 @@ For commands and test conventions, see [testing.md](./testing.md).
 ## Overview
 
 All checks are declared in the **checks configuration**
-(`configs/flake/checks`), a flake-parts configuration that the caisson top in
-`configs/flake/caisson` declares under
+(`configs/flake-parts/checks`), a flake-parts configuration that the caisson top in
+`configs/flake-parts/caisson` declares under
 `caisson.flake-parts.configurations.checks`. The checks configuration:
 
 1. Adds the development-time dependencies of `tests/dependencies` to the
@@ -99,7 +99,7 @@ and the workflows build them by name.
 
 ### The pattern
 
-For each test or example flake, `configs/flake/checks` builds a call:
+For each test or example flake, `configs/flake-parts/checks` builds a call:
 
 ```nix
 consumerPool = {
@@ -171,7 +171,7 @@ lib = core.mkLib {
 };
 
 lib.caisson.flake-parts.mkTopConfiguration {
-  configModule = lib.caisson.flake-parts.mkModule ./configs/flake/unit-tests;
+  configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/unit-tests;
 };
 ```
 
@@ -190,7 +190,7 @@ verify that the framework's composition machinery works end-to-end.
 
 ### nix-unit integration
 
-The test flake's config module (`tests/unit/configs/flake/unit-tests/default.nix`)
+The test flake's config module (`tests/unit/configs/flake-parts/unit-tests/default.nix`)
 imports the nix-unit flake-parts module:
 
 ```nix
@@ -324,27 +324,27 @@ writing, `nix flake check` runs:
 | `nix-unit` | `tests/unit/` | Library function correctness |
 | `composition-success` | `tests/integration/basic-composition/` | Basic flake composition |
 | `minimal-consumer-success` | `tests/integration/minimal-consumer/` | Minimal consumption pattern |
-| `minimal-consumer-all-outputs` | `configs/flake/checks` (inline) | Consumer exposes `flakeModule` and `lib` |
+| `minimal-consumer-all-outputs` | `configs/flake-parts/checks` (inline) | Consumer exposes `flakeModule` and `lib` |
 | `module-class-export-success` | `tests/integration/module-class-export/` | Class-keyed module export and disable |
 | `lib-consumer-chain-success` | `tests/integration/lib-consumer-chain/` | Transitive consumption through a middle flake |
 | `pkg-overlays-registry-producer` | `tests/integration/pkg-overlays-registry/producer/` | A package set applies the project `default` package overlay and its imports once; the `pkgOverlays` and `overlays` outputs carry the local entries; entries caisson contributed through `projects` are not exported by default |
 | `pkg-overlays-registry-consumer` | `tests/integration/pkg-overlays-registry/consumer/` | The consumer package sets apply both defaults, a shared import once, and a named entry only where selected; a project entry leaves only when a selector names it |
 | `literate-flake-default` | `examples/literate-flake/` | Example default package builds |
 | `literate-flake-greeting` | `examples/literate-flake/` | Example greeting package builds |
-| `debug-disabled` | `configs/flake/checks` (inline) | caisson's flake publishes no `debug` output |
+| `debug-disabled` | `configs/flake-parts/checks` (inline) | caisson's flake publishes no `debug` output |
 | `checks-evaluation-consumer` | `tests/integration/checks-evaluation/` | A consumer reads the exports of a producer whose checks configuration is declared with dependencies that throw when they are read, and the producer evaluates neither that configuration nor those dependencies; the `checks` output of the producer reads them and throws. The checks configuration declares the checks of the consumer with `caisson.checks.checks-evaluation.top` |
-| `pinned-world` | `configs/flake/checks` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
-| `hjem-system` | `configs/flake/checks` + `tests/hjem-system/` | The manifest file of a hjem configuration inside a NixOS configuration builds, which checks it against hjem's schema with `cue vet`, and so do the units that activate it, which runs shellcheck on their scripts |
-| `darwin-system` (aarch64-darwin) | `configs/flake/checks` + `tests/darwin-system/` | The nix-darwin configurations of the pinned-world suite, declared through the darwin integration, build: the bare nix-darwin configuration, and the nix-darwin configuration with a home-manager configuration and a hjem configuration inside it; the `darwin-build` job of the check workflow builds them on a macOS runner |
-| `drift-message` | `configs/flake/checks` + `tests/drift-message/` | The drift check of a configuration prints its warning, with the text quoted for the shell, when the marker of the configuration above differs |
-| `activation-vm` | `configs/flake/checks` + `tests/activation-vm/` | A NixOS VM switched between two versions and back activates the Nix profiles, the home-manager configurations and the hjem configurations declared inside it, through the units of each, and puts a profile changed by hand back |
-| `nix-unit-integration` | `configs/flake/checks` + `tests/nix-unit/` | The nix-unit integration in a flake-parts caisson top evaluated for x86_64-linux and aarch64-linux. The check record holds the check `unit` of each nix-unit configuration for both systems, with the category `unit`. The check of a passing configuration builds, so nix-unit runs its cases over the library composed again in the build sandbox. The check of a failing configuration fails to build, and its log names the failing case |
-| `nixos-test-vm` | `configs/flake/checks` + `tests/nixos-test-vm/` | A NixOS test declared through the nixos-test integration inside a NixOS configuration runs in a VM. The test takes the module registered under its name, and its node writes the host name it reads from the NixOS configuration the test is declared inside |
-| `user-packages-vm` | `configs/flake/checks` + `tests/user-packages-vm/` | A NixOS VM installs the packages of the home-manager configurations that set `caisson.useUserPackages` in `/etc/profiles/per-user/<user>`. Each switch between two versions, and a boot, changes those packages, also for a user who has no home directory yet. The activation of each such home-manager configuration links its files and records the generations that `home-manager generations` lists. A home-manager configuration without the option installs its packages into `~/.nix-profile` |
-| `nestedVmTests.x86_64-linux.microvm-host-vm`, built by name | `configs/flake/checks` + `tests/microvm-host-vm/` | A guest of a caisson-microvm configuration on cloud-hypervisor, on nested KVM, which the host runs through caisson's `microvm-host` NixOS module and the units of microvm.nix's host module: after `systemctl start microvm@probe.service` the unit is active, and the guest answers on its vsock port through the socket of its hybrid vsock. On a CI runner, which is itself a VM, the guest is three levels deep and does not boot within the start timeout, so no workflow builds it. We recommend building it by name on a machine with KVM before merging a change to `microvm-host` or the microvm integrations: `nix build -L '.#nestedVmTests.x86_64-linux.microvm-host-vm'` |
-| `system-manager-vm-<distribution>` | `configs/flake/checks` + `tests/system-manager/vm.nix` | A system-manager configuration, activated through sequences of changes in a VM of Ubuntu 22.04 or Debian 12 booted from the cloud image of the distribution, applies its profiles, its home-manager configurations and its hjem configuration, and a home-manager configuration activated by hand for another version warns of the drift |
-| `containerTests.x86_64-linux.system-manager-<distribution>`, built by name | `configs/flake/checks` + `tests/system-manager/container.nix` | The same sequences in a container of each distribution of `tests/system-manager/container-distros.nix`; the container needs `auto-allocate-uids`, so the `system-manager-container` job of the check workflow builds each by name |
-| `argument-errors` | `configs/flake/checks` + `tests/argument-errors/` | The argument error of every entry point comes from Nix itself, raised at the call site with no frame of caisson |
-| `deferred-errors` | `configs/flake/checks` + `tests/deferred-errors/` | The errors of deferred configurations and the NixOps4 integrations carry their text: `caisson-deferred: needs <path>` with the member path from the root, and the errors that refuse members or outputs named from outputs, a name declared as composite and resource, and a second root |
-| `nixops4-discovery` | `configs/flake/checks` + `tests/nixops4-discovery/` | The discovery program of a NixOps4 root builds, with one state resource and with two, and prints, from recorded state dumps, the output values at the paths the root names in `argsNeeded` |
-| `eval-weight` | `configs/flake/checks` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |
+| `pinned-world` | `configs/flake-parts/checks` + `tests/pinned-world/` | caisson composed with the pinned upstream world (nixpkgs, home-manager, colmena, disko, nix-darwin, hjem, terranix, system-manager) evaluates end to end; the `drift` workflow runs the same check against advanced pins |
+| `hjem-system` | `configs/flake-parts/checks` + `tests/hjem-system/` | The manifest file of a hjem configuration inside a NixOS configuration builds, which checks it against hjem's schema with `cue vet`, and so do the units that activate it, which runs shellcheck on their scripts |
+| `darwin-system` (aarch64-darwin) | `configs/flake-parts/checks` + `tests/darwin-system/` | The nix-darwin configurations of the pinned-world suite, declared through the darwin integration, build: the bare nix-darwin configuration, and the nix-darwin configuration with a home-manager configuration and a hjem configuration inside it; the `darwin-build` job of the check workflow builds them on a macOS runner |
+| `drift-message` | `configs/flake-parts/checks` + `tests/drift-message/` | The drift check of a configuration prints its warning, with the text quoted for the shell, when the marker of the configuration above differs |
+| `activation-vm` | `configs/flake-parts/checks` + `tests/activation-vm/` | A NixOS VM switched between two versions and back activates the Nix profiles, the home-manager configurations and the hjem configurations declared inside it, through the units of each, and puts a profile changed by hand back |
+| `nix-unit-integration` | `configs/flake-parts/checks` + `tests/nix-unit/` | The nix-unit integration in a flake-parts caisson top evaluated for x86_64-linux and aarch64-linux. The check record holds the check `unit` of each nix-unit configuration for both systems, with the category `unit`. The check of a passing configuration builds, so nix-unit runs its cases over the library composed again in the build sandbox. The check of a failing configuration fails to build, and its log names the failing case |
+| `nixos-test-vm` | `configs/flake-parts/checks` + `tests/nixos-test-vm/` | A NixOS test declared through the nixos-test integration inside a NixOS configuration runs in a VM. The test takes the module registered under its name, and its node writes the host name it reads from the NixOS configuration the test is declared inside |
+| `user-packages-vm` | `configs/flake-parts/checks` + `tests/user-packages-vm/` | A NixOS VM installs the packages of the home-manager configurations that set `caisson.useUserPackages` in `/etc/profiles/per-user/<user>`. Each switch between two versions, and a boot, changes those packages, also for a user who has no home directory yet. The activation of each such home-manager configuration links its files and records the generations that `home-manager generations` lists. A home-manager configuration without the option installs its packages into `~/.nix-profile` |
+| `nestedVmTests.x86_64-linux.microvm-host-vm`, built by name | `configs/flake-parts/checks` + `tests/microvm-host-vm/` | A guest of a caisson-microvm configuration on cloud-hypervisor, on nested KVM, which the host runs through caisson's `microvm-host` NixOS module and the units of microvm.nix's host module: after `systemctl start microvm@probe.service` the unit is active, and the guest answers on its vsock port through the socket of its hybrid vsock. On a CI runner, which is itself a VM, the guest is three levels deep and does not boot within the start timeout, so no workflow builds it. We recommend building it by name on a machine with KVM before merging a change to `microvm-host` or the microvm integrations: `nix build -L '.#nestedVmTests.x86_64-linux.microvm-host-vm'` |
+| `system-manager-vm-<distribution>` | `configs/flake-parts/checks` + `tests/system-manager/vm.nix` | A system-manager configuration, activated through sequences of changes in a VM of Ubuntu 22.04 or Debian 12 booted from the cloud image of the distribution, applies its profiles, its home-manager configurations and its hjem configuration, and a home-manager configuration activated by hand for another version warns of the drift |
+| `containerTests.x86_64-linux.system-manager-<distribution>`, built by name | `configs/flake-parts/checks` + `tests/system-manager/container.nix` | The same sequences in a container of each distribution of `tests/system-manager/container-distros.nix`; the container needs `auto-allocate-uids`, so the `system-manager-container` job of the check workflow builds each by name |
+| `argument-errors` | `configs/flake-parts/checks` + `tests/argument-errors/` | The argument error of every entry point comes from Nix itself, raised at the call site with no frame of caisson |
+| `deferred-errors` | `configs/flake-parts/checks` + `tests/deferred-errors/` | The errors of deferred configurations and the NixOps4 integrations carry their text: `caisson-deferred: needs <path>` with the member path from the root, and the errors that refuse members or outputs named from outputs, a name declared as composite and resource, and a second root |
+| `nixops4-discovery` | `configs/flake-parts/checks` + `tests/nixops4-discovery/` | The discovery program of a NixOps4 root builds, with one state resource and with two, and prints, from recorded state dumps, the output values at the paths the root names in `argsNeeded` |
+| `eval-weight` | `configs/flake-parts/checks` + `tests/eval-weight/` | Framework evaluation cost held to committed ceilings ([guide](https://nix-caisson.github.io/docs/eval-weight.html)) |

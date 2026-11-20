@@ -31,6 +31,6 @@
       # The default default applies caisson/default, which imports the
       # nixpkgs machinery from the `projects` entry `caisson`. This
       # flake configures none of it.
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/nixpkgs-no-pkg-sets;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/nixpkgs-no-pkg-sets;
     };
 }

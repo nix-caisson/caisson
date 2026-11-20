@@ -4,7 +4,7 @@
 # configuration of what caisson exports, declared inside this caisson
 # top under the name it is registered by (configs/structural/impl),
 # the flake-parts configuration that holds the checks
-# (configs/flake/checks), and the formatter partition that only a
+# (configs/flake-parts/checks), and the formatter partition that only a
 # flake evaluation carries. What the shared configuration exports is
 # passed up into the exports of this caisson top, and from there into
 # the flake outputs.

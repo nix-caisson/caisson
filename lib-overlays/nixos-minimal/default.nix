@@ -40,6 +40,7 @@
           common = over.compose {
             context = "lib.caisson.nixos-minimal.mkConfiguration";
             nixpkgsModule = false;
+            integration = "nixos-minimal";
           } given args;
           callArgs = {
             prefix = if (args.prefix or null) == null then [ ] else args.prefix;

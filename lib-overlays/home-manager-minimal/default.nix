@@ -35,6 +35,7 @@
       configuration = over.configuration {
         context = "lib.caisson.home-manager-minimal.mkConfiguration";
         minimal = true;
+        integration = "home-manager-minimal";
       };
     in
     {

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The nix-unit integration over a flake-parts caisson top evaluated for
-# x86_64-linux and aarch64-linux (configs/flake/nix-unit). `inputs` is
+# x86_64-linux and aarch64-linux (configs/flake-parts/nix-unit). `inputs` is
 # the dependency pool of the checks configuration of caisson, with
 # `caisson` set to the flake of caisson.
 #

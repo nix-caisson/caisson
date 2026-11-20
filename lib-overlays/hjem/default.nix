@@ -125,7 +125,7 @@
           # (`configs/hjem/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "hjem";
+            integration = "hjem";
             configModule = args.configModule or null;
           };
 

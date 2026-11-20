@@ -114,10 +114,10 @@
 
           # The configuration's module: the module passed, else the
           # configuration registered under the configuration's name
-          # (`configs/flake/<name>`), else none.
+          # (`configs/flake-parts/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "flake";
+            integration = "flake-parts";
             configModule = args.configModule or null;
           };
 
@@ -332,7 +332,7 @@
           {
             # The configuration's module. When absent, the configuration
             # registered under the configuration's name
-            # (`lib.caisson.configs.flake.<name>`), if any. Further
+            # (`lib.caisson.configs.flake-parts.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The checks of caisson: a flake-parts configuration declared inside
-# the flake-parts caisson top (configs/flake/caisson), whose
+# the flake-parts caisson top (configs/flake-parts/caisson), whose
 # dependencies are those of the caisson top with the pins of
 # tests/dependencies beside them. The caisson top gathers the checks
 # declared here into its `checks` output. A flake that uses caisson
@@ -509,7 +509,7 @@ in
 
     in
     {
-      # Duplicated in configs/flake/caisson/partitions/formatter.nix:
+      # Duplicated in configs/flake-parts/caisson/partitions/formatter.nix:
       # the formatter partition is a separate evaluation of the modules
       # of the caisson top, so sharing the settings would need more
       # wiring than the duplication. The check of the formatter is a

@@ -58,7 +58,10 @@
       evaluate =
         args: given:
         let
-          common = nixos.compose { context = "lib.caisson.microvm.mkConfiguration"; } given args;
+          common = nixos.compose {
+            context = "lib.caisson.microvm.mkConfiguration";
+            integration = "microvm";
+          } given args;
           microvmSrc = native.ecosystemSrcOf {
             explicit = args.microvmSrc or null;
             manifest = given.lib.caisson-core.libManifest or { };
@@ -141,7 +144,7 @@
             # the `microvm.*` options as microvm.nix's guest module
             # declares them. When absent, the configuration registered
             # under the configuration's name
-            # (`lib.caisson.configs.nixos.<name>`), if any. Further
+            # (`lib.caisson.configs.microvm.<name>`), if any. Further
             # modules of the class are selected with `moduleImports`,
             # from the registry.
             configModule ? null,
@@ -190,14 +193,9 @@
     {
       # The modules of a microvm configuration are registered with
       # `lib.caisson.nixos.mkModule`, the registration form of the
-      # nixos class, and every configuration registered in that class
-      # is a NixOS configuration, so the namespace carries neither
-      # `mkModule` nor `mkConfigurations`.
+      # nixos class, so the namespace carries no `mkModule`.
       caisson = (prev.caisson or { }) // {
-        microvm = builtins.removeAttrs integration.namespace [
-          "mkModule"
-          "mkConfigurations"
-        ];
+        microvm = builtins.removeAttrs integration.namespace [ "mkModule" ];
       };
     };
 

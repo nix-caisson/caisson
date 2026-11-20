@@ -333,10 +333,10 @@
             if (args.moduleImports or null) == null then selection.defaultModuleImports else args.moduleImports;
           # The config's module: the module passed, else the configuration
           # registered under the config's name
-          # (`configs/nixpkgsConfig/<name>`), else none.
+          # (`configs/nixpkgs/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nixpkgsConfig";
+            integration = "nixpkgs";
             configModule = args.configModule or null;
           };
           configEval = lib.evalModules {
@@ -466,7 +466,7 @@
             # nixpkgs' options at the top level, caisson's under
             # `caisson.nixpkgs`. When absent, the configuration
             # registered under the config's name
-            # (`lib.caisson.configs.nixpkgsConfig.<name>`), if any.
+            # (`lib.caisson.configs.nixpkgs.<name>`), if any.
             # Further modules of the class are selected with
             # `moduleImports`, from the registry.
             configModule ? null,
@@ -546,7 +546,7 @@
                   throw ''
                     lib.caisson.nixpkgs.mkTopPkgSet: the set's nixpkgs config is the
                     package config `${packageConfig.name}`, declared in its module
-                    (configs/nixpkgsConfig/${packageConfig.name}); a `config` argument
+                    (configs/nixpkgs/${packageConfig.name}); a `config` argument
                     cannot replace it.
                   ''
                 else if overlays == [ ] then

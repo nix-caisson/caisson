@@ -8,7 +8,7 @@ name: drift
 # what the advance broke. The checks are built by name rather than the
 # whole `nix flake check`, whose eval-weight baseline and formatter
 # would report nixpkgs churn as failures. The checks configuration
-# (configs/flake/checks) reads tests/dependencies/flake.lock, and for a
+# (configs/flake-parts/checks) reads tests/dependencies/flake.lock, and for a
 # dependency that flake.lock pins as well (caisson-core, flake-parts,
 # nixpkgs-lib) it uses the pin of flake.lock. So each job advances
 # those dependencies in flake.lock as well, in the same working tree.

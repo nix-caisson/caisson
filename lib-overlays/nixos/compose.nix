@@ -17,6 +17,9 @@
   context,
   # Whether the evaluation carries NixOS' nixpkgs module.
   nixpkgsModule ? true,
+  # The integration the configuration belongs to, whose registered
+  # configurations it is found among by name.
+  integration ? "nixos",
 }:
 { lib, manifest }:
 args:
@@ -65,11 +68,11 @@ let
   moduleImports = selection.moduleImportsOf "nixos" { inherit lib manifest; } args;
 
   # The configuration's module: the module passed, else the
-  # configuration registered under the configuration's name
-  # (`configs/nixos/<name>`), else none.
+  # configuration registered for the integration under the
+  # configuration's name (`configs/nixos/<name>`,
+  # `configs/nixos-minimal/<name>`), else none.
   configModule = selection.configModuleOf {
-    inherit lib name;
-    class = "nixos";
+    inherit lib name integration;
     configModule = args.configModule or null;
   };
 in

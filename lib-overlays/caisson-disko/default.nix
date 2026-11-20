@@ -229,7 +229,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "caisson-disko";
+            integration = "caisson-disko";
             configModule = args.configModule or null;
           };
 

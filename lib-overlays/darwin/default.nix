@@ -101,7 +101,7 @@
           # (`configs/darwin/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "darwin";
+            integration = "darwin";
             configModule = args.configModule or null;
           };
 

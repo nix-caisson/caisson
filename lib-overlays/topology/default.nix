@@ -100,7 +100,7 @@
           # (`configs/topology/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "topology";
+            integration = "topology";
             configModule = args.configModule or null;
           };
 

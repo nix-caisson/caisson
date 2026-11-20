@@ -93,7 +93,7 @@
           # (`configs/treefmt/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "treefmt";
+            integration = "treefmt";
             configModule = args.configModule or null;
           };
 

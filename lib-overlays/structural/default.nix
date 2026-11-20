@@ -55,7 +55,7 @@
           name = manifest.name or null;
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "structural";
+            integration = "structural";
             configModule = args.configModule or null;
           };
 

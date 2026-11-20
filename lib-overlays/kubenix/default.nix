@@ -110,7 +110,7 @@
           # (`configs/kubenix/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "kubenix";
+            integration = "kubenix";
             configModule = args.configModule or null;
           };
 

@@ -125,7 +125,7 @@
           # (`configs/nvf/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nvf";
+            integration = "nvf";
             configModule = args.configModule or null;
           };
 

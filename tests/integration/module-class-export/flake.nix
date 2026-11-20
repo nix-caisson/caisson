@@ -43,6 +43,6 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/module-class-export;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/module-class-export;
     };
 }

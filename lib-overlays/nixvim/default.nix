@@ -109,7 +109,7 @@
           # (`configs/nixvim/<name>`), else none.
           configModule = selection.configModuleOf {
             inherit lib name;
-            class = "nixvim";
+            integration = "nixvim";
             configModule = args.configModule or null;
           };
 

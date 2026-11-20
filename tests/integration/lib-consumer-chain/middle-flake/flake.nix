@@ -40,6 +40,6 @@
       };
     in
     lib.caisson.flake-parts.mkTopConfiguration {
-      configModule = lib.caisson.flake-parts.mkModule ./configs/flake/middle-flake;
+      configModule = lib.caisson.flake-parts.mkModule ./configs/flake-parts/middle-flake;
     };
 }
