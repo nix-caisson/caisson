@@ -28,7 +28,11 @@
 # The `bin` directory of each profile of the system is put on the
 # `PATH` of every shell, by the path of the profile, in
 # `environment.profiles`. A switch of the profile therefore changes the
-# programs of every shell that starts afterwards.
+# programs of every shell that starts afterwards. The `share/fonts`
+# directory of each profile is a fontconfig directory, by the path of
+# the profile: in `fonts.fontconfig.localConf` of a NixOS configuration,
+# and in a file of `/etc/fonts/conf.d` of a system-manager
+# configuration.
 #
 # The module is registered for the `nixos` and `systemManager` classes,
 # under the same name, and the `default` module of each imports it.
@@ -48,6 +52,9 @@ let
 
   hasUnits = options ? systemd && options.systemd ? services;
   hasProfiles = options ? environment && options.environment ? profiles;
+  hasLocalConf =
+    options ? fonts && options.fonts ? fontconfig && options.fonts.fontconfig ? localConf;
+  hasEtc = options ? environment && options.environment ? etc;
 
   coreModule =
     if (evalManifest.type or null) == "system-manager" then
@@ -133,23 +140,33 @@ in
   # of an option that no module declares, and the nixos-minimal
   # integration can produce a NixOS configuration without these options.
   config = lib.mkIf (!evalManifest.childless) (
-    lib.optionalAttrs hasUnits {
-      systemd.services = builtins.listToAttrs (
-        builtins.map (entry: unitOf { inherit entry; }) ofSystem
-        ++ builtins.concatMap (
-          hjem:
-          builtins.map (
-            entry:
-            unitOf {
-              inherit entry;
-              inherit (hjem) user;
-            }
-          ) hjem.profiles
-        ) hjemUsers
-      );
-    }
-    // lib.optionalAttrs hasProfiles {
-      environment.profiles = paths;
-    }
+    lib.mkMerge [
+      (lib.optionalAttrs hasUnits {
+        systemd.services = builtins.listToAttrs (
+          builtins.map (entry: unitOf { inherit entry; }) ofSystem
+          ++ builtins.concatMap (
+            hjem:
+            builtins.map (
+              entry:
+              unitOf {
+                inherit entry;
+                inherit (hjem) user;
+              }
+            ) hjem.profiles
+          ) hjemUsers
+        );
+      })
+      (lib.optionalAttrs hasProfiles {
+        environment.profiles = paths;
+      })
+      (lib.optionalAttrs hasLocalConf {
+        fonts.fontconfig.localConf = lib.mkIf (paths != [ ]) (selection.profileFontDirsOf paths);
+      })
+      (lib.optionalAttrs (hasEtc && !hasLocalConf) {
+        environment.etc."fonts/conf.d/60-caisson-profiles.conf" = lib.mkIf (paths != [ ]) {
+          text = selection.profileFontsConfOf paths;
+        };
+      })
+    ]
   );
 }

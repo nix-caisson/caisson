@@ -12,7 +12,9 @@
 # configuration is applied (the module `profile-activation` of the
 # class of that configuration). This module puts the `bin` directory of
 # each profile in front of the `PATH` of the user, by the path of the
-# profile, in `environment.sessionVariables`.
+# profile, in `environment.sessionVariables`. On Linux, the `share/fonts`
+# directory of each profile is a fontconfig directory of the user, in a
+# file of `~/.config/fontconfig/conf.d`.
 #
 # A hjem configuration with no such configuration above it is applied
 # with `hjem standalone switch`, and no configuration above activates
@@ -149,6 +151,11 @@ in
       })
       (lib.mkIf (standalone && onDarwin) {
         "Library/LaunchAgents/org.caisson.profiles.plist".source = agent;
+      })
+      (lib.mkIf onLinux {
+        ".config/fontconfig/conf.d/60-caisson-profiles.conf".text = selection.profileFontsConfOf (
+          builtins.map pathOf profiles
+        );
       })
     ];
 
