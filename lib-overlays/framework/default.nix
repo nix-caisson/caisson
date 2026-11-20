@@ -83,7 +83,7 @@ let
     dependencies = lib.caisson-core.libManifest.dependencies;
     # the registries
     modules = keyedModules lib (registryIn lib "modules");
-    configs = keyedConfigs lib (registryIn lib "configs");
+    configs = knownConfigs lib (keyedConfigs lib (registryIn lib "configs"));
     libOverlays = registryIn lib "libOverlays";
     pkgOverlays = registryIn lib "pkgOverlays";
   };
@@ -205,6 +205,80 @@ let
         }
       )
     );
+
+  # The integrations of a library: the names under `lib.caisson` whose
+  # value has the `class` and the `mkConfiguration` that `mkIntegration`
+  # and `mkAltIntegration` publish. The registries are left out, since
+  # reading `lib.caisson.configs` here would read the value being
+  # checked.
+  integrationsOf =
+    lib:
+    let
+      caisson = lib.caisson or { };
+      registries = [
+        "modules"
+        "configs"
+        "libOverlays"
+        "pkgOverlays"
+      ];
+    in
+    builtins.filter (
+      name:
+      !(builtins.elem name registries)
+      && (
+        let
+          value = caisson.${name};
+        in
+        builtins.isAttrs value && value ? class && value ? mkConfiguration
+      )
+    ) (builtins.attrNames caisson);
+
+  # The configuration registry, refused when a group of it names no
+  # integration of the library. The registry is keyed by integration,
+  # and nothing reads a group that names none, so its configurations
+  # would drop out of the registry unseen: a flake that still keeps
+  # `configs/flake/<name>` after the registry moved to integration
+  # names would evaluate with no flake-parts configuration. The error
+  # names the group and, when the group is the class of integrations
+  # of the library, the directories those integrations read
+  # (`configs/flake` is the class of flake-parts, so the directory is
+  # `configs/flake-parts`).
+  knownConfigs =
+    lib: registry:
+    let
+      caisson = lib.caisson or { };
+      isIntegration =
+        name:
+        let
+          value = caisson.${name} or null;
+        in
+        builtins.isAttrs value && value ? class && value ? mkConfiguration;
+      unknown = builtins.filter (name: !isIntegration name) (builtins.attrNames registry);
+      integrations = integrationsOf lib;
+      ofClass = class: builtins.filter (name: caisson.${name}.class == class) integrations;
+      directories =
+        names: builtins.concatStringsSep " or " (builtins.map (name: "`configs/${name}`") names);
+      explain =
+        name:
+        let
+          candidates = ofClass name;
+        in
+        if candidates == [ ] then
+          "`configs/${name}` names no integration of this library."
+        else
+          "`configs/${name}` names the class `${name}` rather than an integration; move it to ${directories candidates}.";
+    in
+    if unknown == [ ] then
+      registry
+    else
+      throw ''
+        caisson: the registry of configurations is keyed by integration
+        (`configs/<integration>/<name>`), and these groups name none:
+        ${builtins.concatStringsSep "\n" (builtins.map (name: "- ${explain name}") unknown)}
+        The integrations of this library are ${
+          builtins.concatStringsSep ", " (builtins.map (name: "`${name}`") integrations)
+        }.
+      '';
 
   # A registry, read from the manifest of the library. A registry is
   # empty in a library that no mkLib built, and in a stage of the
