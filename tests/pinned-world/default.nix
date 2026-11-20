@@ -6796,6 +6796,7 @@ let
         "eval"
         "format"
         "hardware"
+        "qemu"
         "unit"
         "vm"
       ]
