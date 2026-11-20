@@ -48,7 +48,7 @@ let
     # The profiles of this home-manager configuration that the NixOS
     # configuration above sets, read from the profile adapter of the
     # home-manager integration over these evaluated options.
-    profiles = lib.caisson.integrations.machineProfilesOf (
+    profiles = lib.caisson.integrations.profilesSetBySystemConfiguration (
       lib.caisson.evalManifest // { value = { inherit config; }; }
     );
   } lib.caisson.evalManifest;

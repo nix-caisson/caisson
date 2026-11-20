@@ -151,7 +151,7 @@
           # A NixOS configuration is activated on a computer; the
           # configurations with an activation declared inside it check
           # its marker.
-          activation = final.caisson.integrations.machineActivation;
+          activation = final.caisson.integrations.systemConfigurationActivation;
           # Each evaluation result of a NixOS configuration checks that
           # its system closure builds, the closure `nixos-rebuild`
           # builds and switches to.

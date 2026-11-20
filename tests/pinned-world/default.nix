@@ -2220,7 +2220,7 @@ let
           && !(pkgs.lib.hasInfix "INSTALL_CMD" step)
           && adapter.profiles.packages.path == "/etc/profiles/per-user/${name}"
           && adapter.profiles.packages.holds.drvPath == config.home.path.drvPath
-          && adapter.profiles.packages.setBy == "machine"
+          && adapter.profiles.packages.setBy == "systemConfiguration"
           && adapter.profiles.generations.setBy == "activation";
       in
       installedByTheNixosConfiguration "declared"
@@ -5572,10 +5572,10 @@ let
     # `nemacsConfigurations.<system>.<name>`, and its editor is the one
     # `evalNemacs` of nemacs builds from the same module on the same
     # package set. The core module comes from the flake of nemacs, which
-    # registers it for the class. A configuration declared inside a NixOS
-    # machine is a profile of the system, activated by a unit that runs
-    # as root, and the machine installs the program with which a shell
-    # chooses the profile.
+    # registers it for the class. A nemacs configuration declared inside
+    # a NixOS configuration is a profile of the system, activated by a
+    # unit that runs as root, and the NixOS configuration installs the
+    # program with which a shell chooses the profile.
     nemacsIsTheEditorNemacsBuilds =
       let
         module = {
@@ -5605,7 +5605,7 @@ let
                       fsType = "tmpfs";
                     };
                     system.stateVersion = "25.05";
-                    caisson.nemacs.configurations.machine-editor = nemacsConfiguration lib;
+                    caisson.nemacs.configurations.workstation-editor = nemacsConfiguration lib;
                   };
               };
             };
@@ -5614,8 +5614,8 @@ let
           inherit pkgs;
           modules = [ module ];
         };
-        machine = top.nixosConfigurations.workstation.config;
-        unit = machine.systemd.services.caisson-profile-nemacs-machine-editor;
+        workstation = top.nixosConfigurations.workstation.config;
+        unit = workstation.systemd.services.caisson-profile-nemacs-workstation-editor;
         topProfile =
           top.caisson.manifest.children.system.x86_64-linux.children.nemacs.editor.outputs.profile;
         published = top.nemacsConfigurations.x86_64-linux.editor;
@@ -5628,12 +5628,12 @@ let
       &&
         builtins.attrNames top.nemacsConfigurations.x86_64-linux == [
           "editor"
-          "machine-editor"
+          "workstation-editor"
         ]
       && unit.wantedBy == [ "multi-user.target" ]
       && !(unit.serviceConfig ? User)
-      && builtins.elem "/nix/var/nix/profiles/caisson/nemacs/machine-editor" machine.environment.profiles
-      && pkgs.lib.hasInfix "<dir>/nix/var/nix/profiles/caisson/nemacs/machine-editor/share/fonts</dir>" machine.fonts.fontconfig.localConf
+      && builtins.elem "/nix/var/nix/profiles/caisson/nemacs/workstation-editor" workstation.environment.profiles
+      && pkgs.lib.hasInfix "<dir>/nix/var/nix/profiles/caisson/nemacs/workstation-editor/share/fonts</dir>" workstation.fonts.fontconfig.localConf
       && topProfile.scope == "user"
       && topProfile.path == "$HOME/.local/state/caisson/profiles/nemacs/editor"
       && topProfile.package.drvPath == upstream.config.build.package.drvPath;
